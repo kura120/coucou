@@ -20,6 +20,7 @@ use std::sync::{Arc, Mutex};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_autostart::{ManagerExt, MacosLauncher};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use claude::{Chat, ChatContext, ChatReply};
 use files::DroppedFile;
@@ -34,6 +35,7 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 pub struct Shared {
     pub settings: Mutex<Settings>,
     pub gate: Arc<PollGate>,
+    pub hotkey: Mutex<Option<Shortcut>>,
 }
 
 #[derive(Serialize)]
@@ -51,6 +53,7 @@ fn boot(app: AppHandle, shared: State<Shared>) -> BootInfo {
     // The real state of ~/.claude/settings.json wins over whatever we stored.
     settings.hooks_installed = hooks::status().installed;
     let screen = island::screen_info(&app, &settings.screen);
+    register_hotkey(&app, &shared, settings.toggle_key);
     BootInfo {
         settings,
         screen,
@@ -61,12 +64,13 @@ fn boot(app: AppHandle, shared: State<Shared>) -> BootInfo {
 
 #[tauri::command]
 fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
-    let (screen_changed, autostart_changed) = {
+    let (screen_changed, autostart_changed, hotkey_changed) = {
         let mut current = shared.settings.lock().unwrap();
         let screen_changed = current.screen != settings.screen;
         let autostart_changed = current.autostart != settings.autostart;
+        let hotkey_changed = current.toggle_key != settings.toggle_key;
         *current = settings.clone();
-        (screen_changed, autostart_changed)
+        (screen_changed, autostart_changed, hotkey_changed)
     };
     if let Err(err) = settings::save(&settings) {
         eprintln!("[coucou] could not save settings: {err}");
@@ -81,6 +85,9 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
     if screen_changed {
         let collapsed = shared.gate.collapsed.load(Ordering::Relaxed);
         island::apply_geometry(&app, &settings.screen, collapsed);
+    }
+    if hotkey_changed {
+        register_hotkey(&app, &shared, settings.toggle_key);
     }
     // Keep the other window in step (island ⇄ settings window).
     let _ = app.emit("settings-changed", settings);
@@ -377,6 +384,7 @@ pub fn run() {
         .manage(Shared {
             settings: Mutex::new(loaded.clone()),
             gate: gate.clone(),
+            hotkey: Mutex::new(None),
         })
         .manage(Pending::default())
         .manage(Chat::default())
@@ -408,6 +416,7 @@ pub fn run() {
             open_settings_window,
             set_paused,
         ])
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(move |app| {
             let handle = app.handle().clone();
             tray::build(&handle)?;
@@ -431,4 +440,78 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Coucou");
+}
+
+/// Maps a Windows virtual-key code to the key `Code` the hotkey crate expects.
+/// Covers the keys the settings UI can capture.
+fn vk_to_code(vk: u32) -> Option<Code> {
+    const DIGITS: [Code; 10] = [
+        Code::Digit0, Code::Digit1, Code::Digit2, Code::Digit3, Code::Digit4,
+        Code::Digit5, Code::Digit6, Code::Digit7, Code::Digit8, Code::Digit9,
+    ];
+    const LETTERS: [Code; 26] = [
+        Code::KeyA, Code::KeyB, Code::KeyC, Code::KeyD, Code::KeyE,
+        Code::KeyF, Code::KeyG, Code::KeyH, Code::KeyI, Code::KeyJ,
+        Code::KeyK, Code::KeyL, Code::KeyM, Code::KeyN, Code::KeyO,
+        Code::KeyP, Code::KeyQ, Code::KeyR, Code::KeyS, Code::KeyT,
+        Code::KeyU, Code::KeyV, Code::KeyW, Code::KeyX, Code::KeyY,
+        Code::KeyZ,
+    ];
+    const NUMPAD: [Code; 10] = [
+        Code::Numpad0, Code::Numpad1, Code::Numpad2, Code::Numpad3, Code::Numpad4,
+        Code::Numpad5, Code::Numpad6, Code::Numpad7, Code::Numpad8, Code::Numpad9,
+    ];
+    const F_KEYS: [Code; 12] = [
+        Code::F1, Code::F2, Code::F3, Code::F4, Code::F5, Code::F6,
+        Code::F7, Code::F8, Code::F9, Code::F10, Code::F11, Code::F12,
+    ];
+    Some(match vk {
+        0x09 => Code::Tab,
+        0x10 => Code::ShiftLeft,
+        0x11 => Code::ControlLeft,
+        0x12 => Code::AltLeft,
+        0x14 => Code::CapsLock,
+        0x1B => Code::Escape,
+        0x20 => Code::Space,
+        0x21 => Code::PageUp,
+        0x22 => Code::PageDown,
+        0x23 => Code::End,
+        0x24 => Code::Home,
+        0x2D => Code::Insert,
+        0x2E => Code::Delete,
+        0x30..=0x39 => DIGITS[(vk - 0x30) as usize],
+        0x41..=0x5A => LETTERS[(vk - 0x41) as usize],
+        0x5B => Code::MetaLeft,
+        0x5C => Code::MetaRight,
+        0x5D => Code::ContextMenu,
+        0x60..=0x69 => NUMPAD[(vk - 0x60) as usize],
+        0x70..=0x7B => F_KEYS[(vk - 0x70) as usize],
+        _ => return None,
+    })
+}
+
+/// Registers the global hotkey that toggles the island.
+fn register_hotkey(app: &AppHandle, shared: &State<Shared>, vk_code: u32) {
+    // Unregister any existing hotkey first.
+    if let Some(existing) = shared.hotkey.lock().unwrap().take() {
+        let _ = app.global_shortcut().unregister(existing);
+    }
+
+    let Some(code) = vk_to_code(vk_code) else {
+        eprintln!("[coucou] unsupported hotkey vk_code {vk_code:#04x}");
+        return;
+    };
+    let shortcut = Shortcut::new(Some(Modifiers::empty()), code);
+
+    let app_clone = app.clone();
+    if let Err(e) = app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
+        if event.state == ShortcutState::Pressed {
+            let _ = app_clone.emit("toggle-island", ());
+        }
+    }) {
+        eprintln!("[coucou] failed to register hotkey: {e}");
+        return;
+    }
+
+    *shared.hotkey.lock().unwrap() = Some(shortcut);
 }

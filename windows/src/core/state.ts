@@ -92,6 +92,8 @@ export interface Settings {
   hooksInstalled: boolean;
   /** Claude model used by the chat. */
   model: string;
+  /** Virtual-key code for the global hotkey that toggles the island UI. */
+  toggleKey: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -106,6 +108,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autostart: false,
   hooksInstalled: false,
   model: "claude-opus-5",
+  toggleKey: 0x24, // VK_HOME
 };
 
 type Listener = () => void;

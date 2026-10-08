@@ -48,6 +48,9 @@ export const Bridge = {
 
   reposition: () => call<void>("reposition"),
 
+  /** Listen for events from Rust (e.g., global hotkey). */
+  onEvent: <T>(name: string, handler: (payload: T) => void) => onEvent<T>(name, handler),
+
   openUrl: (url: string) => call<void>("open_url", { url }),
 
   /** "Open terminal" → opens the folder in VS Code when `code` is on PATH. */

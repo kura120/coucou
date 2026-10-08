@@ -93,17 +93,33 @@ export class Island {
     this.build();
     this.wireFsm();
     this.wireInput();
-    this.engine.onDizzy = () => this.handleDizzy();
-    this.greeting.onComplete = () => this.fsm.greetComplete();
-    State.subscribe(() => {
-      this.dirty = true;
-      this.ensureRunning();
-    });
-  }
+        this.engine.onDizzy = () => this.handleDizzy();
+        this.greeting.onComplete = () => this.fsm.greetComplete();
+        State.subscribe(() => {
+          this.dirty = true;
+          this.ensureRunning();
+        });
 
-  // ── DOM ─────────────────────────────────────────────────────────────────────
+        // Listen for global hotkey to toggle island
+        if (IS_TAURI) {
+          void Bridge.onEvent("toggle-island", () => {
+            this.toggleFromHotkey();
+          });
+        }
+      }
 
-  private build() {
+      private toggleFromHotkey() {
+        if (State.mode === "expanded") {
+          // Same rule as Escape: never dismiss a pinned alert.
+          if (!State.isPinned) this.collapse();
+        } else {
+          this.fsm.forceHome();
+        }
+      }
+
+      // ── DOM ─────────────────────────────────────────────────────────────────────
+
+      private build() {
     const actions: ViewActions = {
       setView: (v) => this.setView(v),
       collapse: () => this.collapse(),

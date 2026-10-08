@@ -392,30 +392,120 @@ function generalSection(): HTMLElement {
     void save();
   });
 
-  return h(
-    "section",
-    {},
-    h("h2", {}, h("span", { text: "General" })),
-    h("div", { class: "row" },
-      h("label", { text: "Sound" }),
-      toggle(settings.soundEnabled, (v) => { settings.soundEnabled = v; void save(); }),
-      volume,
-    ),
-    h("div", { class: "row" },
-      h("label", { text: "Auto-close" }),
-      autoClose,
-      h("span", { class: "hint", text: "seconds after you leave the island" }),
-    ),
-    h("div", { class: "row" },
-      h("label", { text: "Island lives on" }),
-      screen,
-    ),
-    h("div", { class: "row" },
-      h("label", { text: "Launch at startup" }),
-      toggle(settings.autostart, (v) => { settings.autostart = v; void save(); }),
-    ),
-  );
-}
+  // Hotkey capture
+    const hotkeyBox = h("input", {
+      type: "text",
+      readOnly: true,
+      placeholder: "Click and press a key…",
+      value: vkToString(settings.toggleKey),
+      style: "width:140px;font-family:monospace",
+    }) as HTMLInputElement;
+    let capturing = false;
+    hotkeyBox.addEventListener("click", () => {
+      capturing = true;
+      hotkeyBox.value = "Press a key…";
+      hotkeyBox.style.background = "#1e293b";
+    });
+    hotkeyBox.addEventListener("blur", () => {
+      capturing = false;
+      hotkeyBox.value = vkToString(settings.toggleKey);
+      hotkeyBox.style.background = "";
+    });
+    hotkeyBox.addEventListener("keydown", (e) => {
+      if (!capturing) return;
+      e.preventDefault();
+      const vk = keyToVK(e.code);
+      if (vk) {
+        settings.toggleKey = vk;
+        hotkeyBox.value = vkToString(vk);
+        capturing = false;
+        hotkeyBox.style.background = "";
+        hotkeyBox.blur();
+        void save();
+      }
+    });
+
+    return h(
+      "section",
+      {},
+      h("h2", {}, h("span", { text: "General" })),
+      h("div", { class: "row" },
+        h("label", { text: "Sound" }),
+        toggle(settings.soundEnabled, (v) => { settings.soundEnabled = v; void save(); }),
+        volume,
+      ),
+      h("div", { class: "row" },
+        h("label", { text: "Auto-close" }),
+        autoClose,
+        h("span", { class: "hint", text: "seconds after you leave the island" }),
+      ),
+      h("div", { class: "row" },
+        h("label", { text: "Island lives on" }),
+        screen,
+      ),
+      h("div", { class: "row" },
+        h("label", { text: "Launch at startup" }),
+        toggle(settings.autostart, (v) => { settings.autostart = v; void save(); }),
+      ),
+      h("div", { class: "row" },
+        h("label", { text: "Toggle UI hotkey" }),
+        hotkeyBox,
+        h("span", { class: "hint", text: "Click the box, then press your desired key" }),
+      ),
+    );
+  }
+
+  // Convert virtual key code to human-readable string
+  function vkToString(vk: number): string {
+    const map: Record<number, string> = {
+      0x24: "Home",
+      0x23: "End",
+      0x21: "PageUp",
+      0x22: "PageDown",
+      0x2D: "Insert",
+      0x2E: "Delete",
+      0x70: "F1", 0x71: "F2", 0x72: "F3", 0x73: "F4",
+      0x74: "F5", 0x75: "F6", 0x76: "F7", 0x77: "F8",
+      0x78: "F9", 0x79: "F10", 0x7A: "F11", 0x7B: "F12",
+      0x1B: "Escape",
+      0x09: "Tab",
+      0x20: "Space",
+      0x14: "CapsLock",
+      0x12: "Alt",
+      0x11: "Control",
+      0x10: "Shift",
+      0x5B: "Win",
+      0x5C: "Win",
+      0x5D: "Menu",
+    };
+    if (vk >= 0x41 && vk <= 0x5A) return String.fromCharCode(vk); // A-Z
+    if (vk >= 0x30 && vk <= 0x39) return String.fromCharCode(vk); // 0-9
+    if (vk >= 0x60 && vk <= 0x69) return `Numpad${vk - 0x60}`; // Numpad 0-9
+    return map[vk] || `VK_${vk.toString(16).toUpperCase()}`;
+  }
+
+  // Convert KeyboardEvent.code to virtual key code
+  function keyToVK(code: string): number | null {
+    const map: Record<string, number> = {
+      "Home": 0x24, "End": 0x23, "PageUp": 0x21, "PageDown": 0x22,
+      "Insert": 0x2D, "Delete": 0x2E,
+      "F1": 0x70, "F2": 0x71, "F3": 0x72, "F4": 0x73,
+      "F5": 0x74, "F6": 0x75, "F7": 0x76, "F8": 0x77,
+      "F9": 0x78, "F10": 0x79, "F11": 0x7A, "F12": 0x7B,
+      "Escape": 0x1B, "Tab": 0x09, "Space": 0x20,
+      "CapsLock": 0x14, "AltLeft": 0x12, "AltRight": 0x12,
+      "ControlLeft": 0x11, "ControlRight": 0x11,
+      "ShiftLeft": 0x10, "ShiftRight": 0x10,
+      "MetaLeft": 0x5B, "MetaRight": 0x5C, "ContextMenu": 0x5D,
+    };
+    if (code.length === 1 && code >= "A" && code <= "Z") return code.charCodeAt(0);
+    if (code.length === 1 && code >= "0" && code <= "9") return code.charCodeAt(0);
+    if (code.startsWith("Numpad")) {
+      const n = parseInt(code.slice(6), 10);
+      if (!isNaN(n) && n >= 0 && n <= 9) return 0x60 + n;
+    }
+    return map[code] || null;
+  }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 

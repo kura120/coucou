@@ -20,6 +20,14 @@ pub struct Settings {
     /// Defaulted explicitly so a settings.json written by an older build still loads.
     #[serde(default = "default_model")]
     pub model: String,
+    /// Virtual-key code for the global hotkey that toggles the island UI.
+    /// Default is VK_HOME (0x24). User can change this in settings.
+    #[serde(default = "default_toggle_key")]
+    pub toggle_key: u32,
+}
+
+fn default_toggle_key() -> u32 {
+    0x24 // VK_HOME
 }
 
 fn default_model() -> String {
@@ -43,6 +51,7 @@ impl Default for Settings {
             autostart: false,
             hooks_installed: false,
             model: default_model(),
+            toggle_key: default_toggle_key(),
         }
     }
 }
