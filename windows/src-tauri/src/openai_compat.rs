@@ -1,6 +1,6 @@
 // Cloud providers that speak the OpenAI chat completions API: OpenAI, Google AI
-// (Gemini's OpenAI-compatible endpoint, as ClaudeService.swift uses it) and
-// OpenRouter. One table describes them; one client talks to all three.
+// (Gemini's OpenAI-compatible endpoint, as ClaudeService.swift uses it),
+// OpenRouter and NVIDIA NIM. One table describes them; one client talks to all.
 //
 // Same contract as claude.rs: the key never leaves the credential store and
 // file bytes never cross the IPC boundary. Chat only — no tools are sent, so
@@ -63,6 +63,19 @@ pub const PROVIDERS: &[Provider] = &[
         models_path: "models",
         default_model: "openrouter/auto",
         not_chat: &[],
+        max_tokens_field: "max_tokens",
+    },
+    Provider {
+        id: "nvidia",
+        name: "NVIDIA NIM",
+        base_url: "https://integrate.api.nvidia.com/v1",
+        key: "nvidia-api-key",
+        models_path: "models",
+        default_model: "meta/llama-3.3-70b-instruct",
+        // The catalog also lists retrieval, safety and reward models.
+        not_chat: &[
+            "embed", "rerank", "retriever", "bge", "reward", "guard", "safety", "nv-clip", "deplot",
+        ],
         max_tokens_field: "max_tokens",
     },
 ];
@@ -241,6 +254,8 @@ fn parse_models(p: &Provider, json: &Value) -> Vec<ModelInfo> {
         "openrouter" => models.sort_by(|a, b| {
             b.2.cmp(&a.2).then_with(|| a.0.label.to_lowercase().cmp(&b.0.label.to_lowercase()))
         }),
+        // Hundreds of "vendor/model" ids in no particular order.
+        "nvidia" => models.sort_by(|a, b| a.0.label.to_lowercase().cmp(&b.0.label.to_lowercase())),
         _ => {}
     }
     models.into_iter().map(|(m, _, _)| m).collect()
@@ -306,6 +321,10 @@ mod tests {
             "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
         );
         assert_eq!(url(p("openrouter"), "models").unwrap().as_str(), "https://openrouter.ai/api/v1/models");
+        assert_eq!(
+            url(p("nvidia"), "chat/completions").unwrap().as_str(),
+            "https://integrate.api.nvidia.com/v1/chat/completions"
+        );
         for prov in PROVIDERS {
             assert!(crate::secrets::KNOWN_KEYS.contains(&prov.key), "{}", prov.key);
             assert!(prov.base_url.starts_with("https://"));
@@ -411,6 +430,16 @@ mod tests {
         let models = parse_models(p("openrouter"), &openrouter);
         let labels: Vec<_> = models.iter().map(|m| m.label.as_str()).collect();
         assert_eq!(labels, vec!["A (free)", "C Zero (free)", "B Paid"]);
+
+        let nvidia = json!({"data":[
+            {"id":"nvidia/nv-embedqa-e5-v5"},
+            {"id":"meta/llama-3.3-70b-instruct"},
+            {"id":"nvidia/llama-3.2-nv-rerankqa-1b-v2"},
+            {"id":"deepseek-ai/deepseek-r1"},
+            {"id":"nvidia/llama-3.1-nemoguard-8b-content-safety"}
+        ]});
+        let ids: Vec<_> = parse_models(p("nvidia"), &nvidia).into_iter().map(|m| m.id).collect();
+        assert_eq!(ids, vec!["deepseek-ai/deepseek-r1", "meta/llama-3.3-70b-instruct"]);
     }
 
     #[test]
