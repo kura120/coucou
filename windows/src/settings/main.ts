@@ -16,6 +16,7 @@ import {
 } from "../core/pills";
 import { h, clear } from "../views/dom";
 import { agentsSection } from "./agents";
+import { initMotion } from "./motion";
 import { renderDiff, statusDot } from "./parts";
 import {
   LANGUAGES, N_, isRtl, onLanguageChange, resolveLanguage, setLanguage, systemLanguages, t, tn,
@@ -1221,6 +1222,8 @@ async function rerender() {
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 async function main() {
+  // First, so the page is already waiting in its hidden state when shown.
+  initMotion(root);
   const boot = await Bridge.boot();
   if (boot) {
     settings = { ...settings, ...boot.settings };

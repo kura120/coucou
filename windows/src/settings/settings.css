@@ -387,3 +387,61 @@ select option {
 html[dir="rtl"] :is(.diff, .path, .keycap, input[type="password"], input[type="text"]) {
   direction: ltr;
 }
+
+/* ── Opening and closing (motion.ts) ───────────────────────────────────────────
+   The island's view reveal (style.css `.view.on`): a 0.3 s fade with a 0.97 →
+   1 scale on its overshoot curve, the sections one after the other, 30 ms
+   apart; closing is its 0.16 s ease-in fade. */
+
+#settings-root.before {
+  opacity: 0;
+}
+
+#settings-root > * {
+  transform-origin: 50% 0;
+}
+
+#settings-root.entering > * {
+  animation:
+    settings-fade-in 0.3s ease-out both,
+    settings-pop-in 0.3s cubic-bezier(0.3, 1.2, 0.4, 1) both;
+  animation-delay: calc(var(--i, 0) * 30ms);
+}
+
+#settings-root > :nth-child(2) { --i: 1; }
+#settings-root > :nth-child(3) { --i: 2; }
+#settings-root > :nth-child(4) { --i: 3; }
+#settings-root > :nth-child(5) { --i: 4; }
+#settings-root > :nth-child(6) { --i: 5; }
+#settings-root > :nth-child(7) { --i: 6; }
+#settings-root > :nth-child(8) { --i: 7; }
+#settings-root > :nth-child(9) { --i: 8; }
+#settings-root > :nth-child(10) { --i: 9; }
+#settings-root > :nth-child(n + 11) { --i: 10; }
+
+#settings-root.leaving {
+  opacity: 0;
+  transform-origin: 50% 0;
+  animation: settings-fade-out 0.16s ease-in;
+}
+
+@keyframes settings-fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes settings-pop-in {
+  from { transform: translateY(6px) scale(0.97); }
+}
+
+@keyframes settings-fade-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: scale(0.97); }
+}
+
+/* Windows' "Animation effects" off: no motion, it just appears and goes. */
+@media (prefers-reduced-motion: reduce) {
+  #settings-root.entering > *,
+  #settings-root.leaving {
+    animation: none;
+  }
+}

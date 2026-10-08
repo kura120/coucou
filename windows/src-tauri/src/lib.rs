@@ -30,7 +30,7 @@ mod tray;
 mod webview_drop;
 
 use std::process::Command;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
@@ -586,12 +586,24 @@ fn create_settings_window(app: &AppHandle) {
         .build()
     {
         Ok(win) => {
-            // Closing it must only hide it, or it could never be reopened.
+            // Closing it must only hide it, or it could never be reopened. The
+            // page plays its closing motion first and then asks for the hide
+            // (hide_settings_window); the timer hides it anyway should the page
+            // not answer.
             let hidden = win.clone();
+            let handle = app.clone();
             win.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
-                    let _ = hidden.hide();
+                    let generation = SETTINGS_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+                    let _ = handle.emit_to("settings", "settings-closing", ());
+                    let late = hidden.clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(SETTINGS_CLOSE_FALLBACK);
+                        if SETTINGS_GENERATION.load(Ordering::SeqCst) == generation {
+                            let _ = late.hide();
+                        }
+                    });
                 }
             });
         }
@@ -599,14 +611,33 @@ fn create_settings_window(app: &AppHandle) {
     }
 }
 
+/// Bumped on every show and close request, so the fallback hide of a close
+/// never hides a window that was opened again in the meantime.
+static SETTINGS_GENERATION: AtomicU64 = AtomicU64::new(0);
+/// How long the page gets for its closing motion (160 ms) before the window is
+/// hidden anyway: a stalled webview must not keep it on screen.
+const SETTINGS_CLOSE_FALLBACK: std::time::Duration = std::time::Duration::from_millis(400);
+
 pub fn show_settings_window(app: &AppHandle) {
     let Some(win) = app.get_webview_window("settings") else {
         log::line("settings window missing");
         return;
     };
+    SETTINGS_GENERATION.fetch_add(1, Ordering::SeqCst);
     let _ = win.unminimize();
     let _ = win.show();
     let _ = win.set_focus();
+    // The page plays its opening motion (src/settings/motion.ts).
+    let _ = app.emit_to("settings", "settings-shown", ());
+}
+
+/// The settings page finished its closing motion.
+#[tauri::command]
+fn hide_settings_window(app: AppHandle) {
+    SETTINGS_GENERATION.fetch_add(1, Ordering::SeqCst);
+    if let Some(win) = app.get_webview_window("settings") {
+        let _ = win.hide();
+    }
 }
 
 #[tauri::command]
@@ -689,6 +720,7 @@ pub fn run() {
             github_refresh,
             open_n8n,
             open_settings_window,
+            hide_settings_window,
             set_paused,
             shortcuts_status,
             shortcuts_suspend,
