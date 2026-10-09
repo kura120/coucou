@@ -87,6 +87,53 @@ body {
   border-radius: inherit;
 }
 
+/* The glow under the pointer over the compact island (island.ts
+   followHoverGlow): it follows the pointer, and bursts when the island opens. */
+#hover-glow {
+  position: absolute;
+  left: calc(50% + var(--gx, 0px));
+  top: var(--gy, 0px);
+  width: 84px;
+  height: 84px;
+  margin: -42px 0 0 -42px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(129, 120, 255, 0.62) 0%,
+    rgba(99, 102, 241, 0.3) 36%,
+    rgba(99, 102, 241, 0) 70%
+  );
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.18s ease-out, transform 0.22s cubic-bezier(0.3, 1.2, 0.4, 1);
+  pointer-events: none;
+}
+
+#hover-glow.on {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* A short, modest burst: the island is growing at the same moment, and a
+   glow thirteen times its size held that opening up. No transition while it
+   plays, so nothing fights the animation, and nothing is left when it ends. */
+#hover-glow.burst {
+  transition: none;
+  will-change: transform, opacity;
+  animation: hover-glow-burst 0.4s ease-out both;
+}
+
+@keyframes hover-glow-burst {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(4.5);
+  }
+}
+
 #bot-canvas,
 #greeting-canvas {
   position: absolute;
@@ -1357,6 +1404,150 @@ input[type="range"]::-webkit-slider-thumb {
   color: #60a5fa;
   font: inherit;
   cursor: default;
+}
+
+/* ── Pull requests (next to the conversations) ────────────────────────────── */
+
+/* The conversations and the pull requests, together at the row's other end. */
+.model-row-left {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  max-width: 62%;
+  margin-right: auto;
+}
+
+.model-row-left .convo-btn {
+  max-width: none;
+  margin-right: 0;
+}
+
+.model-row-left .pull-btn {
+  flex: 0 0 auto;
+}
+
+.pull-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 6px 2px;
+  font: 500 11px var(--font);
+  color: #9aa0a9;
+}
+
+.pull-group:first-child {
+  padding-top: 0;
+}
+
+.pull-group i {
+  font: 400 10px var(--font);
+  font-style: normal;
+  color: #6b7079;
+}
+
+.pull-number {
+  flex: 0 0 auto;
+  font: 500 10.5px var(--mono);
+  color: #8a8f98;
+}
+
+.pull-tag {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font: 500 9.5px var(--font);
+  color: #8a8f98;
+}
+
+.pulls .convo-row svg {
+  flex: 0 0 auto;
+  color: #6b7079;
+}
+
+/* The date gives way to the delete button under the pointer only where there is one. */
+.pulls .convo-row:hover .convo-when {
+  display: inline;
+}
+
+/* ── File edits under an answer ───────────────────────────────────────────── */
+
+.chat-row.stacked {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.edits {
+  display: flex;
+  flex-direction: column;
+  /* Full width, so an opened diff has the room; the pill itself stays small. */
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+}
+
+.edits:empty {
+  display: none;
+}
+
+.edit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.edit-pill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #8a8f98;
+  font: 500 10.5px var(--font);
+  cursor: default;
+}
+
+.edit-pill:hover,
+.edit-pill.open {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.edit-pill svg {
+  flex: 0 0 auto;
+}
+
+.edit-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #c8cdd4;
+}
+
+.edit-plus {
+  color: #4ade80;
+}
+
+.edit-minus {
+  color: #f87171;
+}
+
+.edit-diff {
+  max-height: 180px;
+  overflow: auto;
+  padding: 6px 0;
+  border-radius: 8px;
+  background: #0b0c0e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  user-select: text;
 }
 
 /* ── Conversations (the list behind the title, left of the model) ─────────── */

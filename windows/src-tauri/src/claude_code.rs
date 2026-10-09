@@ -20,8 +20,12 @@
 //   for a click, and without them it is denied.
 //
 // The answer is streamed like a local model's: `chat-delta` events carry the
-// text so far, and the reply of the command is the finished text.
+// text so far, and the reply of the command is the finished text. A file
+// Claude Code edited on the way goes to the island as a `chat-edit` event —
+// the tool's own input, once the tool has succeeded — which the chat shows as
+// a pill with its diff.
 
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -66,6 +70,10 @@ const DELTA_INTERVAL: Duration = Duration::from_millis(1000 / 15);
 /// Ceilings for what is read: one line (search results come back as one), and the whole answer.
 const MAX_LINE: usize = 8 * 1024 * 1024;
 const MAX_ANSWER: usize = 4 * 1024 * 1024;
+/// The tools whose calls are file edits, and how large an edit may be to be
+/// shown (the island stops diffing at 200 KB a side anyway).
+const EDIT_TOOLS: &[&str] = &["Edit", "MultiEdit", "Write"];
+const MAX_EDIT_BYTES: usize = 512 * 1024;
 
 /// Mochi's voice on top of Claude Code's own instructions, when it works in a folder.
 const AGENT_PROMPT: &str = "You are answering as Mochi, in Coucou's small chat window at the top of the user's screen. \
@@ -215,6 +223,10 @@ enum Event {
     Delta(String),
     /// Another message begins (after a tool ran): its text starts a new paragraph.
     NewMessage,
+    /// Claude Code is about to edit files: `(tool use id, tool, input)`.
+    Edits(Vec<(String, String, Value)>),
+    /// Tools finished: `(tool use id, it succeeded)`.
+    ToolResults(Vec<(String, bool)>),
     /// The turn is over: the final text, or what went wrong.
     Done(Result<String, String>),
     /// Anything else: Claude Code is at work.
@@ -241,6 +253,31 @@ fn parse_line(line: &str) -> Event {
                     }
                 }
                 _ => Event::Other,
+            }
+        }
+        // Whole messages, not deltas: a tool call arrives complete here.
+        "assistant" | "user" if json.get("parent_tool_use_id").is_none_or(Value::is_null) => {
+            let blocks = json.pointer("/message/content").and_then(Value::as_array).map(Vec::as_slice).unwrap_or(&[]);
+            let of = |kind: &'static str| {
+                blocks.iter().filter(move |b| b.get("type").and_then(Value::as_str) == Some(kind))
+            };
+            let edits: Vec<_> = of("tool_use")
+                .filter_map(|b| {
+                    let tool = b.get("name")?.as_str().filter(|n| EDIT_TOOLS.contains(n))?;
+                    let input = b.get("input").filter(|i| i.is_object())?;
+                    Some((b.get("id")?.as_str()?.to_string(), tool.to_string(), input.clone()))
+                })
+                .collect();
+            let results: Vec<_> = of("tool_result")
+                .filter_map(|b| {
+                    let failed = b.get("is_error").and_then(Value::as_bool).unwrap_or(false);
+                    Some((b.get("tool_use_id")?.as_str()?.to_string(), !failed))
+                })
+                .collect();
+            match (edits.is_empty(), results.is_empty()) {
+                (false, _) => Event::Edits(edits),
+                (true, false) => Event::ToolResults(results),
+                (true, true) => Event::Other,
             }
         }
         "result" => {
@@ -274,8 +311,13 @@ pub async fn send(
 
     let island = app.clone();
     let answer = tauri::async_runtime::spawn_blocking(move || {
-        run(&exe, &args, &cwd, &line, quiet, |visible| {
-            let _ = island.emit_to(WINDOW_LABEL, "chat-delta", visible);
+        run(&exe, &args, &cwd, &line, quiet, |update| {
+            let _ = match update {
+                Update::Text(visible) => island.emit_to(WINDOW_LABEL, "chat-delta", visible),
+                Update::Edit { tool, input } => {
+                    island.emit_to(WINDOW_LABEL, "chat-edit", json!({ "tool": tool, "input": input }))
+                }
+            };
         })
     })
     .await
@@ -299,15 +341,25 @@ struct Answer {
     session: Option<String>,
 }
 
+/// What a running turn has to show.
+#[derive(Debug, PartialEq)]
+enum Update {
+    /// The visible text so far.
+    Text(String),
+    /// A file edit that went through: the tool and its input.
+    Edit { tool: String, input: Value },
+}
+
 /// Starts Claude Code in `cwd`, hands it the question and reads its answer.
-/// `on_delta` gets the visible text at most 15 times a second. Blocking.
+/// `on_update` gets the visible text at most 15 times a second, and each file
+/// edit once its tool has succeeded. Blocking.
 fn run(
     exe: &Path,
     args: &[String],
     cwd: &Path,
     input: &str,
     quiet: Duration,
-    mut on_delta: impl FnMut(String),
+    mut on_update: impl FnMut(Update),
 ) -> Result<Answer, String> {
     let no_answer = || t("Claude Code gave no answer. Run claude in a terminal to check that it is signed in.");
     let stops = STOPS.load(Ordering::Relaxed);
@@ -342,6 +394,9 @@ fn run(
 
     let mut text = String::new();
     let mut session = None;
+    // Edits asked for, until their tool says whether it went through (a
+    // permission refused in the island is an error here, and shows nothing).
+    let mut pending: HashMap<String, (String, Value)> = HashMap::new();
     let mut stopped = false;
     let mut finished = false;
     let mut heard = Instant::now();
@@ -369,7 +424,21 @@ fn run(
                 }
                 if last.elapsed() >= DELTA_INTERVAL {
                     last = Instant::now();
-                    on_delta(text.trim().to_string());
+                    on_update(Update::Text(text.trim().to_string()));
+                }
+            }
+            Event::Edits(edits) => {
+                for (id, tool, input) in edits {
+                    if input.to_string().len() <= MAX_EDIT_BYTES {
+                        pending.insert(id, (tool, input));
+                    }
+                }
+            }
+            Event::ToolResults(results) => {
+                for (id, succeeded) in results {
+                    if let (Some((tool, input)), true) = (pending.remove(&id), succeeded) {
+                        on_update(Update::Edit { tool, input });
+                    }
                 }
             }
             Event::NewMessage => {
@@ -394,7 +463,7 @@ fn run(
             if answer.is_empty() {
                 return Err(if stopped { t("Stopped.") } else { no_answer() });
             }
-            on_delta(answer.clone());
+            on_update(Update::Text(answer.clone()));
             Ok(Answer { text: answer, session })
         }
         Err(message) if message.is_empty() => Err(no_answer()),
@@ -569,6 +638,28 @@ mod tests {
         assert_eq!(parse_line(r#"{"type":"system","subtype":"status","session_id":"s1"}"#), Event::Other);
         assert_eq!(parse_line(r#"{"type":"assistant","message":{"content":[{"type":"text","text":"Hi"}]}}"#), Event::Other);
         assert_eq!(parse_line("not json"), Event::Other);
+    }
+
+    #[test]
+    fn a_file_edit_is_told_once_its_tool_has_succeeded() {
+        let asked = r#"{"type":"assistant","parent_tool_use_id":null,"message":{"content":[
+            {"type":"text","text":"On it."},
+            {"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/w/a.rs","old_string":"a","new_string":"b"}},
+            {"type":"tool_use","id":"t2","name":"Bash","input":{"command":"ls"}},
+            {"type":"tool_use","id":"t3","name":"Write","input":{"file_path":"/w/b.rs","content":"x"}}]}}"#
+            .replace('\n', "");
+        let Event::Edits(edits) = parse_line(&asked) else { panic!("not edits") };
+        assert_eq!(edits.iter().map(|(id, tool, _)| (id.as_str(), tool.as_str())).collect::<Vec<_>>(), [("t1", "Edit"), ("t3", "Write")]);
+        assert_eq!(edits[0].2["new_string"], "b");
+
+        let done = r#"{"type":"user","message":{"content":[
+            {"type":"tool_result","tool_use_id":"t1","content":"ok"},
+            {"type":"tool_result","tool_use_id":"t3","is_error":true,"content":"denied"}]}}"#
+            .replace('\n', "");
+        assert_eq!(parse_line(&done), Event::ToolResults(vec![("t1".into(), true), ("t3".into(), false)]));
+        // A subagent's edits are its own business.
+        let sub = asked.replace(r#""parent_tool_use_id":null"#, r#""parent_tool_use_id":"toolu_9""#);
+        assert_eq!(parse_line(&sub), Event::Other);
         assert_eq!(
             parse_line(r#"{"type":"result","is_error":false,"result":" Hi there. "}"#),
             Event::Done(Ok("Hi there.".into()))

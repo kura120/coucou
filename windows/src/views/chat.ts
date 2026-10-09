@@ -13,13 +13,18 @@
 // in, newest first. Opening one puts it back in the chat, on both sides. The
 // sessions Claude Code holds itself (a terminal, the Claude app) are in the
 // list too; those are Claude Code's to delete, not Coucou's.
+//
+// With Claude Code in a folder: each file it edits shows as a pill under the
+// answer, which opens the diff; and next to the conversations sits the list of
+// the folder's pull requests — on GitHub, and local branches without one yet.
 
 import { h, svg, clear } from "./dom";
 import { ICONS } from "./icons";
 import { renderMarkdown } from "./markdown";
 import {
-  Bridge, onEvent, type ChatContext, type ConversationSummary, type ModelInfo,
+  Bridge, onEvent, type ChatContext, type ChatEdit, type ConversationSummary, type ModelInfo, type RepoPulls,
 } from "../core/bridge";
+import { buildFileDiff, fileName, type DiffKind, type FileDiff } from "../core/diff";
 import {
   activeModel, pickModel, providerDef, visibleProviders, withModel, type ProviderDef,
 } from "../core/providers";
@@ -27,7 +32,7 @@ import { CHAT_MIN_H, chatPromptHeight, clampChatHeight } from "../core/layout";
 import { Sound } from "../core/sound";
 import { State, type ChatMessage } from "../core/state";
 import type { ViewHost } from "./views";
-import { N_, dayMonth, t, tl } from "../i18n/i18n";
+import { N_, dayMonth, t, tl, tn } from "../i18n/i18n";
 
 const STRINGS = {
   placeholderFirst: N_("Ask me anything…"),
@@ -53,6 +58,14 @@ const STRINGS = {
   anyFolder: N_("No folder"),
   noConversations: N_("No conversations yet."),
   deleteConversation: N_("Delete this conversation"),
+  tooLarge: N_("Diff too large"),
+  pulls: N_("Pull requests"),
+  onGitHub: N_("On GitHub"),
+  localOnly: N_("Local only"),
+  noPulls: N_("No open pull requests."),
+  noLocal: N_("No local branch waiting for a pull request."),
+  draft: N_("Draft"),
+  notPushed: N_("Not pushed"),
 };
 
 /** Claude Code's `--effort` levels; "" leaves it to Claude Code. */
@@ -73,6 +86,53 @@ function shortPath(path: string): string {
 
 let nextId = 1;
 
+const DIFF_SYMBOLS: Record<DiffKind, string> = { added: "+", removed: "−", context: " " };
+
+/**
+ * A file Claude Code edited, as a pill: its name and how many lines went in
+ * and out. A click opens the diff under it, another folds it away.
+ */
+export function editPill(diff: FileDiff): HTMLElement {
+  const pill = h(
+    "button",
+    { class: "edit-pill", title: diff.path },
+    svg(ICONS.doc, 10),
+    h("span", { class: "edit-name", text: fileName(diff.path) }),
+    diff.added > 0 ? h("span", { class: "edit-plus", text: `+${diff.added}` }) : null,
+    diff.removed > 0 ? h("span", { class: "edit-minus", text: `−${diff.removed}` }) : null,
+  );
+  const el = h("div", { class: "edit" }, pill);
+  let body: HTMLElement | null = null;
+  pill.addEventListener("click", () => {
+    if (body) {
+      body.remove();
+      body = null;
+      pill.classList.remove("open");
+      return;
+    }
+    const lines = diff.hunks.flatMap((hunk) => hunk.lines);
+    body = h("div", { class: "edit-diff" });
+    if (diff.tooLarge || lines.length === 0) {
+      body.append(h("div", { class: "picker-status", text: t(STRINGS.tooLarge) }));
+    } else {
+      for (const line of lines) {
+        body.append(
+          h(
+            "div",
+            { class: `diff-line ${line.kind}` },
+            h("span", { class: "sym", text: DIFF_SYMBOLS[line.kind] }),
+            h("span", { class: "txt", text: line.text }),
+          ),
+        );
+      }
+    }
+    el.append(body);
+    pill.classList.add("open");
+    Sound.play("blip");
+  });
+  return el;
+}
+
 function bubble(message: ChatMessage): HTMLElement {
   if (message.role === "user") {
     return h(
@@ -83,7 +143,8 @@ function bubble(message: ChatMessage): HTMLElement {
   }
   const reply = h("div", { class: "reply" });
   renderMarkdown(reply, message.content);
-  return h("div", { class: "chat-row" }, reply);
+  if (!message.edits?.length) return h("div", { class: "chat-row" }, reply);
+  return h("div", { class: "chat-row stacked" }, reply, h("div", { class: "edits" }, ...message.edits.map(editPill)));
 }
 
 function typingDots(): HTMLElement {
@@ -461,6 +522,92 @@ function buildConversations(
   };
 }
 
+// ── Pull requests ─────────────────────────────────────────────────────────────
+
+interface PullList {
+  el: HTMLElement;
+  open(): void;
+  close(): void;
+  readonly isOpen: boolean;
+}
+
+/** What `repo_pulls` answered, as the two halves of the list. */
+export function drawPulls(el: HTMLElement, pulls: RepoPulls) {
+  clear(el);
+  const heading = (text: string, detail: string | null) =>
+    h("div", { class: "pull-group" }, h("span", { text }), detail ? h("i", { text: detail }) : null);
+
+  el.append(heading(t(STRINGS.onGitHub), pulls.repo));
+  for (const pr of pulls.remote) {
+    const row = h(
+      "div",
+      { class: "convo-row", title: pr.title },
+      h("span", { class: "pull-number", text: `#${pr.number}` }),
+      h("span", { class: "convo-title", text: pr.title }),
+      pr.draft ? h("span", { class: "pull-tag", text: t(STRINGS.draft) }) : null,
+      h("span", { class: "convo-when", text: pr.branch }),
+    );
+    row.addEventListener("click", () => void Bridge.openUrl(pr.url));
+    el.append(row);
+  }
+  if (pulls.remote.length === 0) {
+    el.append(h("div", { class: "picker-status", text: pulls.note ?? t(STRINGS.noPulls) }));
+  }
+
+  el.append(heading(t(STRINGS.localOnly), null));
+  for (const b of pulls.local) {
+    el.append(
+      h(
+        "div",
+        { class: b.current ? "convo-row on" : "convo-row", title: b.branch },
+        svg(ICONS.pull, 10, { stroke: 2.2 }),
+        h("span", { class: "convo-title", text: b.branch }),
+        b.pushed ? null : h("span", { class: "pull-tag", text: t(STRINGS.notPushed) }),
+        h("span", { class: "convo-when", text: tn("{count} commit", "{count} commits", b.ahead) }),
+      ),
+    );
+  }
+  if (pulls.local.length === 0) el.append(h("div", { class: "picker-status", text: t(STRINGS.noLocal) }));
+}
+
+/** The folder's pull requests, asked for each time the list opens. */
+function buildPulls(onChange: () => void): PullList {
+  const el = h("div", { class: "convos pulls" });
+  let isOpen = false;
+  let request = 0;
+
+  async function load() {
+    const ticket = ++request;
+    clear(el);
+    el.append(h("div", { class: "picker-status", text: t(STRINGS.loading) }));
+    try {
+      const pulls = await Bridge.repoPulls();
+      if (ticket === request) drawPulls(el, pulls);
+    } catch (err) {
+      if (ticket !== request) return;
+      clear(el);
+      el.append(h("div", { class: "picker-status", text: String(err).replace(/^Error:\s*/, "") }));
+    }
+  }
+
+  return {
+    el,
+    open() {
+      isOpen = true;
+      onChange();
+      void load();
+    },
+    close() {
+      isOpen = false;
+      request++;
+      onChange();
+    },
+    get isOpen() {
+      return isOpen;
+    },
+  };
+}
+
 // ── View ──────────────────────────────────────────────────────────────────────
 
 export function buildPrompt(onHeightChange: () => void): ViewHost {
@@ -493,15 +640,25 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     convoName,
     svg(ICONS.chevronUpDown, 9, { stroke: 2 }),
   );
-  const modelRow = h("div", { class: "model-row" }, convoBtn, modelBtn);
+  // The folder's pull requests, next to the conversations.
+  const pullBtn = h(
+    "button",
+    { class: "convo-btn pull-btn", title: tl(STRINGS.pulls) },
+    // A line icon: drawn filled it is all but invisible.
+    svg(ICONS.pull, 11, { stroke: 2.4 }),
+    svg(ICONS.chevronUpDown, 9, { stroke: 2 }),
+  );
+  const modelRow = h("div", { class: "model-row" }, h("div", { class: "model-row-left" }, convoBtn, pullBtn), modelBtn);
 
   const body = h("div", { class: "chat-body" });
   /** The picker or the list is open: the island is taller, and the log gives way. */
   const panelChanged = () => {
     body.classList.toggle("picking", picker.isOpen);
-    body.classList.toggle("listing", convos.isOpen);
+    body.classList.toggle("listing", convos.isOpen || pulls.isOpen);
+    convos.el.style.display = convos.isOpen ? "" : "none";
+    pulls.el.style.display = pulls.isOpen ? "" : "none";
     drawModelButton();
-    const open = picker.isOpen || convos.isOpen;
+    const open = picker.isOpen || convos.isOpen || pulls.isOpen;
     if (State.chatPicking !== open) {
       State.chatPicking = open;
       State.notify();
@@ -510,10 +667,18 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   };
   const picker = buildPicker(panelChanged);
   const convos = buildConversations(panelChanged, (id) => void openConversation(id), startIn);
-  body.append(chipRow, log, picker.el, convos.el, modelRow, bar);
+  const pulls = buildPulls(panelChanged);
+  /** At most one of the three is open. */
+  const closePanels = () => {
+    if (picker.isOpen) picker.close();
+    if (convos.isOpen) convos.close();
+    if (pulls.isOpen) pulls.close();
+  };
+  body.append(chipRow, log, picker.el, convos.el, pulls.el, modelRow, bar);
 
   // The card's lower edge: drag it to make the chat taller or shorter, double-
-  // click to let it follow the conversation again.
+  // click to let it follow the conversation again. The height lasts until the
+  // island closes: the chat always opens at its usual size.
   const grip = h("div", { class: "chat-grip" });
   const el = h("div", { class: "view" }, h("div", { class: "card wash chat-card" }, body, grip));
   (el.querySelector(".card") as HTMLElement).style.setProperty("--wash", "rgba(99,102,241,0.5)");
@@ -535,15 +700,20 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     convoBtn.style.display = p.conversations || convos.isOpen ? "" : "none";
     convoBtn.classList.toggle("open", convos.isOpen);
     convoBtn.disabled = sending;
+    // Pull requests belong to a folder: Claude Code's.
+    const inFolder = p.id === "claudecode" && State.settings.claudeCodeDir !== "";
+    pullBtn.style.display = inFolder || pulls.isOpen ? "" : "none";
+    pullBtn.classList.toggle("open", pulls.isOpen);
+    pullBtn.disabled = sending;
     const first = State.conversationId ? State.chatHistory.find((m) => m.role === "user") : undefined;
     convoName.textContent = first ? first.content.replace(/\s+/g, " ").trim() : t(STRINGS.conversations);
     send.classList.toggle("stop", stoppable);
     send.title = t(stoppable ? STRINGS.stop : STRINGS.send);
   }
 
-  function setHeight(chatHeight: number) {
-    if (chatHeight === State.settings.chatHeight) return;
-    State.settings = { ...State.settings, chatHeight };
+  function setHeight(height: number) {
+    if (height === State.chatUserHeight) return;
+    State.chatUserHeight = height;
     State.notify();
     onHeightChange();
   }
@@ -552,7 +722,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   grip.addEventListener("pointerdown", (e) => {
     const p = e as PointerEvent;
     if (p.button !== 0) return;
-    const height = chatPromptHeight(State.chatHistory.length, State.chatPicking, State.settings.chatHeight);
+    const height = chatPromptHeight(State.chatHistory.length, State.chatPicking, State.chatUserHeight);
     drag = { y: p.clientY, height };
     State.chatResizing = true;
     grip.setPointerCapture?.(p.pointerId);
@@ -566,14 +736,10 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     if (!drag) return;
     drag = null;
     State.chatResizing = false;
-    saveSettings();
   };
   grip.addEventListener("pointerup", endDrag);
   grip.addEventListener("pointercancel", endDrag);
-  grip.addEventListener("dblclick", () => {
-    setHeight(0);
-    saveSettings();
-  });
+  grip.addEventListener("dblclick", () => setHeight(0));
 
   // While the field has the keyboard the island does not fold (island.ts).
   // Told a moment later: a blur can come from inside a sync.
@@ -587,16 +753,23 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
 
   modelBtn.addEventListener("click", () => {
     if (sending) return;
-    if (convos.isOpen) convos.close();
-    if (picker.isOpen) picker.close();
-    else picker.open();
+    const was = picker.isOpen;
+    closePanels();
+    if (!was) picker.open();
   });
 
   convoBtn.addEventListener("click", () => {
     if (sending) return;
-    if (picker.isOpen) picker.close();
-    if (convos.isOpen) convos.close();
-    else convos.open();
+    const was = convos.isOpen;
+    closePanels();
+    if (!was) convos.open();
+  });
+
+  pullBtn.addEventListener("click", () => {
+    if (sending) return;
+    const was = pulls.isOpen;
+    closePanels();
+    if (!was) pulls.open();
   });
 
   /** The chat shows another conversation (or none): redraw, and back to the field. */
@@ -649,22 +822,42 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     showConversation();
   }
 
-  void onEvent<string>("chat-delta", (text) => {
-    if (!sending || !text) return; // nothing visible yet: the dots stay
+  // The files Claude Code edited in the turn that is running, and where their pills show.
+  let turnEdits: FileDiff[] = [];
+  let liveEdits: HTMLElement | null = null;
+
+  /** The row the running answer grows in: its text, then the pills of its edits. */
+  function liveRow(): HTMLElement {
     if (!live) {
       live = h("div", { class: "reply" });
+      liveEdits = h("div", { class: "edits" });
       log.querySelector(".typing")?.parentElement?.remove();
-      log.append(h("div", { class: "chat-row" }, live));
+      log.append(h("div", { class: "chat-row stacked" }, live, liveEdits));
     }
-    renderMarkdown(live, text);
+    return live;
+  }
+
+  void onEvent<string>("chat-delta", (text) => {
+    if (!sending || !text) return; // nothing visible yet: the dots stay
+    renderMarkdown(liveRow(), text);
+    log.scrollTop = log.scrollHeight;
+  });
+
+  void onEvent<ChatEdit>("chat-edit", (edit) => {
+    if (!sending || !edit) return;
+    const diff = buildFileDiff(edit.tool, edit.input ?? {});
+    if (!diff) return;
+    turnEdits.push(diff);
+    liveRow();
+    liveEdits?.append(editPill(diff));
     log.scrollTop = log.scrollHeight;
   });
 
   async function submit() {
     const query = input.value.trim();
     if (!query || sending) return;
-    if (picker.isOpen) picker.close();
-    if (convos.isOpen) convos.close();
+    closePanels();
+    turnEdits = [];
     input.value = "";
     sending = true;
     stoppable = State.settings.chatProvider === "claudecode";
@@ -682,7 +875,12 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
 
     try {
       const reply = await Bridge.chatSend(query, context);
-      State.chatHistory.push({ id: nextId++, role: "assistant", content: reply.text });
+      State.chatHistory.push({
+        id: nextId++,
+        role: "assistant",
+        content: reply.text,
+        ...(turnEdits.length > 0 ? { edits: turnEdits } : {}),
+      });
       if (reply.conversationId) State.conversationId = reply.conversationId;
       State.stateOverride = null;
       Sound.play("finish");
@@ -695,6 +893,8 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       sending = false;
       stoppable = false;
       live = null;
+      liveEdits = null;
+      turnEdits = [];
       renderedCount = -1; // the finished answer replaces the streamed one
       drawModelButton();
       State.notify();
@@ -712,10 +912,9 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     if (key === "Enter") {
       e.preventDefault();
       void submit();
-    } else if (key === "Escape" && (picker.isOpen || convos.isOpen)) {
+    } else if (key === "Escape" && (picker.isOpen || convos.isOpen || pulls.isOpen)) {
       e.preventDefault();
-      if (picker.isOpen) picker.close();
-      if (convos.isOpen) convos.close();
+      closePanels();
     }
     e.stopPropagation(); // Escape closes the island, not the chat
   });
@@ -742,8 +941,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       }
 
       // Leaving the chat folds the picker and the list away.
-      if (State.view !== "prompt" && picker.isOpen) picker.close();
-      if (State.view !== "prompt" && convos.isOpen) convos.close();
+      if (State.view !== "prompt") closePanels();
       // A chat emptied elsewhere (the new-chat shortcut, a dropped file) is a new conversation.
       if (State.chatHistory.length === 0 && !sending) State.conversationId = null;
       drawModelButton();

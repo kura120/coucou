@@ -43,6 +43,9 @@ const PRE_PROGRESS = USC.T_PROG_START - USC.T_DROP;
 
 const modeOrder = (m: IslandMode) => (m === "hidden" ? 0 : m === "compact" ? 1 : 2);
 
+/** style.css `hover-glow-burst`, with a little slack. */
+const HOVER_GLOW_BURST_MS = 520;
+
 export class Island {
   readonly fsm = new IslandStateMachine();
   /** Mochi on the desktop: his life cycle and the drag out of the island. */
@@ -50,6 +53,10 @@ export class Island {
 
   private root: HTMLElement;
   private islandEl!: HTMLElement;
+  /** The glow under the pointer while it is over the compact island. */
+  private hoverGlow = h("div", { id: "hover-glow" });
+  private glowBurst = 0;
+  private glowAt = { x: NaN, y: NaN };
   private clipEl!: HTMLElement;
   private contentEl!: HTMLElement;
   private viewsEl!: HTMLElement;
@@ -281,6 +288,7 @@ export class Island {
     this.clipEl = h(
       "div",
       { id: "island-clip" },
+      this.hoverGlow,
       this.greetingCanvas,
       this.uploadCanvas.el,
       this.contentEl,
@@ -351,6 +359,9 @@ export class Island {
     const prev = State.mode;
     if (mode === prev) return;
     State.mode = mode;
+    this.followHoverGlow(prev === "compact" && mode === "expanded");
+    // A chat dragged taller is for what is being read now: it opens at its usual size.
+    if (mode !== "expanded") State.chatUserHeight = 0;
     if (mode === "expanded") Sound.play("open");
     if (prev === "expanded") {
       Sound.play("close");
@@ -645,7 +656,7 @@ export class Island {
 
   private targetSize(): { w: number; h: number; r: number } {
     let { w, h } = islandSize(
-      State.mode, State.view, State.chatHistory.length, State.chatPicking, State.settings.chatHeight,
+      State.mode, State.view, State.chatHistory.length, State.chatPicking, State.chatUserHeight,
     );
     if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
       h = QUESTION_PICKER_H;
@@ -701,6 +712,44 @@ export class Island {
     const w = this.width.value;
     const hh = this.height.value;
     return { x: (PANEL_W - w) / 2, y: 0, w, h: hh };
+  }
+
+  /**
+   * The compact island glows under the pointer. Opened from there — a click,
+   * or a hover that opens — the glow bursts outwards from where the pointer
+   * was and fades as the island grows. Costs nothing unless the pointer moves
+   * over the compact island: a style change per cursor event, no timer.
+   */
+  private followHoverGlow(opening: boolean) {
+    const glow = this.hoverGlow;
+    const on = State.mode === "compact" && this.wasInIsland;
+    if (on) {
+      // From the island's centre line: it widens around it as it opens. Whole
+      // pixels, and only when they change: the cursor reports far more often.
+      const x = Math.round(State.mouseInIsland.x - this.width.value / 2);
+      const y = Math.round(State.mouseInIsland.y);
+      if (x !== this.glowAt.x || y !== this.glowAt.y) {
+        this.glowAt = { x, y };
+        glow.style.setProperty("--gx", `${x}px`);
+        glow.style.setProperty("--gy", `${y}px`);
+      }
+    }
+    const wasOn = glow.classList.contains("on");
+    if (on !== wasOn) glow.classList.toggle("on", on);
+    if (opening && wasOn) {
+      const mine = ++this.glowBurst;
+      const done = () => {
+        if (this.glowBurst === mine) glow.classList.remove("burst");
+      };
+      glow.classList.add("burst");
+      glow.addEventListener("animationend", done, { once: true });
+      // Should the animation never report its end, the glow still goes.
+      window.setTimeout(done, HOVER_GLOW_BURST_MS);
+    } else if (on && glow.classList.contains("burst")) {
+      // Back over the compact island before a burst ended: the glow, not its ghost.
+      this.glowBurst++;
+      glow.classList.remove("burst");
+    }
   }
 
   // ── Window collapse (hidden → tiny wake strip, zero polling) ────────────────
@@ -864,6 +913,7 @@ export class Island {
     if (!inIsland && wasIn) {
       this.fsm.mouseLeft();
     }
+    this.followHoverGlow(false);
 
     // Bot hover → love
     const overBot = State.mode === "expanded" && State.stateOverride == null && this.isBotHit(x, y);
@@ -1221,6 +1271,6 @@ export class Island {
   }
 
   get chatHeight() {
-    return chatPromptHeight(State.chatHistory.length, State.chatPicking, State.settings.chatHeight);
+    return chatPromptHeight(State.chatHistory.length, State.chatPicking, State.chatUserHeight);
   }
 }

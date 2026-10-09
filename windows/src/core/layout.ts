@@ -118,7 +118,7 @@ export function clampChatHeight(h: number): number {
 /**
  * Chat view grows with the conversation — IslandContainer.chatPromptHeight —
  * until the user drags its lower edge: it then keeps that height (`userHeight`,
- * 0 when never dragged).
+ * 0 when not dragged) for as long as the island stays open.
  */
 export function chatPromptHeight(messageCount: number, picking = false, userHeight = 0): number {
   if (userHeight > 0) {
