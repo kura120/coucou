@@ -1,12 +1,12 @@
 // Who the chat can talk to — the island's side of chat.rs. The Mac's
-// ChatProvider (IslandTypes.swift) plus OpenRouter, NVIDIA NIM and any OpenAI-compatible
-// server. Pure data and helpers, so they can be tested without a webview.
+// ChatProvider (IslandTypes.swift) plus Claude Code (the user's own sign-in, no
+// key), OpenRouter, NVIDIA NIM and any OpenAI-compatible server. Pure data and helpers, so they can be tested without a webview.
 
 import type { Settings } from "./state";
 import { N_ } from "../i18n/i18n";
 
 export type ProviderId =
-  | "anthropic" | "openai" | "google" | "openrouter" | "nvidia"
+  | "anthropic" | "claudecode" | "openai" | "google" | "openrouter" | "nvidia"
   | "ollama" | "lmstudio" | "custom";
 
 export interface ProviderDef {
@@ -14,7 +14,7 @@ export interface ProviderDef {
   /** Shown on the chip in the chat's model picker. */
   name: string;
   accent: string;
-  /** Credential store entry of its key; null for the model servers. */
+  /** Credential store entry of its key; null for the model servers and Claude Code. */
   key: string | null;
   /** Settings field holding a model server's address. */
   urlField: "ollamaUrl" | "lmstudioUrl" | "customUrl" | null;
@@ -25,6 +25,7 @@ export interface ProviderDef {
 
 export const PROVIDERS: readonly ProviderDef[] = [
   { id: "anthropic", name: "Anthropic", accent: "#E07950", key: "anthropic-api-key", urlField: null, defaultModel: "claude-opus-5", prefer: "opus" },
+  { id: "claudecode", name: "Claude Code", accent: "#D97757", key: null, urlField: null, defaultModel: "claude-sonnet-5-5", prefer: "sonnet" },
   { id: "google", name: "Google", accent: "#4285F4", key: "google-api-key", urlField: null, defaultModel: "gemini-2.0-flash", prefer: "flash" },
   { id: "openai", name: "OpenAI", accent: "#10A37F", key: "openai-api-key", urlField: null, defaultModel: "gpt-4o", prefer: "mini" },
   { id: "openrouter", name: "OpenRouter", accent: "#6467F2", key: "openrouter-api-key", urlField: null, defaultModel: "openrouter/auto", prefer: null },

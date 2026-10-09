@@ -1,10 +1,12 @@
 // Chat view — DOM port of PromptView / ChatBubble / TypingDotsView /
 // ModelPickerView from IslandViewContent.swift.
 //
-// Answers are rendered as Markdown (markdown.ts). A local model streams its
-// answer: Rust sends `chat-delta` events with the text visible so far. The
+// Answers are rendered as Markdown (markdown.ts). A local model and Claude Code
+// stream their answer: Rust sends `chat-delta` events with the text visible so far. The
 // model name above the text field opens the picker: provider chips, then the
-// models of the chosen provider, asked for only once it is picked.
+// models of the chosen provider, asked for only once it is picked. Claude Code
+// has options of its own under its models: the folder it works in, its effort
+// and its permission mode (src-tauri/src/claude_code.rs).
 
 import { h, svg, clear } from "./dom";
 import { ICONS } from "./icons";
@@ -27,7 +29,32 @@ const STRINGS = {
   loading: N_("Loading models…"),
   noKey: N_("No API key — add it in Settings."),
   openSettings: N_("Open Settings"),
+  stop: N_("Stop answering"),
+  folder: N_("Folder"),
+  noFolder: N_("None: chat only"),
+  choose: N_("Choose…"),
+  clear: N_("Clear"),
+  effort: N_("Effort"),
+  permissions: N_("Permissions"),
+  chatOnly: N_("Without a folder, Claude Code only chats and searches the web."),
+  inFolder: N_("Claude Code can read, edit and run commands in this folder. What it must ask for shows in the island."),
 };
+
+/** Claude Code's `--effort` levels; "" leaves it to Claude Code. */
+const EFFORTS: readonly [string, string][] = [
+  ["", N_("Default")], ["low", N_("Low")], ["medium", N_("Medium")],
+  ["high", N_("High")], ["xhigh", N_("Very high")], ["max", N_("Max")],
+];
+/** Its `--permission-mode`s. Bypassing permissions is deliberately not offered. */
+const MODES: readonly [string, string][] = [
+  ["default", N_("Ask")], ["acceptEdits", N_("Accept edits")], ["plan", N_("Plan")], ["auto", N_("Auto")],
+];
+/** A long path keeps its end: the folder's own name. */
+const PATH_CHARS = 44;
+
+function shortPath(path: string): string {
+  return path.length > PATH_CHARS ? `…${path.slice(-(PATH_CHARS - 1))}` : path;
+}
 
 let nextId = 1;
 
@@ -76,7 +103,8 @@ interface Picker {
 function buildPicker(onChange: () => void): Picker {
   const chips = h("div", { class: "picker-chips" });
   const list = h("div", { class: "picker-list" });
-  const el = h("div", { class: "picker" }, chips, h("div", { class: "picker-rule" }), list);
+  const opts = h("div", { class: "picker-opts" });
+  const el = h("div", { class: "picker" }, chips, h("div", { class: "picker-rule" }), list, opts);
 
   /** Models already asked for, by provider; a model server is asked again each time. */
   const cache = new Map<string, ModelInfo[]>();
@@ -104,6 +132,64 @@ function buildPicker(onChange: () => void): Picker {
       });
       chips.append(chip);
     }
+  }
+
+  function set(patch: Partial<typeof State.settings>) {
+    State.settings = { ...State.settings, ...patch };
+    saveSettings();
+    Sound.play("blip");
+    drawOptions();
+  }
+
+  function segments(choices: readonly [string, string][], current: string, pick: (value: string) => void) {
+    return h(
+      "div",
+      { class: "seg" },
+      ...choices.map(([value, label]) =>
+        h("button", { class: value === current ? "on" : "", text: t(label), onclick: () => pick(value) }),
+      ),
+    );
+  }
+
+  /** Claude Code's folder, effort and permission mode; nothing for any other provider. */
+  function drawOptions() {
+    clear(opts);
+    const s = State.settings;
+    opts.style.display = s.chatProvider === "claudecode" ? "" : "none";
+    if (s.chatProvider !== "claudecode") return;
+    const dir = s.claudeCodeDir;
+    const folder = h(
+      "div",
+      { class: "picker-opt" },
+      h("span", { class: "picker-opt-label", text: t(STRINGS.folder) }),
+      h("span", { class: "picker-path", title: dir, text: dir ? shortPath(dir) : t(STRINGS.noFolder) }),
+      h("button", {
+        class: "picker-link",
+        text: t(STRINGS.choose),
+        onclick: async () => {
+          const picked = await Bridge.pickFolder();
+          if (picked) set({ claudeCodeDir: picked });
+        },
+      }),
+      dir ? h("button", { class: "picker-link", text: t(STRINGS.clear), onclick: () => set({ claudeCodeDir: "" }) }) : null,
+    );
+    opts.append(
+      folder,
+      h(
+        "div",
+        { class: "picker-opt" },
+        h("span", { class: "picker-opt-label", text: t(STRINGS.effort) }),
+        segments(EFFORTS, s.claudeCodeEffort, (claudeCodeEffort) => set({ claudeCodeEffort })),
+      ),
+      h(
+        "div",
+        // Without a folder nothing can ask for a permission.
+        { class: dir ? "picker-opt" : "picker-opt off" },
+        h("span", { class: "picker-opt-label", text: t(STRINGS.permissions) }),
+        segments(MODES, s.claudeCodeMode, (claudeCodeMode) => set({ claudeCodeMode })),
+      ),
+      h("div", { class: "picker-hint", text: t(dir ? STRINGS.inFolder : STRINGS.chatOnly) }),
+    );
   }
 
   function status(text: string, withSettings = false) {
@@ -144,6 +230,7 @@ function buildPicker(onChange: () => void): Picker {
   }
 
   async function loadModels() {
+    drawOptions();
     const p = providerDef(State.settings.chatProvider);
     const ticket = ++request;
     const cached = p.urlField ? undefined : cache.get(p.id);
@@ -228,6 +315,12 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   const picker = buildPicker(() => {
     body.classList.toggle("picking", picker.isOpen);
     drawModelButton();
+    // The island is taller while the picker is open.
+    if (State.chatPicking !== picker.isOpen) {
+      State.chatPicking = picker.isOpen;
+      State.notify();
+      onHeightChange();
+    }
   });
   body.append(chipRow, log, picker.el, modelRow, bar);
 
@@ -235,6 +328,8 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   (el.querySelector(".card") as HTMLElement).style.setProperty("--wash", "rgba(99,102,241,0.5)");
 
   let sending = false;
+  // Claude Code is answering: the send button stops it.
+  let stoppable = false;
   let renderedCount = -1;
   // A local model answers token by token: where its text so far is shown.
   let live: HTMLElement | null = null;
@@ -245,6 +340,8 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     modelName.textContent = activeModel(State.settings) || t(STRINGS.noModel);
     modelBtn.classList.toggle("open", picker.isOpen);
     modelBtn.disabled = sending;
+    send.classList.toggle("stop", stoppable);
+    send.title = t(stoppable ? STRINGS.stop : STRINGS.send);
   }
 
   modelBtn.addEventListener("click", () => {
@@ -270,6 +367,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     if (picker.isOpen) picker.close();
     input.value = "";
     sending = true;
+    stoppable = State.settings.chatProvider === "claudecode";
     drawModelButton();
     Sound.play("send");
 
@@ -294,6 +392,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       Sound.play("error");
     } finally {
       sending = false;
+      stoppable = false;
       live = null;
       renderedCount = -1; // the finished answer replaces the streamed one
       drawModelButton();
@@ -303,7 +402,10 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     }
   }
 
-  send.addEventListener("click", () => void submit());
+  send.addEventListener("click", () => {
+    if (stoppable) void Bridge.chatStop();
+    else void submit();
+  });
   input.addEventListener("keydown", (e) => {
     const key = (e as KeyboardEvent).key;
     if (key === "Enter") {

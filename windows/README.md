@@ -231,6 +231,27 @@ mid-conversation carries the conversation over as plain text, so nothing in one
 provider's format is ever sent to another. These providers get no web search
 and no tools — they answer, they never act on your PC.
 
+No API key? Pick **Claude Code** in the same picker. Coucou then asks the
+Claude Code CLI installed on your PC (`claude -p`), which answers with its own
+sign-in — a Claude Pro or Max plan, usually — so each question counts against
+that plan's limits rather than an API bill. Coucou reads no credential.
+
+Under its models, the picker has Claude Code's own options:
+
+- **Folder** — none by default: Claude Code is then a plain chat model. Web
+  search is its only tool, no settings file is read (your hooks do not fire)
+  and nothing is saved to disk. With a folder, it is Claude Code as it runs in
+  a terminal there — its tools, your settings and the project's — and the
+  conversation is a Claude Code session, resumed turn after turn.
+- **Effort** — Claude Code's `--effort`, or its own default.
+- **Permissions** — Ask, Accept edits, Plan or Auto (`--permission-mode`).
+  Coucou never answers a permission request itself: with the Claude Code hooks
+  installed the request shows in the island and waits for your click, like any
+  other session's; without them it is denied. Bypassing permissions is not
+  offered.
+
+While Claude Code answers, the send button stops it.
+
 **Local models**: **Settings… → Local models** connects **Ollama** or **LM
 Studio** (leave the address empty for the usual one on this PC; Ollama's
 `OLLAMA_HOST` is honoured) or any server that speaks the OpenAI API (vLLM,

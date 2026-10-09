@@ -35,11 +35,15 @@ windows = { version = "0.61", features = [
   "Win32_Security_Authorization",
   # "Open terminal": the relay's process tree leads to the session's window.
   "Win32_System_Diagnostics_ToolHelp",
+  # The chat's "Choose…" folder dialog for Claude Code (IFileOpenDialog).
+  "Win32_System_Com",
   "Win32_System_Ole",
   "Win32_System_Pipes",
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
   "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_Shell",
+  "Win32_UI_Shell_Common",
   "Win32_UI_WindowsAndMessaging",
 ] }
 

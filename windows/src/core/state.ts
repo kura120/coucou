@@ -124,6 +124,13 @@ export interface Settings {
   chatProvider: ProviderId;
   /** The model picked for each provider other than Anthropic, by provider id. */
   chatModels: Record<string, string>;
+  /**
+   * Claude Code in the chat: the folder it works in (empty: a plain chat), its
+   * effort (empty: its own default) and its permission mode.
+   */
+  claudeCodeDir: string;
+  claudeCodeEffort: string;
+  claudeCodeMode: string;
   /** Model server addresses once connected; empty means not connected. */
   ollamaUrl: string;
   lmstudioUrl: string;
@@ -172,6 +179,9 @@ export const DEFAULT_SETTINGS: Settings = {
   showCodexPlanInNotch: false,
   chatProvider: "anthropic",
   chatModels: {},
+  claudeCodeDir: "",
+  claudeCodeEffort: "",
+  claudeCodeMode: "default",
   ollamaUrl: "",
   lmstudioUrl: "",
   customUrl: "",
@@ -214,6 +224,8 @@ class AppState {
   noteMessage: string | null = null;
   searchResult: SearchResult | null = null;
   chatHistory: ChatMessage[] = [];
+  /** The chat's provider and model picker is open: the island is taller. */
+  chatPicking = false;
   pendingApproval: ApprovalInfo | null = null;
   /** The pill that was in front when the card came up; it comes back after. */
   focusBeforeApproval: string | null = null;

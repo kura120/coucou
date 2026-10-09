@@ -268,23 +268,48 @@ pub fn open_claude_desktop() -> bool {
     false
 }
 
+/// A folder picked in the desktop's own dialog, through zenity (GNOME and most
+/// others) or kdialog (KDE); None when cancelled, or when neither is installed.
+/// Blocking: call it off the main thread.
+pub fn pick_folder(_app: &AppHandle) -> Option<PathBuf> {
+    let tools: [(&str, &[&str]); 2] =
+        [("zenity", &["--file-selection", "--directory"]), ("kdialog", &["--getexistingdirectory"])];
+    for (tool, args) in tools {
+        // A tool that is not there is skipped; one that ran has the last word.
+        let Ok(out) = Command::new(tool).args(args).stderr(std::process::Stdio::null()).output() else { continue };
+        let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        return (out.status.success() && !path.is_empty()).then(|| PathBuf::from(path));
+    }
+    None
+}
+
 /// Where the Codex CLI may be, best first: $PATH, then the usual per-user
 /// install folders, which a desktop launch often leaves out of $PATH (npm's
 /// global prefix, Volta, Bun, pnpm, and nvm with its newest Node first).
 pub fn codex_candidates() -> Vec<PathBuf> {
+    cli_candidates("codex")
+}
+
+/// Where the Claude Code CLI may be: the same places (its own installer puts
+/// it in ~/.local/bin).
+pub fn claude_candidates() -> Vec<PathBuf> {
+    cli_candidates("claude")
+}
+
+fn cli_candidates(stem: &str) -> Vec<PathBuf> {
     let home = home_dir();
-    let mut out: Vec<PathBuf> = find_on_path("codex").into_iter().collect();
+    let mut out: Vec<PathBuf> = find_on_path(stem).into_iter().collect();
     for dir in [".local/bin", ".npm-global/bin", ".volta/bin", ".bun/bin", ".local/share/pnpm"] {
-        out.push(home.join(dir).join("codex"));
+        out.push(home.join(dir).join(stem));
     }
-    out.push(PathBuf::from("/usr/local/bin/codex"));
-    out.push(PathBuf::from("/usr/bin/codex"));
+    out.push(Path::new("/usr/local/bin").join(stem));
+    out.push(Path::new("/usr/bin").join(stem));
     let nvm = home.join(".nvm/versions/node");
     if let Ok(entries) = std::fs::read_dir(&nvm) {
         let mut versions: Vec<String> =
             entries.filter_map(|e| e.ok()?.file_name().into_string().ok()).collect();
         versions.sort_by(|a, b| crate::codex_plan::compare_versions(b, a));
-        out.extend(versions.iter().map(|v| nvm.join(v).join("bin/codex")));
+        out.extend(versions.iter().map(|v| nvm.join(v).join("bin").join(stem)));
     }
     out.retain(|p| {
         std::fs::metadata(p)

@@ -3360,6 +3360,226 @@
    "pt-BR": "Só um arquivo solto na ilha pode ser enviado com uma pergunta.",
    "ru": "С вопросом можно отправить только файл, перетащенный на остров.",
    "id": "Hanya file yang dijatuhkan ke pulau yang bisa dikirim bersama pertanyaan."
+  },
+  "Claude Code isn't installed. Install it and sign in with your Claude account, then try again.": {
+   "zh-Hans": "尚未安装 Claude Code。请先安装并用你的 Claude 账户登录，然后重试。",
+   "hi": "Claude Code इंस्टॉल नहीं है। इसे इंस्टॉल करें और अपने Claude खाते से साइन इन करें, फिर दोबारा कोशिश करें।",
+   "es": "Claude Code no está instalado. Instálalo e inicia sesión con tu cuenta de Claude, y vuelve a intentarlo.",
+   "ar": "Claude Code غير مثبّت. ثبّته وسجّل الدخول بحساب Claude الخاص بك، ثم حاول مرة أخرى.",
+   "fr": "Claude Code n'est pas installé. Installe-le et connecte-toi avec ton compte Claude, puis réessaie.",
+   "bn": "Claude Code ইনস্টল করা নেই। এটি ইনস্টল করে আপনার Claude অ্যাকাউন্ট দিয়ে সাইন ইন করুন, তারপর আবার চেষ্টা করুন।",
+   "pt-BR": "O Claude Code não está instalado. Instale-o e entre com sua conta Claude, depois tente de novo.",
+   "ru": "Claude Code не установлен. Установите его и войдите в свою учётную запись Claude, затем повторите попытку.",
+   "id": "Claude Code belum terpasang. Pasang dan masuk dengan akun Claude Anda, lalu coba lagi."
+  },
+  "Claude Code took too long to answer.": {
+   "zh-Hans": "Claude Code 回答超时。",
+   "hi": "Claude Code ने जवाब देने में बहुत देर लगाई।",
+   "es": "Claude Code tardó demasiado en responder.",
+   "ar": "استغرق Claude Code وقتًا طويلًا جدًا للرد.",
+   "fr": "Claude Code a mis trop de temps à répondre.",
+   "bn": "Claude Code উত্তর দিতে খুব বেশি সময় নিয়েছে।",
+   "pt-BR": "O Claude Code demorou demais para responder.",
+   "ru": "Claude Code отвечал слишком долго.",
+   "id": "Claude Code terlalu lama menjawab."
+  },
+  "Claude Code gave no answer. Run claude in a terminal to check that it is signed in.": {
+   "zh-Hans": "Claude Code 没有回答。请在终端中运行 claude，确认它已登录。",
+   "hi": "Claude Code ने कोई जवाब नहीं दिया। टर्मिनल में claude चलाकर जाँचें कि वह साइन इन है।",
+   "es": "Claude Code no respondió. Ejecuta claude en una terminal para comprobar que tiene la sesión iniciada.",
+   "ar": "لم يُجب Claude Code. شغّل claude في الطرفية للتأكد من تسجيل الدخول.",
+   "fr": "Claude Code n'a pas répondu. Lance claude dans un terminal pour vérifier qu'il est connecté.",
+   "bn": "Claude Code কোনো উত্তর দেয়নি। টার্মিনালে claude চালিয়ে দেখুন সাইন ইন করা আছে কি না।",
+   "pt-BR": "O Claude Code não respondeu. Execute claude em um terminal para conferir se a sessão está iniciada.",
+   "ru": "Claude Code не ответил. Запустите claude в терминале и проверьте, что вход выполнен.",
+   "id": "Claude Code tidak menjawab. Jalankan claude di terminal untuk memastikan sudah masuk."
+  },
+  "Folder": {
+   "zh-Hans": "文件夹",
+   "hi": "फ़ोल्डर",
+   "es": "Carpeta",
+   "ar": "المجلد",
+   "fr": "Dossier",
+   "bn": "ফোল্ডার",
+   "pt-BR": "Pasta",
+   "ru": "Папка",
+   "id": "Folder"
+  },
+  "Effort": {
+   "zh-Hans": "投入程度",
+   "hi": "प्रयास",
+   "es": "Esfuerzo",
+   "ar": "الجهد",
+   "fr": "Effort",
+   "bn": "প্রচেষ্টা",
+   "pt-BR": "Esforço",
+   "ru": "Усилие",
+   "id": "Upaya"
+  },
+  "Choose…": {
+   "zh-Hans": "选择…",
+   "hi": "चुनें…",
+   "es": "Elegir…",
+   "ar": "اختيار…",
+   "fr": "Choisir…",
+   "bn": "বেছে নিন…",
+   "pt-BR": "Escolher…",
+   "ru": "Выбрать…",
+   "id": "Pilih…"
+  },
+  "None: chat only": {
+   "zh-Hans": "无：仅聊天",
+   "hi": "कोई नहीं: केवल चैट",
+   "es": "Ninguna: solo chat",
+   "ar": "لا شيء: دردشة فقط",
+   "fr": "Aucun : chat seulement",
+   "bn": "নেই: শুধু চ্যাট",
+   "pt-BR": "Nenhuma: só chat",
+   "ru": "Нет: только чат",
+   "id": "Tidak ada: hanya obrolan"
+  },
+  "Low": {
+   "zh-Hans": "低",
+   "hi": "कम",
+   "es": "Bajo",
+   "ar": "منخفض",
+   "fr": "Faible",
+   "bn": "কম",
+   "pt-BR": "Baixo",
+   "ru": "Низкое",
+   "id": "Rendah"
+  },
+  "Medium": {
+   "zh-Hans": "中",
+   "hi": "मध्यम",
+   "es": "Medio",
+   "ar": "متوسط",
+   "fr": "Moyen",
+   "bn": "মাঝারি",
+   "pt-BR": "Médio",
+   "ru": "Среднее",
+   "id": "Sedang"
+  },
+  "High": {
+   "zh-Hans": "高",
+   "hi": "अधिक",
+   "es": "Alto",
+   "ar": "مرتفع",
+   "fr": "Élevé",
+   "bn": "বেশি",
+   "pt-BR": "Alto",
+   "ru": "Высокое",
+   "id": "Tinggi"
+  },
+  "Very high": {
+   "zh-Hans": "很高",
+   "hi": "बहुत अधिक",
+   "es": "Muy alto",
+   "ar": "مرتفع جدًا",
+   "fr": "Très élevé",
+   "bn": "খুব বেশি",
+   "pt-BR": "Muito alto",
+   "ru": "Очень высокое",
+   "id": "Sangat tinggi"
+  },
+  "Max": {
+   "zh-Hans": "最高",
+   "hi": "अधिकतम",
+   "es": "Máx.",
+   "ar": "الأقصى",
+   "fr": "Max",
+   "bn": "সর্বোচ্চ",
+   "pt-BR": "Máx.",
+   "ru": "Макс.",
+   "id": "Maks"
+  },
+  "Accept edits": {
+   "zh-Hans": "接受编辑",
+   "hi": "संपादन स्वीकारें",
+   "es": "Aceptar ediciones",
+   "ar": "قبول التعديلات",
+   "fr": "Accepter les modifications",
+   "bn": "সম্পাদনা গ্রহণ",
+   "pt-BR": "Aceitar edições",
+   "ru": "Принимать правки",
+   "id": "Terima suntingan"
+  },
+  "Plan": {
+   "zh-Hans": "计划",
+   "hi": "योजना",
+   "es": "Plan",
+   "ar": "خطة",
+   "fr": "Plan",
+   "bn": "পরিকল্পনা",
+   "pt-BR": "Plano",
+   "ru": "План",
+   "id": "Rencana"
+  },
+  "Auto": {
+   "zh-Hans": "自动",
+   "hi": "स्वतः",
+   "es": "Auto",
+   "ar": "تلقائي",
+   "fr": "Auto",
+   "bn": "স্বয়ংক্রিয়",
+   "pt-BR": "Auto",
+   "ru": "Авто",
+   "id": "Otomatis"
+  },
+  "Stop answering": {
+   "zh-Hans": "停止",
+   "hi": "रोकें",
+   "es": "Detener",
+   "ar": "إيقاف",
+   "fr": "Arrêter",
+   "bn": "থামান",
+   "pt-BR": "Parar",
+   "ru": "Остановить",
+   "id": "Hentikan"
+  },
+  "Stopped.": {
+   "zh-Hans": "已停止。",
+   "hi": "रोक दिया गया।",
+   "es": "Detenido.",
+   "ar": "تم الإيقاف.",
+   "fr": "Arrêté.",
+   "bn": "থামানো হয়েছে।",
+   "pt-BR": "Parado.",
+   "ru": "Остановлено.",
+   "id": "Dihentikan."
+  },
+  "Without a folder, Claude Code only chats and searches the web.": {
+   "zh-Hans": "未选择文件夹时，Claude Code 只能聊天和搜索网页。",
+   "hi": "फ़ोल्डर के बिना Claude Code केवल चैट करता है और वेब पर खोजता है।",
+   "es": "Sin carpeta, Claude Code solo conversa y busca en la web.",
+   "ar": "بدون مجلد، يكتفي Claude Code بالدردشة والبحث في الويب.",
+   "fr": "Sans dossier, Claude Code se contente de discuter et de chercher sur le web.",
+   "bn": "ফোল্ডার ছাড়া Claude Code শুধু চ্যাট করে আর ওয়েবে খোঁজে।",
+   "pt-BR": "Sem pasta, o Claude Code só conversa e pesquisa na web.",
+   "ru": "Без папки Claude Code только общается и ищет в интернете.",
+   "id": "Tanpa folder, Claude Code hanya mengobrol dan mencari di web."
+  },
+  "Claude Code can read, edit and run commands in this folder. What it must ask for shows in the island.": {
+   "zh-Hans": "Claude Code 可以在此文件夹中读取、编辑并运行命令。需要征求许可的操作会显示在灵动岛中。",
+   "hi": "Claude Code इस फ़ोल्डर में पढ़ सकता है, संपादन कर सकता है और कमांड चला सकता है। जिसके लिए उसे पूछना ज़रूरी है, वह आइलैंड में दिखता है।",
+   "es": "Claude Code puede leer, editar y ejecutar comandos en esta carpeta. Lo que debe preguntar aparece en la isla.",
+   "ar": "يستطيع Claude Code القراءة والتعديل وتشغيل الأوامر في هذا المجلد. ما يجب أن يستأذن فيه يظهر في الجزيرة.",
+   "fr": "Claude Code peut lire, modifier et lancer des commandes dans ce dossier. Ce qu'il doit demander s'affiche dans l'île.",
+   "bn": "Claude Code এই ফোল্ডারে পড়তে, সম্পাদনা করতে ও কমান্ড চালাতে পারে। যার জন্য তাকে জিজ্ঞেস করতে হয়, তা আইল্যান্ডে দেখা যায়।",
+   "pt-BR": "O Claude Code pode ler, editar e executar comandos nesta pasta. O que ele precisa perguntar aparece na ilha.",
+   "ru": "Claude Code может читать, изменять файлы и запускать команды в этой папке. То, о чём он должен спросить, появляется на острове.",
+   "id": "Claude Code bisa membaca, menyunting, dan menjalankan perintah di folder ini. Hal yang harus ia tanyakan muncul di pulau."
+  },
+  "The folder picked for Claude Code is gone. Pick another one above the chat box.": {
+   "zh-Hans": "为 Claude Code 选择的文件夹已不存在。请在聊天框上方另选一个。",
+   "hi": "Claude Code के लिए चुना गया फ़ोल्डर अब नहीं है। चैट बॉक्स के ऊपर कोई दूसरा चुनें।",
+   "es": "La carpeta elegida para Claude Code ya no existe. Elige otra encima del cuadro de chat.",
+   "ar": "المجلد المختار لـ Claude Code لم يعد موجودًا. اختر مجلدًا آخر فوق مربع الدردشة.",
+   "fr": "Le dossier choisi pour Claude Code n'existe plus. Choisis-en un autre au-dessus de la zone de chat.",
+   "bn": "Claude Code-এর জন্য বেছে নেওয়া ফোল্ডারটি আর নেই। চ্যাট বক্সের উপরে অন্য একটি বেছে নিন।",
+   "pt-BR": "A pasta escolhida para o Claude Code não existe mais. Escolha outra acima da caixa de chat.",
+   "ru": "Папка, выбранная для Claude Code, больше не существует. Выберите другую над полем чата.",
+   "id": "Folder yang dipilih untuk Claude Code sudah tidak ada. Pilih yang lain di atas kotak obrolan."
   }
  }
 }

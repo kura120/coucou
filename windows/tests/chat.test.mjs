@@ -54,7 +54,7 @@ test("a provider without a key is never asked for its models", async () => {
   $(".model-btn").fire("click");
   await flush();
   assert.ok($(".chat-body").classList.contains("picking"));
-  assert.deepEqual(chips(), ["Anthropic", "Google", "OpenAI", "OpenRouter", "NVIDIA"]);
+  assert.deepEqual(chips(), ["Anthropic", "Claude Code", "Google", "OpenAI", "OpenRouter", "NVIDIA"]);
   assert.deepEqual(sent("secret_present"), [{ key: "anthropic-api-key" }]);
   assert.deepEqual(sent("chat_models"), []);
   assert.match($(".picker-status").textContent, /No API key/);
@@ -83,7 +83,7 @@ test("switching provider saves it and asks the new provider only", async () => {
   $(".model-btn").fire("click");
   await flush();
   assert.deepEqual(sent("chat_models"), []);
-  view.el.find(".picker-chip")[1].fire("click");
+  view.el.find(".picker-chip")[2].fire("click");
   await flush();
   assert.equal(State.settings.chatProvider, "google");
   assert.deepEqual(sent("chat_models"), [{ provider: "google" }]);
@@ -121,4 +121,62 @@ test("a local answer streams into one reply, then the finished text replaces it"
   assert.equal(view.el.find(".reply")[0].textContent, "Hello there!");
   assert.deepEqual(State.chatHistory.map((m) => m.role), ["user", "assistant"]);
   assert.ok(!$(".model-btn").disabled);
+});
+
+test("Claude Code has its folder, effort and permissions under its models, and the island grows", async () => {
+  answers.chat_models = [{ id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5" }];
+  answers.pick_folder = "C:\work\app";
+  $(".model-btn").fire("click");
+  await flush();
+  assert.equal(State.chatPicking, true);
+  // Another provider has no such options.
+  assert.equal(view.el.find(".picker-opt").length, 0);
+  view.el.find(".picker-chip")[1].fire("click");
+  await flush();
+  assert.equal(State.settings.chatProvider, "claudecode");
+  assert.deepEqual(sent("secret_present"), [{ key: "anthropic-api-key" }]); // never asked for a key of its own
+  assert.deepEqual(models(), ["Claude Sonnet 5.5"]);
+  const rows = () => view.el.find(".picker-opt");
+  assert.equal(rows().length, 3);
+  // No folder yet: a plain chat, and nothing to ask a permission for.
+  assert.match($(".picker-path").textContent, /chat only/);
+  assert.ok(rows()[2].classList.contains("off"));
+
+  rows()[0].find(".picker-link")[0].fire("click");
+  await flush();
+  assert.equal(State.settings.claudeCodeDir, "C:\work\app");
+  assert.equal($(".picker-path").textContent, "C:\work\app");
+  assert.ok(!rows()[2].classList.contains("off"));
+
+  rows()[1].find("button")[3].fire("click");
+  rows()[2].find("button")[2].fire("click");
+  assert.equal(State.settings.claudeCodeEffort, "high");
+  assert.equal(State.settings.claudeCodeMode, "plan");
+  const saved = sent("save_settings").at(-1).settings;
+  assert.deepEqual(
+    [saved.claudeCodeDir, saved.claudeCodeEffort, saved.claudeCodeMode],
+    ["C:\work\app", "high", "plan"],
+  );
+  // Bypassing permissions is not on offer.
+  assert.deepEqual(rows()[2].find("button").map((b) => b.textContent), ["Ask", "Accept edits", "Plan", "Auto"]);
+
+  $(".model-btn").fire("click");
+  assert.equal(State.chatPicking, false);
+});
+
+test("while Claude Code answers, the send button stops it", async () => {
+  State.settings = { ...State.settings, chatProvider: "claudecode" };
+  let finish;
+  answers.chat_send = () => new Promise((resolve) => (finish = resolve));
+  $(".chat-input").value = "hello";
+  $(".send-btn").fire("click");
+  await flush();
+  assert.ok($(".send-btn").classList.contains("stop"));
+  $(".send-btn").fire("click");
+  await flush();
+  assert.equal(sent("chat_stop").length, 1);
+  assert.equal(sent("chat_send").length, 1);
+  finish({ text: "partial" });
+  await flush();
+  assert.ok(!$(".send-btn").classList.contains("stop"));
 });

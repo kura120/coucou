@@ -50,10 +50,11 @@ export interface ViewLayout {
   agentMode: AgentLayoutMode;
 }
 
-// The window is a fixed 720×320 (largest view) like the macOS panel; the island is
-// drawn inside it, glued to the top edge and horizontally centred.
+// The window is a fixed 720×480 (largest view: the chat with its model picker
+// open) like the macOS panel; the island is drawn inside it, glued to the top
+// edge and horizontally centred.
 export const PANEL_W = 720;
-export const PANEL_H = 320;
+export const PANEL_H = 480;
 
 // No notch on a PC: these are the hidden/compact sizes from docs/SPEC.md.
 export const NOTCH_W = 184;
@@ -102,8 +103,12 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
 /** The question view with options to pick from: room for two rows of them. */
 export const QUESTION_PICKER_H = 200;
 
+/** The chat with its provider and model picker open: room to read the list. */
+export const CHAT_PICKER_H = 460;
+
 /** Chat view grows with the conversation — IslandContainer.chatPromptHeight. */
-export function chatPromptHeight(messageCount: number): number {
+export function chatPromptHeight(messageCount: number, picking = false): number {
+  if (picking) return CHAT_PICKER_H;
   return Math.min(300, 240 + messageCount * 40);
 }
 
@@ -111,6 +116,7 @@ export function islandSize(
   mode: IslandMode,
   view: IslandViewName,
   chatCount = 0,
+  chatPicking = false,
 ): { w: number; h: number } {
   switch (mode) {
     case "hidden":
@@ -120,7 +126,7 @@ export function islandSize(
     case "compact":
       return { w: COMPACT_W, h: NOTCH_H };
     case "expanded": {
-      const h = view === "prompt" ? chatPromptHeight(chatCount) : VIEW_LAYOUTS[view].height;
+      const h = view === "prompt" ? chatPromptHeight(chatCount, chatPicking) : VIEW_LAYOUTS[view].height;
       return { w: EXPANDED_W, h };
     }
   }

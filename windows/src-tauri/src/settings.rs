@@ -38,13 +38,19 @@ pub struct Settings {
     /// Show the Codex plan pill (5 h / weekly limits from `codex app-server`).
     /// Off by default; nothing is installed for it.
     pub show_codex_plan_in_notch: bool,
-    /// Who the chat talks to: "anthropic", a cloud provider of
+    /// Who the chat talks to: "anthropic", "claudecode" (claude_code.rs), a cloud provider of
     /// openai_compat.rs ("openai", "google", "openrouter", "nvidia"), or a model server
     /// of local_chat.rs ("ollama", "lmstudio", "custom"). Picked in the chat view.
     pub chat_provider: String,
     /// The model picked for each provider other than Anthropic (whose model is
     /// `model`), by provider id.
     pub chat_models: BTreeMap<String, String>,
+    /// Claude Code in the chat (claude_code.rs): the folder it works in (empty:
+    /// a plain chat, no access to anything), its effort (empty: its own
+    /// default) and its permission mode. Picked in the chat view.
+    pub claude_code_dir: String,
+    pub claude_code_effort: String,
+    pub claude_code_mode: String,
     /// Addresses of the model servers once connected; empty means not connected.
     pub ollama_url: String,
     pub lmstudio_url: String,
@@ -116,6 +122,9 @@ impl Default for Settings {
             show_codex_plan_in_notch: false,
             chat_provider: crate::chat::ANTHROPIC.into(),
             chat_models: BTreeMap::new(),
+            claude_code_dir: String::new(),
+            claude_code_effort: String::new(),
+            claude_code_mode: "default".into(),
             ollama_url: String::new(),
             lmstudio_url: String::new(),
             custom_url: String::new(),
@@ -393,6 +402,9 @@ mod tests {
   "showCodexPlanInNotch": true,
   "chatProvider": "ollama",
   "chatModels": { "ollama": "llama3.2", "openai": "gpt-x" },
+  "claudeCodeDir": "C:/work/app",
+  "claudeCodeEffort": "high",
+  "claudeCodeMode": "plan",
   "ollamaUrl": "http://127.0.0.1:11434",
   "lmstudioUrl": "http://127.0.0.1:1234",
   "customUrl": "https://llm.example.com",
@@ -796,6 +808,9 @@ mod tests {
                 "showCodexPlanInNotch",
                 "chatProvider",
                 "chatModels",
+                "claudeCodeDir",
+                "claudeCodeEffort",
+                "claudeCodeMode",
                 "ollamaUrl",
                 "lmstudioUrl",
                 "customUrl",

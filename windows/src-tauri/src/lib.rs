@@ -4,6 +4,7 @@ mod agent_hooks;
 mod agents;
 mod chat;
 mod claude;
+mod claude_code;
 mod codex_plan;
 mod config_file;
 mod desktop;
@@ -484,6 +485,22 @@ fn chat_reset(chat: State<Chat>) {
     chat.reset();
 }
 
+/// "Stop" in the chat view: ends the Claude Code turn that is running.
+#[tauri::command]
+fn chat_stop() {
+    claude_code::stop();
+}
+
+/// The folder Claude Code works in, picked in the system's own dialog; None
+/// when it was cancelled (or, on Linux, when no dialog tool is installed).
+#[tauri::command]
+async fn pick_folder(app: AppHandle) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || platform::pick_folder(&app))
+        .await
+        .map(|path| path.map(|p| p.to_string_lossy().to_string()))
+        .map_err(|e| e.to_string())
+}
+
 /// Copies a dropped file into the inbox and reports its name back.
 #[tauri::command]
 fn ingest_file(path: String) -> Result<DroppedFile, String> {
@@ -733,6 +750,8 @@ pub fn run() {
             local_connect,
             local_set_key,
             chat_reset,
+            chat_stop,
+            pick_folder,
             ingest_file,
             secret_present,
             secret_set,

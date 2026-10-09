@@ -11,12 +11,15 @@ import { DEFAULT_SETTINGS } from "../src/core/state.ts";
 const settings = (over = {}) => ({ ...DEFAULT_SETTINGS, ...over });
 
 test("the ids and key names match the Rust side and the Mac", () => {
-  assert.deepEqual(PROVIDERS.map((p) => p.id), ["anthropic", "google", "openai", "openrouter", "nvidia", "ollama", "lmstudio", "custom"]);
+  assert.deepEqual(PROVIDERS.map((p) => p.id), ["anthropic", "claudecode", "google", "openai", "openrouter", "nvidia", "ollama", "lmstudio", "custom"]);
   assert.equal(providerDef("google").key, "google-api-key");
   assert.equal(providerDef("openai").key, "openai-api-key");
   assert.equal(providerDef("openrouter").key, "openrouter-api-key");
   assert.equal(providerDef("nvidia").key, "nvidia-api-key");
   assert.equal(providerDef("ollama").key, null);
+  // Claude Code answers with its own sign-in: no key, no address.
+  assert.equal(providerDef("claudecode").key, null);
+  assert.equal(providerDef("claudecode").urlField, null);
   // An unknown id (an older or newer settings.json) falls back to Claude.
   assert.equal(providerDef("nope").id, "anthropic");
 });
@@ -25,6 +28,7 @@ test("Claude's model is the existing setting; the others are kept per provider",
   assert.equal(activeModel(settings()), "claude-opus-5");
   assert.equal(activeModel(settings({ chatProvider: "google" })), "gemini-2.0-flash");
   assert.equal(activeModel(settings({ chatProvider: "ollama" })), "");
+  assert.equal(activeModel(settings({ chatProvider: "claudecode" })), "claude-sonnet-5-5");
   let s = withModel(settings({ chatProvider: "openai" }), "openai", "gpt-5-mini");
   assert.equal(activeModel(s), "gpt-5-mini");
   assert.equal(s.model, "claude-opus-5");
@@ -37,9 +41,9 @@ test("Claude's model is the existing setting; the others are kept per provider",
 
 test("model servers show in the picker once connected, or while in use", () => {
   const ids = (s) => visibleProviders(s).map((p) => p.id);
-  assert.deepEqual(ids(settings()), ["anthropic", "google", "openai", "openrouter", "nvidia"]);
-  assert.deepEqual(ids(settings({ ollamaUrl: "http://127.0.0.1:11434" })), ["anthropic", "google", "openai", "openrouter", "nvidia", "ollama"]);
-  assert.deepEqual(ids(settings({ chatProvider: "custom" })), ["anthropic", "google", "openai", "openrouter", "nvidia", "custom"]);
+  assert.deepEqual(ids(settings()), ["anthropic", "claudecode", "google", "openai", "openrouter", "nvidia"]);
+  assert.deepEqual(ids(settings({ ollamaUrl: "http://127.0.0.1:11434" })), ["anthropic", "claudecode", "google", "openai", "openrouter", "nvidia", "ollama"]);
+  assert.deepEqual(ids(settings({ chatProvider: "custom" })), ["anthropic", "claudecode", "google", "openai", "openrouter", "nvidia", "custom"]);
 });
 
 test("the saved model is kept when offered, else a sensible one is picked", () => {

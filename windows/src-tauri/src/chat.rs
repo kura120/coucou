@@ -1,6 +1,7 @@
 // The chat, whoever answers it: the conversation, the system prompt, and which
 // provider a turn goes to. Each provider's own wire format lives in its module:
-// claude.rs (Anthropic), openai_compat.rs (OpenAI, Google AI, OpenRouter, NVIDIA NIM) and
+// claude.rs (Anthropic), claude_code.rs (the user's own Claude Code, no key),
+// openai_compat.rs (OpenAI, Google AI, OpenRouter, NVIDIA NIM) and
 // local_chat.rs (Ollama, LM Studio, any OpenAI-compatible server).
 //
 // API keys never leave the credential store and file bytes never cross the IPC
@@ -13,7 +14,7 @@ use serde_json::{json, Value};
 use tauri::AppHandle;
 
 use crate::settings::Settings;
-use crate::{claude, local_chat, openai_compat, secrets};
+use crate::{claude, claude_code, local_chat, openai_compat, secrets};
 
 pub const ANTHROPIC: &str = "anthropic";
 
@@ -169,6 +170,7 @@ pub fn model_for(settings: &Settings, provider: &str) -> String {
         .map(|m| m.trim().to_string())
         .filter(|m| !m.is_empty())
         .or_else(|| openai_compat::provider(provider).map(|p| p.default_model.to_string()))
+        .or_else(|| (provider == claude_code::ID).then(|| claude_code::DEFAULT_MODEL.to_string()))
         .unwrap_or_default()
 }
 
@@ -210,6 +212,9 @@ pub async fn send(
     if provider == ANTHROPIC || provider.is_empty() {
         return claude::send(chat, &model, query, context).await;
     }
+    if provider == claude_code::ID {
+        return claude_code::send(app, chat, settings, &model, query, context).await;
+    }
     if let Some(p) = openai_compat::provider(provider) {
         return openai_compat::send(chat, p, &model, query, context).await;
     }
@@ -227,6 +232,9 @@ pub async fn models(settings: &Settings, provider: &str) -> Result<Vec<ModelInfo
     if provider == ANTHROPIC {
         let key = secrets::get(claude::KEY).ok_or_else(no_key)?;
         return claude::models(&key).await;
+    }
+    if provider == claude_code::ID {
+        return claude_code::models();
     }
     if let Some(p) = openai_compat::provider(provider) {
         let key = secrets::get(p.key).ok_or_else(no_key)?;
@@ -335,6 +343,7 @@ mod tests {
         assert_eq!(model_for(&s, "anthropic"), claude::DEFAULT_MODEL);
         assert_eq!(model_for(&s, "openai"), openai_compat::provider("openai").unwrap().default_model);
         assert_eq!(model_for(&s, "ollama"), "");
+        assert_eq!(model_for(&s, "claudecode"), claude_code::DEFAULT_MODEL);
         s.chat_models.insert("openai".into(), " gpt-x ".into());
         s.chat_models.insert("ollama".into(), "llama3.2".into());
         s.model = "claude-haiku-4-5".into();

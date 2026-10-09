@@ -145,6 +145,10 @@ export const Bridge = {
   chatSend: (query: string, context: ChatContext | null) =>
     callOrThrow<{ text: string }>("chat_send", { query, context }),
   chatReset: () => call<void>("chat_reset"),
+  /** Ends the Claude Code turn that is running. */
+  chatStop: () => call<void>("chat_stop"),
+  /** The system's folder dialog; null when cancelled. */
+  pickFolder: () => call<string | null>("pick_folder"),
   /**
    * The models a provider offers, for the picker in the chat view. Rust asks
    * the provider only when it has a key (or a server address).

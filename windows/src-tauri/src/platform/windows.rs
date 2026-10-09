@@ -15,6 +15,10 @@ use ::windows::Win32::Security::{GetTokenInformation, TokenUser, TOKEN_QUERY, TO
 use ::windows::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
 };
+use ::windows::Win32::System::Com::{
+    CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_INPROC_SERVER,
+    COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
+};
 use ::windows::Win32::System::Ole::RevokeDragDrop;
 use ::windows::Win32::System::Pipes::GetNamedPipeClientProcessId;
 use ::windows::Win32::System::SystemInformation::GetLocalTime;
@@ -22,6 +26,9 @@ use ::windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 use ::windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, GetKeyboardLayoutList, MapVirtualKeyExW, ToUnicodeEx, HKL, MAPVK_VK_TO_VSC,
     VK_CONTROL, VK_LBUTTON, VK_MENU, VK_SHIFT,
+};
+use ::windows::Win32::UI::Shell::{
+    FileOpenDialog, IFileOpenDialog, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH,
 };
 use ::windows::Win32::UI::WindowsAndMessaging::{
     EnumChildWindows, EnumWindows, GetClassNameW, GetCursorPos, GetWindow, GetWindowLongPtrW,
@@ -137,21 +144,58 @@ pub fn find_on_path(stem: &str) -> Option<PathBuf> {
 /// codex.cmd), then npm's global folder and the Volta / Bun / pnpm ones.
 /// Rust quotes the one fixed argument safely for a `.cmd` (see find_on_path).
 pub fn codex_candidates() -> Vec<PathBuf> {
-    let mut out: Vec<PathBuf> = find_on_path("codex").into_iter().collect();
+    cli_candidates("codex")
+}
+
+/// Where the Claude Code CLI may be: the same places (its own installer puts
+/// claude.exe in ~/.local/bin).
+pub fn claude_candidates() -> Vec<PathBuf> {
+    cli_candidates("claude")
+}
+
+fn cli_candidates(stem: &str) -> Vec<PathBuf> {
+    let mut out: Vec<PathBuf> = find_on_path(stem).into_iter().collect();
     let var = |k: &str| std::env::var_os(k).map(PathBuf::from).filter(|p| p.is_absolute());
     if let Some(appdata) = var("APPDATA") {
-        out.push(appdata.join("npm").join("codex.cmd"));
+        out.push(appdata.join("npm").join(format!("{stem}.cmd")));
     }
     if let Some(local) = var("LOCALAPPDATA") {
-        out.push(local.join("Volta").join("bin").join("codex.exe"));
-        out.push(local.join("pnpm").join("codex.cmd"));
+        out.push(local.join("Volta").join("bin").join(format!("{stem}.exe")));
+        out.push(local.join("pnpm").join(format!("{stem}.cmd")));
     }
     if let Some(home) = var("USERPROFILE") {
-        out.push(home.join(".bun").join("bin").join("codex.exe"));
-        out.push(home.join(".local").join("bin").join("codex.exe"));
+        out.push(home.join(".bun").join("bin").join(format!("{stem}.exe")));
+        out.push(home.join(".local").join("bin").join(format!("{stem}.exe")));
     }
     out.retain(|p| p.is_file());
     out
+}
+
+/// The system's "Select Folder" dialog, over the island; None when cancelled.
+/// Blocking: call it off the main thread.
+pub fn pick_folder(app: &AppHandle) -> Option<PathBuf> {
+    let owner = app
+        .get_webview_window(crate::island::WINDOW_LABEL)
+        .and_then(|w| w.hwnd().ok())
+        .map(|h| HWND(h.0 as _));
+    unsafe {
+        let com = CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+        let picked = (|| {
+            let dialog: IFileOpenDialog = CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER).ok()?;
+            let options = dialog.GetOptions().ok()?;
+            dialog.SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM).ok()?;
+            // Cancel comes back as an error.
+            dialog.Show(owner).ok()?;
+            let name = dialog.GetResult().ok()?.GetDisplayName(SIGDN_FILESYSPATH).ok()?;
+            let path = name.to_string().ok().map(PathBuf::from);
+            CoTaskMemFree(Some(name.0 as _));
+            path
+        })();
+        if com.is_ok() {
+            CoUninitialize();
+        }
+        picked
+    }
 }
 
 // ── Who we are ────────────────────────────────────────────────────────────────

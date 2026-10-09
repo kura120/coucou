@@ -83,7 +83,9 @@ pub mod logic {
 
     /// Island panel, logical pixels: dropping Mochi on it brings him home.
     pub const HOME_ZONE_W: f64 = crate::island::PANEL_W;
-    pub const HOME_ZONE_H: f64 = crate::island::PANEL_H;
+    /// The height the island's usual views fit in, not the taller window the
+    /// chat's model picker needs.
+    pub const HOME_ZONE_H: f64 = 320.0;
 
     /// Hit test of the round body inside the square window (window-local).
     pub fn is_over_body(local: (f64, f64), size: f64) -> bool {

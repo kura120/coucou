@@ -1324,6 +1324,59 @@ input[type="range"]::-webkit-slider-thumb {
   cursor: default;
 }
 
+/* Claude Code's own options, under its models: folder, effort, permissions. */
+
+.picker-opts {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.picker-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 24px;
+  font: 400 11.5px var(--font);
+  color: #8a8f98;
+}
+
+.picker-opt.off {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.picker-opt-label {
+  flex: 0 0 auto;
+}
+
+.picker-opt .seg {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.picker-opt .seg button {
+  white-space: nowrap;
+}
+
+.picker-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #c8cdd4;
+}
+
+.picker-hint {
+  font: 400 10.5px var(--font);
+  color: #6b7079;
+}
+
 .chat-bar {
   display: flex;
   align-items: center;
@@ -1364,6 +1417,19 @@ input[type="range"]::-webkit-slider-thumb {
 
 .send-btn:active {
   transform: scale(0.94);
+}
+
+/* While Claude Code answers, the same button stops it. */
+.send-btn.stop svg {
+  display: none;
+}
+
+.send-btn.stop::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: currentColor;
 }
 
 /* ── Drop zone ──────────────────────────────────────────────────────────── */
