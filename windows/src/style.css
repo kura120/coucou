@@ -87,6 +87,48 @@ body {
   border-radius: inherit;
 }
 
+/* The glow under the pointer over the compact island (island.ts
+   followHoverGlow): it follows the pointer, and bursts when the island opens. */
+#hover-glow {
+  position: absolute;
+  left: calc(50% + var(--gx, 0px));
+  top: var(--gy, 0px);
+  width: 84px;
+  height: 84px;
+  margin: -42px 0 0 -42px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(129, 120, 255, 0.62) 0%,
+    rgba(99, 102, 241, 0.3) 36%,
+    rgba(99, 102, 241, 0) 70%
+  );
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.18s ease-out, transform 0.22s cubic-bezier(0.3, 1.2, 0.4, 1);
+  pointer-events: none;
+}
+
+#hover-glow.on {
+  opacity: 1;
+  transform: scale(1);
+}
+
+#hover-glow.burst {
+  animation: hover-glow-burst 0.62s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes hover-glow-burst {
+  from {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(13);
+  }
+}
+
 #bot-canvas,
 #greeting-canvas {
   position: absolute;
