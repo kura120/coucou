@@ -10,7 +10,9 @@
 //
 // A provider whose conversations are saved (core/providers.ts) has their list
 // behind the title on the left of the model: grouped by the folder they work
-// in, newest first. Opening one puts it back in the chat, on both sides.
+// in, newest first. Opening one puts it back in the chat, on both sides. The
+// sessions Claude Code holds itself (a terminal, the Claude app) are in the
+// list too; those are Claude Code's to delete, not Coucou's.
 
 import { h, svg, clear } from "./dom";
 import { ICONS } from "./icons";
@@ -377,7 +379,7 @@ function buildConversations(
       h("i", { class: "model-dot", style: `background:${providerDef(c.provider).accent}` }),
       h("span", { class: "convo-title", text: c.title }),
       h("span", { class: "convo-when", text: when(c.updated) }),
-      remove,
+      c.external ? null : remove,
     );
     el.addEventListener("click", () => pick(c.id));
     return el;

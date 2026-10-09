@@ -8,6 +8,12 @@
 // on the conversation: Claude Code's session id, so opening a conversation
 // resumes that session with everything its tools did.
 //
+// Claude Code keeps sessions of its own, held in a terminal or in the Claude
+// app (claude_sessions.rs). They are listed with Coucou's and open the same
+// way, read from Claude Code's transcript; nothing is copied until such a
+// conversation gets an answer here. One Coucou already saved shows once, and
+// opens with whatever was said in it elsewhere since.
+//
 // Only Claude Code's conversations are saved today. Nothing else here is about
 // Claude Code, though. To save another provider's:
 //   1. add its id to SAVED (and `conversations: true` to its entry in
@@ -28,13 +34,15 @@ use serde_json::Value;
 
 use crate::chat::{Chat, Snapshot};
 use crate::settings::Settings;
-use crate::{claude_code, platform};
+use crate::{claude_code, claude_sessions, platform};
 
 /// The providers whose conversations are kept.
 const SAVED: &[&str] = &[claude_code::ID];
 /// The oldest conversations go once there are more than this.
 const MAX_CONVERSATIONS: usize = 100;
 const MAX_TITLE_CHARS: usize = 60;
+/// The id of a conversation that is only in Claude Code yet: this, then its session id.
+const CLAUDE_PREFIX: &str = "claude:";
 
 pub fn supports(provider: &str) -> bool {
     SAVED.contains(&provider)
@@ -67,6 +75,8 @@ pub struct Summary {
     pub provider: String,
     pub dir: String,
     pub updated: u64,
+    /// Held in Claude Code only: Coucou has no record of its own to delete.
+    pub external: bool,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -200,10 +210,58 @@ pub fn record(chat: &Chat, settings: &Settings, provider: &str, model: &str) -> 
     Some(snapshot.id)
 }
 
-/// The list, newest first.
+/// The list, newest first: Coucou's conversations, and Claude Code's sessions
+/// that are not one of them already.
 pub fn list() -> Vec<Summary> {
-    let _file = FILE.lock().unwrap_or_else(|e| e.into_inner());
-    summaries(&load(&path()))
+    let store = {
+        let _file = FILE.lock().unwrap_or_else(|e| e.into_inner());
+        load(&path())
+    };
+    merged(&store, claude_sessions::list())
+}
+
+fn merged(store: &Store, sessions: Vec<claude_sessions::Found>) -> Vec<Summary> {
+    let mut rows = summaries(store);
+    let ours = |session: &str| {
+        store.conversations.iter().any(|c| c.provider == claude_code::ID && c.handle.as_deref() == Some(session))
+    };
+    rows.extend(sessions.into_iter().filter(|s| !ours(&s.session)).map(|s| Summary {
+        id: format!("{CLAUDE_PREFIX}{}", s.session),
+        title: s.title,
+        provider: claude_code::ID.to_string(),
+        dir: s.dir,
+        updated: s.updated,
+        external: true,
+    }));
+    rows.sort_by_key(|row| std::cmp::Reverse(row.updated));
+    rows
+}
+
+/// A Claude Code session as a conversation of the list.
+fn from_session(id: &str, t: claude_sessions::Transcript) -> Saved {
+    Saved {
+        id: id.to_string(),
+        title: t.found.title,
+        provider: claude_code::ID.to_string(),
+        // Whatever model the chat is on: the session takes it from the next turn.
+        model: String::new(),
+        dir: t.found.dir,
+        handle: Some(t.found.session),
+        updated: t.found.updated,
+        turns: t.turns,
+    }
+}
+
+/// What was said in a saved conversation's session since Coucou last saved
+/// it — in a terminal, say — replaces Coucou's older copy of the turns.
+fn caught_up(mut saved: Saved, session: Option<claude_sessions::Transcript>) -> Saved {
+    if let Some(t) = session {
+        if t.found.updated > saved.updated && t.turns.len() >= saved.turns.len() {
+            saved.turns = t.turns;
+            saved.updated = t.found.updated;
+        }
+    }
+    saved
 }
 
 fn summaries(store: &Store) -> Vec<Summary> {
@@ -217,6 +275,7 @@ fn summaries(store: &Store) -> Vec<Summary> {
             provider: c.provider.clone(),
             dir: c.dir.clone(),
             updated: c.updated,
+            external: false,
         })
         .collect();
     rows.sort_by_key(|row| std::cmp::Reverse(row.updated));
@@ -229,6 +288,15 @@ pub fn open(chat: &Chat, id: &str) -> Result<Saved, String> {
     let saved = {
         let _file = FILE.lock().unwrap_or_else(|e| e.into_inner());
         load(&path()).conversations.into_iter().find(|c| c.id == id && supports(&c.provider))
+    };
+    let saved = match saved {
+        Some(saved) if saved.provider == claude_code::ID => {
+            let session = saved.handle.as_deref().and_then(claude_sessions::read);
+            Some(caught_up(saved, session))
+        }
+        Some(saved) => Some(saved),
+        // Not one of Coucou's (yet): a session of Claude Code's own.
+        None => id.strip_prefix(CLAUDE_PREFIX).and_then(claude_sessions::read).map(|t| from_session(id, t)),
     }
     .ok_or_else(|| crate::i18n::t("This conversation is gone."))?;
     match native_for(&saved) {
@@ -340,6 +408,50 @@ mod tests {
         std::fs::write(&path, br#"{"conversations":[{"id":"old","turns":[]}]}"#).unwrap();
         assert_eq!(load(&path).conversations[0].id, "old");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn session(id: &str, updated: u64, turns: Vec<Value>) -> claude_sessions::Transcript {
+        claude_sessions::Transcript {
+            found: claude_sessions::Found { session: id.into(), title: "From the terminal".into(), dir: "/work".into(), updated },
+            turns,
+        }
+    }
+
+    #[test]
+    fn claude_code_s_own_sessions_are_listed_once_with_coucou_s() {
+        let mut store = Store::default();
+        upsert(&mut store, Saved {
+            id: "mine".into(), provider: "claudecode".into(), handle: Some("s1".into()), updated: 50, ..Saved::default()
+        });
+        let found = |id: &str, updated| session(id, updated, vec![]).found;
+        let rows = merged(&store, vec![found("s1", 90), found("s2", 70), found("s3", 10)]);
+        assert_eq!(
+            rows.iter().map(|r| (r.id.as_str(), r.external)).collect::<Vec<_>>(),
+            [("claude:s2", true), ("mine", false), ("claude:s3", true)]
+        );
+        assert_eq!(rows[0].dir, "/work");
+    }
+
+    #[test]
+    fn a_session_opens_as_a_claude_code_conversation_that_resumes_it() {
+        let saved = from_session("claude:s2", session("s2", 70, turns()));
+        assert_eq!((saved.provider.as_str(), saved.dir.as_str(), saved.handle.as_deref()), ("claudecode", "/work", Some("s2")));
+        assert_eq!(saved.turns, turns());
+        assert_eq!(claude_code::session_in(&native_for(&saved).unwrap()).as_deref(), Some("s2"));
+    }
+
+    #[test]
+    fn a_saved_conversation_catches_up_with_what_was_said_in_its_session_since() {
+        let saved = Saved { id: "mine".into(), provider: "claudecode".into(), handle: Some("s1".into()), updated: 50, turns: turns(), ..Saved::default() };
+        let mut longer = turns();
+        longer.push(json!({"role":"user","content":"and the tests?"}));
+        longer.push(json!({"role":"assistant","content":"They pass."}));
+        let caught = caught_up(saved.clone(), Some(session("s1", 90, longer.clone())));
+        assert_eq!((caught.turns.len(), caught.updated, caught.title.as_str()), (4, 90, saved.title.as_str()));
+        // Nothing newer, a shorter transcript, or no transcript at all: Coucou's copy stands.
+        assert_eq!(caught_up(saved.clone(), Some(session("s1", 40, longer))), saved);
+        assert_eq!(caught_up(saved.clone(), Some(session("s1", 90, vec![]))), saved);
+        assert_eq!(caught_up(saved.clone(), None), saved);
     }
 
     #[test]

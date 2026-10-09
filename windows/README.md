@@ -261,6 +261,14 @@ the last 100 of them, and deleting one there leaves Claude Code's own session
 untouched. Other providers' conversations are not saved yet;
 `src-tauri/src/conversations.rs` says how to add one.
 
+The list also shows the sessions Claude Code holds itself — from a terminal or
+the Claude app — read from `~/.claude/projects`: opening one shows what was
+said and the next question resumes that session. Coucou only reads there; it
+never writes, moves or deletes anything of Claude Code's. The other way round
+needs nothing: a conversation held in a folder from Coucou is a Claude Code
+session from its first turn, so `claude --resume` in that folder finds it. A
+chat without a folder is not a Claude Code session and stays in Coucou.
+
 **Local models**: **Settings… → Local models** connects **Ollama** or **LM
 Studio** (leave the address empty for the usual one on this PC; Ollama's
 `OLLAMA_HOST` is honoured) or any server that speaks the OpenAI API (vLLM,
