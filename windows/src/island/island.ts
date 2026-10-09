@@ -44,7 +44,7 @@ const PRE_PROGRESS = USC.T_PROG_START - USC.T_DROP;
 const modeOrder = (m: IslandMode) => (m === "hidden" ? 0 : m === "compact" ? 1 : 2);
 
 /** style.css `hover-glow-burst`, with a little slack. */
-const HOVER_GLOW_BURST_MS = 700;
+const HOVER_GLOW_BURST_MS = 520;
 
 export class Island {
   readonly fsm = new IslandStateMachine();
@@ -56,6 +56,7 @@ export class Island {
   /** The glow under the pointer while it is over the compact island. */
   private hoverGlow = h("div", { id: "hover-glow" });
   private glowBurst = 0;
+  private glowAt = { x: NaN, y: NaN };
   private clipEl!: HTMLElement;
   private contentEl!: HTMLElement;
   private viewsEl!: HTMLElement;
@@ -359,6 +360,8 @@ export class Island {
     if (mode === prev) return;
     State.mode = mode;
     this.followHoverGlow(prev === "compact" && mode === "expanded");
+    // A chat dragged taller is for what is being read now: it opens at its usual size.
+    if (mode !== "expanded") State.chatUserHeight = 0;
     if (mode === "expanded") Sound.play("open");
     if (prev === "expanded") {
       Sound.play("close");
@@ -653,7 +656,7 @@ export class Island {
 
   private targetSize(): { w: number; h: number; r: number } {
     let { w, h } = islandSize(
-      State.mode, State.view, State.chatHistory.length, State.chatPicking, State.settings.chatHeight,
+      State.mode, State.view, State.chatHistory.length, State.chatPicking, State.chatUserHeight,
     );
     if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
       h = QUESTION_PICKER_H;
@@ -721,18 +724,32 @@ export class Island {
     const glow = this.hoverGlow;
     const on = State.mode === "compact" && this.wasInIsland;
     if (on) {
-      // From the island's centre line: it widens around it as it opens.
-      glow.style.setProperty("--gx", `${State.mouseInIsland.x - this.width.value / 2}px`);
-      glow.style.setProperty("--gy", `${State.mouseInIsland.y}px`);
+      // From the island's centre line: it widens around it as it opens. Whole
+      // pixels, and only when they change: the cursor reports far more often.
+      const x = Math.round(State.mouseInIsland.x - this.width.value / 2);
+      const y = Math.round(State.mouseInIsland.y);
+      if (x !== this.glowAt.x || y !== this.glowAt.y) {
+        this.glowAt = { x, y };
+        glow.style.setProperty("--gx", `${x}px`);
+        glow.style.setProperty("--gy", `${y}px`);
+      }
     }
-    if (opening && glow.classList.contains("on")) {
+    const wasOn = glow.classList.contains("on");
+    if (on !== wasOn) glow.classList.toggle("on", on);
+    if (opening && wasOn) {
       const mine = ++this.glowBurst;
-      glow.classList.add("burst");
-      window.setTimeout(() => {
+      const done = () => {
         if (this.glowBurst === mine) glow.classList.remove("burst");
-      }, HOVER_GLOW_BURST_MS);
+      };
+      glow.classList.add("burst");
+      glow.addEventListener("animationend", done, { once: true });
+      // Should the animation never report its end, the glow still goes.
+      window.setTimeout(done, HOVER_GLOW_BURST_MS);
+    } else if (on && glow.classList.contains("burst")) {
+      // Back over the compact island before a burst ended: the glow, not its ghost.
+      this.glowBurst++;
+      glow.classList.remove("burst");
     }
-    glow.classList.toggle("on", on);
   }
 
   // ── Window collapse (hidden → tiny wake strip, zero polling) ────────────────
@@ -1254,6 +1271,6 @@ export class Island {
   }
 
   get chatHeight() {
-    return chatPromptHeight(State.chatHistory.length, State.chatPicking, State.settings.chatHeight);
+    return chatPromptHeight(State.chatHistory.length, State.chatPicking, State.chatUserHeight);
   }
 }

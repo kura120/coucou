@@ -133,8 +133,6 @@ export interface Settings {
   claudeCodeDir: string;
   claudeCodeEffort: string;
   claudeCodeMode: string;
-  /** The chat's height once the user dragged its lower edge; 0 follows the conversation. */
-  chatHeight: number;
   /** Model server addresses once connected; empty means not connected. */
   ollamaUrl: string;
   lmstudioUrl: string;
@@ -186,7 +184,6 @@ export const DEFAULT_SETTINGS: Settings = {
   claudeCodeDir: "",
   claudeCodeEffort: "",
   claudeCodeMode: "default",
-  chatHeight: 0,
   ollamaUrl: "",
   lmstudioUrl: "",
   customUrl: "",
@@ -235,6 +232,11 @@ class AppState {
   conversationId: string | null = null;
   /** The chat's text field has the keyboard: the island stays open. */
   chatTyping = false;
+  /**
+   * The height the chat was dragged to, while the island stays open; 0 follows
+   * the conversation. Forgotten when the island closes.
+   */
+  chatUserHeight = 0;
   /** The chat's lower edge is being dragged: the island follows without easing. */
   chatResizing = false;
   pendingApproval: ApprovalInfo | null = null;

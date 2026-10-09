@@ -560,7 +560,7 @@ export function drawPulls(el: HTMLElement, pulls: RepoPulls) {
       h(
         "div",
         { class: b.current ? "convo-row on" : "convo-row", title: b.branch },
-        svg(ICONS.pull, 10),
+        svg(ICONS.pull, 10, { stroke: 2.2 }),
         h("span", { class: "convo-title", text: b.branch }),
         b.pushed ? null : h("span", { class: "pull-tag", text: t(STRINGS.notPushed) }),
         h("span", { class: "convo-when", text: tn("{count} commit", "{count} commits", b.ahead) }),
@@ -644,7 +644,8 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   const pullBtn = h(
     "button",
     { class: "convo-btn pull-btn", title: tl(STRINGS.pulls) },
-    svg(ICONS.pull, 10),
+    // A line icon: drawn filled it is all but invisible.
+    svg(ICONS.pull, 11, { stroke: 2.4 }),
     svg(ICONS.chevronUpDown, 9, { stroke: 2 }),
   );
   const modelRow = h("div", { class: "model-row" }, h("div", { class: "model-row-left" }, convoBtn, pullBtn), modelBtn);
@@ -676,7 +677,8 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   body.append(chipRow, log, picker.el, convos.el, pulls.el, modelRow, bar);
 
   // The card's lower edge: drag it to make the chat taller or shorter, double-
-  // click to let it follow the conversation again.
+  // click to let it follow the conversation again. The height lasts until the
+  // island closes: the chat always opens at its usual size.
   const grip = h("div", { class: "chat-grip" });
   const el = h("div", { class: "view" }, h("div", { class: "card wash chat-card" }, body, grip));
   (el.querySelector(".card") as HTMLElement).style.setProperty("--wash", "rgba(99,102,241,0.5)");
@@ -709,9 +711,9 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     send.title = t(stoppable ? STRINGS.stop : STRINGS.send);
   }
 
-  function setHeight(chatHeight: number) {
-    if (chatHeight === State.settings.chatHeight) return;
-    State.settings = { ...State.settings, chatHeight };
+  function setHeight(height: number) {
+    if (height === State.chatUserHeight) return;
+    State.chatUserHeight = height;
     State.notify();
     onHeightChange();
   }
@@ -720,7 +722,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   grip.addEventListener("pointerdown", (e) => {
     const p = e as PointerEvent;
     if (p.button !== 0) return;
-    const height = chatPromptHeight(State.chatHistory.length, State.chatPicking, State.settings.chatHeight);
+    const height = chatPromptHeight(State.chatHistory.length, State.chatPicking, State.chatUserHeight);
     drag = { y: p.clientY, height };
     State.chatResizing = true;
     grip.setPointerCapture?.(p.pointerId);
@@ -734,14 +736,10 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     if (!drag) return;
     drag = null;
     State.chatResizing = false;
-    saveSettings();
   };
   grip.addEventListener("pointerup", endDrag);
   grip.addEventListener("pointercancel", endDrag);
-  grip.addEventListener("dblclick", () => {
-    setHeight(0);
-    saveSettings();
-  });
+  grip.addEventListener("dblclick", () => setHeight(0));
 
   // While the field has the keyboard the island does not fold (island.ts).
   // Told a moment later: a blur can come from inside a sync.

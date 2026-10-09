@@ -51,9 +51,6 @@ pub struct Settings {
     pub claude_code_dir: String,
     pub claude_code_effort: String,
     pub claude_code_mode: String,
-    /// The chat's height once the user dragged its lower edge, logical pixels;
-    /// 0 lets it follow the conversation.
-    pub chat_height: f64,
     /// Addresses of the model servers once connected; empty means not connected.
     pub ollama_url: String,
     pub lmstudio_url: String,
@@ -128,7 +125,6 @@ impl Default for Settings {
             claude_code_dir: String::new(),
             claude_code_effort: String::new(),
             claude_code_mode: "default".into(),
-            chat_height: 0.0,
             ollama_url: String::new(),
             lmstudio_url: String::new(),
             custom_url: String::new(),
@@ -409,7 +405,6 @@ mod tests {
   "claudeCodeDir": "C:/work/app",
   "claudeCodeEffort": "high",
   "claudeCodeMode": "plan",
-  "chatHeight": 420.5,
   "ollamaUrl": "http://127.0.0.1:11434",
   "lmstudioUrl": "http://127.0.0.1:1234",
   "customUrl": "https://llm.example.com",
@@ -816,7 +811,6 @@ mod tests {
                 "claudeCodeDir",
                 "claudeCodeEffort",
                 "claudeCodeMode",
-                "chatHeight",
                 "ollamaUrl",
                 "lmstudioUrl",
                 "customUrl",

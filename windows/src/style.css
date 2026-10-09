@@ -114,18 +114,23 @@ body {
   transform: scale(1);
 }
 
+/* A short, modest burst: the island is growing at the same moment, and a
+   glow thirteen times its size held that opening up. No transition while it
+   plays, so nothing fights the animation, and nothing is left when it ends. */
 #hover-glow.burst {
-  animation: hover-glow-burst 0.62s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  transition: none;
+  will-change: transform, opacity;
+  animation: hover-glow-burst 0.4s ease-out both;
 }
 
 @keyframes hover-glow-burst {
   from {
-    opacity: 0.95;
+    opacity: 0.9;
     transform: scale(1);
   }
   to {
     opacity: 0;
-    transform: scale(13);
+    transform: scale(4.5);
   }
 }
 
