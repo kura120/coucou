@@ -3580,6 +3580,83 @@
    "pt-BR": "A pasta escolhida para o Claude Code não existe mais. Escolha outra acima da caixa de chat.",
    "ru": "Папка, выбранная для Claude Code, больше не существует. Выберите другую над полем чата.",
    "id": "Folder yang dipilih untuk Claude Code sudah tidak ada. Pilih yang lain di atas kotak obrolan."
+  },
+  "Conversations": {
+   "zh-Hans": "对话",
+   "hi": "बातचीत",
+   "es": "Conversaciones",
+   "ar": "المحادثات",
+   "fr": "Conversations",
+   "bn": "কথোপকথন",
+   "pt-BR": "Conversas",
+   "ru": "Беседы",
+   "id": "Percakapan"
+  },
+  "New chat": {
+   "zh-Hans": "新对话",
+   "hi": "नई चैट",
+   "es": "Nuevo chat",
+   "ar": "دردشة جديدة",
+   "fr": "Nouveau chat",
+   "bn": "নতুন চ্যাট",
+   "pt-BR": "Novo chat",
+   "ru": "Новый чат",
+   "id": "Obrolan baru"
+  },
+  "New chat in this folder": {
+   "zh-Hans": "在此文件夹中新建对话",
+   "hi": "इस फ़ोल्डर में नई चैट",
+   "es": "Nuevo chat en esta carpeta",
+   "ar": "دردشة جديدة في هذا المجلد",
+   "fr": "Nouveau chat dans ce dossier",
+   "bn": "এই ফোল্ডারে নতুন চ্যাট",
+   "pt-BR": "Novo chat nesta pasta",
+   "ru": "Новый чат в этой папке",
+   "id": "Obrolan baru di folder ini"
+  },
+  "No folder": {
+   "zh-Hans": "无文件夹",
+   "hi": "कोई फ़ोल्डर नहीं",
+   "es": "Sin carpeta",
+   "ar": "بلا مجلد",
+   "fr": "Sans dossier",
+   "bn": "ফোল্ডার নেই",
+   "pt-BR": "Sem pasta",
+   "ru": "Без папки",
+   "id": "Tanpa folder"
+  },
+  "No conversations yet.": {
+   "zh-Hans": "还没有对话。",
+   "hi": "अभी कोई बातचीत नहीं।",
+   "es": "Aún no hay conversaciones.",
+   "ar": "لا توجد محادثات بعد.",
+   "fr": "Pas encore de conversation.",
+   "bn": "এখনও কোনো কথোপকথন নেই।",
+   "pt-BR": "Ainda não há conversas.",
+   "ru": "Бесед пока нет.",
+   "id": "Belum ada percakapan."
+  },
+  "Delete this conversation": {
+   "zh-Hans": "删除此对话",
+   "hi": "यह बातचीत हटाएँ",
+   "es": "Eliminar esta conversación",
+   "ar": "حذف هذه المحادثة",
+   "fr": "Supprimer cette conversation",
+   "bn": "এই কথোপকথন মুছুন",
+   "pt-BR": "Excluir esta conversa",
+   "ru": "Удалить эту беседу",
+   "id": "Hapus percakapan ini"
+  },
+  "This conversation is gone.": {
+   "zh-Hans": "此对话已不存在。",
+   "hi": "यह बातचीत अब नहीं है।",
+   "es": "Esta conversación ya no existe.",
+   "ar": "هذه المحادثة لم تعد موجودة.",
+   "fr": "Cette conversation n'existe plus.",
+   "bn": "এই কথোপকথনটি আর নেই।",
+   "pt-BR": "Esta conversa não existe mais.",
+   "ru": "Этой беседы больше нет.",
+   "id": "Percakapan ini sudah tidak ada."
   }
  }
 }

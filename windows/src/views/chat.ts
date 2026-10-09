@@ -7,11 +7,17 @@
 // models of the chosen provider, asked for only once it is picked. Claude Code
 // has options of its own under its models: the folder it works in, its effort
 // and its permission mode (src-tauri/src/claude_code.rs).
+//
+// A provider whose conversations are saved (core/providers.ts) has their list
+// behind the title on the left of the model: grouped by the folder they work
+// in, newest first. Opening one puts it back in the chat, on both sides.
 
 import { h, svg, clear } from "./dom";
 import { ICONS } from "./icons";
 import { renderMarkdown } from "./markdown";
-import { Bridge, onEvent, type ChatContext, type ModelInfo } from "../core/bridge";
+import {
+  Bridge, onEvent, type ChatContext, type ConversationSummary, type ModelInfo,
+} from "../core/bridge";
 import {
   activeModel, pickModel, providerDef, visibleProviders, withModel, type ProviderDef,
 } from "../core/providers";
@@ -19,7 +25,7 @@ import { CHAT_MIN_H, chatPromptHeight, clampChatHeight } from "../core/layout";
 import { Sound } from "../core/sound";
 import { State, type ChatMessage } from "../core/state";
 import type { ViewHost } from "./views";
-import { N_, t, tl } from "../i18n/i18n";
+import { N_, dayMonth, t, tl } from "../i18n/i18n";
 
 const STRINGS = {
   placeholderFirst: N_("Ask me anything…"),
@@ -39,6 +45,12 @@ const STRINGS = {
   permissions: N_("Permissions"),
   chatOnly: N_("Without a folder, Claude Code only chats and searches the web."),
   inFolder: N_("Claude Code can read, edit and run commands in this folder. What it must ask for shows in the island."),
+  conversations: N_("Conversations"),
+  newChat: N_("New chat"),
+  newChatHere: N_("New chat in this folder"),
+  anyFolder: N_("No folder"),
+  noConversations: N_("No conversations yet."),
+  deleteConversation: N_("Delete this conversation"),
 };
 
 /** Claude Code's `--effort` levels; "" leaves it to Claude Code. */
@@ -287,6 +299,125 @@ function buildPicker(onChange: () => void): Picker {
   };
 }
 
+// ── Conversations ─────────────────────────────────────────────────────────────
+
+/** A folder's own name: the last part of its path. */
+export function folderName(dir: string): string {
+  return dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
+}
+
+/** The list's groups: one per folder, in the order of their newest conversation. */
+export function groupByFolder(list: ConversationSummary[]): { dir: string; items: ConversationSummary[] }[] {
+  const groups = new Map<string, ConversationSummary[]>();
+  for (const c of list) {
+    if (!groups.has(c.dir)) groups.set(c.dir, []);
+    groups.get(c.dir)!.push(c);
+  }
+  return [...groups].map(([dir, items]) => ({ dir, items }));
+}
+
+/** The time of a conversation's last answer today, its day before that. */
+function when(updated: number): string {
+  const date = new Date(updated * 1000);
+  const now = new Date();
+  const today =
+    date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+  if (!today) return dayMonth(date.getMonth(), date.getDate());
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+interface ConversationList {
+  el: HTMLElement;
+  open(): void;
+  close(): void;
+  readonly isOpen: boolean;
+}
+
+/**
+ * The saved conversations, by folder. `pick` opens one; `start` begins a new
+ * one in a folder ("" for none).
+ */
+function buildConversations(
+  onChange: () => void,
+  pick: (id: string) => void,
+  start: (dir: string) => void,
+): ConversationList {
+  const el = h("div", { class: "convos" });
+  let isOpen = false;
+  let request = 0;
+
+  function heading(dir: string): HTMLElement {
+    return h(
+      "div",
+      { class: "convo-group", title: dir },
+      h("span", { text: dir ? folderName(dir) : t(STRINGS.anyFolder) }),
+      h(
+        "button",
+        { class: "convo-icon", title: tl(dir ? STRINGS.newChatHere : STRINGS.newChat), onclick: () => start(dir) },
+        svg(ICONS.plus, 11),
+      ),
+    );
+  }
+
+  function row(c: ConversationSummary): HTMLElement {
+    const remove = h(
+      "button",
+      { class: "convo-icon", title: tl(STRINGS.deleteConversation) },
+      svg(ICONS.xmark, 10),
+    );
+    remove.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await Bridge.conversationDelete(c.id);
+      if (State.conversationId === c.id) State.conversationId = null;
+      void load();
+    });
+    const el = h(
+      "div",
+      { class: c.id === State.conversationId ? "convo-row on" : "convo-row", title: c.title },
+      h("i", { class: "model-dot", style: `background:${providerDef(c.provider).accent}` }),
+      h("span", { class: "convo-title", text: c.title }),
+      h("span", { class: "convo-when", text: when(c.updated) }),
+      remove,
+    );
+    el.addEventListener("click", () => pick(c.id));
+    return el;
+  }
+
+  async function load() {
+    const ticket = ++request;
+    const list = (await Bridge.conversationsList()) ?? [];
+    if (ticket !== request) return;
+    clear(el);
+    const groups = groupByFolder(list);
+    // The folder in use is always there to start a chat in, even with nothing saved in it yet.
+    const current = State.settings.claudeCodeDir;
+    if (!groups.some((g) => g.dir === current)) groups.unshift({ dir: current, items: [] });
+    for (const group of groups) {
+      el.append(heading(group.dir));
+      for (const c of group.items) el.append(row(c));
+    }
+    if (list.length === 0) el.append(h("div", { class: "picker-status", text: t(STRINGS.noConversations) }));
+  }
+
+  return {
+    el,
+    open() {
+      isOpen = true;
+      clear(el);
+      onChange();
+      void load();
+    },
+    close() {
+      isOpen = false;
+      request++;
+      onChange();
+    },
+    get isOpen() {
+      return isOpen;
+    },
+  };
+}
+
 // ── View ──────────────────────────────────────────────────────────────────────
 
 export function buildPrompt(onHeightChange: () => void): ViewHost {
@@ -310,20 +441,33 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     modelName,
     svg(ICONS.chevronUpDown, 9, { stroke: 2 }),
   );
-  const modelRow = h("div", { class: "model-row" }, modelBtn);
+  // The conversation's title, left of the model: opens the list of the saved ones.
+  const convoName = h("span", { class: "convo-name" });
+  const convoBtn = h(
+    "button",
+    { class: "convo-btn", title: tl(STRINGS.conversations) },
+    svg(ICONS.bubble, 9),
+    convoName,
+    svg(ICONS.chevronUpDown, 9, { stroke: 2 }),
+  );
+  const modelRow = h("div", { class: "model-row" }, convoBtn, modelBtn);
 
   const body = h("div", { class: "chat-body" });
-  const picker = buildPicker(() => {
+  /** The picker or the list is open: the island is taller, and the log gives way. */
+  const panelChanged = () => {
     body.classList.toggle("picking", picker.isOpen);
+    body.classList.toggle("listing", convos.isOpen);
     drawModelButton();
-    // The island is taller while the picker is open.
-    if (State.chatPicking !== picker.isOpen) {
-      State.chatPicking = picker.isOpen;
+    const open = picker.isOpen || convos.isOpen;
+    if (State.chatPicking !== open) {
+      State.chatPicking = open;
       State.notify();
       onHeightChange();
     }
-  });
-  body.append(chipRow, log, picker.el, modelRow, bar);
+  };
+  const picker = buildPicker(panelChanged);
+  const convos = buildConversations(panelChanged, (id) => void openConversation(id), startIn);
+  body.append(chipRow, log, picker.el, convos.el, modelRow, bar);
 
   // The card's lower edge: drag it to make the chat taller or shorter, double-
   // click to let it follow the conversation again.
@@ -344,6 +488,12 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     modelName.textContent = activeModel(State.settings) || t(STRINGS.noModel);
     modelBtn.classList.toggle("open", picker.isOpen);
     modelBtn.disabled = sending;
+    // Only a provider whose conversations are saved has the list.
+    convoBtn.style.display = p.conversations || convos.isOpen ? "" : "none";
+    convoBtn.classList.toggle("open", convos.isOpen);
+    convoBtn.disabled = sending;
+    const first = State.conversationId ? State.chatHistory.find((m) => m.role === "user") : undefined;
+    convoName.textContent = first ? first.content.replace(/\s+/g, " ").trim() : t(STRINGS.conversations);
     send.classList.toggle("stop", stoppable);
     send.title = t(stoppable ? STRINGS.stop : STRINGS.send);
   }
@@ -394,9 +544,67 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
 
   modelBtn.addEventListener("click", () => {
     if (sending) return;
+    if (convos.isOpen) convos.close();
     if (picker.isOpen) picker.close();
     else picker.open();
   });
+
+  convoBtn.addEventListener("click", () => {
+    if (sending) return;
+    if (picker.isOpen) picker.close();
+    if (convos.isOpen) convos.close();
+    else convos.open();
+  });
+
+  /** The chat shows another conversation (or none): redraw, and back to the field. */
+  function showConversation() {
+    State.droppedFile = null;
+    State.promptContext = null;
+    saveSettings();
+    renderedCount = -1;
+    if (convos.isOpen) convos.close();
+    State.notify();
+    onHeightChange();
+    input.focus();
+  }
+
+  async function openConversation(id: string) {
+    if (sending) return;
+    let saved;
+    try {
+      saved = await Bridge.conversationOpen(id);
+    } catch (err) {
+      State.noteMessage = String(err).replace(/^Error:\s*/, "");
+      State.view = "note";
+      State.notify();
+      return;
+    }
+    State.chatHistory = saved.turns.map((turn) => ({
+      id: nextId++,
+      role: turn.role === "assistant" ? "assistant" : "user",
+      content: String(turn.content),
+    }));
+    State.conversationId = saved.id;
+    // The conversation comes back with who answered it, and where it worked.
+    const provider = providerDef(saved.provider);
+    let settings = { ...State.settings, chatProvider: provider.id };
+    if (saved.model) settings = withModel(settings, provider.id, saved.model);
+    if (provider.id === "claudecode") settings.claudeCodeDir = saved.dir;
+    State.settings = settings;
+    Sound.play("blip");
+    showConversation();
+  }
+
+  /** A new conversation in `dir` ("" for a plain chat). */
+  function startIn(dir: string) {
+    if (sending) return;
+    State.chatHistory = [];
+    State.conversationId = null;
+    void Bridge.chatReset();
+    State.settings = { ...State.settings, claudeCodeDir: dir };
+    Sound.play("blip");
+    showConversation();
+  }
 
   void onEvent<string>("chat-delta", (text) => {
     if (!sending || !text) return; // nothing visible yet: the dots stay
@@ -413,6 +621,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     const query = input.value.trim();
     if (!query || sending) return;
     if (picker.isOpen) picker.close();
+    if (convos.isOpen) convos.close();
     input.value = "";
     sending = true;
     stoppable = State.settings.chatProvider === "claudecode";
@@ -431,6 +640,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     try {
       const reply = await Bridge.chatSend(query, context);
       State.chatHistory.push({ id: nextId++, role: "assistant", content: reply.text });
+      if (reply.conversationId) State.conversationId = reply.conversationId;
       State.stateOverride = null;
       Sound.play("finish");
     } catch (err) {
@@ -459,9 +669,10 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     if (key === "Enter") {
       e.preventDefault();
       void submit();
-    } else if (key === "Escape" && picker.isOpen) {
+    } else if (key === "Escape" && (picker.isOpen || convos.isOpen)) {
       e.preventDefault();
-      picker.close();
+      if (picker.isOpen) picker.close();
+      if (convos.isOpen) convos.close();
     }
     e.stopPropagation(); // Escape closes the island, not the chat
   });
@@ -487,8 +698,11 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
         log.scrollTop = log.scrollHeight;
       }
 
-      // Leaving the chat folds the picker away.
+      // Leaving the chat folds the picker and the list away.
       if (State.view !== "prompt" && picker.isOpen) picker.close();
+      if (State.view !== "prompt" && convos.isOpen) convos.close();
+      // A chat emptied elsewhere (the new-chat shortcut, a dropped file) is a new conversation.
+      if (State.chatHistory.length === 0 && !sending) State.conversationId = null;
       drawModelButton();
 
       input.placeholder = t(State.chatHistory.length === 0 ? STRINGS.placeholderFirst : STRINGS.placeholderNext);

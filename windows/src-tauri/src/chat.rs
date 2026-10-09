@@ -60,6 +60,16 @@ struct Conversation {
     native: Vec<Value>,
     /// `{"role", "content": text}` turns, the same whoever answered.
     plain: Vec<Value>,
+    /// Its id among the saved conversations (conversations.rs), once it has one.
+    id: Option<String>,
+}
+
+/// The conversation as it stands, for conversations.rs to save.
+pub struct Snapshot {
+    pub id: String,
+    pub owner: Option<String>,
+    pub native: Vec<Value>,
+    pub plain: Vec<Value>,
 }
 
 /// What a provider needs to build one turn.
@@ -77,6 +87,37 @@ impl Chat {
         let mut c = self.inner.lock().unwrap();
         let epoch = c.epoch + 1;
         *c = Conversation { epoch, ..Default::default() };
+    }
+
+    /// Bumped by every reset: a turn that began before one is not this conversation's.
+    pub fn epoch(&self) -> u64 {
+        self.inner.lock().unwrap().epoch
+    }
+
+    /// The conversation, given an id by `new_id` if it has none yet.
+    pub fn snapshot(&self, new_id: impl FnOnce() -> String) -> Snapshot {
+        let mut c = self.inner.lock().unwrap();
+        let id = c.id.get_or_insert_with(new_id).clone();
+        Snapshot { id, owner: c.owner.clone(), native: c.native.clone(), plain: c.plain.clone() }
+    }
+
+    /// A saved conversation takes the place of the current one. `owner` and
+    /// `native` are the provider that can pick it up as it left it, if any;
+    /// without them the next turn starts from the plain turns, like a switch
+    /// of provider.
+    pub fn restore(&self, id: &str, owner: Option<&str>, native: Vec<Value>, plain: Vec<Value>) {
+        let mut c = self.inner.lock().unwrap();
+        let epoch = c.epoch + 1;
+        *c = Conversation { epoch, owner: owner.map(str::to_string), native, plain, id: Some(id.to_string()) };
+    }
+
+    /// The saved conversation `id` was deleted: if it is the current one, the
+    /// chat goes on as a conversation not saved yet.
+    pub fn detach(&self, id: &str) {
+        let mut c = self.inner.lock().unwrap();
+        if c.id.as_deref() == Some(id) {
+            c.id = None;
+        }
     }
 
     /// Starts a turn with `provider`, converting the history if another
@@ -313,6 +354,34 @@ mod tests {
         let _other = chat.begin("google");
         chat.commit(&t, json!({"role":"user","content":"q"}), json!({"role":"assistant","content":"a"}), "q", "a");
         assert!(chat.begin("google").first);
+    }
+
+    #[test]
+    fn a_saved_conversation_comes_back_with_its_id_and_a_new_chat_has_none() {
+        let chat = Chat::default();
+        let mut made = 0;
+        let s = chat.snapshot(|| { made += 1; "new".into() });
+        assert_eq!((s.id.as_str(), s.plain.len()), ("new", 0));
+        // The id sticks: it is not made twice.
+        assert_eq!(chat.snapshot(|| "other".into()).id, "new");
+        assert_eq!(made, 1);
+
+        let plain = vec![json!({"role":"user","content":"q"}), json!({"role":"assistant","content":"a"})];
+        let native = vec![json!({"role":"user","content":"q","session":"s1"}), json!({"role":"assistant","content":"a"})];
+        let before = chat.epoch();
+        chat.restore("c7", Some("claudecode"), native.clone(), plain.clone());
+        assert!(chat.epoch() > before);
+        // Its own provider carries on from its own history, any other from the plain turns.
+        assert_eq!(chat.begin("claudecode").history, native);
+        assert_eq!(chat.begin("openai").history, plain);
+        assert_eq!(chat.snapshot(|| "x".into()).id, "c7");
+
+        chat.detach("someone-else");
+        assert_eq!(chat.snapshot(|| "x".into()).id, "c7");
+        chat.detach("c7");
+        assert_eq!(chat.snapshot(|| "fresh".into()).id, "fresh");
+        chat.reset();
+        assert_eq!(chat.snapshot(|| "after-reset".into()).id, "after-reset");
     }
 
     #[test]

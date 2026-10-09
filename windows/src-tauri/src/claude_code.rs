@@ -10,7 +10,8 @@
 //
 // * No folder — a plain chat model. Web search is its only tool, no settings
 //   file is read (Coucou's own hooks do not fire), nothing is saved to disk,
-//   and the earlier turns ride along with each question.
+//   and the earlier turns ride along with each question. (Coucou itself keeps
+//   the conversation's text, like any conversation of the list: conversations.rs.)
 // * A folder — Claude Code as it runs in a terminal there: its tools, the
 //   user's settings and the project's, in the permission mode picked. The
 //   conversation is a Claude Code session, resumed turn after turn. Anything
@@ -160,6 +161,26 @@ fn session_of(history: &[Value], dir: &Path) -> Option<String> {
     let last = history.iter().rev().find(|m| m.get("role").and_then(Value::as_str) == Some("user"))?;
     let same = last.get("dir").and_then(Value::as_str) == Some(dir.to_string_lossy().as_ref());
     last.get("session").and_then(Value::as_str).filter(|_| same).map(str::to_string)
+}
+
+/// The session of the conversation's last turn, whatever its folder — what a
+/// saved conversation keeps (conversations.rs).
+pub fn session_in(history: &[Value]) -> Option<String> {
+    let last = history.iter().rev().find(|m| m.get("role").and_then(Value::as_str) == Some("user"))?;
+    last.get("session").and_then(Value::as_str).map(str::to_string)
+}
+
+/// A saved conversation's turns as this module keeps them: the last question
+/// carries the session and its folder again, so the next turn resumes it.
+pub fn resumed(turns: &[Value], session: &str, dir: &str) -> Vec<Value> {
+    let mut history = turns.to_vec();
+    if let Some(Value::Object(last)) =
+        history.iter_mut().rev().find(|m| m.get("role").and_then(Value::as_str) == Some("user"))
+    {
+        last.insert("session".into(), json!(session));
+        last.insert("dir".into(), json!(dir));
+    }
+    history
 }
 
 /// The one line Claude Code reads: a single user message. Turns it does not
@@ -493,6 +514,24 @@ mod tests {
         let plain = json!({"role":"user","content":"q2"});
         assert_eq!(session_of(&[ours, reply.clone(), plain, reply], Path::new("/work")), None);
         assert_eq!(session_of(&[], Path::new("/work")), None);
+    }
+
+    #[test]
+    fn a_saved_conversation_resumes_its_session_in_its_folder() {
+        let turns = vec![
+            json!({"role":"user","content":"q1"}),
+            json!({"role":"assistant","content":"a1"}),
+            json!({"role":"user","content":"q2"}),
+            json!({"role":"assistant","content":"a2"}),
+        ];
+        let history = resumed(&turns, "s1", "/work");
+        assert_eq!(session_in(&history).as_deref(), Some("s1"));
+        assert_eq!(session_of(&history, Path::new("/work")).as_deref(), Some("s1"));
+        assert_eq!(session_of(&history, Path::new("/elsewhere")), None);
+        // Only the last question carries it, and the text is untouched.
+        assert!(history[0].get("session").is_none());
+        assert_eq!(history[2]["content"], "q2");
+        assert_eq!(session_in(&turns), None);
     }
 
     #[test]

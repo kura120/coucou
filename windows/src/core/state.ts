@@ -229,6 +229,8 @@ class AppState {
   chatHistory: ChatMessage[] = [];
   /** The chat's provider and model picker is open: the island is taller. */
   chatPicking = false;
+  /** The saved conversation the chat is in; null until its first answer. */
+  conversationId: string | null = null;
   /** The chat's text field has the keyboard: the island stays open. */
   chatTyping = false;
   /** The chat's lower edge is being dragged: the island follows without easing. */

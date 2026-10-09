@@ -143,7 +143,12 @@ export const Bridge = {
   // ── Chat, files, secrets ──────────────────────────────────────────────────
   /** One chat turn. The API key and any file bytes never leave Rust. */
   chatSend: (query: string, context: ChatContext | null) =>
-    callOrThrow<{ text: string }>("chat_send", { query, context }),
+    callOrThrow<{ text: string; conversationId?: string | null }>("chat_send", { query, context }),
+  /** The saved conversations, newest first. */
+  conversationsList: () => call<ConversationSummary[]>("conversations_list"),
+  /** Opens a saved conversation: the Rust side carries on from it. */
+  conversationOpen: (id: string) => callOrThrow<SavedConversation>("conversation_open", { id }),
+  conversationDelete: (id: string) => call<void>("conversation_delete", { id }),
   chatReset: () => call<void>("chat_reset"),
   /** Ends the Claude Code turn that is running. */
   chatStop: () => call<void>("chat_stop"),
@@ -281,6 +286,22 @@ export type ChatContext =
 export interface ModelInfo {
   id: string;
   label: string;
+}
+
+/** A row of the chat's conversation list (conversations.rs). */
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  provider: string;
+  /** The folder it works in; empty for a plain chat. */
+  dir: string;
+  /** Seconds since 1970, at the last answer. */
+  updated: number;
+}
+
+export interface SavedConversation extends ConversationSummary {
+  model: string;
+  turns: { role: string; content: string }[];
 }
 
 export interface LocalServer {

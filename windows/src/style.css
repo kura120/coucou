@@ -1185,6 +1185,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 .model-row {
   display: flex;
+  gap: 8px;
   justify-content: flex-end;
   padding: 0 10px;
 }
@@ -1350,6 +1351,157 @@ input[type="range"]::-webkit-slider-thumb {
   color: #60a5fa;
   font: inherit;
   cursor: default;
+}
+
+/* ── Conversations (the list behind the title, left of the model) ─────────── */
+
+/* The model button's twin, at the other end of its row. */
+.convo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 55%;
+  margin-right: auto;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #5c6370;
+  cursor: default;
+}
+
+.convo-btn:hover:not(:disabled),
+.convo-btn.open {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.convo-btn:disabled {
+  opacity: 0.6;
+}
+
+.convo-btn svg {
+  flex: 0 0 auto;
+}
+
+.convo-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 10.5px var(--font);
+  color: #7b8089;
+}
+
+.convos {
+  display: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #16171b;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.chat-body.listing .convos {
+  display: flex;
+}
+
+.chat-body.listing .chat-log,
+.chat-body.listing .chip-row {
+  display: none;
+}
+
+.convo-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 2px;
+  font: 500 10.5px var(--font);
+  color: #6b7079;
+}
+
+.convo-group:first-child {
+  padding-top: 0;
+}
+
+.convo-group span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.convo-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #8a8f98;
+  cursor: default;
+}
+
+.convo-icon:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink-2);
+}
+
+.convo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 4px 5px 8px;
+  border-radius: 6px;
+  color: #c8cdd4;
+  font: 400 12px var(--font);
+  cursor: default;
+}
+
+.convo-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.convo-row.on {
+  color: var(--ink-2);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.convo-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.convo-when {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: #6b7079;
+}
+
+/* The delete button takes the date's place under the pointer. */
+.convo-row .convo-icon {
+  display: none;
+}
+
+.convo-row:hover .convo-icon {
+  display: grid;
+}
+
+.convo-row:hover .convo-when {
+  display: none;
 }
 
 /* Claude Code's own options, under its models: folder, effort, permissions. */
