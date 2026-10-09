@@ -3,6 +3,9 @@
 // slight overshoot, one after the other, and the page fades out before Rust
 // hides the window. The window itself is never moved or resized — only what is
 // drawn inside it. The timings live in settings.css.
+//
+// Like the island's own motion, it plays whatever Windows' "Animation effects"
+// setting says: honouring it here only made this one window open flat.
 
 import { Bridge, IS_TAURI, onEvent } from "../core/bridge";
 
@@ -16,8 +19,6 @@ type Phase = "hidden" | "open" | "closing";
 let phase: Phase = "hidden";
 /** Bumped by every transition, so a timer from an older one does nothing. */
 let token = 0;
-
-const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function enter(root: HTMLElement) {
   if (phase === "open") return;
@@ -44,7 +45,7 @@ function leave(root: HTMLElement) {
     if (token !== mine) return;
     phase = "hidden";
     void Bridge.hideSettingsWindow();
-  }, reducedMotion() ? 0 : LEAVE_MS);
+  }, LEAVE_MS);
 }
 
 /**
