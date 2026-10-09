@@ -377,3 +377,26 @@ test("open on hover: an island opened by an alert keeps the normal delay", () =>
   seconds(2);
   assert.equal(fsm.state, "petit");
 });
+
+test("the island does not fold while the chat field has the keyboard", () => {
+  fsm.forceHome();
+  fsm.mouseLeft();
+  seconds(10);
+  // Typing begins mid-countdown: the countdown is dropped, not paused.
+  fsm.typing = true;
+  assert.equal(fsm.homeCollapseDueAt, null);
+  seconds(600);
+  assert.equal(fsm.state, "home");
+  // The mouse coming and going changes nothing while the field is focused.
+  fsm.mouseEntered();
+  fsm.mouseLeft();
+  seconds(600);
+  assert.equal(fsm.state, "home");
+  // Letting go: the island says the mouse is away, and the full delay runs again.
+  fsm.typing = false;
+  fsm.mouseLeft();
+  seconds(14);
+  assert.equal(fsm.state, "home");
+  seconds(2);
+  assert.equal(fsm.state, "petit");
+});

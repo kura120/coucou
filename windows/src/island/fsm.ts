@@ -30,6 +30,18 @@ export class IslandStateMachine {
   /** An alert waiting for an answer stays open, even when the mouse leaves. */
   pinned = false;
   /**
+   * The chat field has the keyboard: the open island does not fold while the
+   * user is writing. Letting go starts nothing by itself — the island tells
+   * the machine the mouse is away, as it does for a pin.
+   */
+  get typing(): boolean {
+    return this.isTyping;
+  }
+  set typing(on: boolean) {
+    this.isTyping = on;
+    if (on) this.clear("homeCollapse");
+  }
+  /**
    * Hovering opens the island all the way instead of peeking (Settings →
    * General → Open on hover, off by default), as IslandStateMachine.openOnHover.
    */
@@ -50,6 +62,7 @@ export class IslandStateMachine {
 
   private homeDelay = 15;
   private byHover = false;
+  private isTyping = false;
   private petitHide: number | null = null;
   private homeCollapse: number | null = null;
   private greetCollapse: number | null = null;
@@ -169,14 +182,14 @@ export class IslandStateMachine {
 
   private scheduleHomeCollapse() {
     this.clear("homeCollapse");
-    if (this.pinned) return;
+    if (this.pinned || this.isTyping) return;
     const ms = (this.byHover ? this.hoverCloseDelay : this.homeDelay) * 1000;
     this.homeCollapseDueAt = performance.now() + ms;
     this.homeCollapse = window.setTimeout(() => {
       this.homeCollapse = null;
       this.homeCollapseDueAt = null;
       // An alert pinned while the countdown ran keeps the island open.
-      if (this.state === "home" && !this.pinned) {
+      if (this.state === "home" && !this.pinned && !this.isTyping) {
         this.byHover = false;
         this.transition("petit");
       }

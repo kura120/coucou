@@ -50,11 +50,11 @@ export interface ViewLayout {
   agentMode: AgentLayoutMode;
 }
 
-// The window is a fixed 720×480 (largest view: the chat with its model picker
-// open) like the macOS panel; the island is drawn inside it, glued to the top
+// The window is a fixed 720×640 (largest view: the chat pulled all the way
+// down) like the macOS panel; the island is drawn inside it, glued to the top
 // edge and horizontally centred.
 export const PANEL_W = 720;
-export const PANEL_H = 480;
+export const PANEL_H = 640;
 
 // No notch on a PC: these are the hidden/compact sizes from docs/SPEC.md.
 export const NOTCH_W = 184;
@@ -106,8 +106,25 @@ export const QUESTION_PICKER_H = 200;
 /** The chat with its provider and model picker open: room to read the list. */
 export const CHAT_PICKER_H = 460;
 
-/** Chat view grows with the conversation — IslandContainer.chatPromptHeight. */
-export function chatPromptHeight(messageCount: number, picking = false): number {
+/** How short and how tall the chat can be dragged. */
+export const CHAT_MIN_H = 240;
+export const CHAT_MAX_H = PANEL_H - 20;
+
+/** A height the user dragged the chat to, kept within what the window can show. */
+export function clampChatHeight(h: number): number {
+  return Math.round(Math.min(CHAT_MAX_H, Math.max(CHAT_MIN_H, h)));
+}
+
+/**
+ * Chat view grows with the conversation — IslandContainer.chatPromptHeight —
+ * until the user drags its lower edge: it then keeps that height (`userHeight`,
+ * 0 when never dragged).
+ */
+export function chatPromptHeight(messageCount: number, picking = false, userHeight = 0): number {
+  if (userHeight > 0) {
+    const h = clampChatHeight(userHeight);
+    return picking ? Math.max(CHAT_PICKER_H, h) : h;
+  }
   if (picking) return CHAT_PICKER_H;
   return Math.min(300, 240 + messageCount * 40);
 }
@@ -117,6 +134,7 @@ export function islandSize(
   view: IslandViewName,
   chatCount = 0,
   chatPicking = false,
+  chatUserHeight = 0,
 ): { w: number; h: number } {
   switch (mode) {
     case "hidden":
@@ -126,7 +144,7 @@ export function islandSize(
     case "compact":
       return { w: COMPACT_W, h: NOTCH_H };
     case "expanded": {
-      const h = view === "prompt" ? chatPromptHeight(chatCount, chatPicking) : VIEW_LAYOUTS[view].height;
+      const h = view === "prompt" ? chatPromptHeight(chatCount, chatPicking, chatUserHeight) : VIEW_LAYOUTS[view].height;
       return { w: EXPANDED_W, h };
     }
   }

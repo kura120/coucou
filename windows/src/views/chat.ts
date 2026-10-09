@@ -15,6 +15,7 @@ import { Bridge, onEvent, type ChatContext, type ModelInfo } from "../core/bridg
 import {
   activeModel, pickModel, providerDef, visibleProviders, withModel, type ProviderDef,
 } from "../core/providers";
+import { CHAT_MIN_H, chatPromptHeight, clampChatHeight } from "../core/layout";
 import { Sound } from "../core/sound";
 import { State, type ChatMessage } from "../core/state";
 import type { ViewHost } from "./views";
@@ -324,7 +325,10 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   });
   body.append(chipRow, log, picker.el, modelRow, bar);
 
-  const el = h("div", { class: "view" }, h("div", { class: "card wash chat-card" }, body));
+  // The card's lower edge: drag it to make the chat taller or shorter, double-
+  // click to let it follow the conversation again.
+  const grip = h("div", { class: "chat-grip" });
+  const el = h("div", { class: "view" }, h("div", { class: "card wash chat-card" }, body, grip));
   (el.querySelector(".card") as HTMLElement).style.setProperty("--wash", "rgba(99,102,241,0.5)");
 
   let sending = false;
@@ -343,6 +347,50 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     send.classList.toggle("stop", stoppable);
     send.title = t(stoppable ? STRINGS.stop : STRINGS.send);
   }
+
+  function setHeight(chatHeight: number) {
+    if (chatHeight === State.settings.chatHeight) return;
+    State.settings = { ...State.settings, chatHeight };
+    State.notify();
+    onHeightChange();
+  }
+
+  let drag: { y: number; height: number } | null = null;
+  grip.addEventListener("pointerdown", (e) => {
+    const p = e as PointerEvent;
+    if (p.button !== 0) return;
+    const height = chatPromptHeight(State.chatHistory.length, State.chatPicking, State.settings.chatHeight);
+    drag = { y: p.clientY, height };
+    State.chatResizing = true;
+    grip.setPointerCapture?.(p.pointerId);
+    p.preventDefault();
+  });
+  grip.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    setHeight(clampChatHeight(Math.max(CHAT_MIN_H, drag.height + (e as PointerEvent).clientY - drag.y)));
+  });
+  const endDrag = () => {
+    if (!drag) return;
+    drag = null;
+    State.chatResizing = false;
+    saveSettings();
+  };
+  grip.addEventListener("pointerup", endDrag);
+  grip.addEventListener("pointercancel", endDrag);
+  grip.addEventListener("dblclick", () => {
+    setHeight(0);
+    saveSettings();
+  });
+
+  // While the field has the keyboard the island does not fold (island.ts).
+  // Told a moment later: a blur can come from inside a sync.
+  const typing = (on: boolean) => {
+    if (State.chatTyping === on) return;
+    State.chatTyping = on;
+    queueMicrotask(() => State.notify());
+  };
+  input.addEventListener("focus", () => typing(true));
+  input.addEventListener("blur", () => typing(false));
 
   modelBtn.addEventListener("click", () => {
     if (sending) return;

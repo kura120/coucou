@@ -644,7 +644,9 @@ export class Island {
   // ── Geometry ────────────────────────────────────────────────────────────────
 
   private targetSize(): { w: number; h: number; r: number } {
-    let { w, h } = islandSize(State.mode, State.view, State.chatHistory.length, State.chatPicking);
+    let { w, h } = islandSize(
+      State.mode, State.view, State.chatHistory.length, State.chatPicking, State.settings.chatHeight,
+    );
     if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
       h = QUESTION_PICKER_H;
     }
@@ -654,7 +656,12 @@ export class Island {
 
   private animateGeometry(shrinking: boolean) {
     const { w, h, r } = this.targetSize();
-    if (shrinking) {
+    if (State.chatResizing) {
+      // Under the pointer that drags it, the edge does not lag behind.
+      this.width.jump(w);
+      this.height.jump(h);
+      this.radius.jump(r);
+    } else if (shrinking) {
       this.width.curveTowards(w);
       this.height.curveTowards(h);
       this.radius.curveTowards(r);
@@ -689,7 +696,7 @@ export class Island {
     }
   }
 
-  /** Island rect in window coordinates (origin top-left of the 720×480 window). */
+  /** Island rect in window coordinates (origin top-left of the 720×640 window). */
   private islandRect(): { x: number; y: number; w: number; h: number } {
     const w = this.width.value;
     const hh = this.height.value;
@@ -1159,6 +1166,14 @@ export class Island {
       if (on) view.sync();
     }
 
+    // Nobody's words are folded away mid-sentence: while the chat field has the
+    // keyboard the auto-close waits, and starts over once it lets go.
+    const typing = State.chatTyping && State.view === "prompt" && State.mode === "expanded";
+    if (typing !== this.fsm.typing) {
+      this.fsm.typing = typing;
+      if (!typing && !this.wasInIsland && this.fsm.state === "home") this.fsm.mouseLeft();
+    }
+
     // The chat is the only view with a text field, so it is the only time the
     // island is allowed to take keyboard focus.
     if (this.lastSyncedView !== State.view) {
@@ -1206,6 +1221,6 @@ export class Island {
   }
 
   get chatHeight() {
-    return chatPromptHeight(State.chatHistory.length, State.chatPicking);
+    return chatPromptHeight(State.chatHistory.length, State.chatPicking, State.settings.chatHeight);
   }
 }

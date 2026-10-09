@@ -180,3 +180,24 @@ test("while Claude Code answers, the send button stops it", async () => {
   await flush();
   assert.ok(!$(".send-btn").classList.contains("stop"));
 });
+
+test("the chat keeps the height it was dragged to, within what the window shows", async () => {
+  const { CHAT_MAX_H, CHAT_MIN_H, CHAT_PICKER_H, chatPromptHeight } = await import("../src/core/layout.ts");
+  // Never dragged: it follows the conversation, as on the Mac.
+  assert.equal(chatPromptHeight(0), 240);
+  assert.equal(chatPromptHeight(9), 300);
+  assert.equal(chatPromptHeight(0, true), CHAT_PICKER_H);
+  // Dragged: that height, whatever the conversation; the picker never gets less than its own.
+  assert.equal(chatPromptHeight(9, false, 520), 520);
+  assert.equal(chatPromptHeight(0, true, 520), 520);
+  assert.equal(chatPromptHeight(0, true, 260), CHAT_PICKER_H);
+  assert.equal(chatPromptHeight(0, false, 5000), CHAT_MAX_H);
+  assert.equal(chatPromptHeight(0, false, 10), CHAT_MIN_H);
+});
+
+test("the text field tells the island when it has the keyboard", async () => {
+  $(".chat-input").fire("focus");
+  assert.equal(State.chatTyping, true);
+  $(".chat-input").fire("blur");
+  assert.equal(State.chatTyping, false);
+});
