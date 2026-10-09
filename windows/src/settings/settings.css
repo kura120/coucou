@@ -478,10 +478,5 @@ html[dir="rtl"] :is(.diff, .path, .keycap, input[type="password"], input[type="t
   to { opacity: 0; transform: scale(0.97); }
 }
 
-/* Windows' "Animation effects" off: no motion, it just appears and goes. */
-@media (prefers-reduced-motion: reduce) {
-  #settings-root.entering > *,
-  #settings-root.leaving {
-    animation: none;
-  }
-}
+/* No prefers-reduced-motion exception: the island has none either, and with
+   Windows' "Animation effects" off this window alone opened and closed flat. */
