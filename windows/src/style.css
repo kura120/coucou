@@ -701,6 +701,12 @@ body {
   pointer-events: none;
 }
 
+/* A name too long to sit centred without running under the little Mochi
+   ("Claude Desktop") starts after him instead; a short one stays centred. */
+.pill .lbl.long {
+  padding-left: 34px;
+}
+
 .pill:hover {
   transform: scale(1.04);
   filter: brightness(1.06);
