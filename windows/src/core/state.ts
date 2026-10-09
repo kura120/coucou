@@ -63,6 +63,8 @@ export interface ChatMessage {
   id: number;
   role: "user" | "assistant";
   content: string;
+  /** The files Claude Code edited while answering, shown as pills under the answer. */
+  edits?: FileDiff[];
 }
 
 export type PromptContext =

@@ -149,6 +149,8 @@ export const Bridge = {
   /** Opens a saved conversation: the Rust side carries on from it. */
   conversationOpen: (id: string) => callOrThrow<SavedConversation>("conversation_open", { id }),
   conversationDelete: (id: string) => call<void>("conversation_delete", { id }),
+  /** The pull requests of the folder Claude Code works in (git and the GitHub CLI). */
+  repoPulls: () => callOrThrow<RepoPulls>("repo_pulls"),
   chatReset: () => call<void>("chat_reset"),
   /** Ends the Claude Code turn that is running. */
   chatStop: () => call<void>("chat_stop"),
@@ -299,6 +301,21 @@ export interface ConversationSummary {
   updated: number;
   /** A session of Claude Code's own (a terminal, the Claude app): Coucou has no record to delete. */
   external?: boolean;
+}
+
+/** repo_pulls.rs: the open pull requests on GitHub, and the local branches without one. */
+export interface RepoPulls {
+  repo: string | null;
+  remote: { number: number; title: string; branch: string; url: string; draft: boolean }[];
+  local: { branch: string; ahead: number; pushed: boolean; current: boolean }[];
+  /** Why the GitHub half is empty, when it is not simply that there are none. */
+  note: string | null;
+}
+
+/** A file edit Claude Code made while answering: the tool and its input (`chat-edit`). */
+export interface ChatEdit {
+  tool: string;
+  input: Record<string, unknown>;
 }
 
 export interface SavedConversation extends ConversationSummary {

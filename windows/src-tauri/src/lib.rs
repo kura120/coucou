@@ -26,6 +26,7 @@ mod platform;
 #[cfg(target_os = "linux")]
 mod portal;
 mod recap;
+mod repo_pulls;
 mod secrets;
 mod session_window;
 mod settings;
@@ -488,6 +489,17 @@ fn conversation_open(chat: State<Chat>, id: String) -> Result<conversations::Sav
     conversations::open(&chat, &id)
 }
 
+/// The pull requests of the folder Claude Code works in: the open ones on
+/// GitHub and the local branches without one. Asked only when the list opens.
+#[tauri::command]
+async fn repo_pulls(shared: State<'_, Shared>) -> Result<repo_pulls::Pulls, String> {
+    let dir = std::path::PathBuf::from(shared.settings.lock().unwrap().claude_code_dir.trim());
+    if !dir.is_absolute() || !dir.is_dir() {
+        return Err(i18n::t("The folder picked for Claude Code is gone. Pick another one above the chat box."));
+    }
+    tauri::async_runtime::spawn_blocking(move || repo_pulls::read(&dir)).await.map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 fn conversation_delete(chat: State<Chat>, id: String) {
     conversations::delete(&chat, &id);
@@ -788,6 +800,7 @@ pub fn run() {
             conversations_list,
             conversation_open,
             conversation_delete,
+            repo_pulls,
             pick_folder,
             ingest_file,
             secret_present,
