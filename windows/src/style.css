@@ -1423,17 +1423,88 @@ input[type="range"]::-webkit-slider-thumb {
   display: none;
 }
 
+/* A tree: each folder is a node that folds, its conversations hang from the
+   line that runs down under it. */
+
+.convo-node + .convo-node {
+  margin-top: 4px;
+}
+
 .convo-group {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 8px 2px;
-  font: 500 10.5px var(--font);
-  color: #6b7079;
+  padding: 4px 4px 4px 6px;
+  border-radius: 6px;
+  font: 500 11px var(--font);
+  color: #9aa0a9;
+  cursor: default;
 }
 
-.convo-group:first-child {
-  padding-top: 0;
+.convo-group:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.convo-group > svg {
+  flex: 0 0 auto;
+  transform: rotate(90deg);
+  transition: transform 0.16s ease-out;
+}
+
+.convo-node.folded .convo-group > svg {
+  transform: none;
+}
+
+.convo-count {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font: 500 9.5px var(--font);
+  font-style: normal;
+  color: #7b8089;
+}
+
+.convo-branch {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-left: 10px;
+  padding-left: 12px;
+}
+
+.convo-node.folded .convo-branch {
+  display: none;
+}
+
+/* The trunk, and a twig to each conversation; the trunk stops at the last twig. */
+.convo-branch .convo-row {
+  position: relative;
+}
+
+.convo-branch .convo-row::before,
+.convo-branch .convo-row::after {
+  content: "";
+  position: absolute;
+  left: -12px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.convo-branch .convo-row::before {
+  top: -1px;
+  bottom: 0;
+  width: 1px;
+}
+
+.convo-branch .convo-row:last-child::before {
+  bottom: 50%;
+}
+
+.convo-branch .convo-row::after {
+  top: 50%;
+  width: 9px;
+  height: 1px;
 }
 
 .convo-group span {

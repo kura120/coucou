@@ -233,7 +233,16 @@ test("Claude Code's conversations are listed by folder, and opening one puts it 
   await flush();
   assert.ok($(".chat-body").classList.contains("listing"));
   assert.equal(State.chatPicking, true);
-  assert.deepEqual(view.el.find(".convo-group").map((g) => g.textContent), ["coucou", "No folder"]);
+  assert.deepEqual(view.el.find(".convo-group").map((g) => g.textContent), ["coucou2", "No folder1"]); // name, count
+  // A folder is a node of the tree: its heading folds its conversations away, and back.
+  const node = view.el.find(".convo-node")[0];
+  assert.equal(node.find(".convo-row").length, 2);
+  assert.ok(!node.classList.contains("folded"));
+  node.find(".convo-group")[0].fire("click");
+  assert.ok(node.classList.contains("folded"));
+  assert.ok(!view.el.find(".convo-node")[1].classList.contains("folded"));
+  node.find(".convo-group")[0].fire("click");
+  assert.ok(!node.classList.contains("folded"));
   assert.deepEqual(view.el.find(".convo-title").map((r) => r.textContent), ["review the branch", "plan review", "what is this?"]);
 
   view.el.find(".convo-row")[0].fire("click");

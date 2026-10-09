@@ -328,6 +328,28 @@ function when(updated: number): string {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Where the folded folders of the list are remembered, on this machine. */
+const FOLDED_KEY = "coucou.conversations.folded";
+
+/** The folders the user folded away: their conversations stay out of sight. */
+export function loadFolded(): Set<string> {
+  try {
+    const raw = window.localStorage?.getItem(FOLDED_KEY);
+    const list: unknown = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(list) ? list.filter((d): d is string => typeof d === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveFolded(folded: Set<string>) {
+  try {
+    window.localStorage?.setItem(FOLDED_KEY, JSON.stringify([...folded]));
+  } catch {
+    // Remembered until the island restarts, then.
+  }
+}
+
 interface ConversationList {
   el: HTMLElement;
   open(): void;
@@ -347,18 +369,40 @@ function buildConversations(
   const el = h("div", { class: "convos" });
   let isOpen = false;
   let request = 0;
+  const folded = loadFolded();
 
-  function heading(dir: string): HTMLElement {
-    return h(
+  /**
+   * A folder and the conversations under it, as a node of the tree: the
+   * heading folds and unfolds its branch.
+   */
+  function folder(dir: string, items: ConversationSummary[]): HTMLElement {
+    const add = h(
+      "button",
+      { class: "convo-icon", title: tl(dir ? STRINGS.newChatHere : STRINGS.newChat) },
+      svg(ICONS.plus, 11),
+    );
+    add.addEventListener("click", (e) => {
+      e.stopPropagation();
+      start(dir);
+    });
+    const head = h(
       "div",
       { class: "convo-group", title: dir },
+      svg(ICONS.chevronRight, 9, { stroke: 2 }),
       h("span", { text: dir ? folderName(dir) : t(STRINGS.anyFolder) }),
-      h(
-        "button",
-        { class: "convo-icon", title: tl(dir ? STRINGS.newChatHere : STRINGS.newChat), onclick: () => start(dir) },
-        svg(ICONS.plus, 11),
-      ),
+      items.length > 0 ? h("i", { class: "convo-count", text: String(items.length) }) : null,
+      add,
     );
+    const branch = h("div", { class: "convo-branch" }, ...items.map(row));
+    const node = h("div", { class: folded.has(dir) ? "convo-node folded" : "convo-node" }, head, branch);
+    head.addEventListener("click", () => {
+      if (folded.has(dir)) folded.delete(dir);
+      else folded.add(dir);
+      saveFolded(folded);
+      node.classList.toggle("folded", folded.has(dir));
+      Sound.play("blip");
+    });
+    return node;
   }
 
   function row(c: ConversationSummary): HTMLElement {
@@ -394,10 +438,7 @@ function buildConversations(
     // The folder in use is always there to start a chat in, even with nothing saved in it yet.
     const current = State.settings.claudeCodeDir;
     if (!groups.some((g) => g.dir === current)) groups.unshift({ dir: current, items: [] });
-    for (const group of groups) {
-      el.append(heading(group.dir));
-      for (const c of group.items) el.append(row(c));
-    }
+    for (const group of groups) el.append(folder(group.dir, group.items));
     if (list.length === 0) el.append(h("div", { class: "picker-status", text: t(STRINGS.noConversations) }));
   }
 
