@@ -277,3 +277,86 @@ test("an answer names the conversation it was saved in, and deleting it forgets 
   assert.equal(State.conversationId, null);
   assert.match($(".convos").textContent, /No conversations yet/);
 });
+
+test("a file Claude Code edits shows as a pill under the answer, and opens its diff", async () => {
+  State.settings = { ...State.settings, chatProvider: "claudecode" };
+  let finish;
+  answers.chat_send = () => new Promise((resolve) => (finish = resolve));
+  $(".chat-input").value = "rename it";
+  $(".send-btn").fire("click");
+  await flush();
+  emit("chat-edit", { tool: "Edit", input: { file_path: "/w/src/app.rs", old_string: "let a = 1;", new_string: "let b = 1;\nlet c = 2;" } });
+  emit("chat-edit", { tool: "Bash", input: { command: "ls" } }); // not a file edit
+  emit("chat-delta", "Renamed.");
+  // While the answer is on its way the pill is already there.
+  assert.deepEqual(view.el.find(".edit-name").map((n) => n.textContent), ["app.rs"]);
+  finish({ text: "Renamed." });
+  await flush();
+  view.sync();
+
+  const reply = State.chatHistory.at(-1);
+  assert.equal(reply.edits.length, 1);
+  assert.deepEqual([reply.edits[0].added, reply.edits[0].removed], [2, 1]);
+  const pill = $(".edit-pill");
+  assert.equal(pill.textContent, "app.rs+2−1");
+  assert.equal(view.el.find(".edit-diff").length, 0);
+  pill.fire("click");
+  assert.deepEqual($(".edit-diff").find(".diff-line").map((l) => l.textContent), ["−let a = 1;", "+let b = 1;", "+let c = 2;"]);
+  pill.fire("click");
+  assert.equal(view.el.find(".edit-diff").length, 0);
+
+  // The next turn starts with no edits of its own.
+  answers.chat_send = { text: "Nothing to change." };
+  $(".chat-input").value = "anything else?";
+  $(".send-btn").fire("click");
+  await flush();
+  assert.equal(State.chatHistory.at(-1).edits, undefined);
+});
+
+test("the folder's pull requests are listed in two halves, and only asked for when opened", async () => {
+  // Pull requests belong to a folder: no folder, no list.
+  State.settings = { ...State.settings, chatProvider: "claudecode" };
+  view.sync();
+  assert.equal($(".pull-btn").style.display, "none");
+  State.settings = { ...State.settings, claudeCodeDir: "/w/app" };
+  view.sync();
+  assert.equal($(".pull-btn").style.display, "");
+  assert.deepEqual(sent("repo_pulls"), []);
+
+  answers.repo_pulls = {
+    repo: "me/app",
+    remote: [{ number: 7, title: "Add a thing", branch: "feat/thing", url: "https://github.com/me/app/pull/7", draft: true }],
+    local: [{ branch: "wip", ahead: 2, pushed: false, current: true }, { branch: "idea", ahead: 1, pushed: true, current: false }],
+    note: null,
+  };
+  $(".pull-btn").fire("click");
+  await flush();
+  assert.equal(sent("repo_pulls").length, 1);
+  assert.equal(State.chatPicking, true);
+  const list = $(".pulls");
+  assert.deepEqual(list.find(".pull-group").map((g) => g.textContent), ["On GitHubme/app", "Local only"]);
+  assert.deepEqual(list.find(".convo-row").map((r) => r.textContent), [
+    "#7Add a thingDraftfeat/thing",
+    "wipNot pushed2 commits",
+    "idea1 commit",
+  ]);
+  list.find(".convo-row")[0].fire("click");
+  assert.deepEqual(sent("open_url"), [{ url: "https://github.com/me/app/pull/7" }]);
+  // A local branch opens nothing.
+  list.find(".convo-row")[1].fire("click");
+  assert.equal(sent("open_url").length, 1);
+
+  // Opening the conversations closes it: one panel at a time.
+  answers.conversations_list = [];
+  $(".convo-btn").fire("click");
+  await flush();
+  assert.equal($(".pulls").style.display, "none");
+  assert.equal($(".convos").style.display, "");
+
+  // GitHub out of reach: its half says why, the local half still shows.
+  answers.repo_pulls = { repo: "me/app", remote: [], local: [], note: "gh: not signed in" };
+  $(".pull-btn").fire("click");
+  await flush();
+  assert.match($(".pulls").textContent, /gh: not signed in/);
+  assert.match($(".pulls").textContent, /No local branch waiting/);
+});

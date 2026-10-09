@@ -1359,6 +1359,150 @@ input[type="range"]::-webkit-slider-thumb {
   cursor: default;
 }
 
+/* ── Pull requests (next to the conversations) ────────────────────────────── */
+
+/* The conversations and the pull requests, together at the row's other end. */
+.model-row-left {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  max-width: 62%;
+  margin-right: auto;
+}
+
+.model-row-left .convo-btn {
+  max-width: none;
+  margin-right: 0;
+}
+
+.model-row-left .pull-btn {
+  flex: 0 0 auto;
+}
+
+.pull-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 6px 2px;
+  font: 500 11px var(--font);
+  color: #9aa0a9;
+}
+
+.pull-group:first-child {
+  padding-top: 0;
+}
+
+.pull-group i {
+  font: 400 10px var(--font);
+  font-style: normal;
+  color: #6b7079;
+}
+
+.pull-number {
+  flex: 0 0 auto;
+  font: 500 10.5px var(--mono);
+  color: #8a8f98;
+}
+
+.pull-tag {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font: 500 9.5px var(--font);
+  color: #8a8f98;
+}
+
+.pulls .convo-row svg {
+  flex: 0 0 auto;
+  color: #6b7079;
+}
+
+/* The date gives way to the delete button under the pointer only where there is one. */
+.pulls .convo-row:hover .convo-when {
+  display: inline;
+}
+
+/* ── File edits under an answer ───────────────────────────────────────────── */
+
+.chat-row.stacked {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.edits {
+  display: flex;
+  flex-direction: column;
+  /* Full width, so an opened diff has the room; the pill itself stays small. */
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+}
+
+.edits:empty {
+  display: none;
+}
+
+.edit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.edit-pill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #8a8f98;
+  font: 500 10.5px var(--font);
+  cursor: default;
+}
+
+.edit-pill:hover,
+.edit-pill.open {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.edit-pill svg {
+  flex: 0 0 auto;
+}
+
+.edit-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #c8cdd4;
+}
+
+.edit-plus {
+  color: #4ade80;
+}
+
+.edit-minus {
+  color: #f87171;
+}
+
+.edit-diff {
+  max-height: 180px;
+  overflow: auto;
+  padding: 6px 0;
+  border-radius: 8px;
+  background: #0b0c0e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  user-select: text;
+}
+
 /* ── Conversations (the list behind the title, left of the model) ─────────── */
 
 /* The model button's twin, at the other end of its row. */

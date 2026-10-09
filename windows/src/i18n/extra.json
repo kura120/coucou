@@ -3657,6 +3657,158 @@
    "pt-BR": "Esta conversa não existe mais.",
    "ru": "Этой беседы больше нет.",
    "id": "Percakapan ini sudah tidak ada."
+  },
+  "Pull requests": {
+   "zh-Hans": "拉取请求",
+   "hi": "पुल रिक्वेस्ट",
+   "es": "Pull requests",
+   "ar": "طلبات السحب",
+   "fr": "Pull requests",
+   "bn": "পুল রিকোয়েস্ট",
+   "pt-BR": "Pull requests",
+   "ru": "Пул-реквесты",
+   "id": "Pull request"
+  },
+  "On GitHub": {
+   "zh-Hans": "在 GitHub 上",
+   "hi": "GitHub पर",
+   "es": "En GitHub",
+   "ar": "على GitHub",
+   "fr": "Sur GitHub",
+   "bn": "GitHub-এ",
+   "pt-BR": "No GitHub",
+   "ru": "На GitHub",
+   "id": "Di GitHub"
+  },
+  "Local only": {
+   "zh-Hans": "仅本地",
+   "hi": "केवल लोकल",
+   "es": "Solo local",
+   "ar": "محلي فقط",
+   "fr": "En local seulement",
+   "bn": "শুধু লোকাল",
+   "pt-BR": "Apenas local",
+   "ru": "Только локально",
+   "id": "Hanya lokal"
+  },
+  "No open pull requests.": {
+   "zh-Hans": "没有打开的拉取请求。",
+   "hi": "कोई खुला पुल रिक्वेस्ट नहीं।",
+   "es": "No hay pull requests abiertas.",
+   "ar": "لا توجد طلبات سحب مفتوحة.",
+   "fr": "Aucune pull request ouverte.",
+   "bn": "কোনো খোলা পুল রিকোয়েস্ট নেই।",
+   "pt-BR": "Nenhum pull request aberto.",
+   "ru": "Открытых пул-реквестов нет.",
+   "id": "Tidak ada pull request terbuka."
+  },
+  "No local branch waiting for a pull request.": {
+   "zh-Hans": "没有等待拉取请求的本地分支。",
+   "hi": "पुल रिक्वेस्ट की प्रतीक्षा में कोई लोकल ब्रांच नहीं।",
+   "es": "Ninguna rama local espera una pull request.",
+   "ar": "لا يوجد فرع محلي بانتظار طلب سحب.",
+   "fr": "Aucune branche locale en attente d'une pull request.",
+   "bn": "পুল রিকোয়েস্টের অপেক্ষায় কোনো লোকাল ব্রাঞ্চ নেই।",
+   "pt-BR": "Nenhum branch local aguardando um pull request.",
+   "ru": "Нет локальных веток, ожидающих пул-реквеста.",
+   "id": "Tidak ada branch lokal yang menunggu pull request."
+  },
+  "Not pushed": {
+   "zh-Hans": "未推送",
+   "hi": "पुश नहीं हुआ",
+   "es": "Sin subir",
+   "ar": "غير مدفوع",
+   "fr": "Non poussée",
+   "bn": "পুশ হয়নি",
+   "pt-BR": "Não enviado",
+   "ru": "Не отправлена",
+   "id": "Belum di-push"
+  },
+  "This folder is not a Git repository.": {
+   "zh-Hans": "此文件夹不是 Git 仓库。",
+   "hi": "यह फ़ोल्डर Git रिपॉज़िटरी नहीं है।",
+   "es": "Esta carpeta no es un repositorio Git.",
+   "ar": "هذا المجلد ليس مستودع Git.",
+   "fr": "Ce dossier n'est pas un dépôt Git.",
+   "bn": "এই ফোল্ডারটি Git রিপোজিটরি নয়।",
+   "pt-BR": "Esta pasta não é um repositório Git.",
+   "ru": "Эта папка не является репозиторием Git.",
+   "id": "Folder ini bukan repositori Git."
+  },
+  "This repository's origin is not on GitHub.": {
+   "zh-Hans": "此仓库的 origin 不在 GitHub 上。",
+   "hi": "इस रिपॉज़िटरी का origin GitHub पर नहीं है।",
+   "es": "El origin de este repositorio no está en GitHub.",
+   "ar": "الـ origin لهذا المستودع ليس على GitHub.",
+   "fr": "L'origin de ce dépôt n'est pas sur GitHub.",
+   "bn": "এই রিপোজিটরির origin GitHub-এ নেই।",
+   "pt-BR": "O origin deste repositório não está no GitHub.",
+   "ru": "Origin этого репозитория не на GitHub.",
+   "id": "Origin repositori ini tidak ada di GitHub."
+  },
+  "Install the GitHub CLI (gh) and sign in to see the pull requests on GitHub.": {
+   "zh-Hans": "安装 GitHub CLI（gh）并登录后，即可查看 GitHub 上的拉取请求。",
+   "hi": "GitHub पर पुल रिक्वेस्ट देखने के लिए GitHub CLI (gh) इंस्टॉल करें और साइन इन करें।",
+   "es": "Instala la CLI de GitHub (gh) e inicia sesión para ver las pull requests de GitHub.",
+   "ar": "ثبّت GitHub CLI (gh) وسجّل الدخول لرؤية طلبات السحب على GitHub.",
+   "fr": "Installe la CLI GitHub (gh) et connecte-toi pour voir les pull requests sur GitHub.",
+   "bn": "GitHub-এর পুল রিকোয়েস্ট দেখতে GitHub CLI (gh) ইনস্টল করে সাইন ইন করুন।",
+   "pt-BR": "Instale a CLI do GitHub (gh) e entre para ver os pull requests no GitHub.",
+   "ru": "Установите GitHub CLI (gh) и войдите, чтобы видеть пул-реквесты на GitHub.",
+   "id": "Pasang GitHub CLI (gh) dan masuk untuk melihat pull request di GitHub."
+  },
+  "GitHub did not answer.": {
+   "zh-Hans": "GitHub 没有响应。",
+   "hi": "GitHub ने जवाब नहीं दिया।",
+   "es": "GitHub no respondió.",
+   "ar": "لم يُجب GitHub.",
+   "fr": "GitHub n'a pas répondu.",
+   "bn": "GitHub সাড়া দেয়নি।",
+   "pt-BR": "O GitHub não respondeu.",
+   "ru": "GitHub не ответил.",
+   "id": "GitHub tidak menjawab."
+  },
+  "{count} commits": {
+   "zh-Hans": {
+    "other": "{count} 个提交"
+   },
+   "hi": {
+    "one": "{count} कमिट",
+    "other": "{count} कमिट"
+   },
+   "es": {
+    "one": "{count} commit",
+    "other": "{count} commits"
+   },
+   "ar": {
+    "zero": "{count} إيداع",
+    "one": "إيداع واحد",
+    "two": "إيداعان",
+    "few": "{count} إيداعات",
+    "many": "{count} إيداعًا",
+    "other": "{count} إيداع"
+   },
+   "fr": {
+    "one": "{count} commit",
+    "other": "{count} commits"
+   },
+   "bn": {
+    "one": "{count}টি কমিট",
+    "other": "{count}টি কমিট"
+   },
+   "pt-BR": {
+    "one": "{count} commit",
+    "other": "{count} commits"
+   },
+   "ru": {
+    "one": "{count} коммит",
+    "few": "{count} коммита",
+    "many": "{count} коммитов",
+    "other": "{count} коммита"
+   },
+   "id": {
+    "other": "{count} commit"
+   }
   }
  }
 }

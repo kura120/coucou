@@ -269,6 +269,15 @@ needs nothing: a conversation held in a folder from Coucou is a Claude Code
 session from its first turn, so `claude --resume` in that folder finds it. A
 chat without a folder is not a Claude Code session and stays in Coucou.
 
+In a folder, each file Claude Code edits shows as a pill under its answer —
+the file's name and the lines added and removed — and a click opens the diff
+there. The pills last as long as the chat is on screen; they are not saved
+with the conversation. Next to the conversations, a second button lists the
+folder's pull requests: the open ones on GitHub (a click opens one in the
+browser) and the local branches that have commits but no pull request yet.
+Coucou asks `git` and the GitHub CLI (`gh`, with its own sign-in) for them,
+only when the list is opened; without `gh` the local half still shows.
+
 **Local models**: **Settings… → Local models** connects **Ollama** or **LM
 Studio** (leave the address empty for the usual one on this PC; Ollama's
 `OLLAMA_HOST` is honoured) or any server that speaks the OpenAI API (vLLM,
