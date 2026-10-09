@@ -5,6 +5,7 @@ mod agents;
 mod chat;
 mod claude;
 mod claude_code;
+mod claude_sessions;
 mod codex_plan;
 mod config_file;
 mod conversations;

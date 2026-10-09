@@ -297,6 +297,8 @@ export interface ConversationSummary {
   dir: string;
   /** Seconds since 1970, at the last answer. */
   updated: number;
+  /** A session of Claude Code's own (a terminal, the Claude app): Coucou has no record to delete. */
+  external?: boolean;
 }
 
 export interface SavedConversation extends ConversationSummary {
