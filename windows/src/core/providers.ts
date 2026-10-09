@@ -21,11 +21,17 @@ export interface ProviderDef {
   defaultModel: string;
   /** When the saved model is not offered, the first one containing this is picked. */
   prefer: string | null;
+  /**
+   * Its conversations are saved and listed in the chat. The Rust side keeps the
+   * matching list (SAVED in src-tauri/src/conversations.rs, which says how to
+   * add a provider).
+   */
+  conversations?: boolean;
 }
 
 export const PROVIDERS: readonly ProviderDef[] = [
   { id: "anthropic", name: "Anthropic", accent: "#E07950", key: "anthropic-api-key", urlField: null, defaultModel: "claude-opus-5", prefer: "opus" },
-  { id: "claudecode", name: "Claude Code", accent: "#D97757", key: null, urlField: null, defaultModel: "claude-sonnet-5-5", prefer: "sonnet" },
+  { id: "claudecode", name: "Claude Code", accent: "#D97757", key: null, urlField: null, defaultModel: "claude-sonnet-5-5", prefer: "sonnet", conversations: true },
   { id: "google", name: "Google", accent: "#4285F4", key: "google-api-key", urlField: null, defaultModel: "gemini-2.0-flash", prefer: "flash" },
   { id: "openai", name: "OpenAI", accent: "#10A37F", key: "openai-api-key", urlField: null, defaultModel: "gpt-4o", prefer: "mini" },
   { id: "openrouter", name: "OpenRouter", accent: "#6467F2", key: "openrouter-api-key", urlField: null, defaultModel: "openrouter/auto", prefer: null },

@@ -125,7 +125,7 @@ test("a local answer streams into one reply, then the finished text replaces it"
 
 test("Claude Code has its folder, effort and permissions under its models, and the island grows", async () => {
   answers.chat_models = [{ id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5" }];
-  answers.pick_folder = "C:\work\app";
+  answers.pick_folder = "C:\\work\\app";
   $(".model-btn").fire("click");
   await flush();
   assert.equal(State.chatPicking, true);
@@ -144,8 +144,8 @@ test("Claude Code has its folder, effort and permissions under its models, and t
 
   rows()[0].find(".picker-link")[0].fire("click");
   await flush();
-  assert.equal(State.settings.claudeCodeDir, "C:\work\app");
-  assert.equal($(".picker-path").textContent, "C:\work\app");
+  assert.equal(State.settings.claudeCodeDir, "C:\\work\\app");
+  assert.equal($(".picker-path").textContent, "C:\\work\\app");
   assert.ok(!rows()[2].classList.contains("off"));
 
   rows()[1].find("button")[3].fire("click");
@@ -155,7 +155,7 @@ test("Claude Code has its folder, effort and permissions under its models, and t
   const saved = sent("save_settings").at(-1).settings;
   assert.deepEqual(
     [saved.claudeCodeDir, saved.claudeCodeEffort, saved.claudeCodeMode],
-    ["C:\work\app", "high", "plan"],
+    ["C:\\work\\app", "high", "plan"],
   );
   // Bypassing permissions is not on offer.
   assert.deepEqual(rows()[2].find("button").map((b) => b.textContent), ["Ask", "Accept edits", "Plan", "Auto"]);
@@ -200,4 +200,80 @@ test("the text field tells the island when it has the keyboard", async () => {
   assert.equal(State.chatTyping, true);
   $(".chat-input").fire("blur");
   assert.equal(State.chatTyping, false);
+});
+
+test("Claude Code's conversations are listed by folder, and opening one puts it back", async () => {
+  const { groupByFolder, folderName } = await import("../src/views/chat.ts");
+  assert.equal(folderName("C:\\dev\\coucou"), "coucou");
+  assert.equal(folderName("/home/me/py-doc/"), "py-doc");
+  const list = [
+    { id: "a", title: "review the branch", provider: "claudecode", dir: "C:\\dev\\coucou", updated: 300 },
+    { id: "b", title: "what is this?", provider: "claudecode", dir: "", updated: 200 },
+    { id: "c", title: "plan review", provider: "claudecode", dir: "C:\\dev\\coucou", updated: 100 },
+  ];
+  assert.deepEqual(groupByFolder(list).map((g) => [g.dir, g.items.map((c) => c.id)]), [
+    ["C:\\dev\\coucou", ["a", "c"]],
+    ["", ["b"]],
+  ]);
+
+  // Another provider has no list.
+  assert.equal($(".convo-btn").style.display, "none");
+  State.settings = { ...State.settings, chatProvider: "claudecode" };
+  view.sync();
+  assert.equal($(".convo-btn").style.display, "");
+  assert.equal($(".convo-name").textContent, "Conversations");
+
+  answers.conversations_list = list;
+  answers.conversation_open = ({ id }) => ({
+    ...list.find((c) => c.id === id),
+    model: "claude-opus-5-5",
+    turns: [{ role: "user", content: "review the branch" }, { role: "assistant", content: "Looks good." }],
+  });
+  $(".convo-btn").fire("click");
+  await flush();
+  assert.ok($(".chat-body").classList.contains("listing"));
+  assert.equal(State.chatPicking, true);
+  assert.deepEqual(view.el.find(".convo-group").map((g) => g.textContent), ["coucou", "No folder"]);
+  assert.deepEqual(view.el.find(".convo-title").map((r) => r.textContent), ["review the branch", "plan review", "what is this?"]);
+
+  view.el.find(".convo-row")[0].fire("click");
+  await flush();
+  assert.deepEqual(sent("conversation_open"), [{ id: "a" }]);
+  assert.deepEqual(State.chatHistory.map((m) => [m.role, m.content]), [["user", "review the branch"], ["assistant", "Looks good."]]);
+  assert.equal(State.conversationId, "a");
+  assert.equal(State.settings.claudeCodeDir, "C:\\dev\\coucou");
+  assert.equal(State.settings.chatModels.claudecode, "claude-opus-5-5");
+  assert.ok(!$(".chat-body").classList.contains("listing"));
+  assert.equal($(".convo-name").textContent, "review the branch");
+
+  // "+" on a folder: a new conversation there, and the Rust side starts over.
+  $(".convo-btn").fire("click");
+  await flush();
+  view.el.find(".convo-group")[1].find(".convo-icon")[0].fire("click");
+  await flush();
+  assert.equal(sent("chat_reset").length, 1);
+  assert.deepEqual(State.chatHistory, []);
+  assert.equal(State.conversationId, null);
+  assert.equal(State.settings.claudeCodeDir, "");
+});
+
+test("an answer names the conversation it was saved in, and deleting it forgets that", async () => {
+  State.settings = { ...State.settings, chatProvider: "claudecode" };
+  answers.chat_send = { text: "hi", conversationId: "c9" };
+  $(".chat-input").value = "hello";
+  $(".send-btn").fire("click");
+  await flush();
+  assert.equal(State.conversationId, "c9");
+
+  answers.conversations_list = [{ id: "c9", title: "hello", provider: "claudecode", dir: "", updated: 1 }];
+  $(".convo-btn").fire("click");
+  await flush();
+  assert.ok(view.el.find(".convo-row")[0].classList.contains("on"));
+  answers.conversations_list = [];
+  view.el.find(".convo-row")[0].find(".convo-icon")[0].fire("click");
+  await flush();
+  assert.deepEqual(sent("conversation_delete"), [{ id: "c9" }]);
+  assert.equal(sent("conversation_open").length, 0); // the row itself was not clicked
+  assert.equal(State.conversationId, null);
+  assert.match($(".convos").textContent, /No conversations yet/);
 });

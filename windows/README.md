@@ -252,6 +252,15 @@ Under its models, the picker has Claude Code's own options:
 
 While Claude Code answers, the send button stops it.
 
+Claude Code's conversations are saved: the title on the left of the model name
+opens their list, grouped by the folder they work in, newest first. Opening one
+puts it back in the chat and, in a folder, resumes its Claude Code session;
+`+` on a folder starts a new one there. Coucou keeps their text in
+`conversations.json` in its local data folder (a dropped file by name only),
+the last 100 of them, and deleting one there leaves Claude Code's own session
+untouched. Other providers' conversations are not saved yet;
+`src-tauri/src/conversations.rs` says how to add one.
+
 **Local models**: **Settings… → Local models** connects **Ollama** or **LM
 Studio** (leave the address empty for the usual one on this PC; Ollama's
 `OLLAMA_HOST` is honoured) or any server that speaks the OpenAI API (vLLM,

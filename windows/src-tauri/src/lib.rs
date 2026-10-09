@@ -7,6 +7,7 @@ mod claude;
 mod claude_code;
 mod codex_plan;
 mod config_file;
+mod conversations;
 mod desktop;
 mod files;
 mod github;
@@ -454,9 +455,41 @@ async fn chat_send(
     chat: State<'_, Chat>,
     query: String,
     context: Option<ChatContext>,
-) -> Result<ChatReply, String> {
+) -> Result<ChatSent, String> {
     let settings = shared.settings.lock().unwrap().clone();
-    chat::send(&app, &chat, &settings, query, context).await
+    let epoch = chat.epoch();
+    let ChatReply { text } = chat::send(&app, &chat, &settings, query, context).await?;
+    // Saved only if this is still the conversation the question was asked in.
+    let provider = settings.chat_provider.as_str();
+    let conversation_id = (chat.epoch() == epoch)
+        .then(|| conversations::record(&chat, &settings, provider, &chat::model_for(&settings, provider)))
+        .flatten();
+    Ok(ChatSent { text, conversation_id })
+}
+
+/// The answer, and the saved conversation it now belongs to, if it is kept.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ChatSent {
+    text: String,
+    conversation_id: Option<String>,
+}
+
+/// The saved conversations, newest first, for the list in the chat view.
+#[tauri::command]
+fn conversations_list() -> Vec<conversations::Summary> {
+    conversations::list()
+}
+
+/// Opens a saved conversation: the chat carries on from it.
+#[tauri::command]
+fn conversation_open(chat: State<Chat>, id: String) -> Result<conversations::Saved, String> {
+    conversations::open(&chat, &id)
+}
+
+#[tauri::command]
+fn conversation_delete(chat: State<Chat>, id: String) {
+    conversations::delete(&chat, &id);
 }
 
 /// The models a provider offers, for the picker in the chat view. Only asked
@@ -751,6 +784,9 @@ pub fn run() {
             local_set_key,
             chat_reset,
             chat_stop,
+            conversations_list,
+            conversation_open,
+            conversation_delete,
             pick_folder,
             ingest_file,
             secret_present,
