@@ -424,15 +424,38 @@ export function hasSessionTicker(task: AgentTask): boolean {
   return isSession && (task.state !== "idle" || task.steps.length > 0);
 }
 
+/**
+ * How far from the pill's edge a centred name must stay to clear the little
+ * Mochi (he ends at 31 px) with some air; `.pill .lbl.long` in style.css.
+ */
+const PILL_BOT_CLEARANCE = 38;
+
+/**
+ * The name is centred across the whole pill, the little Mochi included. One
+ * wide enough to reach him is marked `long`, and starts after him instead.
+ */
+function fitPillLabel(pill: HTMLElement, lbl: HTMLElement) {
+  requestAnimationFrame(() => {
+    if (!pill.isConnected || !lbl.firstChild) return;
+    const range = document.createRange();
+    range.selectNodeContents(lbl);
+    const text = range.getBoundingClientRect().width;
+    const room = pill.offsetWidth - 2 * PILL_BOT_CLEARANCE;
+    lbl.classList.toggle("long", text > room);
+  });
+}
+
 function buildPill(task: AgentTask, actions: ViewActions): HTMLElement {
   const label = task.id === "integration_claude" ? "VS Code" : task.name;
   const canvas = createMiniBot(task, 24);
+  const lbl = h("span", { class: "lbl", text: label });
   const pill = h(
     "div",
     { class: "pill", onclick: () => actions.setFocus(task.id) },
     canvas,
-    h("span", { class: "lbl", text: label }),
+    lbl,
   );
+  fitPillLabel(pill, lbl);
   pill.style.borderColor = `${task.color}24`;
   pill.addEventListener("mouseenter", () => {
     pill.style.background = `${task.color}2e`;
