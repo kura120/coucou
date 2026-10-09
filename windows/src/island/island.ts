@@ -43,6 +43,9 @@ const PRE_PROGRESS = USC.T_PROG_START - USC.T_DROP;
 
 const modeOrder = (m: IslandMode) => (m === "hidden" ? 0 : m === "compact" ? 1 : 2);
 
+/** style.css `hover-glow-burst`, with a little slack. */
+const HOVER_GLOW_BURST_MS = 700;
+
 export class Island {
   readonly fsm = new IslandStateMachine();
   /** Mochi on the desktop: his life cycle and the drag out of the island. */
@@ -50,6 +53,9 @@ export class Island {
 
   private root: HTMLElement;
   private islandEl!: HTMLElement;
+  /** The glow under the pointer while it is over the compact island. */
+  private hoverGlow = h("div", { id: "hover-glow" });
+  private glowBurst = 0;
   private clipEl!: HTMLElement;
   private contentEl!: HTMLElement;
   private viewsEl!: HTMLElement;
@@ -281,6 +287,7 @@ export class Island {
     this.clipEl = h(
       "div",
       { id: "island-clip" },
+      this.hoverGlow,
       this.greetingCanvas,
       this.uploadCanvas.el,
       this.contentEl,
@@ -351,6 +358,7 @@ export class Island {
     const prev = State.mode;
     if (mode === prev) return;
     State.mode = mode;
+    this.followHoverGlow(prev === "compact" && mode === "expanded");
     if (mode === "expanded") Sound.play("open");
     if (prev === "expanded") {
       Sound.play("close");
@@ -703,6 +711,30 @@ export class Island {
     return { x: (PANEL_W - w) / 2, y: 0, w, h: hh };
   }
 
+  /**
+   * The compact island glows under the pointer. Opened from there — a click,
+   * or a hover that opens — the glow bursts outwards from where the pointer
+   * was and fades as the island grows. Costs nothing unless the pointer moves
+   * over the compact island: a style change per cursor event, no timer.
+   */
+  private followHoverGlow(opening: boolean) {
+    const glow = this.hoverGlow;
+    const on = State.mode === "compact" && this.wasInIsland;
+    if (on) {
+      // From the island's centre line: it widens around it as it opens.
+      glow.style.setProperty("--gx", `${State.mouseInIsland.x - this.width.value / 2}px`);
+      glow.style.setProperty("--gy", `${State.mouseInIsland.y}px`);
+    }
+    if (opening && glow.classList.contains("on")) {
+      const mine = ++this.glowBurst;
+      glow.classList.add("burst");
+      window.setTimeout(() => {
+        if (this.glowBurst === mine) glow.classList.remove("burst");
+      }, HOVER_GLOW_BURST_MS);
+    }
+    glow.classList.toggle("on", on);
+  }
+
   // ── Window collapse (hidden → tiny wake strip, zero polling) ────────────────
 
   private updateWindowCollapsed() {
@@ -864,6 +896,7 @@ export class Island {
     if (!inIsland && wasIn) {
       this.fsm.mouseLeft();
     }
+    this.followHoverGlow(false);
 
     // Bot hover → love
     const overBot = State.mode === "expanded" && State.stateOverride == null && this.isBotHit(x, y);
