@@ -82,7 +82,7 @@ pub mod logic {
     pub const BODY_RADIUS_FRACTION: f64 = 0.24;
 
     /// Island panel, logical pixels: dropping Mochi on it brings him home.
-    pub const HOME_ZONE_W: f64 = crate::island::PANEL_W;
+    pub const HOME_ZONE_W: f64 = 720.0;
     /// The height the island's usual views fit in, not the taller window the
     /// chat's model picker needs.
     pub const HOME_ZONE_H: f64 = 320.0;

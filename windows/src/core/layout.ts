@@ -50,10 +50,11 @@ export interface ViewLayout {
   agentMode: AgentLayoutMode;
 }
 
-// The window is a fixed 720×800 (largest view: the chat pulled all the way
-// down; the Mac's panel is 640 tall); the island is drawn inside it, glued to
-// the top edge and horizontally centred.
-export const PANEL_W = 720;
+// The window is a fixed 880×800 (widest view: the overview with the music
+// card next to the pills; tallest: the chat pulled all the way down — the
+// Mac's panel is 720×640); the island is drawn inside it, glued to the top
+// edge and horizontally centred.
+export const PANEL_W = 880;
 export const PANEL_H = 800;
 
 // No notch on a PC: these are the hidden/compact sizes from docs/SPEC.md.
@@ -61,6 +62,9 @@ export const NOTCH_W = 184;
 export const NOTCH_H = 32;
 export const COMPACT_W = 288; // NOTCH_W + 104
 export const EXPANDED_W = 640;
+/** The music card next to the pills, and the gap before it: what the overview widens by. */
+export const MUSIC_CARD_W = 176;
+export const MUSIC_CARD_GAP = 10;
 
 export const ROUNDED_CORNER = 14; // hidden / compact
 export const EXPANDED_CORNER = 22;
@@ -150,6 +154,7 @@ export function islandSize(
   chatCount = 0,
   chatPicking = false,
   chatUserHeight = 0,
+  musicCard = false,
 ): { w: number; h: number } {
   switch (mode) {
     case "hidden":
@@ -160,7 +165,9 @@ export function islandSize(
       return { w: COMPACT_W, h: NOTCH_H };
     case "expanded": {
       const h = view === "prompt" ? chatPromptHeight(chatCount, chatPicking, chatUserHeight) : VIEW_LAYOUTS[view].height;
-      return { w: EXPANDED_W, h };
+      // Only the overview has the music card, so only it grows for it.
+      const w = EXPANDED_W + (musicCard && view === "overview" ? MUSIC_CARD_W + MUSIC_CARD_GAP : 0);
+      return { w, h };
     }
   }
 }

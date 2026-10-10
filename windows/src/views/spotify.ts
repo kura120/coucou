@@ -11,7 +11,8 @@ import { ICONS } from "./icons";
 import { Bridge } from "../core/bridge";
 import { State, type AgentTask } from "../core/state";
 import {
-  SPOTIFY_GREEN, SPOTIFY_ID, Spotify, currentArtwork, formatTime, isAd, spotifyPosition, volumeLevel, withPlaying,
+  SPOTIFY_GREEN, SPOTIFY_ID, Spotify, currentArtwork, formatTime, isAd, spotifyPosition, volumeLevel,
+  withPlaying,
   type SpotifyTrack,
 } from "../core/spotify";
 import { createMiniBot } from "../mochi/minibots";
@@ -256,6 +257,110 @@ function iconButton(icon: string, size: number, stroke: number, onClick: () => v
 export interface SpotifyCardHost {
   el: HTMLElement;
   sync(): void;
+}
+
+// ── Music card (overview, next to the pills) ─────────────────────────────────
+
+/**
+ * The player in small, for while another pill is in front: the cover, the
+ * title and the artist, how far the track is, and previous / play / next.
+ * Everything else — seek, shuffle, repeat — is on Spotify's own card, which a
+ * click on the cover or the title brings to the front (`onOpen`).
+ */
+export function buildSpotifyMini(onOpen: () => void): SpotifyCardHost {
+  const green = SPOTIFY_GREEN;
+  const art = h("div", { class: "np-art" });
+  const artImg = h("img", { alt: "", draggable: "false" }) as HTMLImageElement;
+  const artNote = svg(ICONS.musicNote, 14);
+  artNote.style.color = `${green}b3`;
+  art.append(artNote, artImg);
+  const title = h("div", { class: "np-title" });
+  const subtitle = h("div", { class: "np-sub" });
+  const head = h("button", { class: "np-mini-head" }, art, h("div", { class: "np-text" }, title, subtitle));
+  head.addEventListener("click", onOpen);
+
+  const fill = h("i", { class: "np-fill" });
+  const bar = h("div", { class: "np-mini-bar" }, h("i", { class: "np-track" }), fill);
+
+  const prev = iconButton(ICONS.backward, 12, 0, () => void Bridge.spotifyControl("previous"));
+  const next = iconButton(ICONS.forward, 12, 0, () => void Bridge.spotifyControl("next"));
+  prev.style.color = "#C5C8CD";
+  next.style.color = "#C5C8CD";
+  const play = h("button", { class: "np-play", onclick: togglePlay });
+  const el = h("div", { class: "np-mini" }, head, bar, h("div", { class: "np-buttons" }, prev, play, next));
+
+  let shownTrack: SpotifyTrack | null = null;
+  let playIcon: boolean | null = null;
+  let timer: number | null = null;
+
+  /** On screen: the overview is up, and the card is part of it. */
+  const visible = () =>
+    State.mode === "expanded" && State.view === "overview" && State.musicCard && el.isConnected !== false;
+
+  function paintProgress() {
+    const s = Spotify.state;
+    const d = s.track?.duration ?? 0;
+    const f = d > 0 ? Math.min(1, Math.max(0, spotifyPosition(s, Date.now()) / d)) : 0;
+    fill.style.width = `${f * 100}%`;
+  }
+
+  /** The bar moves on its own clock, once a second, only while it plays on screen. */
+  function syncTimer() {
+    const run = Spotify.state.playing && visible();
+    if (run && timer == null) {
+      timer = window.setInterval(() => {
+        if (!(Spotify.state.playing && visible())) {
+          if (timer != null) window.clearInterval(timer);
+          timer = null;
+          return;
+        }
+        paintProgress();
+      }, 1000);
+    } else if (!run && timer != null) {
+      window.clearInterval(timer);
+      timer = null;
+    }
+  }
+
+  return {
+    el,
+    sync() {
+      const s = Spotify.state;
+      const track = s.track;
+      if (!track) {
+        syncTimer();
+        return;
+      }
+      if (shownTrack !== track) {
+        shownTrack = track;
+        const name = isAd(track) ? t("Advertisement") : track.title;
+        title.textContent = name;
+        subtitle.textContent = track.artist;
+        subtitle.style.display = track.artist ? "" : "none";
+        head.title = [name, track.artist, track.album].filter((x) => x).join(" · ");
+      }
+      const cover = currentArtwork(s);
+      if (cover) {
+        if (artImg.getAttribute("src") !== cover) artImg.setAttribute("src", cover);
+        art.classList.add("has-art");
+      } else {
+        art.classList.remove("has-art");
+        artImg.removeAttribute("src");
+      }
+      paintProgress();
+      if (playIcon !== s.playing) {
+        playIcon = s.playing;
+        clear(play);
+        const icon = svg(s.playing ? ICONS.pause : ICONS.play, 9);
+        if (!s.playing) icon.style.transform = "translateX(1px)";
+        play.append(icon);
+      }
+      play.title = s.playing ? t("Pause") : t("Play");
+      prev.title = t("Previous");
+      next.title = t("Next");
+      syncTimer();
+    },
+  };
 }
 
 /** SpotifyCardView: now playing, or the idle card (not playing / not installed). */

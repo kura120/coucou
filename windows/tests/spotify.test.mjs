@@ -9,11 +9,12 @@ import { emit, sent } from "./tauri.mjs";
 import { installFakeDom } from "./fakedom.mjs";
 import {
   IDLE_SPOTIFY, SPOTIFY_ID, Spotify, currentArtwork, desktopDances, formatTime, isAd, islandDances,
-  musicPlaying, spotifyPosition, volumeLevel, withPlaying,
+  musicCardShown, musicPlaying, spotifyPosition, volumeLevel, withPlaying,
 } from "../src/core/spotify.ts";
+import { EXPANDED_W, MUSIC_CARD_GAP, MUSIC_CARD_W, PANEL_W, islandSize } from "../src/core/layout.ts";
 import { BotEngine, danceTransform, stepDanceLevel } from "../src/mochi/engine.ts";
 import { registerSpotifyHandlers } from "../src/island/spotify.ts";
-import { buildSpotifyCard, buildSpotifyPill } from "../src/views/spotify.ts";
+import { buildSpotifyCard, buildSpotifyMini, buildSpotifyPill } from "../src/views/spotify.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
 import { lookup, setLanguage } from "../src/i18n/i18n.ts";
 
@@ -283,6 +284,81 @@ test("the playing card: title, artist · album, times, and the controls", () => 
   Spotify.state = playing({ track: track({ id: "spotify:ad:9", title: "x", artist: "", album: "" }) });
   card.sync();
   assert.ok(card.el.textContent.includes("Advertisement"));
+});
+
+// ── The music card ────────────────────────────────────────────────────────────
+
+test("the music card shows while Spotify has a track on a declared pill that is not in front", () => {
+  const declared = [SPOTIFY_ID];
+  assert.ok(musicCardShown(playing(), declared, "integration_claude"));
+  // Paused too: a pause can be undone from the card.
+  assert.ok(musicCardShown(playing({ playing: false }), declared, "integration_claude"));
+  // Nothing loaded, not declared, or Spotify in front with its own card up.
+  assert.ok(!musicCardShown({ ...IDLE_SPOTIFY, running: true }, declared, "integration_claude"));
+  assert.ok(!musicCardShown(playing(), [], "integration_claude"));
+  assert.ok(!musicCardShown(playing(), declared, SPOTIFY_ID));
+});
+
+test("with the music card up, Spotify's pill leaves the pills and the overview widens", () => {
+  const pills = () => State.overviewPills.map((t) => t.id);
+  assert.ok(!State.musicCard);
+  assert.ok(pills().includes(SPOTIFY_ID));
+  Spotify.state = playing();
+  assert.ok(State.musicCard);
+  assert.ok(!pills().includes(SPOTIFY_ID));
+  // The compact island's little Mochis are not the overview's pills: Spotify's stays.
+  assert.ok(State.shownPills.some((t) => t.id === SPOTIFY_ID));
+  // In front, Spotify has the left card: no second one, and nothing to leave.
+  State.setFocus(SPOTIFY_ID);
+  assert.ok(!State.musicCard);
+
+  const wide = EXPANDED_W + MUSIC_CARD_W + MUSIC_CARD_GAP;
+  assert.equal(islandSize("expanded", "overview", 0, false, 0, true).w, wide);
+  assert.equal(islandSize("expanded", "overview", 0, false, 0, false).w, EXPANDED_W);
+  // Only the overview has the card; no other view, and no closed island, grows for it.
+  assert.equal(islandSize("expanded", "prompt", 0, false, 0, true).w, EXPANDED_W);
+  assert.equal(islandSize("expanded", "approval", 0, false, 0, true).w, EXPANDED_W);
+  assert.equal(islandSize("compact", "overview", 0, false, 0, true).w, islandSize("compact", "overview").w);
+  // And the window has the room.
+  assert.ok(wide < PANEL_W);
+});
+
+test("the music card: cover, title and artist, and previous, play, next", () => {
+  let opened = 0;
+  const mini = buildSpotifyMini(() => (opened += 1));
+  State.mode = "expanded";
+  Spotify.state = playing({ position: 45, positionAt: Date.now() });
+  Spotify.artwork = { artUrl: "https://i.scdn.co/image/abc", dataUrl: "data:image/png;base64,AA" };
+  mini.sync();
+  assert.equal(mini.el.querySelector("np-title").textContent, "Get Lucky");
+  assert.equal(mini.el.querySelector("np-sub").textContent, "Daft Punk");
+  assert.equal(mini.el.find("IMG")[0].getAttribute("src"), "data:image/png;base64,AA");
+  // A quarter of the way through.
+  assert.match(mini.el.querySelector("np-mini-bar").find(".np-fill")[0].style.width, /^25(\.\d+)?%$/);
+
+  const [prev, play, next] = mini.el.querySelector("np-buttons").children;
+  assert.equal(play.title, "Pause");
+  const before = sent("spotify_control").length;
+  prev.fire("click");
+  next.fire("click");
+  play.fire("click");
+  assert.deepEqual(sent("spotify_control").slice(before), [
+    { action: "previous", value: null },
+    { action: "next", value: null },
+    { action: "playPause", value: null },
+  ]);
+  assert.equal(Spotify.state.playing, false, "shown at once");
+  mini.sync();
+  assert.equal(play.title, "Play");
+
+  // The cover and the names bring Spotify's own card to the front.
+  mini.el.querySelector("np-mini-head").fire("click");
+  assert.equal(opened, 1);
+  // An ad has no title of its own, and no artist.
+  Spotify.state = playing({ track: track({ id: "spotify:ad:9", title: "x", artist: "" }) });
+  mini.sync();
+  assert.equal(mini.el.querySelector("np-title").textContent, "Advertisement");
+  assert.equal(mini.el.querySelector("np-sub").style.display, "none");
 });
 
 test("the card has no volume where Spotify's cannot be read", () => {

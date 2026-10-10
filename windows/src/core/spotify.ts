@@ -101,6 +101,19 @@ export function musicPlaying(s: SpotifyState, activeIntegrations: readonly strin
   return s.playing && s.track != null && activeIntegrations.includes(SPOTIFY_ID);
 }
 
+/**
+ * Whether the music card shows next to the pills: Spotify has a track loaded —
+ * playing or paused, so a pause can be undone from the card — on a declared
+ * pill that is not in front. In front, Spotify has the whole left card.
+ */
+export function musicCardShown(
+  s: SpotifyState,
+  activeIntegrations: readonly string[],
+  focusId: string | null | undefined,
+): boolean {
+  return s.track != null && activeIntegrations.includes(SPOTIFY_ID) && focusId !== SPOTIFY_ID;
+}
+
 /** The states Mochi dances in; the rest (an alert, an error, sleep) win. */
 const DANCE_STATES: ReadonlySet<BotStateName> = new Set(["idle", "working", "thinking", "searching", "finished"]);
 
