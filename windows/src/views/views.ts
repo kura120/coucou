@@ -306,6 +306,10 @@ function buildOverview(actions: ViewActions): ViewHost {
     sync() {
       const task = State.focusTask;
       if (task?.id !== lastFocus) {
+        // Another pill comes to the front: its card and the pills ease in,
+        // rather than being swapped under the eye. Not the first time the
+        // overview is drawn: nothing was there to change from.
+        if (lastFocus != null) easeIn(leftBody, pills);
         lastFocus = task?.id ?? null;
         detailOpen = false;
         activeDiffId = null;
@@ -413,11 +417,34 @@ function buildOverview(actions: ViewActions): ViewHost {
       if (pillKey !== pillIds) {
         pillIds = pillKey;
         clear(pills);
-        for (const t of others) pills.append(buildPill(t, actions));
+        others.forEach((t, index) => {
+          const pill = buildPill(t, actions);
+          // Its place in the row of pills easing in (style.css `.switch-in`).
+          pill.style.setProperty("--i", String(index));
+          pills.append(pill);
+        });
         pruneMiniBots();
       }
     },
   };
+}
+
+/** style.css `card-switch`, the last pill's delay included, with some slack. */
+const SWITCH_MS = 520;
+
+/**
+ * Plays the change of pill on what changes with it. The class starts the
+ * animation and is taken off once it has played, so a later redraw of the same
+ * card (a new step, a new track) does not play it again.
+ */
+function easeIn(...els: HTMLElement[]) {
+  for (const el of els) {
+    el.classList.remove("switch-in");
+    // Read back so that a change made mid-animation starts it over.
+    void el.offsetWidth;
+    el.classList.add("switch-in");
+    window.setTimeout(() => el.classList.remove("switch-in"), SWITCH_MS);
+  }
 }
 
 /**
