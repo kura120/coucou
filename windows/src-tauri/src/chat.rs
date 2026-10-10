@@ -58,7 +58,9 @@ struct Conversation {
     /// The provider `native` belongs to.
     owner: Option<String>,
     native: Vec<Value>,
-    /// `{"role", "content": text}` turns, the same whoever answered.
+    /// `{"role", "content": text}` turns, the same whoever answered. An answer
+    /// during which Claude Code edited files also has `"edits"`: they are for
+    /// the island to show again, never part of what a provider is sent.
     plain: Vec<Value>,
     /// Its id among the saved conversations (conversations.rs), once it has one.
     id: Option<String>,
@@ -125,7 +127,7 @@ impl Chat {
     pub fn begin(&self, provider: &str) -> Turn {
         let mut c = self.inner.lock().unwrap();
         if c.owner.as_deref() != Some(provider) {
-            c.native = c.plain.clone();
+            c.native = c.plain.iter().map(said).collect();
             c.owner = Some(provider.to_string());
         }
         Turn {
@@ -149,6 +151,31 @@ impl Chat {
         c.plain.push(json!({ "role": "user", "content": user_text }));
         c.plain.push(json!({ "role": "assistant", "content": answer }));
     }
+
+    /// The files edited during the turn just committed go with its answer, so
+    /// the conversation still shows them when it is opened again.
+    pub fn attach_edits(&self, turn: &Turn, edits: Vec<Value>) {
+        if edits.is_empty() {
+            return;
+        }
+        let mut c = self.inner.lock().unwrap();
+        if c.epoch != turn.epoch || c.owner.as_deref() != Some(turn.provider.as_str()) {
+            return;
+        }
+        if let Some(Value::Object(last)) = c.plain.last_mut() {
+            if last.get("role").and_then(Value::as_str) == Some("assistant") {
+                last.insert("edits".into(), Value::Array(edits));
+            }
+        }
+    }
+}
+
+/// What a turn said and who said it: all a provider is ever sent of a plain turn.
+fn said(turn: &Value) -> Value {
+    json!({
+        "role": turn.get("role").cloned().unwrap_or(Value::Null),
+        "content": turn.get("content").cloned().unwrap_or(Value::Null),
+    })
 }
 
 // ── System prompt ─────────────────────────────────────────────────────────────
@@ -354,6 +381,35 @@ mod tests {
         let _other = chat.begin("google");
         chat.commit(&t, json!({"role":"user","content":"q"}), json!({"role":"assistant","content":"a"}), "q", "a");
         assert!(chat.begin("google").first);
+    }
+
+    #[test]
+    fn the_files_an_answer_edited_are_kept_with_it_and_never_sent_to_a_provider() {
+        let chat = Chat::default();
+        let t = chat.begin("claudecode");
+        chat.commit(&t, json!({"role":"user","content":"rename it"}), json!({"role":"assistant","content":"Done."}), "rename it", "Done.");
+        let edit = json!({"tool":"Edit","input":{"file_path":"/w/a.rs","old_string":"a","new_string":"b"}});
+        chat.attach_edits(&t, vec![edit.clone()]);
+        let plain = chat.snapshot(|| "c1".into()).plain;
+        assert_eq!(plain[1]["edits"], json!([edit]));
+        assert!(plain[0].get("edits").is_none());
+
+        // Another provider picks the conversation up: what was said, nothing else.
+        let other = chat.begin("openai");
+        assert_eq!(other.history, vec![json!({"role":"user","content":"rename it"}), json!({"role":"assistant","content":"Done."})]);
+        assert!(!serde_json::to_string(&other.history).unwrap().contains("edits"));
+        // And the saved copy still has them.
+        assert_eq!(chat.snapshot(|| "x".into()).plain[1]["edits"], json!([edit]));
+
+        // No edit, a turn from before a reset, or no answer to hang them on: nothing changes.
+        chat.attach_edits(&other, vec![]);
+        let stale = chat.begin("openai");
+        chat.reset();
+        chat.attach_edits(&stale, vec![edit.clone()]);
+        assert!(chat.snapshot(|| "y".into()).plain.is_empty());
+        let fresh = chat.begin("openai");
+        chat.attach_edits(&fresh, vec![edit]);
+        assert!(chat.snapshot(|| "z".into()).plain.is_empty());
     }
 
     #[test]

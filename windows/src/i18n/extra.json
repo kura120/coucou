@@ -3809,6 +3809,204 @@
    "id": {
     "other": "{count} commit"
    }
+  },
+  "Cut": {
+   "zh-Hans": "剪切",
+   "hi": "काटें",
+   "es": "Cortar",
+   "ar": "قص",
+   "fr": "Couper",
+   "bn": "কাট করুন",
+   "pt-BR": "Recortar",
+   "ru": "Вырезать",
+   "id": "Potong"
+  },
+  "Paste": {
+   "zh-Hans": "粘贴",
+   "hi": "पेस्ट करें",
+   "es": "Pegar",
+   "ar": "لصق",
+   "fr": "Coller",
+   "bn": "পেস্ট করুন",
+   "pt-BR": "Colar",
+   "ru": "Вставить",
+   "id": "Tempel"
+  },
+  "Select all": {
+   "zh-Hans": "全选",
+   "hi": "सभी चुनें",
+   "es": "Seleccionar todo",
+   "ar": "تحديد الكل",
+   "fr": "Tout sélectionner",
+   "bn": "সব নির্বাচন করুন",
+   "pt-BR": "Selecionar tudo",
+   "ru": "Выделить всё",
+   "id": "Pilih semua"
+  },
+  "Copy answer": {
+   "zh-Hans": "复制回答",
+   "hi": "उत्तर कॉपी करें",
+   "es": "Copiar respuesta",
+   "ar": "نسخ الإجابة",
+   "fr": "Copier la réponse",
+   "bn": "উত্তর কপি করুন",
+   "pt-BR": "Copiar resposta",
+   "ru": "Скопировать ответ",
+   "id": "Salin jawaban"
+  },
+  "Delete": {
+   "zh-Hans": "删除",
+   "hi": "हटाएँ",
+   "es": "Eliminar",
+   "ar": "حذف",
+   "fr": "Supprimer",
+   "bn": "মুছুন",
+   "pt-BR": "Excluir",
+   "ru": "Удалить",
+   "id": "Hapus"
+  },
+  "Fold": {
+   "zh-Hans": "折叠",
+   "hi": "समेटें",
+   "es": "Plegar",
+   "ar": "طي",
+   "fr": "Replier",
+   "bn": "ভাঁজ করুন",
+   "pt-BR": "Recolher",
+   "ru": "Свернуть",
+   "id": "Lipat"
+  },
+  "Unfold": {
+   "zh-Hans": "展开",
+   "hi": "खोलें",
+   "es": "Desplegar",
+   "ar": "بسط",
+   "fr": "Déplier",
+   "bn": "খুলুন",
+   "pt-BR": "Expandir",
+   "ru": "Развернуть",
+   "id": "Buka lipatan"
+  },
+  "Open on GitHub": {
+   "zh-Hans": "在 GitHub 上打开",
+   "hi": "GitHub पर खोलें",
+   "es": "Abrir en GitHub",
+   "ar": "فتح في GitHub",
+   "fr": "Ouvrir sur GitHub",
+   "bn": "GitHub-এ খুলুন",
+   "pt-BR": "Abrir no GitHub",
+   "ru": "Открыть на GitHub",
+   "id": "Buka di GitHub"
+  },
+  "Copy branch name": {
+   "zh-Hans": "复制分支名",
+   "hi": "ब्रांच का नाम कॉपी करें",
+   "es": "Copiar nombre de la rama",
+   "ar": "نسخ اسم الفرع",
+   "fr": "Copier le nom de la branche",
+   "bn": "ব্রাঞ্চের নাম কপি করুন",
+   "pt-BR": "Copiar nome da branch",
+   "ru": "Скопировать имя ветки",
+   "id": "Salin nama branch"
+  },
+  "Show diff": {
+   "zh-Hans": "显示差异",
+   "hi": "डिफ़ दिखाएँ",
+   "es": "Mostrar diff",
+   "ar": "إظهار الفروق",
+   "fr": "Afficher le diff",
+   "bn": "ডিফ দেখান",
+   "pt-BR": "Mostrar diff",
+   "ru": "Показать изменения",
+   "id": "Tampilkan diff"
+  },
+  "Hide diff": {
+   "zh-Hans": "隐藏差异",
+   "hi": "डिफ़ छिपाएँ",
+   "es": "Ocultar diff",
+   "ar": "إخفاء الفروق",
+   "fr": "Masquer le diff",
+   "bn": "ডিফ লুকান",
+   "pt-BR": "Ocultar diff",
+   "ru": "Скрыть изменения",
+   "id": "Sembunyikan diff"
+  },
+  "Open file": {
+   "zh-Hans": "打开文件",
+   "hi": "फ़ाइल खोलें",
+   "es": "Abrir archivo",
+   "ar": "فتح الملف",
+   "fr": "Ouvrir le fichier",
+   "bn": "ফাইল খুলুন",
+   "pt-BR": "Abrir arquivo",
+   "ru": "Открыть файл",
+   "id": "Buka file"
+  },
+  "Copy path": {
+   "zh-Hans": "复制路径",
+   "hi": "पाथ कॉपी करें",
+   "es": "Copiar ruta",
+   "ar": "نسخ المسار",
+   "fr": "Copier le chemin",
+   "bn": "পাথ কপি করুন",
+   "pt-BR": "Copiar caminho",
+   "ru": "Скопировать путь",
+   "id": "Salin jalur"
+  },
+  "Bring to front": {
+   "zh-Hans": "置于前面",
+   "hi": "सामने लाएँ",
+   "es": "Traer al frente",
+   "ar": "إحضار إلى المقدمة",
+   "fr": "Mettre au premier plan",
+   "bn": "সামনে আনুন",
+   "pt-BR": "Trazer para a frente",
+   "ru": "На передний план",
+   "id": "Bawa ke depan"
+  },
+  "Ask Mochi anything": {
+   "zh-Hans": "向 Mochi 提问任何事",
+   "hi": "Mochi से कुछ भी पूछें",
+   "es": "Pregúntale lo que quieras a Mochi",
+   "ar": "اسأل Mochi أي شيء",
+   "fr": "Demande ce que tu veux à Mochi",
+   "bn": "Mochi-কে যেকোনো কিছু জিজ্ঞেস করুন",
+   "pt-BR": "Pergunte qualquer coisa ao Mochi",
+   "ru": "Спроси Mochi о чём угодно",
+   "id": "Tanyakan apa saja ke Mochi"
+  },
+  "Pick a model below, or just start typing.": {
+   "zh-Hans": "在下方选择模型，或直接开始输入。",
+   "hi": "नीचे एक मॉडल चुनें, या बस लिखना शुरू करें।",
+   "es": "Elige un modelo abajo o empieza a escribir.",
+   "ar": "اختر نموذجاً أدناه، أو ابدأ الكتابة مباشرة.",
+   "fr": "Choisis un modèle ci-dessous, ou commence à écrire.",
+   "bn": "নিচে একটি মডেল বেছে নিন, অথবা সরাসরি লিখতে শুরু করুন।",
+   "pt-BR": "Escolha um modelo abaixo ou comece a digitar.",
+   "ru": "Выбери модель ниже или просто начни писать.",
+   "id": "Pilih model di bawah, atau langsung mulai mengetik."
+  },
+  "Claude Code works in {folder}": {
+   "zh-Hans": "Claude Code 在 {folder} 中工作",
+   "hi": "Claude Code {folder} में काम करता है",
+   "es": "Claude Code trabaja en {folder}",
+   "ar": "يعمل Claude Code في {folder}",
+   "fr": "Claude Code travaille dans {folder}",
+   "bn": "Claude Code {folder}-এ কাজ করে",
+   "pt-BR": "O Claude Code trabalha em {folder}",
+   "ru": "Claude Code работает в {folder}",
+   "id": "Claude Code bekerja di {folder}"
+  },
+  "New": {
+   "zh-Hans": "新建",
+   "hi": "नई",
+   "es": "Nuevo",
+   "ar": "جديد",
+   "fr": "Nouveau",
+   "bn": "নতুন",
+   "pt-BR": "Novo",
+   "ru": "Новый",
+   "id": "Baru"
   }
  }
 }

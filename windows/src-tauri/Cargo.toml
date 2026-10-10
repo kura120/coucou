@@ -44,6 +44,9 @@ windows = { version = "0.61", features = [
   "Win32_System_Diagnostics_ToolHelp",
   # The chat's "Choose…" folder dialog for Claude Code (IFileOpenDialog).
   "Win32_System_Com",
+  # Paste in the right-click menu reads the clipboard's text (clipboard.rs).
+  "Win32_System_DataExchange",
+  "Win32_System_Memory",
   "Win32_System_Ole",
   "Win32_System_Pipes",
   "Win32_System_SystemInformation",

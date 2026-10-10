@@ -22,6 +22,7 @@ import { Bridge } from "../core/bridge";
 import { buildRecap } from "./recap";
 import { buildWardrobe } from "./wardrobe";
 import { buildSpotifyCard, buildSpotifyPill, type SpotifyPillHost } from "./spotify";
+import { provideMenu } from "./menu";
 import { SPOTIFY_ID } from "../core/spotify";
 import type { Outfit, OutfitSelection } from "../mochi/wardrobe";
 import { language, t, tl, type Msg } from "../i18n/i18n";
@@ -462,6 +463,9 @@ function buildPill(task: AgentTask, actions: ViewActions): HTMLElement {
     lbl,
   );
   fitPillLabel(pill, lbl);
+  provideMenu(pill, () => [
+    { label: t("Bring to front"), icon: ICONS.arrowUp, action: () => actions.setFocus(task.id) },
+  ]);
   pill.style.borderColor = `${task.color}24`;
   pill.addEventListener("mouseenter", () => {
     pill.style.background = `${task.color}2e`;

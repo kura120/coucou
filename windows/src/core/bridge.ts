@@ -5,6 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import type { SavedEdit } from "./diff";
 import type { Settings } from "./state";
 import type { RecapHistory, RecapPrefs } from "../recap/summary";
 import type { SpotifyState } from "./spotify";
@@ -156,6 +157,9 @@ export const Bridge = {
   chatStop: () => call<void>("chat_stop"),
   /** The system's folder dialog; null when cancelled. */
   pickFolder: () => call<string | null>("pick_folder"),
+
+  /** The clipboard's text, for Paste in the right-click menu; null when Rust has none to give. */
+  clipboardText: () => call<string | null>("clipboard_text"),
   /**
    * The models a provider offers, for the picker in the chat view. Rust asks
    * the provider only when it has a key (or a server address).
@@ -320,7 +324,8 @@ export interface ChatEdit {
 
 export interface SavedConversation extends ConversationSummary {
   model: string;
-  turns: { role: string; content: string }[];
+  /** An answer during which Claude Code edited files carries them (core/diff.ts, diffOfSaved). */
+  turns: { role: string; content: string; edits?: SavedEdit[] }[];
 }
 
 export interface LocalServer {

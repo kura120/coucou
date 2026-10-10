@@ -3,6 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { changeBar, diffOfSaved, folderLabel, relativePath } from "../src/core/diff.ts";
 import {
   DIFF_MAX_LINES, buildFileDiff, fileName, fromEdit, fromNew, isDiffStep, lastTextStep,
   makeDiffStep, parseDiffStep, toOneLine,
@@ -189,4 +190,47 @@ test("buildFileDiff — Write and other tools", () => {
   assert.equal(buildFileDiff("Write", { file_path: "/p/n.md", content: "" }), null);
   assert.equal(buildFileDiff("Bash", { command: "ls" }), null);
   assert.equal(buildFileDiff("Read", { file_path: "/p/n.md" }), null);
+});
+
+// ── A file's pill in the chat ─────────────────────────────────────────────────
+
+test("a file is placed from the folder Claude Code works in", () => {
+  assert.equal(relativePath("C:\\dev\\coucou\\windows\\src\\views\\chat.ts", "C:\\dev\\coucou"), "windows/src/views/chat.ts");
+  assert.equal(relativePath("c:/DEV/coucou/README.md", "C:\\dev\\coucou\\"), "README.md");
+  // Not under it, or no folder at all: the path as it is.
+  assert.equal(relativePath("/etc/hosts", "/home/me/app"), "/etc/hosts");
+  assert.equal(relativePath("/home/me/application/a.rs", "/home/me/app"), "/home/me/application/a.rs");
+  assert.equal(relativePath("/w/a.rs"), "/w/a.rs");
+});
+
+test("a pill names the two folders nearest the file, and nothing for a file at the root", () => {
+  assert.equal(folderLabel("/w/src/app.rs", "/w"), "src/");
+  assert.equal(folderLabel("/w/src/views/chat.ts", "/w"), "src/views/");
+  assert.equal(folderLabel("/w/windows/src/views/chat.ts", "/w"), "…/src/views/");
+  assert.equal(folderLabel("/w/README.md", "/w"), "");
+  assert.equal(folderLabel("C:\\Users\\me\\notes\\todo.md"), "…/me/notes/");
+  assert.equal(folderLabel("todo.md"), "");
+});
+
+test("the squares of a pill show additions to removals, each with at least one", () => {
+  assert.deepEqual(changeBar(0, 0), { plus: 0, minus: 0 });
+  assert.deepEqual(changeBar(12, 0), { plus: 5, minus: 0 });
+  assert.deepEqual(changeBar(0, 7), { plus: 0, minus: 5 });
+  assert.deepEqual(changeBar(2, 1), { plus: 3, minus: 2 });
+  assert.deepEqual(changeBar(1, 400), { plus: 1, minus: 4 });
+  assert.deepEqual(changeBar(400, 1), { plus: 4, minus: 1 });
+  assert.deepEqual(changeBar(5, 5), { plus: 3, minus: 2 });
+});
+
+test("a saved edit is drawn again from its input, or named when that was too large to keep", () => {
+  const diff = diffOfSaved({ tool: "Edit", input: { file_path: "/w/a.rs", old_string: "a", new_string: "b\nc" } });
+  assert.deepEqual([diff.path, diff.added, diff.removed, diff.tooLarge], ["/w/a.rs", 2, 1, false]);
+  const stub = diffOfSaved({ tool: "Write", path: "/w/big.json", tooLarge: true });
+  assert.deepEqual([stub.path, stub.added, stub.removed, stub.tooLarge, stub.isNewFile, stub.hunks.length], ["/w/big.json", 0, 0, true, true, 0]);
+  assert.equal(diffOfSaved({ tool: "Edit", path: "/w/a.rs", tooLarge: true }).isNewFile, false);
+  // Not a file edit, nothing to name, or not an edit at all.
+  assert.equal(diffOfSaved({ tool: "Bash", input: { command: "ls" } }), null);
+  assert.equal(diffOfSaved({ tool: "Write", path: "" }), null);
+  assert.equal(diffOfSaved(null), null);
+  assert.equal(diffOfSaved({}), null);
 });

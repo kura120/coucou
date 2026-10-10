@@ -1,6 +1,8 @@
 /* Coucou for Windows — same palette, sizes and type scale as the macOS island.
    Every colour below is copied from the Swift views. */
 
+@import "./menu.css";
+
 :root {
   color-scheme: dark;
 
@@ -1059,6 +1061,30 @@ input[type="range"]::-webkit-slider-thumb {
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
+/* What an empty chat says. Centred on the island, not on the log: the log
+   starts after Mochi (84 px), the card's other side has 16. */
+.chat-empty {
+  position: relative;
+  left: -34px;
+  margin: auto;
+  padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  text-align: center;
+}
+
+.chat-empty-title {
+  font: 600 14px var(--font);
+  color: var(--ink-2);
+}
+
+.chat-empty-sub {
+  font: 400 11.5px var(--font);
+  color: var(--dim-3);
+}
+
 .chat-row {
   display: flex;
 }
@@ -1297,6 +1323,40 @@ input[type="range"]::-webkit-slider-thumb {
   display: flex;
 }
 
+/* The picker and the lists rise into place as the island grows for them; the
+   conversation comes back down when they close. One short run each, on the
+   element that appears: nothing is animated while nothing changes. */
+.chat-body.picking .picker,
+.chat-body.listing .convos {
+  animation: panel-in 0.26s cubic-bezier(0.3, 1.2, 0.4, 1) both;
+}
+
+.chat-log {
+  animation: log-back 0.2s ease-out both;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes log-back {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-body.picking .picker,
+  .chat-body.listing .convos,
+  .chat-log {
+    animation: none;
+  }
+}
+
 .chat-body.picking .chat-log,
 .chat-body.picking .chip-row {
   display: none;
@@ -1522,12 +1582,67 @@ input[type="range"]::-webkit-slider-thumb {
   flex: 0 0 auto;
 }
 
-.edit-name {
+/* Where the file is, then its name: the folder gives way first. */
+.edit-file {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.edit-dir {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: #6b7079;
+}
+
+.edit-name {
+  flex: 0 1 auto;
+  min-width: 2ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #c8cdd4;
+}
+
+.edit-tag {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(74, 222, 128, 0.14);
+  color: #4ade80;
+  font-size: 9.5px;
+}
+
+/* Additions to removals, at a glance. */
+.edit-bar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  gap: 1.5px;
+}
+
+.edit-bar i {
+  width: 4px;
+  height: 6px;
+  border-radius: 1px;
+}
+
+.edit-bar .plus {
+  background: #4ade80;
+}
+
+.edit-bar .minus {
+  background: #f87171;
+}
+
+.edit-chevron {
+  color: #5c6370;
+  transition: transform 0.15s ease-out;
+}
+
+.edit-pill.open .edit-chevron {
+  transform: rotate(90deg);
 }
 
 .edit-plus {
@@ -1548,6 +1663,41 @@ input[type="range"]::-webkit-slider-thumb {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
   user-select: text;
+}
+
+.edit-diff-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding: 0 10px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font: 500 10.5px var(--font);
+  color: #8a8f98;
+}
+
+.edit-diff-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The line's number, kept out of what a selection copies. */
+.edit-diff .diff-line .num {
+  flex: 0 0 34px;
+  padding-right: 8px;
+  text-align: right;
+  color: #454850;
+  user-select: none;
+}
+
+.edit-gap {
+  padding: 0 10px 0 16px;
+  font: 400 10.5px/1.35 var(--mono);
+  color: #454850;
+  user-select: none;
 }
 
 /* ── Conversations (the list behind the title, left of the model) ─────────── */
@@ -1579,6 +1729,26 @@ input[type="range"]::-webkit-slider-thumb {
 
 .convo-btn svg {
   flex: 0 0 auto;
+}
+
+/* Whether an answer is on its way: orange then, gray the rest of the time —
+   on the pill, and on that conversation's row of the list. */
+.convo-dot {
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #5c6370;
+  transition: background 0.2s ease-out;
+}
+
+.convo-dot.on {
+  background: var(--amber);
+}
+
+/* During an answer the list is only read. */
+.convos.busy .convo-icon {
+  display: none;
 }
 
 .convo-name {

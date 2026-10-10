@@ -17,14 +17,20 @@
 // With Claude Code in a folder: each file it edits shows as a pill under the
 // answer, which opens the diff; and next to the conversations sits the list of
 // the folder's pull requests — on GitHub, and local branches without one yet.
+// The edits are saved with the conversation, so its pills are there again when
+// it is opened; and the log is added to, never rebuilt, so a diff that was
+// opened stays open when the next message comes.
 
 import { h, svg, clear } from "./dom";
 import { ICONS } from "./icons";
-import { renderMarkdown } from "./markdown";
+import { renderMarkdown, writeClipboard } from "./markdown";
+import { provideMenu } from "./menu";
 import {
   Bridge, onEvent, type ChatContext, type ChatEdit, type ConversationSummary, type ModelInfo, type RepoPulls,
 } from "../core/bridge";
-import { buildFileDiff, fileName, type DiffKind, type FileDiff } from "../core/diff";
+import {
+  buildFileDiff, changeBar, diffOfSaved, fileName, folderLabel, relativePath, type DiffKind, type FileDiff,
+} from "../core/diff";
 import {
   activeModel, pickModel, providerDef, visibleProviders, withModel, type ProviderDef,
 } from "../core/providers";
@@ -53,6 +59,10 @@ const STRINGS = {
   chatOnly: N_("Without a folder, Claude Code only chats and searches the web."),
   inFolder: N_("Claude Code can read, edit and run commands in this folder. What it must ask for shows in the island."),
   conversations: N_("Conversations"),
+  newConversation: N_("New conversation"),
+  emptyTitle: N_("Ask Mochi anything"),
+  emptyHint: N_("Pick a model below, or just start typing."),
+  emptyFolder: N_("Claude Code works in {folder}"),
   newChat: N_("New chat"),
   newChatHere: N_("New chat in this folder"),
   anyFolder: N_("No folder"),
@@ -66,6 +76,19 @@ const STRINGS = {
   noLocal: N_("No local branch waiting for a pull request."),
   draft: N_("Draft"),
   notPushed: N_("Not pushed"),
+  // The right-click menu (views/menu.ts).
+  copyAnswer: N_("Copy answer"),
+  open: N_("Open"),
+  delete: N_("Delete"),
+  fold: N_("Fold"),
+  unfold: N_("Unfold"),
+  openOnGitHub: N_("Open on GitHub"),
+  copyBranch: N_("Copy branch name"),
+  showDiff: N_("Show diff"),
+  hideDiff: N_("Hide diff"),
+  openFile: N_("Open file"),
+  copyPath: N_("Copy path"),
+  newFile: N_("New"),
 };
 
 /** Claude Code's `--effort` levels; "" leaves it to Claude Code. */
@@ -89,20 +112,45 @@ let nextId = 1;
 const DIFF_SYMBOLS: Record<DiffKind, string> = { added: "+", removed: "−", context: " " };
 
 /**
- * A file Claude Code edited, as a pill: its name and how many lines went in
- * and out. A click opens the diff under it, another folds it away.
+ * A file Claude Code edited, as a pill: the folder it is in (from `base`, the
+ * folder Claude Code works in), its name, whether it is new, how many lines
+ * went in and out and in what proportion. A click opens the diff under it —
+ * the file's path, its lines with their numbers — another folds it away.
  */
-export function editPill(diff: FileDiff): HTMLElement {
+export function editPill(diff: FileDiff, base = State.settings.claudeCodeDir): HTMLElement {
+  const dir = folderLabel(diff.path, base);
+  const { plus, minus } = changeBar(diff.added, diff.removed);
+  const chevron = svg(ICONS.chevronRight, 8, { stroke: 2.4 });
+  chevron.setAttribute("class", "edit-chevron");
   const pill = h(
     "button",
     { class: "edit-pill", title: diff.path },
     svg(ICONS.doc, 10),
-    h("span", { class: "edit-name", text: fileName(diff.path) }),
+    h(
+      "span",
+      { class: "edit-file" },
+      dir ? h("span", { class: "edit-dir", text: dir }) : null,
+      h("span", { class: "edit-name", text: fileName(diff.path) }),
+    ),
+    diff.isNewFile ? h("span", { class: "edit-tag", text: t(STRINGS.newFile) }) : null,
     diff.added > 0 ? h("span", { class: "edit-plus", text: `+${diff.added}` }) : null,
     diff.removed > 0 ? h("span", { class: "edit-minus", text: `−${diff.removed}` }) : null,
+    plus + minus > 0
+      ? h(
+          "span",
+          { class: "edit-bar" },
+          ...Array.from({ length: plus + minus }, (_, i) => h("i", { class: i < plus ? "plus" : "minus" })),
+        )
+      : null,
+    chevron,
   );
   const el = h("div", { class: "edit" }, pill);
   let body: HTMLElement | null = null;
+  provideMenu(el, () => [
+    { label: t(body ? STRINGS.hideDiff : STRINGS.showDiff), icon: ICONS.doc, action: () => pill.click() },
+    { label: t(STRINGS.openFile), icon: ICONS.arrowUpRight, action: () => void Bridge.openFileInVSCode(diff.path) },
+    { label: t(STRINGS.copyPath), icon: ICONS.copy, action: () => void writeClipboard(diff.path) },
+  ]);
   pill.addEventListener("click", () => {
     if (body) {
       body.remove();
@@ -110,21 +158,39 @@ export function editPill(diff: FileDiff): HTMLElement {
       pill.classList.remove("open");
       return;
     }
-    const lines = diff.hunks.flatMap((hunk) => hunk.lines);
-    body = h("div", { class: "edit-diff" });
-    if (diff.tooLarge || lines.length === 0) {
+    body = h(
+      "div",
+      { class: "edit-diff" },
+      h(
+        "div",
+        { class: "edit-diff-head" },
+        h("span", { class: "edit-diff-path", title: diff.path, text: relativePath(diff.path, base) }),
+        h("button", {
+          class: "picker-link",
+          text: t(STRINGS.openFile),
+          onclick: () => void Bridge.openFileInVSCode(diff.path),
+        }),
+      ),
+    );
+    if (diff.tooLarge || diff.hunks.every((hunk) => hunk.lines.length === 0)) {
       body.append(h("div", { class: "picker-status", text: t(STRINGS.tooLarge) }));
     } else {
-      for (const line of lines) {
-        body.append(
-          h(
-            "div",
-            { class: `diff-line ${line.kind}` },
-            h("span", { class: "sym", text: DIFF_SYMBOLS[line.kind] }),
-            h("span", { class: "txt", text: line.text }),
-          ),
-        );
-      }
+      diff.hunks.forEach((hunk, index) => {
+        // What lies between two hunks is not shown: say so.
+        if (index > 0) body!.append(h("div", { class: "edit-gap", text: "⋯" }));
+        for (const line of hunk.lines) {
+          body!.append(
+            h(
+              "div",
+              { class: `diff-line ${line.kind}` },
+              // Where the line is now; a removed one, where it was.
+              h("span", { class: "num", text: String(line.newLine > 0 ? line.newLine : line.origLine) }),
+              h("span", { class: "sym", text: DIFF_SYMBOLS[line.kind] }),
+              h("span", { class: "txt", text: line.text }),
+            ),
+          );
+        }
+      });
     }
     el.append(body);
     pill.classList.add("open");
@@ -143,8 +209,12 @@ function bubble(message: ChatMessage): HTMLElement {
   }
   const reply = h("div", { class: "reply" });
   renderMarkdown(reply, message.content);
+  provideMenu(reply, () => [
+    { label: t(STRINGS.copyAnswer), icon: ICONS.copy, action: () => void writeClipboard(message.content) },
+  ]);
   if (!message.edits?.length) return h("div", { class: "chat-row" }, reply);
-  return h("div", { class: "chat-row stacked" }, reply, h("div", { class: "edits" }, ...message.edits.map(editPill)));
+  const pills = message.edits.map((diff) => editPill(diff));
+  return h("div", { class: "chat-row stacked" }, reply, h("div", { class: "edits" }, ...pills));
 }
 
 function typingDots(): HTMLElement {
@@ -415,17 +485,22 @@ interface ConversationList {
   el: HTMLElement;
   open(): void;
   close(): void;
+  /** Draws the list again, as it now stands. */
+  refresh(): void;
   readonly isOpen: boolean;
 }
 
 /**
  * The saved conversations, by folder. `pick` opens one; `start` begins a new
- * one in a folder ("" for none).
+ * one in a folder ("" for none). While an answer is on its way (`busy`) the
+ * list can be read — the conversation being answered wears the orange dot —
+ * but nothing in it can be opened, started or deleted.
  */
 function buildConversations(
   onChange: () => void,
   pick: (id: string) => void,
   start: (dir: string) => void,
+  busy: () => boolean,
 ): ConversationList {
   const el = h("div", { class: "convos" });
   let isOpen = false;
@@ -463,6 +538,10 @@ function buildConversations(
       node.classList.toggle("folded", folded.has(dir));
       Sound.play("blip");
     });
+    provideMenu(head, () => [
+      { label: t(dir ? STRINGS.newChatHere : STRINGS.newChat), icon: ICONS.plus, action: () => start(dir) },
+      { label: t(folded.has(dir) ? STRINGS.unfold : STRINGS.fold), action: () => head.click() },
+    ]);
     return node;
   }
 
@@ -472,21 +551,31 @@ function buildConversations(
       { class: "convo-icon", title: tl(STRINGS.deleteConversation) },
       svg(ICONS.xmark, 10),
     );
-    remove.addEventListener("click", async (e) => {
-      e.stopPropagation();
+    const forget = async () => {
+      if (busy()) return;
       await Bridge.conversationDelete(c.id);
       if (State.conversationId === c.id) State.conversationId = null;
       void load();
+    };
+    remove.addEventListener("click", (e) => {
+      e.stopPropagation();
+      void forget();
     });
     const el = h(
       "div",
       { class: c.id === State.conversationId ? "convo-row on" : "convo-row", title: c.title },
-      h("i", { class: "model-dot", style: `background:${providerDef(c.provider).accent}` }),
+      // Orange while its answer is on its way, gray the rest of the time.
+      h("i", { class: busy() && c.id === State.conversationId ? "convo-dot on" : "convo-dot" }),
       h("span", { class: "convo-title", text: c.title }),
       h("span", { class: "convo-when", text: when(c.updated) }),
       c.external ? null : remove,
     );
     el.addEventListener("click", () => pick(c.id));
+    provideMenu(el, () => [
+      { label: t(STRINGS.open), icon: ICONS.bubble, action: () => pick(c.id) },
+      // Claude Code's own sessions are Claude Code's to delete.
+      ...(c.external ? [] : [{ label: t(STRINGS.delete), icon: ICONS.xmark, danger: true, action: () => void forget() }]),
+    ]);
     return el;
   }
 
@@ -495,6 +584,7 @@ function buildConversations(
     const list = (await Bridge.conversationsList()) ?? [];
     if (ticket !== request) return;
     clear(el);
+    el.classList.toggle("busy", busy());
     const groups = groupByFolder(list);
     // The folder in use is always there to start a chat in, even with nothing saved in it yet.
     const current = State.settings.claudeCodeDir;
@@ -515,6 +605,9 @@ function buildConversations(
       isOpen = false;
       request++;
       onChange();
+    },
+    refresh() {
+      if (isOpen) void load();
     },
     get isOpen() {
       return isOpen;
@@ -548,6 +641,10 @@ export function drawPulls(el: HTMLElement, pulls: RepoPulls) {
       h("span", { class: "convo-when", text: pr.branch }),
     );
     row.addEventListener("click", () => void Bridge.openUrl(pr.url));
+    provideMenu(row, () => [
+      { label: t(STRINGS.openOnGitHub), icon: ICONS.arrowUpRight, action: () => void Bridge.openUrl(pr.url) },
+      { label: t(STRINGS.copyBranch), icon: ICONS.copy, action: () => void writeClipboard(pr.branch) },
+    ]);
     el.append(row);
   }
   if (pulls.remote.length === 0) {
@@ -556,16 +653,18 @@ export function drawPulls(el: HTMLElement, pulls: RepoPulls) {
 
   el.append(heading(t(STRINGS.localOnly), null));
   for (const b of pulls.local) {
-    el.append(
-      h(
-        "div",
-        { class: b.current ? "convo-row on" : "convo-row", title: b.branch },
-        svg(ICONS.pull, 10, { stroke: 2.2 }),
-        h("span", { class: "convo-title", text: b.branch }),
-        b.pushed ? null : h("span", { class: "pull-tag", text: t(STRINGS.notPushed) }),
-        h("span", { class: "convo-when", text: tn("{count} commit", "{count} commits", b.ahead) }),
-      ),
+    const row = h(
+      "div",
+      { class: b.current ? "convo-row on" : "convo-row", title: b.branch },
+      svg(ICONS.pull, 10, { stroke: 2.2 }),
+      h("span", { class: "convo-title", text: b.branch }),
+      b.pushed ? null : h("span", { class: "pull-tag", text: t(STRINGS.notPushed) }),
+      h("span", { class: "convo-when", text: tn("{count} commit", "{count} commits", b.ahead) }),
     );
+    provideMenu(row, () => [
+      { label: t(STRINGS.copyBranch), icon: ICONS.copy, action: () => void writeClipboard(b.branch) },
+    ]);
+    el.append(row);
   }
   if (pulls.local.length === 0) el.append(h("div", { class: "picker-status", text: t(STRINGS.noLocal) }));
 }
@@ -633,10 +732,12 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   );
   // The conversation's title, left of the model: opens the list of the saved ones.
   const convoName = h("span", { class: "convo-name" });
+  // The model button's twin: a dot, orange while an answer is on its way.
+  const convoDot = h("i", { class: "convo-dot" });
   const convoBtn = h(
     "button",
     { class: "convo-btn", title: tl(STRINGS.conversations) },
-    svg(ICONS.bubble, 9),
+    convoDot,
     convoName,
     svg(ICONS.chevronUpDown, 9, { stroke: 2 }),
   );
@@ -666,7 +767,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     }
   };
   const picker = buildPicker(panelChanged);
-  const convos = buildConversations(panelChanged, (id) => void openConversation(id), startIn);
+  const convos = buildConversations(panelChanged, (id) => void openConversation(id), startIn, () => sending);
   const pulls = buildPulls(panelChanged);
   /** At most one of the three is open. */
   const closePanels = () => {
@@ -683,10 +784,39 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   const el = h("div", { class: "view" }, h("div", { class: "card wash chat-card" }, body, grip));
   (el.querySelector(".card") as HTMLElement).style.setProperty("--wash", "rgba(99,102,241,0.5)");
 
+  // What an empty chat says, in the middle of the card, until the first question.
+  const emptyHint = h("div", { class: "chat-empty-sub" });
+  const empty = h("div", { class: "chat-empty" }, h("div", { class: "chat-empty-title", text: tl(STRINGS.emptyTitle) }), emptyHint);
+
   let sending = false;
   // Claude Code is answering: the send button stops it.
   let stoppable = false;
   let renderedCount = -1;
+  // The rows on screen, by message: the log is added to and pruned, never
+  // rebuilt, so what the user opened in a row (a diff) stays as they left it.
+  const rows = new Map<number, HTMLElement>();
+  let dots: HTMLElement | null = null;
+
+  function drawLog(thinking: boolean) {
+    const kept = new Set(State.chatHistory.map((m) => m.id));
+    for (const [id, row] of rows) {
+      if (kept.has(id)) continue;
+      row.remove();
+      rows.delete(id);
+    }
+    dots?.remove();
+    dots = null;
+    empty.remove();
+    for (const m of State.chatHistory) {
+      if (rows.has(m.id)) continue;
+      const row = bubble(m);
+      rows.set(m.id, row);
+      log.append(row);
+    }
+    if (thinking) log.append((dots = typingDots()));
+    else if (State.chatHistory.length === 0) log.append(empty);
+    log.scrollTop = log.scrollHeight;
+  }
   // A local model answers token by token: where its text so far is shown.
   let live: HTMLElement | null = null;
 
@@ -699,14 +829,15 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     // Only a provider whose conversations are saved has the list.
     convoBtn.style.display = p.conversations || convos.isOpen ? "" : "none";
     convoBtn.classList.toggle("open", convos.isOpen);
-    convoBtn.disabled = sending;
+    convoDot.classList.toggle("on", sending);
     // Pull requests belong to a folder: Claude Code's.
     const inFolder = p.id === "claudecode" && State.settings.claudeCodeDir !== "";
     pullBtn.style.display = inFolder || pulls.isOpen ? "" : "none";
     pullBtn.classList.toggle("open", pulls.isOpen);
     pullBtn.disabled = sending;
-    const first = State.conversationId ? State.chatHistory.find((m) => m.role === "user") : undefined;
-    convoName.textContent = first ? first.content.replace(/\s+/g, " ").trim() : t(STRINGS.conversations);
+    // Named after its first question; before there is one, a new conversation.
+    const first = State.chatHistory.find((m) => m.role === "user");
+    convoName.textContent = first ? first.content.replace(/\s+/g, " ").trim() : t(STRINGS.newConversation);
     send.classList.toggle("stop", stoppable);
     send.title = t(stoppable ? STRINGS.stop : STRINGS.send);
   }
@@ -758,8 +889,8 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     if (!was) picker.open();
   });
 
+  // The list opens during an answer too: that is when its orange dot shows.
   convoBtn.addEventListener("click", () => {
-    if (sending) return;
     const was = convos.isOpen;
     closePanels();
     if (!was) convos.open();
@@ -795,11 +926,16 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       State.notify();
       return;
     }
-    State.chatHistory = saved.turns.map((turn) => ({
-      id: nextId++,
-      role: turn.role === "assistant" ? "assistant" : "user",
-      content: String(turn.content),
-    }));
+    State.chatHistory = saved.turns.map((turn) => {
+      // The files that answer edited, drawn again from what was saved of them.
+      const edits = (turn.edits ?? []).map(diffOfSaved).filter((diff): diff is FileDiff => diff != null);
+      return {
+        id: nextId++,
+        role: turn.role === "assistant" ? "assistant" : "user",
+        content: String(turn.content),
+        ...(edits.length > 0 ? { edits } : {}),
+      };
+    });
     State.conversationId = saved.id;
     // The conversation comes back with who answered it, and where it worked.
     const provider = providerDef(saved.provider);
@@ -825,16 +961,33 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   // The files Claude Code edited in the turn that is running, and where their pills show.
   let turnEdits: FileDiff[] = [];
   let liveEdits: HTMLElement | null = null;
+  let liveRowEl: HTMLElement | null = null;
 
   /** The row the running answer grows in: its text, then the pills of its edits. */
   function liveRow(): HTMLElement {
     if (!live) {
       live = h("div", { class: "reply" });
       liveEdits = h("div", { class: "edits" });
-      log.querySelector(".typing")?.parentElement?.remove();
-      log.append(h("div", { class: "chat-row stacked" }, live, liveEdits));
+      dots?.remove();
+      dots = null;
+      liveRowEl = h("div", { class: "chat-row stacked" }, live, liveEdits);
+      log.append(liveRowEl);
     }
     return live;
+  }
+
+  /**
+   * The running answer's row becomes `message`'s: nothing is drawn again, so a
+   * diff opened while the answer was still coming stays open.
+   */
+  function keepLiveRow(message: ChatMessage) {
+    if (!liveRowEl || !live) return;
+    renderMarkdown(live, message.content);
+    provideMenu(live, () => [
+      { label: t(STRINGS.copyAnswer), icon: ICONS.copy, action: () => void writeClipboard(message.content) },
+    ]);
+    rows.set(message.id, liveRowEl);
+    liveRowEl = null;
   }
 
   void onEvent<string>("chat-delta", (text) => {
@@ -881,12 +1034,14 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
 
     try {
       const reply = await Bridge.chatSend(query, context);
-      State.chatHistory.push({
+      const message: ChatMessage = {
         id: nextId++,
         role: "assistant",
         content: reply.text,
         ...(turnEdits.length > 0 ? { edits: turnEdits } : {}),
-      });
+      };
+      State.chatHistory.push(message);
+      keepLiveRow(message);
       if (reply.conversationId) State.conversationId = reply.conversationId;
       State.stateOverride = null;
       Sound.play("finish");
@@ -895,7 +1050,18 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       State.noteMessage = String(err).replace(/^Error:\s*/, "");
       State.view = "note";
       Sound.play("error");
+      // Stopped or failed, the files it had edited by then are edited all the
+      // same: their pills stay, under whatever of the answer had come.
+      if (turnEdits.length > 0) {
+        const message: ChatMessage = { id: nextId++, role: "assistant", content: "", edits: turnEdits };
+        State.chatHistory.push(message);
+        if (liveRowEl) rows.set(message.id, liveRowEl);
+        liveRowEl = null;
+      }
     } finally {
+      // An answer that came to nothing leaves no row.
+      liveRowEl?.remove();
+      liveRowEl = null;
       sending = false;
       stoppable = false;
       live = null;
@@ -903,6 +1069,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       turnEdits = [];
       renderedCount = -1; // the finished answer replaces the streamed one
       drawModelButton();
+      convos.refresh(); // its dot goes gray, and it can be opened again
       State.notify();
       onHeightChange();
       input.focus();
@@ -940,11 +1107,12 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       const count = State.chatHistory.length + (thinking ? 0.5 : 0);
       if (count !== renderedCount && !live) {
         renderedCount = count;
-        clear(log);
-        for (const m of State.chatHistory) log.append(bubble(m));
-        if (thinking) log.append(typingDots());
-        log.scrollTop = log.scrollHeight;
+        drawLog(thinking);
       }
+      // Where Claude Code works when it has a folder; else what to do next.
+      const dir = State.settings.chatProvider === "claudecode" ? State.settings.claudeCodeDir : "";
+      const hint = dir ? t(STRINGS.emptyFolder, { folder: folderName(dir) }) : t(STRINGS.emptyHint);
+      if (emptyHint.textContent !== hint) emptyHint.textContent = hint;
 
       // Leaving the chat folds the picker and the list away.
       if (State.view !== "prompt") closePanels();

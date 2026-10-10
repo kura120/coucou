@@ -50,11 +50,11 @@ export interface ViewLayout {
   agentMode: AgentLayoutMode;
 }
 
-// The window is a fixed 720×640 (largest view: the chat pulled all the way
-// down) like the macOS panel; the island is drawn inside it, glued to the top
-// edge and horizontally centred.
+// The window is a fixed 720×800 (largest view: the chat pulled all the way
+// down; the Mac's panel is 640 tall); the island is drawn inside it, glued to
+// the top edge and horizontally centred.
 export const PANEL_W = 720;
-export const PANEL_H = 640;
+export const PANEL_H = 800;
 
 // No notch on a PC: these are the hidden/compact sizes from docs/SPEC.md.
 export const NOTCH_W = 184;
@@ -104,15 +104,30 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
 export const QUESTION_PICKER_H = 200;
 
 /** The chat with its provider and model picker open: room to read the list. */
-export const CHAT_PICKER_H = 460;
+export const CHAT_PICKER_H = 520;
 
 /** How short and how tall the chat can be dragged. */
-export const CHAT_MIN_H = 240;
+export const CHAT_MIN_H = 300;
 export const CHAT_MAX_H = PANEL_H - 20;
+/** The chat as it opens, and how far it grows by itself with the conversation. */
+const CHAT_GROWN_H = 400;
+const CHAT_GROWTH_PER_MESSAGE = 25;
+/** Kept clear under the island on a screen shorter than the window. */
+const SCREEN_MARGIN = 40;
+
+/**
+ * The tallest the chat can be here: what the window shows, and never past the
+ * bottom of a screen that is shorter than the window (a 768 px laptop).
+ */
+export function chatMaxHeight(): number {
+  const screenH = typeof window !== "undefined" ? window.screen?.availHeight : undefined;
+  if (!screenH || !Number.isFinite(screenH)) return CHAT_MAX_H;
+  return Math.max(CHAT_MIN_H, Math.min(CHAT_MAX_H, screenH - SCREEN_MARGIN));
+}
 
 /** A height the user dragged the chat to, kept within what the window can show. */
 export function clampChatHeight(h: number): number {
-  return Math.round(Math.min(CHAT_MAX_H, Math.max(CHAT_MIN_H, h)));
+  return Math.round(Math.min(chatMaxHeight(), Math.max(CHAT_MIN_H, h)));
 }
 
 /**
@@ -123,10 +138,10 @@ export function clampChatHeight(h: number): number {
 export function chatPromptHeight(messageCount: number, picking = false, userHeight = 0): number {
   if (userHeight > 0) {
     const h = clampChatHeight(userHeight);
-    return picking ? Math.max(CHAT_PICKER_H, h) : h;
+    return picking ? Math.max(Math.min(CHAT_PICKER_H, chatMaxHeight()), h) : h;
   }
-  if (picking) return CHAT_PICKER_H;
-  return Math.min(300, 240 + messageCount * 40);
+  if (picking) return Math.min(CHAT_PICKER_H, chatMaxHeight());
+  return Math.min(CHAT_GROWN_H, CHAT_MIN_H + messageCount * CHAT_GROWTH_PER_MESSAGE);
 }
 
 export function islandSize(

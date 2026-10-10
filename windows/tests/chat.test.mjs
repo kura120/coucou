@@ -182,17 +182,109 @@ test("while Claude Code answers, the send button stops it", async () => {
 });
 
 test("the chat keeps the height it was dragged to, within what the window shows", async () => {
-  const { CHAT_MAX_H, CHAT_MIN_H, CHAT_PICKER_H, chatPromptHeight } = await import("../src/core/layout.ts");
-  // Never dragged: it follows the conversation, as on the Mac.
-  assert.equal(chatPromptHeight(0), 240);
-  assert.equal(chatPromptHeight(9), 300);
+  const { CHAT_MAX_H, CHAT_MIN_H, CHAT_PICKER_H, PANEL_H, chatMaxHeight, chatPromptHeight } = await import("../src/core/layout.ts");
+  // Never dragged: it follows the conversation, up to a point.
+  assert.equal(chatPromptHeight(0), 300);
+  assert.equal(chatPromptHeight(2), 350);
+  assert.equal(chatPromptHeight(9), 400);
   assert.equal(chatPromptHeight(0, true), CHAT_PICKER_H);
+  assert.equal(CHAT_PICKER_H, 520);
   // Dragged: that height, whatever the conversation; the picker never gets less than its own.
-  assert.equal(chatPromptHeight(9, false, 520), 520);
-  assert.equal(chatPromptHeight(0, true, 520), 520);
-  assert.equal(chatPromptHeight(0, true, 260), CHAT_PICKER_H);
+  assert.equal(chatPromptHeight(9, false, 600), 600);
+  assert.equal(chatPromptHeight(0, true, 600), 600);
+  assert.equal(chatPromptHeight(0, true, 320), CHAT_PICKER_H);
   assert.equal(chatPromptHeight(0, false, 5000), CHAT_MAX_H);
   assert.equal(chatPromptHeight(0, false, 10), CHAT_MIN_H);
+  assert.deepEqual([CHAT_MIN_H, CHAT_MAX_H, PANEL_H], [300, 780, 800]);
+
+  // A screen shorter than the window: the chat stops above its bottom edge,
+  // and the picker with it.
+  globalThis.screen = { availHeight: 728 };
+  try {
+    assert.equal(chatMaxHeight(), 688);
+    assert.equal(chatPromptHeight(0, false, 5000), 688);
+    assert.equal(chatPromptHeight(0, true), CHAT_PICKER_H);
+    globalThis.screen = { availHeight: 500 };
+    assert.equal(chatPromptHeight(0, true), 460);
+    // Never shorter than the shortest chat, however small the screen.
+    globalThis.screen = { availHeight: 200 };
+    assert.equal(chatMaxHeight(), CHAT_MIN_H);
+  } finally {
+    delete globalThis.screen;
+  }
+  assert.equal(chatMaxHeight(), CHAT_MAX_H);
+});
+
+test("an empty chat says what it is for, until the first question", async () => {
+  const empty = () => view.el.find(".chat-empty");
+  assert.equal(empty().length, 1);
+  assert.equal($(".chat-empty-title").textContent, "Ask Mochi anything");
+  assert.equal($(".chat-empty-sub").textContent, "Pick a model below, or just start typing.");
+  // With Claude Code in a folder, it says where it works.
+  State.settings = { ...State.settings, chatProvider: "claudecode", claudeCodeDir: "C:\\dev\\coucou" };
+  view.sync();
+  assert.equal($(".chat-empty-sub").textContent, "Claude Code works in coucou");
+  State.settings = { ...State.settings, claudeCodeDir: "" };
+  view.sync();
+  assert.equal($(".chat-empty-sub").textContent, "Pick a model below, or just start typing.");
+
+  answers.chat_send = { text: "hi" };
+  $(".chat-input").value = "hello";
+  $(".send-btn").fire("click");
+  view.sync();
+  assert.equal(empty().length, 0, "gone with the first question");
+  await flush();
+  view.sync();
+  assert.equal(empty().length, 0);
+  // A new chat is empty again.
+  State.chatHistory = [];
+  view.sync();
+  assert.equal(empty().length, 1);
+});
+
+test("the conversation's dot is orange while its answer is on its way, gray otherwise", async () => {
+  State.settings = { ...State.settings, chatProvider: "claudecode" };
+  State.chatHistory = [{ id: 1, role: "user", content: "earlier" }, { id: 2, role: "assistant", content: "yes" }];
+  State.conversationId = "c1";
+  view.sync();
+  const dot = () => $(".convo-btn").find(".convo-dot")[0];
+  assert.ok(!dot().classList.contains("on"));
+
+  let finish;
+  answers.chat_send = () => new Promise((resolve) => (finish = resolve));
+  answers.conversations_list = [
+    { id: "c1", title: "earlier", provider: "claudecode", dir: "", updated: 2 },
+    { id: "c2", title: "another", provider: "claudecode", dir: "", updated: 1 },
+  ];
+  $(".chat-input").value = "and now?";
+  $(".send-btn").fire("click");
+  await flush();
+  assert.ok(dot().classList.contains("on"));
+
+  // The list opens during the answer: only the conversation being answered is orange.
+  assert.ok(!$(".convo-btn").disabled);
+  $(".convo-btn").fire("click");
+  await flush();
+  assert.ok($(".chat-body").classList.contains("listing"));
+  const rows = () => view.el.find(".convo-row");
+  assert.deepEqual(rows().map((r) => r.find(".convo-dot")[0].classList.contains("on")), [true, false]);
+  assert.ok($(".convos").classList.contains("busy"));
+  // And it is only read: nothing opens, nothing is deleted, no new chat starts.
+  rows()[1].fire("click");
+  rows()[1].find(".convo-icon")[0].fire("click");
+  view.el.find(".convo-group")[0].find(".convo-icon")[0].fire("click");
+  await flush();
+  assert.deepEqual(sent("conversation_open"), []);
+  assert.deepEqual(sent("conversation_delete"), []);
+  assert.deepEqual(sent("chat_reset"), []);
+  assert.equal(State.conversationId, "c1");
+
+  finish({ text: "Done.", conversationId: "c1" });
+  await flush();
+  assert.ok(!dot().classList.contains("on"));
+  // The open list is drawn again: every dot gray, and its rows work again.
+  assert.deepEqual(rows().map((r) => r.find(".convo-dot")[0].classList.contains("on")), [false, false]);
+  assert.ok(!$(".convos").classList.contains("busy"));
 });
 
 test("the text field tells the island when it has the keyboard", async () => {
@@ -221,7 +313,9 @@ test("Claude Code's conversations are listed by folder, and opening one puts it 
   State.settings = { ...State.settings, chatProvider: "claudecode" };
   view.sync();
   assert.equal($(".convo-btn").style.display, "");
-  assert.equal($(".convo-name").textContent, "Conversations");
+  // Nothing asked yet: a new conversation. The button still says what it opens.
+  assert.equal($(".convo-name").textContent, "New conversation");
+  assert.equal($(".convo-btn").getAttribute("title"), "Conversations");
 
   answers.conversations_list = list;
   answers.conversation_open = ({ id }) => ({
@@ -264,6 +358,7 @@ test("Claude Code's conversations are listed by folder, and opening one puts it 
   assert.deepEqual(State.chatHistory, []);
   assert.equal(State.conversationId, null);
   assert.equal(State.settings.claudeCodeDir, "");
+  assert.equal($(".convo-name").textContent, "New conversation");
 });
 
 test("an answer names the conversation it was saved in, and deleting it forgets that", async () => {
@@ -288,7 +383,7 @@ test("an answer names the conversation it was saved in, and deleting it forgets 
 });
 
 test("a file Claude Code edits shows as a pill under the answer, and opens its diff", async () => {
-  State.settings = { ...State.settings, chatProvider: "claudecode" };
+  State.settings = { ...State.settings, chatProvider: "claudecode", claudeCodeDir: "/w" };
   let finish;
   answers.chat_send = () => new Promise((resolve) => (finish = resolve));
   $(".chat-input").value = "rename it";
@@ -306,11 +401,20 @@ test("a file Claude Code edits shows as a pill under the answer, and opens its d
   const reply = State.chatHistory.at(-1);
   assert.equal(reply.edits.length, 1);
   assert.deepEqual([reply.edits[0].added, reply.edits[0].removed], [2, 1]);
+  // The pill says where the file is from the folder Claude Code works in, its
+  // name, the counts, and their proportion: two squares in, one out of three…
   const pill = $(".edit-pill");
-  assert.equal(pill.textContent, "app.rs+2−1");
+  assert.equal(pill.textContent, "src/app.rs+2−1");
+  assert.equal(pill.find(".edit-dir")[0].textContent, "src/");
+  assert.deepEqual(pill.find("I").map((i) => i.className), ["plus", "plus", "plus", "minus", "minus"]);
+  assert.equal(pill.find(".edit-tag").length, 0);
   assert.equal(view.el.find(".edit-diff").length, 0);
   pill.fire("click");
-  assert.deepEqual($(".edit-diff").find(".diff-line").map((l) => l.textContent), ["−let a = 1;", "+let b = 1;", "+let c = 2;"]);
+  // The diff under it: the path, then each line with its number.
+  assert.equal($(".edit-diff-path").textContent, "src/app.rs");
+  assert.deepEqual($(".edit-diff").find(".diff-line").map((l) => l.textContent), ["1−let a = 1;", "1+let b = 1;", "2+let c = 2;"]);
+  $(".edit-diff-head").find("BUTTON")[0].fire("click");
+  assert.deepEqual(sent("open_file_in_vscode"), [{ path: "/w/src/app.rs" }]);
   pill.fire("click");
   assert.equal(view.el.find(".edit-diff").length, 0);
 
@@ -320,6 +424,111 @@ test("a file Claude Code edits shows as a pill under the answer, and opens its d
   $(".send-btn").fire("click");
   await flush();
   assert.equal(State.chatHistory.at(-1).edits, undefined);
+});
+
+test("a diff that was opened stays open when the next message comes", async () => {
+  State.settings = { ...State.settings, chatProvider: "claudecode", claudeCodeDir: "/w" };
+  let finish;
+  answers.chat_send = () => new Promise((resolve) => (finish = resolve));
+  $(".chat-input").value = "rename it";
+  $(".send-btn").fire("click");
+  await flush();
+  view.sync();
+  emit("chat-edit", { tool: "Write", input: { file_path: "/w/notes.md", content: "one\ntwo" } });
+  emit("chat-delta", "Writing…");
+  // Opened while the answer is still coming.
+  $(".edit-pill").fire("click");
+  const opened = $(".edit-diff");
+  assert.ok(opened);
+  assert.equal($(".edit-tag").textContent, "New");
+
+  finish({ text: "Written." });
+  await flush();
+  view.sync();
+  // The finished answer took the running row over: the same pill, still open.
+  assert.equal($(".edit-diff"), opened);
+  assert.equal(view.el.find(".edit-pill").length, 1);
+  assert.equal(view.el.find(".reply").length, 1);
+  assert.equal(view.el.find(".reply")[0].textContent, "Written.");
+
+  // And the next question and its answer leave it alone.
+  answers.chat_send = { text: "Nothing else." };
+  $(".chat-input").value = "anything else?";
+  $(".send-btn").fire("click");
+  view.sync();
+  await flush();
+  view.sync();
+  assert.equal($(".edit-diff"), opened);
+  assert.deepEqual(view.el.find(".reply").map((r) => r.textContent), ["Written.", "Nothing else."]);
+  assert.equal(view.el.find(".bubble").length, 2);
+  assert.equal(view.el.find(".typing").length, 0);
+});
+
+test("a stopped or failed answer keeps the pills of the files it had edited", async () => {
+  State.settings = { ...State.settings, chatProvider: "claudecode", claudeCodeDir: "/w" };
+  let fail;
+  answers.chat_send = () => new Promise((_, reject) => (fail = reject));
+  $(".chat-input").value = "rename it";
+  $(".send-btn").fire("click");
+  await flush();
+  emit("chat-edit", { tool: "Edit", input: { file_path: "/w/a.rs", old_string: "a", new_string: "b" } });
+  fail(new Error("Stopped."));
+  await flush();
+  view.sync();
+  assert.equal(State.noteMessage, "Stopped.");
+  assert.deepEqual(view.el.find(".edit-name").map((n) => n.textContent), ["a.rs"]);
+  assert.deepEqual(State.chatHistory.map((m) => [m.role, m.edits?.length ?? 0]), [["user", 0], ["assistant", 1]]);
+
+  // One that edited nothing leaves no row behind.
+  answers.chat_send = () => new Promise((_, reject) => (fail = reject));
+  $(".chat-input").value = "again";
+  $(".send-btn").fire("click");
+  await flush();
+  emit("chat-delta", "Let me");
+  fail(new Error("Stopped."));
+  await flush();
+  view.sync();
+  assert.equal(view.el.find(".reply").length, 1);
+  assert.equal(State.chatHistory.length, 3);
+});
+
+test("a conversation opened again shows the files its answers edited", async () => {
+  State.settings = { ...State.settings, chatProvider: "claudecode" };
+  view.sync();
+  answers.conversations_list = [{ id: "a", title: "rename it", provider: "claudecode", dir: "/w", updated: 1 }];
+  answers.conversation_open = () => ({
+    id: "a", title: "rename it", provider: "claudecode", dir: "/w", updated: 1, model: "",
+    turns: [
+      { role: "user", content: "rename it" },
+      {
+        role: "assistant",
+        content: "Renamed.",
+        edits: [
+          { tool: "Edit", input: { file_path: "/w/src/app.rs", old_string: "let a = 1;", new_string: "let b = 1;" } },
+          // Too large to have been kept: its file's name only.
+          { tool: "Write", path: "/w/big.json", tooLarge: true },
+          // Nothing Coucou can draw.
+          { tool: "Bash", input: { command: "ls" } },
+          null,
+        ],
+      },
+      { role: "user", content: "thanks" },
+      { role: "assistant", content: "Welcome." },
+    ],
+  });
+  $(".convo-btn").fire("click");
+  await flush();
+  view.el.find(".convo-row")[0].fire("click");
+  await flush();
+  view.sync();
+
+  assert.deepEqual(State.chatHistory.map((m) => m.edits?.length ?? 0), [0, 2, 0, 0]);
+  const pills = view.el.find(".edit-pill");
+  assert.deepEqual(pills.map((p) => p.textContent), ["src/app.rs+1−1", "big.jsonNew"]);
+  pills[0].fire("click");
+  assert.deepEqual($(".edit-diff").find(".diff-line").map((l) => l.textContent), ["1−let a = 1;", "1+let b = 1;"]);
+  pills[1].fire("click");
+  assert.match(view.el.find(".edit-diff")[1].textContent, /Diff too large/);
 });
 
 test("the folder's pull requests are listed in two halves, and only asked for when opened", async () => {
