@@ -262,11 +262,12 @@ test("the recogniser is never given a way to approve or to send", () => {
 
 function fakes({ active = [], mainPill = "integration_claude", limit = 6, music = {} } = {}) {
   const calls = [];
-  const state = { running: true, playing: false, shuffle: false, repeat: false, ...music };
+  const state = { enabled: true, running: true, playing: false, shuffle: false, repeat: false, ...music };
   const pills = { active: [...active], main: mainPill };
   const takesSlot = (id) => id !== "integration_spotify";
   const runner = new VoiceRunner(
     {
+      enabled: () => state.enabled,
       running: () => state.running,
       playing: () => state.playing,
       shuffle: () => state.shuffle,
@@ -329,6 +330,19 @@ test("music: without Spotify, play opens it and the rest says there is nothing t
     assert.deepEqual(f.say(said), { outcome: "failure", message: "No music app running" }, said);
   }
   assert.deepEqual(f.calls, ["open"]);
+});
+
+test("music: with Spotify switched off in Settings, nothing is played, opened or pretended", () => {
+  for (const running of [true, false]) {
+    const f = fakes({ music: { enabled: false, running } });
+    for (const said of ["play", "play spotify", "pause", "next track", "previous", "shuffle", "repeat on", "volume up"]) {
+      assert.deepEqual(f.say(said), { outcome: "failure", message: "Spotify is off in Settings" }, said);
+    }
+    assert.deepEqual(f.calls, []);
+  }
+  // Pills are not music: they still work.
+  const f = fakes({ music: { enabled: false } });
+  assert.equal(f.say("add github").outcome, "success");
 });
 
 test("music: what Spotify cannot be asked here says so, and does nothing", () => {

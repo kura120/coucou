@@ -8,7 +8,7 @@ import type { IslandMode, IslandViewName } from "../core/layout";
 import {
   MAX_DECLARED, availablePills, chooseMainPill, sanitizeDeclared, slotsUsed, takesSlot,
 } from "../core/pills";
-import { Spotify } from "../core/spotify";
+import { SPOTIFY_ID, Spotify } from "../core/spotify";
 import { State } from "../core/state";
 import { buildGrammar } from "../voice/grammar";
 import { VoiceRunner, type MusicControls, type PillControls } from "../voice/runner";
@@ -78,6 +78,7 @@ export function applyVoice(island: VoiceHost, event: VoiceEvent) {
 
 /** Spotify, as the music card drives it (views/spotify.ts). */
 const liveMusic: MusicControls = {
+  enabled: () => declared().activeIntegrations.includes(SPOTIFY_ID),
   running: () => Spotify.state.running,
   playing: () => Spotify.state.playing,
   shuffle: () => Spotify.state.shuffle,

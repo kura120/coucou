@@ -22,7 +22,9 @@ export interface VoiceResult {
 }
 
 export interface MusicControls {
-  /** Spotify is running and Coucou is following it. */
+  /** Spotify is switched on in Settings: Coucou follows it and may drive it. */
+  enabled(): boolean;
+  /** Spotify is running. */
   running(): boolean;
   playing(): boolean;
   shuffle(): boolean;
@@ -76,6 +78,8 @@ export class VoiceRunner {
 
   run(intent: VoiceIntent, said = ""): VoiceResult {
     const { music, pills } = this;
+    // Music the user switched off is not touched, and not started either.
+    if (intent.kind.startsWith("music") && !music.enabled()) return fail(t("Spotify is off in Settings"));
     switch (intent.kind) {
       case "musicPlay":
         if (!music.running()) {

@@ -4128,6 +4128,17 @@
    "pt-BR": "{0} ativas — qual remover?",
    "ru": "{0} активно — что удалить?",
    "id": "{0} aktif — mana yang dihapus?"
+  },
+  "Spotify is off in Settings": {
+   "zh-Hans": "Spotify 已在设置中关闭",
+   "hi": "Spotify सेटिंग्स में बंद है",
+   "es": "Spotify está desactivado en Ajustes",
+   "ar": "Spotify متوقف في الإعدادات",
+   "fr": "Spotify est désactivé dans les Réglages",
+   "bn": "Spotify সেটিংসে বন্ধ আছে",
+   "pt-BR": "O Spotify está desativado nos Ajustes",
+   "ru": "Spotify выключен в настройках",
+   "id": "Spotify dimatikan di Pengaturan"
   }
  }
 }
