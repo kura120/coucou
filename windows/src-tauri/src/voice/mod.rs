@@ -1,7 +1,7 @@
-// "OK Coucou" — hands-free voice control. This is the first part of it: listen
-// and wake. Say the wake phrase (or press the "Talk to Coucou" shortcut), the
-// island opens on its listening view, the command is heard and shown. Nothing
-// acts on it yet.
+// "OK Coucou" — hands-free voice control. Say the wake phrase (or press the
+// "Talk to Coucou" shortcut), the island opens on its listening view, the
+// command is heard, and the island understands it and acts (src/voice/). This
+// side only listens: it owns the microphone and the recogniser.
 //
 // The rules, the Mac's (docs/VOICE.md):
 // - On this machine only. No audio and no text leaves it, there is no cloud
@@ -18,12 +18,17 @@
 // recogniser is the one engine for now (sapi.rs), English only. Linux has no
 // system recogniser: it waits for the bundled engine.
 //
+// A fixed-grammar recogniser hears only what it was given. The commands come
+// from the island (`voice_grammar`), which writes them next to the parser
+// that understands them: nothing listens until it has sent them.
+//
 // The island is told with one event, `voice`: { phase, text }, phase being
 // "woke", "partial", "final", "missed" or "cancelled". Settings follows
 // `voice-status`.
 
+use std::collections::BTreeMap;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -32,12 +37,14 @@ use tauri::{AppHandle, Emitter};
 use crate::island::WINDOW_LABEL;
 use crate::settings::VoicePref;
 
+mod grammar;
 #[cfg(windows)]
 mod sapi;
 mod session;
 
 #[cfg(windows)]
 use sapi::Recogniser;
+use grammar::Grammar;
 use session::{Heard, Listen, Session};
 
 const EVENT: &str = "voice";
@@ -94,17 +101,19 @@ enum Control {
 
 struct Shared {
     generation: u64,
-    /// The wake setting the running listener was started with; None when off.
-    running: Option<bool>,
+    /// The wake setting, when voice is on in Settings.
+    want: Option<bool>,
+    /// What the island said can be heard; None until it has.
+    grammar: Option<Arc<Grammar>>,
     tx: Option<Sender<Control>>,
     paused: bool,
     status: Status,
 }
 
 static SHARED: Mutex<Shared> =
-    Mutex::new(Shared { generation: 0, running: None, tx: None, paused: false, status: Status::Off });
+    Mutex::new(Shared { generation: 0, want: None, grammar: None, tx: None, paused: false, status: Status::Off });
 
-fn shared() -> std::sync::MutexGuard<'static, Shared> {
+fn shared() -> MutexGuard<'static, Shared> {
     SHARED.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
@@ -113,15 +122,37 @@ fn shared() -> std::sync::MutexGuard<'static, Shared> {
 pub fn sync(app: &AppHandle, pref: &VoicePref) {
     let want = pref.enabled.then_some(pref.wake);
     let mut s = shared();
-    if s.running == want {
+    if s.want == want {
         return;
     }
-    s.running = want;
+    s.want = want;
+    restart(app, s);
+}
+
+/// The commands that can be heard, from the island. A listener already
+/// running starts again with them.
+#[tauri::command]
+pub fn voice_grammar(app: AppHandle, commands: Vec<String>, slots: BTreeMap<String, Vec<String>>) {
+    let grammar = match Grammar::parse(&commands, &slots) {
+        Ok(grammar) => grammar,
+        Err(why) => return crate::log::line(format!("voice: grammar refused: {why}")),
+    };
+    let mut s = shared();
+    if s.grammar.as_deref() == Some(&grammar) {
+        return;
+    }
+    s.grammar = Some(Arc::new(grammar));
+    restart(&app, s);
+}
+
+/// Stops the listener, and starts one when voice is on and there is something
+/// to listen for.
+fn restart(app: &AppHandle, mut s: MutexGuard<'static, Shared>) {
     s.generation += 1;
     if let Some(tx) = s.tx.take() {
         let _ = tx.send(Control::Stop);
     }
-    let Some(wake) = want else {
+    let (Some(wake), Some(grammar)) = (s.want, s.grammar.clone()) else {
         drop(s);
         set_status(app, None, Status::Off);
         return;
@@ -136,7 +167,7 @@ pub fn sync(app: &AppHandle, pref: &VoicePref) {
     let app = app.clone();
     let spawned = std::thread::Builder::new()
         .name("voice".into())
-        .spawn(move || listen(&app, generation, wake, &rx));
+        .spawn(move || listen(&app, generation, wake, &grammar, &rx));
     if let Err(err) = spawned {
         crate::log::line(format!("voice: no thread: {err}"));
     }
@@ -163,6 +194,13 @@ fn send(s: &Shared, control: Control) {
 #[tauri::command]
 pub fn voice_status() -> Status {
     shared().status
+}
+
+/// The island asked a question and waits for the answer: a command, without
+/// the wake phrase.
+#[tauri::command]
+pub fn voice_talk() {
+    talk();
 }
 
 /// The island left the listening view by itself (Escape, a card coming up).
@@ -204,8 +242,8 @@ fn tell(app: &AppHandle, heard: Heard) {
     let _ = app.emit_to(WINDOW_LABEL, EVENT, Event { phase, text });
 }
 
-fn listen(app: &AppHandle, generation: u64, wake: bool, rx: &Receiver<Control>) {
-    let mut recogniser = match Recogniser::open() {
+fn listen(app: &AppHandle, generation: u64, wake: bool, grammar: &Grammar, rx: &Receiver<Control>) {
+    let mut recogniser = match Recogniser::open(grammar) {
         Ok(recogniser) => recogniser,
         Err(why) => return give_up(app, generation, why),
     };
@@ -335,7 +373,7 @@ struct Recogniser;
 
 #[cfg(not(windows))]
 impl Recogniser {
-    fn open() -> Result<Self, Unavailable> {
+    fn open(_commands: &Grammar) -> Result<Self, Unavailable> {
         Err(Unavailable::Unsupported)
     }
 

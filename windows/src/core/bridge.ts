@@ -248,6 +248,11 @@ export const Bridge = {
   voiceStatus: () => call<VoiceStatus>("voice_status"),
   /** The island left the listening view itself: the command is not waited for. */
   voiceCancel: () => call<void>("voice_cancel"),
+  /** What the recogniser can hear after the wake phrase (voice/grammar.ts). */
+  voiceGrammar: (commands: string[], slots: Record<string, string[]>) =>
+    call<void>("voice_grammar", { commands, slots }),
+  /** Listens for a command without the wake phrase: the answer to a question. */
+  voiceTalk: () => call<void>("voice_talk"),
 };
 
 export type SpotifyAction = "playPause" | "next" | "previous" | "seek" | "shuffle" | "repeat" | "volume";

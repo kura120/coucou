@@ -131,8 +131,20 @@ answer on one line, still, until the next prompt.
 
 Off by default. Turn it on in **Settings… → Voice**, say **"OK Coucou"** (or
 "Hey Coucou"), wait for the island to open on Mochi listening, then say a
-command. This first version only listens: it shows what it heard and goes back
-to where the island was. Nothing acts on a command yet.
+command. A card says what was done, and the island goes back to where it was.
+
+| Say | What happens |
+|---|---|
+| "play", "pause", "next track", "previous track", "shuffle off", "repeat on" | Spotify, as from the music card. "play" opens Spotify when it is not running. |
+| "add GitHub", "show Vercel and Stripe" | Declares the pills, as in Settings → Active pills. |
+| "remove Notion", "hide Stripe and Notion" | Undeclares them. |
+| "replace n8n with GitHub", "keep only GitHub and Vercel" | Both at once. |
+| "switch to Cursor", "use Codex" | Changes the main pill (workspace tools only). |
+| "never mind" | Closes without doing anything. |
+
+With six pills already there, "add Gemini" makes Mochi ask **which one to
+remove**: say its name and the two are swapped, say nothing and it is left as
+it is. Spotify takes no slot, as everywhere else.
 
 - **Windows only, English only, for now.** It uses Windows' own speech
   recogniser, which needs the English speech pack (Settings → Time & language →
@@ -146,12 +158,14 @@ to where the island was. Nothing acts on a command yet.
   until you press the **Talk to Coucou** shortcut (`Ctrl+Alt+V`, off by
   default, in Settings → Shortcuts). The microphone is also closed while Coucou
   is paused from the tray, while the screen is locked and on battery saver.
-- **It can only hear what it was given**: the wake phrases and a short list of
-  commands (play, pause, next track, show github, decline…). The wake phrase
-  and the command are two sentences, with a pause between them. "Coucou" alone
-  does not wake it, and a wake phrase is ignored while a permission or a
-  question waits for you, or while the chat is open.
-- Voice never approves a permission and never sends anything.
+- **It can only hear what it was given**: the wake phrases and the commands
+  above, with any pill's name in them. So it cannot be asked for a song, an
+  artist or a playlist, and Spotify's volume is out of reach on Windows. The
+  wake phrase and the command are two sentences, with a pause between them.
+  "Coucou" alone does not wake it, and a wake phrase is ignored while a
+  permission or a question waits for you, or while the chat is open.
+- Voice never approves a permission and never sends anything: there is no
+  sentence for it.
 
 ## Your pills
 
@@ -413,6 +427,7 @@ windows/
     desktop/           Mochi's own little window, when he lives on the desktop
     toast/             the toasts' window: the stack, its timings and its look
     island/            state machine, hooks, integrations, what voice reports
+    voice/             what a command means and what it does (parser, pill names, runner)
     views/             every island view
     settings/          the settings window
   src-tauri/           Rust backend: window, named pipe, Claude API, pollers
@@ -481,8 +496,10 @@ own window.
 
 ## What's different from the Mac version
 
-- "OK Coucou" only listens and wakes here, in English, on Windows (see
-  ["OK Coucou"](#ok-coucou)). The Mac's ten voice functions are not ported yet.
+- "OK Coucou" is in English and on Windows only (see ["OK Coucou"](#ok-coucou)),
+  and does the first three of the Mac's ten voice functions: music, the active
+  pills, the main pill. Music is Spotify alone, without songs by name or
+  volume; the limit Mochi asks about is six pills, not four.
 - No notch, so the island lives at the top centre of the screen and retracts into
   the top edge instead of hiding in a notch.
 - Permission approval works from **any** terminal; the Mac build only listens to

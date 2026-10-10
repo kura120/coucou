@@ -13,26 +13,6 @@ use std::time::{Duration, Instant};
 /// What wakes Coucou. Never "coucou" alone.
 pub const WAKE_PHRASES: &[&str] = &["ok coucou", "okay coucou", "hey coucou"];
 
-/// The commands a fixed grammar can hear. Nothing acts on them yet: the island
-/// shows what was heard. The real list comes with the parser that understands
-/// them, built from the user's pills.
-pub const COMMANDS: &[&str] = &[
-    "play",
-    "pause",
-    "next track",
-    "previous track",
-    "shuffle",
-    "repeat",
-    "show github",
-    "hide github",
-    "what are my agents doing",
-    "what is the request",
-    "decline",
-    "set a timer for five minutes",
-    "cancel the timer",
-    "never mind",
-];
-
 /// Under this, a wake phrase is something else that sounded like it.
 pub const WAKE_FLOOR: f32 = 0.85;
 /// Commands are only listened for after a wake, so they can be heard lower.
@@ -102,7 +82,8 @@ impl Session {
         }
     }
 
-    /// The "Talk to Coucou" shortcut: the command, without the wake phrase.
+    /// The "Talk to Coucou" shortcut, or the island waiting for the answer to
+    /// a question it asked: the command, without the wake phrase.
     pub fn talk(&mut self, now: Instant) -> Option<Heard> {
         if self.held || self.command_until.is_some() {
             return None;
@@ -290,6 +271,5 @@ mod tests {
     #[test]
     fn coucou_alone_is_not_a_wake_phrase() {
         assert!(WAKE_PHRASES.iter().all(|p| p.split(' ').count() == 2 && p.ends_with(" coucou")));
-        assert!(!COMMANDS.iter().any(|c| c.contains("allow") || c.contains("approve") || c.contains("send")));
     }
 }

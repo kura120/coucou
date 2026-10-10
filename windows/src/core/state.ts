@@ -9,6 +9,7 @@ import {
 import type { CodexPlanUsage, PlanUsage } from "./plan";
 import type { ProviderId } from "./providers";
 import type { FileDiff } from "./diff";
+import type { VoiceResult } from "../voice/runner";
 import type { Bindings } from "./shortcuts";
 import { DEFAULT_OUTFIT, type Outfit } from "../mochi/wardrobe";
 import { pillColor } from "./pill-colors";
@@ -230,8 +231,13 @@ class AppState {
   promptContext: PromptContext | null = null;
   droppedFile: { name: string; path: string } | null = null;
   noteMessage: string | null = null;
-  /** What the listening view shows: the words so far, and how it ended. */
-  voice: { text: string; outcome: "listening" | "heard" | "missed" } = { text: "", outcome: "listening" };
+  /**
+   * What the listening view shows: the words so far, and the question Mochi
+   * asked when he is listening for its answer.
+   */
+  voice: { text: string; question: string } = { text: "", question: "" };
+  /** What the last voice command did, for its card. */
+  voiceResult: VoiceResult | null = null;
   searchResult: SearchResult | null = null;
   chatHistory: ChatMessage[] = [];
   /** The chat's provider and model picker is open: the island is taller. */

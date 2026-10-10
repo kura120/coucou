@@ -114,7 +114,7 @@ test("a wake phrase is taken on a closed island and on the views one only looks 
   for (const mode of ["hidden", "compact"]) {
     for (const view of ["overview", "approval", "prompt"]) assert.equal(wakeBlocked(view, mode, false, false), null);
   }
-  for (const view of ["overview", "empty", "settings", "finished", "error", "wardrobe", "listening", "recap"]) {
+  for (const view of ["overview", "empty", "settings", "finished", "error", "wardrobe", "listening", "voiceResult", "recap"]) {
     assert.equal(wakeBlocked(view, "expanded", false, false), null, view);
   }
 });
@@ -160,9 +160,15 @@ test("the listening view is the Mac's: 160 high, Mochi at 68, 58 wide", () => {
   assert.deepEqual(islandSize("expanded", "listening"), { w: 640, h: 160 });
 });
 
-test("listening is neither a place the island comes back to nor a card over one", () => {
-  assert.equal(isPlace("listening"), false);
-  assert.equal(isCard("listening"), false);
+test("the result card has the same shape, so nothing moves when it replaces the listening view", () => {
+  assert.deepEqual(VIEW_LAYOUTS.voiceResult, VIEW_LAYOUTS.listening);
+});
+
+test("the voice views are neither a place the island comes back to nor a card over one", () => {
+  for (const view of ["listening", "voiceResult"]) {
+    assert.equal(isPlace(view), false);
+    assert.equal(isCard(view), false);
+  }
 });
 
 test("talking to Coucou has the Mac's key and is off until turned on", () => {

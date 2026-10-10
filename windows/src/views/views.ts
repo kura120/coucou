@@ -157,8 +157,9 @@ export function buildHeader(actions: ViewActions): ViewHost {
       soundBtn.append(svg(State.settings.soundEnabled ? ICONS.speakerOn : ICONS.speakerOff, ACTION_ICON));
       syncPlanPills();
       // Nothing to navigate to while Mochi is dizzy or listening.
-      el.style.opacity = v === "confused" || v === "listening" ? "0" : "1";
-      el.style.pointerEvents = v === "listening" ? "none" : "";
+      const voice = v === "listening" || v === "voiceResult";
+      el.style.opacity = v === "confused" || voice ? "0" : "1";
+      el.style.pointerEvents = voice ? "none" : "";
     },
   };
 
@@ -770,12 +771,42 @@ function buildListening(): ViewHost {
   return {
     el: h("div", { class: "view" }, card("cyan", body)),
     sync() {
-      const { text, outcome } = State.voice;
-      title.textContent = outcome === "missed" ? t("Command not recognised") : t("Listening…");
-      line.textContent = text || (outcome === "listening" ? t("Say your command") : "");
+      const { text, question } = State.voice;
+      title.textContent = t("Listening…");
+      // A question Mochi asked stays until its answer is being said.
+      line.textContent = text || question || t("Say your command");
       line.classList.toggle("heard", text !== "");
-      // Pulses only while it is on screen and still listening.
-      micDot.classList.toggle("on", outcome === "listening" && State.mode === "expanded" && State.view === "listening");
+      line.classList.toggle("asked", text === "" && question !== "");
+      // Pulses only while it is on screen.
+      micDot.classList.toggle("on", State.mode === "expanded" && State.view === "listening");
+    },
+  };
+}
+
+/** What a voice command did (VoiceResultView): green and a tick, or red and a cross. */
+function buildVoiceResult(): ViewHost {
+  const side = (wash: Wash, icon: string, opts: { stroke?: number }, color: string) => {
+    const title = h("div", { class: "title one-line" });
+    const mark = svg(icon, 14, opts);
+    mark.style.color = color;
+    mark.style.flex = "none";
+    const body = h(
+      "div",
+      { class: "stack", style: "padding:0 18px 0 110px" },
+      h("div", { class: "listening-head" }, mark, title),
+    );
+    return { el: card(wash, body), title };
+  };
+  const done = side("green", ICONS.check, { stroke: 2.6 }, "#34D399");
+  const failed = side("red", ICONS.xmark, {}, "#F4505E");
+  return {
+    el: h("div", { class: "view" }, done.el, failed.el),
+    sync() {
+      const result = State.voiceResult;
+      const good = result?.outcome !== "failure";
+      done.el.style.display = good ? "" : "none";
+      failed.el.style.display = good ? "none" : "";
+      (good ? done : failed).title.textContent = result?.message ?? "";
     },
   };
 }
@@ -890,6 +921,7 @@ export function buildViews(
   map.set("recap", buildRecap(actions));
   map.set("wardrobe", buildWardrobe(actions));
   map.set("listening", buildListening());
+  map.set("voiceResult", buildVoiceResult());
   // Not in the Windows v1: sending a file by email, window attach + web result.
   map.set("mail", buildPlaceholder(tl("Sending by email isn't in this version."), ""));
   map.set("searching", buildPlaceholder(tl("Claude is searching…"), ""));

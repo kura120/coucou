@@ -4117,6 +4117,17 @@
    "pt-BR": "Desativado: o microfone só abre com o atalho “Falar com o Coucou”. Enquanto escuta, o Windows mostra um microfone na barra de tarefas.",
    "ru": "Выключено: микрофон включается только по сочетанию клавиш «Поговорить с Coucou». Пока идёт прослушивание, Windows показывает микрофон на панели задач.",
    "id": "Mati: mikrofon hanya terbuka untuk pintasan “Bicara dengan Coucou”. Selama mendengarkan, Windows menampilkan mikrofon di bilah tugas."
+  },
+  "{0} active — remove which?": {
+   "zh-Hans": "{0} 个激活 — 删除哪个？",
+   "hi": "{0} सक्रिय — कौन सा हटाएं?",
+   "es": "{0} activas — ¿cuál quitar?",
+   "ar": "{0} نشطة — أيها أزيل؟",
+   "fr": "{0} actives — laquelle retirer ?",
+   "bn": "{0}টি সক্রিয় — কোনটি সরাবো?",
+   "pt-BR": "{0} ativas — qual remover?",
+   "ru": "{0} активно — что удалить?",
+   "id": "{0} aktif — mana yang dihapus?"
   }
  }
 }
