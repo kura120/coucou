@@ -167,6 +167,10 @@ export interface Settings {
     /** The model server asked what a sentence means when the parser does not know: "" for none. */
     brain: string;
     brainModel: string;
+    /** What writes down a command: "system" (Windows' recogniser) or "bundled" (free speech, downloaded). */
+    engine: string;
+    /** Seconds after a command during which another needs no wake phrase; 0 for none. */
+    followUp: number;
   };
   desktopMochi?: {
     onDesktop: boolean;
@@ -203,7 +207,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mochiOutfit: DEFAULT_OUTFIT,
   pillColors: {},
   language: "",
-  voice: { enabled: false, wake: true, brain: "", brainModel: "" },
+  voice: { enabled: false, wake: true, brain: "", brainModel: "", engine: "system", followUp: 8 },
 };
 
 type Listener = () => void;

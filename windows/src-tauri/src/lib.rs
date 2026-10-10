@@ -887,6 +887,9 @@ pub fn run() {
             voice::voice_talk,
             voice::voice_open_app,
             voice::voice_open_folder,
+            voice::voice_engine_status,
+            voice::voice_engine_install,
+            voice::voice_engine_remove,
             voice_brain,
         ])
         .setup(move |app| {

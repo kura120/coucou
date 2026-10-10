@@ -183,9 +183,25 @@ scripts/voice-eval.mjs`); the checks were tuned on that same table, so expect
 less on sentences it has not seen. What you say and what Coucou shows go to
 that server and nowhere else; a toast says so once if it is not this computer.
 
-Until Coucou can hear free speech (the recogniser above only hears the
-sentences it was given), the model is reached by what the parser does not
-understand among those.
+**Free speech.** Windows' recogniser only hears the sentences it was given.
+**Hear free speech** in Settings → Voice downloads an engine that hears anything
+(sherpa-onnx with the Moonshine tiny English model, 37 MB, from the project's
+GitHub releases, checked against a pinned SHA-256) and uses it for the command:
+
+- "OK Coucou" is still heard by Windows' recogniser — the free engine writes
+  "coucou" a different way every time — and then the command is yours to word:
+  "hold the music for a sec", "get rid of Stripe". It is written down once you
+  stop speaking, in a few hundredths of a second.
+- **Keep listening after a command**: for a few seconds (8 by default) after a
+  command, another can be said without the wake phrase. Anything said nearby in
+  that time is heard as a command too, so turn it off in a noisy room.
+- Still two sentences: the wake phrase, a pause, the command.
+- It runs on this computer. The sound stays in memory until it is written
+  down, and is kept nowhere. **Remove** deletes the engine and its model.
+- Windows only for now.
+
+Without the engine, the model is only reached by what the parser does not
+understand among the sentences Windows was given.
 
 ## Your pills
 
@@ -452,7 +468,8 @@ windows/
     views/             every island view
     settings/          the settings window
   src-tauri/           Rust backend: window, named pipe, Claude API, pollers
-    src/voice/         "OK Coucou": the session, and Windows' recogniser behind it
+    src/voice/         "OK Coucou": the session, Windows' recogniser, and the free-speech
+                       engine (its download, the microphone, the voice detector)
   hook/                coucou-hook.exe, the Claude Code relay
   scripts/             icon generator
 ```
