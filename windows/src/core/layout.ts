@@ -172,6 +172,18 @@ export function islandSize(
   }
 }
 
+/**
+ * The room the compact island has for what is playing: from after Mochi to
+ * before the little Mochis, which take two columns, or three (`columns`). The
+ * compact island's own width is used, not the island's as it is drawn: the
+ * line is placed while the island is still shrinking to it.
+ */
+export function nowPlayingRoom(columns: number): { left: number; width: number } {
+  const left = 60;
+  const gridLeft = COMPACT_W - 40 - 14.5 - (Math.max(2, columns) - 2) * 16;
+  return { left, width: Math.max(0, Math.floor(gridLeft - 8 - left)) };
+}
+
 export interface BotPlacement {
   cx: number;
   cy: number;

@@ -11,7 +11,8 @@ import {
   IDLE_SPOTIFY, SPOTIFY_ID, Spotify, currentArtwork, desktopDances, formatTime, isAd, islandDances,
   marquee, musicCardShown, musicPlaying, nowPlayingLine, spotifyPosition, volumeLevel, withPlaying,
 } from "../src/core/spotify.ts";
-import { EXPANDED_W, MUSIC_CARD_GAP, MUSIC_CARD_W, PANEL_W, islandSize } from "../src/core/layout.ts";
+import { EXPANDED_W, MUSIC_CARD_GAP, MUSIC_CARD_W, PANEL_W, islandSize, nowPlayingRoom } from "../src/core/layout.ts";
+import { createMarquee } from "../src/views/marquee.ts";
 import { BotEngine, danceTransform, stepDanceLevel } from "../src/mochi/engine.ts";
 import { registerSpotifyHandlers } from "../src/island/spotify.ts";
 import { buildSpotifyCard, buildSpotifyMini, buildSpotifyPill } from "../src/views/spotify.ts";
@@ -306,6 +307,55 @@ test("a line that fits stays still; a longer one passes at reading speed", () =>
   assert.equal(marquee(0, 163), null);
   assert.equal(marquee(300, 0), null);
   assert.equal(marquee(NaN, 163), null);
+});
+
+test("the compact island's line has the room between Mochi and the little Mochis", () => {
+  // The compact island's own width, whatever the island is drawn at meanwhile.
+  assert.deepEqual(nowPlayingRoom(2), { left: 60, width: 165 });
+  // A third column of little Mochis takes its width from the line.
+  assert.deepEqual(nowPlayingRoom(3), { left: 60, width: 149 });
+});
+
+test("a line passes through its place only when it is too long for it", () => {
+  const line = createMarquee("np-title");
+  const spans = () => line.el.find("SPAN");
+  const widen = (px) => (spans()[0].offsetWidth = px);
+
+  line.set("Get Lucky");
+  assert.deepEqual(spans().map((s) => s.textContent), ["Get Lucky"]);
+  // Not laid out yet: nothing is decided, and it is asked again.
+  line.fit(165);
+  assert.ok(!line.el.classList.contains("scroll"));
+  // It fits: one copy, still.
+  widen(80);
+  line.fit(165);
+  assert.ok(!line.el.classList.contains("scroll"));
+  assert.equal(spans().length, 1);
+
+  // A longer one: a second copy follows the first, and it passes.
+  line.set("A very long title that goes on and on — and its artist");
+  widen(320);
+  line.fit(165);
+  assert.ok(line.el.classList.contains("scroll"));
+  assert.equal(spans().length, 2);
+  assert.equal(spans()[1].getAttribute("aria-hidden"), "true");
+  const run = line.el.find(".marquee-run")[0];
+  assert.equal(run.style["--mq-distance"], "-356px");
+  assert.equal(run.style["--mq-seconds"], "13.7s");
+
+  // Asked again for the same line and room: nothing is rebuilt.
+  const first = spans()[0];
+  line.set("A very long title that goes on and on — and its artist");
+  line.fit(165);
+  assert.equal(spans()[0], first);
+  // Less room (a third column of little Mochis): placed again for it.
+  line.fit(400);
+  assert.ok(!line.el.classList.contains("scroll"));
+  assert.equal(spans().length, 1);
+  // A new line starts still.
+  line.set("Short");
+  assert.ok(!line.el.classList.contains("scroll"));
+  assert.deepEqual(spans().map((s) => s.textContent), ["Short"]);
 });
 
 // ── The music card ────────────────────────────────────────────────────────────

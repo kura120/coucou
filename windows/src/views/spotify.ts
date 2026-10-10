@@ -16,6 +16,7 @@ import {
   type SpotifyTrack,
 } from "../core/spotify";
 import { createMiniBot } from "../mochi/minibots";
+import { createMarquee } from "./marquee";
 import { pillDefinition } from "../core/pills";
 import { N_, t } from "../i18n/i18n";
 
@@ -274,9 +275,10 @@ export function buildSpotifyMini(onOpen: () => void): SpotifyCardHost {
   const artNote = svg(ICONS.musicNote, 14);
   artNote.style.color = `${green}b3`;
   art.append(artNote, artImg);
-  const title = h("div", { class: "np-title" });
+  // A title longer than the card passes through its place.
+  const title = createMarquee("np-title");
   const subtitle = h("div", { class: "np-sub" });
-  const head = h("button", { class: "np-mini-head" }, art, h("div", { class: "np-text" }, title, subtitle));
+  const head = h("button", { class: "np-mini-head" }, art, h("div", { class: "np-text" }, title.el, subtitle));
   head.addEventListener("click", onOpen);
 
   const fill = h("i", { class: "np-fill" });
@@ -334,7 +336,7 @@ export function buildSpotifyMini(onOpen: () => void): SpotifyCardHost {
       if (shownTrack !== track) {
         shownTrack = track;
         const name = isAd(track) ? t("Advertisement") : track.title;
-        title.textContent = name;
+        title.set(name);
         subtitle.textContent = track.artist;
         subtitle.style.display = track.artist ? "" : "none";
         head.title = [name, track.artist, track.album].filter((x) => x).join(" · ");
@@ -347,6 +349,7 @@ export function buildSpotifyMini(onOpen: () => void): SpotifyCardHost {
         art.classList.remove("has-art");
         artImg.removeAttribute("src");
       }
+      title.fit();
       paintProgress();
       if (playIcon !== s.playing) {
         playIcon = s.playing;
@@ -374,11 +377,11 @@ export function buildSpotifyCard(): SpotifyCardHost {
   artNote.style.color = `${green}b3`;
   art.append(artNote, artImg);
   art.addEventListener("click", () => void Bridge.spotifyOpen());
-  const title = h("span", { class: "np-title" });
+  const title = createMarquee("np-title");
   const subtitle = h("div", { class: "np-sub" });
   const head = h("div", { class: "np-head" },
     art,
-    h("div", { class: "np-text" }, h("div", { class: "np-title-row" }, dot(green, 6), title), subtitle),
+    h("div", { class: "np-text" }, h("div", { class: "np-title-row" }, dot(green, 6), title.el), subtitle),
   );
 
   let dragFraction: number | null = null;
@@ -469,13 +472,14 @@ export function buildSpotifyCard(): SpotifyCardHost {
     const s = Spotify.state;
     if (shownTrack !== track) {
       shownTrack = track;
-      title.textContent = isAd(track) ? t("Advertisement") : track.title;
+      title.set(isAd(track) ? t("Advertisement") : track.title);
       const sub = [track.artist, track.album].filter((x) => x).join(" · ");
       subtitle.textContent = sub;
       subtitle.style.display = sub ? "" : "none";
     } else if (isAd(track)) {
-      title.textContent = t("Advertisement");
+      title.set(t("Advertisement"));
     }
+    title.fit();
     art.title = track.album ? t("{0} — open Spotify", { 0: track.album }) : t("Open Spotify");
     const cover = currentArtwork(s);
     if (cover) {
