@@ -203,6 +203,16 @@ GitHub releases, checked against a pinned SHA-256) and uses it for the command:
 Without the engine, the model is only reached by what the parser does not
 understand among the sentences Windows was given.
 
+**Mochi answers out loud.** Also in Settings → Voice, and off until asked for:
+a voice (Supertonic 3, 129 MB, from the same GitHub releases, checked the same
+way) that says what a command did — "GitHub added", "Six active, remove
+which?", the answer to a question. A calm female voice, or a male one, both a
+little slower than the model's own pace. It is made on this computer in about
+half a second and played like Mochi's other sounds: muted when Sound is off,
+quieter under the usual volume. He does not listen while he speaks, and he
+stops when the wake phrase is heard. English only, like listening: in another
+language the card says it. The voice's code is MIT and its model OpenRAIL-M.
+
 ## Your pills
 
 **Settings… → Active pills** lists the tools you use, from the same catalog as

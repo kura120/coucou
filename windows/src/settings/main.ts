@@ -4,7 +4,7 @@
 
 import "./settings.css";
 import {
-  Bridge, onEvent, type HookPreview, type HookStatus, type ShortcutsReport, type VoiceStatus,
+  Bridge, onEvent, type HookPreview, type HookStatus, type ShortcutsReport, type VoiceEnginePart, type VoiceStatus,
 } from "../core/bridge";
 import { CUSTOM_SERVER_KEY, providerDef, urlExposure } from "../core/providers";
 import {
@@ -1084,52 +1084,72 @@ function voiceSection(): HTMLElement {
   model.addEventListener("change", () => change({ brainModel: model.value }));
   void fillModels();
 
-  // Free speech: an engine that is downloaded when asked for, then chosen.
-  const free = h("div", { class: "row" });
-  const drawFree = (installed: boolean, available: boolean, megabytes: number, note = "") => {
-    clear(free);
-    free.append(h("label", { text: t("Hear free speech") }));
-    if (installed) {
-      free.append(
-        toggle(settings.voice.engine === "bundled", (v) => change({ engine: v ? "bundled" : "system" })),
-        h("button", {
+  // The bundled engine's two parts, each downloaded when asked for: a row with
+  // its switch once it is here, a Download button until then.
+  const enginePart = (part: VoiceEnginePart, label: string, isOn: () => boolean, turn: (on: boolean) => void, extra?: HTMLElement) => {
+    const row = h("div", { class: "row" });
+    const draw = (installed: boolean, available: boolean, megabytes: number, note = "") => {
+      clear(row);
+      row.append(h("label", { text: label }));
+      if (installed) {
+        row.append(toggle(isOn(), turn));
+        if (extra) row.append(extra);
+        row.append(h("button", {
           text: t("Remove"),
           onclick: () => {
-            change({ engine: "system" });
-            void Bridge.voiceEngineRemove().then(() => drawFree(false, available, megabytes));
+            turn(false);
+            void Bridge.voiceEngineRemove(part).then(() => refresh());
           },
-        }),
-      );
-    } else if (available) {
-      const download = h("button", {
-        text: t("Download ({0} MB)", { 0: megabytes }),
-        onclick: () => {
-          download.setAttribute("disabled", "");
-          void Bridge.voiceEngineInstall();
-        },
+        }));
+      } else if (available) {
+        const download = h("button", {
+          text: t("Download ({0} MB)", { 0: megabytes }),
+          onclick: () => {
+            download.setAttribute("disabled", "");
+            void Bridge.voiceEngineInstall(part);
+          },
+        });
+        row.append(download);
+      }
+      if (note) row.append(h("span", { class: "hint", text: note }));
+    };
+    const refresh = (note = "") =>
+      void Bridge.voiceEngineStatus(part).then((s) => {
+        if (s) draw(s.installed, s.available, Math.round(s.downloadBytes / 1_000_000), note);
       });
-      free.append(download);
-    }
-    if (note) free.append(h("span", { class: "hint", text: note }));
-  };
-  drawFree(false, false, 0);
-  void Bridge.voiceEngineStatus().then((s) => {
-    if (!s) return;
-    const megabytes = Math.round(s.downloadBytes / 1_000_000);
-    drawFree(s.installed, s.available, megabytes);
-    voiceEngineListener = (p) => {
+    draw(false, false, 0);
+    refresh();
+    voiceEngineListeners[part] = (p) => {
       if (p.installed) {
-        // Downloaded to be used: it is chosen at once.
-        change({ engine: "bundled" });
-        drawFree(true, s.available, megabytes);
+        // Downloaded to be used: it is turned on at once.
+        turn(true);
+        refresh();
       } else if (p.error) {
-        drawFree(false, s.available, megabytes, t("The download failed. Try again."));
+        refresh(t("The download failed. Try again."));
       } else {
-        const note = free.querySelector(".hint") ?? free.appendChild(h("span", { class: "hint" }));
+        const note = row.querySelector(".hint") ?? row.appendChild(h("span", { class: "hint" }));
         note.textContent = t("Downloading… {0} %", { 0: Math.round(p.done * 100) });
       }
     };
-  });
+    return row;
+  };
+
+  const free = enginePart(
+    "hearing", t("Hear free speech"),
+    () => settings.voice.engine === "bundled",
+    (on) => change({ engine: on ? "bundled" : "system" }),
+  );
+
+  const speaker = h("select", {}) as HTMLSelectElement;
+  speaker.append(h("option", { value: "female", text: t("Female voice") }), h("option", { value: "male", text: t("Male voice") }));
+  speaker.value = settings.voice.speaker === "male" ? "male" : "female";
+  speaker.addEventListener("change", () => change({ speaker: speaker.value }));
+  const spoken = enginePart(
+    "speaking", t("Mochi answers out loud"),
+    () => settings.voice.speak,
+    (on) => change({ speak: on }),
+    speaker,
+  );
 
   const followUp = h("select", {}) as HTMLSelectElement;
   followUp.append(h("option", { value: "0", text: t("None") }));
@@ -1162,11 +1182,14 @@ function voiceSection(): HTMLElement {
     h("div", { class: "hint", text: t("For a few seconds after a command, another can be said without « OK Coucou ». Only with free speech.") }),
     h("div", { class: "row" }, h("label", { text: t("Understand free speech with") }), server, model),
     h("div", { class: "hint", text: t("A sentence Coucou does not know is put to this model, with the tools Coucou offers. The model proposes; Coucou checks before acting, and never approves a permission. Connect a server in Local models first.") }),
+    spoken,
+    h("div", { class: "hint", text: t("Mochi says what a command did, in a calm voice made on this computer (Supertonic, downloaded from GitHub when you ask). In English, and quiet when Sound is off.") }),
   );
 }
 
 let voiceListener: ((s: VoiceStatus | null) => void) | null = null;
-let voiceEngineListener: ((p: { done: number; installed: boolean; error: string | null }) => void) | null = null;
+type EngineProgress = { part: VoiceEnginePart; done: number; installed: boolean; error: string | null };
+const voiceEngineListeners: Partial<Record<VoiceEnginePart, (p: EngineProgress) => void>> = {};
 
 function shortcutsSection(initial: ShortcutsReport | null): HTMLElement {
   let report = initial;
@@ -1456,7 +1479,7 @@ async function main() {
 
   void onEvent<ShortcutsReport>("shortcuts-status", (fresh) => shortcutsListener?.report(fresh));
   void onEvent<VoiceStatus>("voice-status", (s) => voiceListener?.(s));
-  void onEvent<{ done: number; installed: boolean; error: string | null }>("voice-engine", (p) => voiceEngineListener?.(p));
+  void onEvent<EngineProgress>("voice-engine", (p) => voiceEngineListeners[p.part]?.(p));
   void onEvent<Settings>("settings-changed", (s) => {
     const before = `${settings.chatProvider}|${settings.ollamaUrl}|${settings.lmstudioUrl}|${settings.customUrl}`;
     settings = { ...settings, ...s };

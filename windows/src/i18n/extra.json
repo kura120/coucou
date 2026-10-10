@@ -4337,6 +4337,50 @@
    "pt-BR": "Por alguns segundos após um comando, outro pode ser dito sem « OK Coucou ». Apenas com fala livre.",
    "ru": "Несколько секунд после команды можно произнести следующую без « OK Coucou ». Только со свободной речью.",
    "id": "Selama beberapa detik setelah perintah, perintah lain dapat diucapkan tanpa « OK Coucou ». Hanya dengan ucapan bebas."
+  },
+  "Mochi answers out loud": {
+   "zh-Hans": "Mochi 出声回答",
+   "hi": "Mochi बोलकर जवाब देता है",
+   "es": "Mochi responde en voz alta",
+   "ar": "Mochi يجيب بصوت مسموع",
+   "fr": "Mochi répond à voix haute",
+   "bn": "Mochi জোরে উত্তর দেয়",
+   "pt-BR": "Mochi responde em voz alta",
+   "ru": "Mochi отвечает вслух",
+   "id": "Mochi menjawab dengan suara"
+  },
+  "Female voice": {
+   "zh-Hans": "女声",
+   "hi": "महिला आवाज़",
+   "es": "Voz femenina",
+   "ar": "صوت أنثوي",
+   "fr": "Voix féminine",
+   "bn": "নারী কণ্ঠ",
+   "pt-BR": "Voz feminina",
+   "ru": "Женский голос",
+   "id": "Suara perempuan"
+  },
+  "Male voice": {
+   "zh-Hans": "男声",
+   "hi": "पुरुष आवाज़",
+   "es": "Voz masculina",
+   "ar": "صوت ذكوري",
+   "fr": "Voix masculine",
+   "bn": "পুরুষ কণ্ঠ",
+   "pt-BR": "Voz masculina",
+   "ru": "Мужской голос",
+   "id": "Suara laki-laki"
+  },
+  "Mochi says what a command did, in a calm voice made on this computer (Supertonic, downloaded from GitHub when you ask). In English, and quiet when Sound is off.": {
+   "zh-Hans": "Mochi 会用平静的声音说出命令的结果，声音在这台电脑上生成（Supertonic，在你要求时从 GitHub 下载）。使用英语；关闭声音时保持安静。",
+   "hi": "Mochi शांत आवाज़ में बताता है कि आदेश ने क्या किया; आवाज़ इसी कंप्यूटर पर बनती है (Supertonic, आपके कहने पर GitHub से डाउनलोड होता है)। अंग्रेज़ी में, और ध्वनि बंद होने पर चुप।",
+   "es": "Mochi dice lo que hizo una orden, con una voz tranquila generada en este equipo (Supertonic, descargado de GitHub cuando lo pides). En inglés, y en silencio cuando el sonido está apagado.",
+   "ar": "يقول Mochi ما فعله الأمر بصوت هادئ يُولَّد على هذا الحاسوب (Supertonic، يُنزَّل من GitHub عند طلبك). بالإنجليزية، ويصمت عند إيقاف الصوت.",
+   "fr": "Mochi dit ce qu’une commande a fait, d’une voix calme produite sur cet ordinateur (Supertonic, téléchargé depuis GitHub quand vous le demandez). En anglais, et silencieux quand le son est coupé.",
+   "bn": "Mochi শান্ত কণ্ঠে বলে কমান্ডটি কী করল; কণ্ঠটি এই কম্পিউটারেই তৈরি হয় (Supertonic, আপনি চাইলে GitHub থেকে ডাউনলোড হয়)। ইংরেজিতে, আর সাউন্ড বন্ধ থাকলে চুপ।",
+   "pt-BR": "O Mochi diz o que um comando fez, com uma voz calma gerada neste computador (Supertonic, baixado do GitHub quando você pede). Em inglês, e em silêncio quando o som está desligado.",
+   "ru": "Mochi спокойным голосом сообщает, что сделала команда; голос создаётся на этом компьютере (Supertonic, скачивается с GitHub по вашей просьбе). На английском; молчит, когда звук выключен.",
+   "id": "Mochi mengucapkan hasil perintah dengan suara tenang yang dibuat di komputer ini (Supertonic, diunduh dari GitHub saat Anda memintanya). Dalam bahasa Inggris, dan diam saat Suara dimatikan."
   }
  }
 }

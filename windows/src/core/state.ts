@@ -171,6 +171,10 @@ export interface Settings {
     engine: string;
     /** Seconds after a command during which another needs no wake phrase; 0 for none. */
     followUp: number;
+    /** Mochi says what a command did, out loud. */
+    speak: boolean;
+    /** "female" or "male". */
+    speaker: string;
   };
   desktopMochi?: {
     onDesktop: boolean;
@@ -207,7 +211,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mochiOutfit: DEFAULT_OUTFIT,
   pillColors: {},
   language: "",
-  voice: { enabled: false, wake: true, brain: "", brainModel: "", engine: "system", followUp: 8 },
+  voice: { enabled: false, wake: true, brain: "", brainModel: "", engine: "system", followUp: 8, speak: false, speaker: "female" },
 };
 
 type Listener = () => void;

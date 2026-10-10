@@ -285,6 +285,255 @@ impl Drop for Engine {
     }
 }
 
+// ── Saying a sentence ─────────────────────────────────────────────────────────
+
+#[repr(C)]
+struct TtsVits {
+    model: Text,
+    lexicon: Text,
+    tokens: Text,
+    data_dir: Text,
+    noise_scale: f32,
+    noise_scale_w: f32,
+    length_scale: f32,
+    dict_dir: Text,
+}
+
+#[repr(C)]
+struct TtsMatcha {
+    acoustic_model: Text,
+    vocoder: Text,
+    lexicon: Text,
+    tokens: Text,
+    data_dir: Text,
+    noise_scale: f32,
+    length_scale: f32,
+    dict_dir: Text,
+}
+
+#[repr(C)]
+struct TtsKokoro {
+    model: Text,
+    voices: Text,
+    tokens: Text,
+    data_dir: Text,
+    length_scale: f32,
+    dict_dir: Text,
+    lexicon: Text,
+    lang: Text,
+}
+
+#[repr(C)]
+struct TtsKitten {
+    model: Text,
+    voices: Text,
+    tokens: Text,
+    data_dir: Text,
+    length_scale: f32,
+}
+
+#[repr(C)]
+struct TtsZipvoice {
+    tokens: Text,
+    encoder: Text,
+    decoder: Text,
+    vocoder: Text,
+    data_dir: Text,
+    lexicon: Text,
+    feat_scale: f32,
+    t_shift: f32,
+    target_rms: f32,
+    guidance_scale: f32,
+}
+
+#[repr(C)]
+struct TtsPocket {
+    lm_flow: Text,
+    lm_main: Text,
+    encoder: Text,
+    decoder: Text,
+    text_conditioner: Text,
+    vocab_json: Text,
+    token_scores_json: Text,
+    voice_embedding_cache_capacity: i32,
+}
+
+#[repr(C)]
+struct TtsSupertonic {
+    duration_predictor: Text,
+    text_encoder: Text,
+    vector_estimator: Text,
+    vocoder: Text,
+    tts_json: Text,
+    unicode_indexer: Text,
+    voice_style: Text,
+}
+
+#[repr(C)]
+struct TtsModelConfig {
+    vits: TtsVits,
+    num_threads: i32,
+    debug: i32,
+    provider: Text,
+    matcha: TtsMatcha,
+    kokoro: TtsKokoro,
+    kitten: TtsKitten,
+    zipvoice: TtsZipvoice,
+    pocket: TtsPocket,
+    supertonic: TtsSupertonic,
+}
+
+#[repr(C)]
+struct TtsConfig {
+    model: TtsModelConfig,
+    rule_fsts: Text,
+    max_num_sentences: i32,
+    rule_fars: Text,
+    silence_scale: f32,
+}
+
+#[repr(C)]
+struct GenerationConfig {
+    silence_scale: f32,
+    speed: f32,
+    sid: i32,
+    reference_audio: *const f32,
+    reference_audio_len: i32,
+    reference_sample_rate: i32,
+    reference_text: Text,
+    num_steps: i32,
+    extra: Text,
+}
+
+#[repr(C)]
+struct GeneratedAudio {
+    samples: *const f32,
+    n: i32,
+    sample_rate: i32,
+}
+
+type CreateTts = unsafe extern "C" fn(*const TtsConfig) -> *const c_void;
+type Generate =
+    unsafe extern "C" fn(*const c_void, Text, *const GenerationConfig, *const c_void, *mut c_void) -> *const GeneratedAudio;
+type DestroyAudio = unsafe extern "C" fn(*const GeneratedAudio);
+
+/// One of the model's voices, and how fast it speaks.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Voice {
+    /// The speaker in Supertonic's voice file.
+    pub speaker: i32,
+    /// 1 is the model's own pace; under it is slower.
+    pub speed: f32,
+}
+
+impl Voice {
+    /// The voice picked by ear for being calm, a little faster than it was first heard.
+    pub const FEMALE: Voice = Voice { speaker: 4, speed: 0.76 };
+    /// The model's male voice at the same pace.
+    pub const MALE: Voice = Voice { speaker: 8, speed: 0.76 };
+}
+
+/// What the model was heard with; fewer is faster and rougher.
+const STEPS: i32 = 8;
+
+/// The bundled engine's voice: Supertonic. A sentence goes in as text and
+/// comes out as samples in memory.
+pub struct Speaker {
+    tts: *const c_void,
+    destroy: Destroy,
+    generate: Generate,
+    destroy_audio: DestroyAudio,
+    _library: Library,
+}
+
+unsafe impl Send for Speaker {}
+
+impl Speaker {
+    pub fn load(runtime: &Path, model: &Path) -> Result<Self, String> {
+        let library = Library::open(&runtime.join(LIBRARY))?;
+        let file = |name: &str| -> Result<CString, String> {
+            let path = model.join(name);
+            if !path.is_file() {
+                return Err("the voice is incomplete".into());
+            }
+            CString::new(path.to_string_lossy().as_bytes()).map_err(|_| "a path has a NUL".to_string())
+        };
+        let duration_predictor = file("duration_predictor.int8.onnx")?;
+        let text_encoder = file("text_encoder.int8.onnx")?;
+        let vector_estimator = file("vector_estimator.int8.onnx")?;
+        let vocoder = file("vocoder.int8.onnx")?;
+        let tts_json = file("tts.json")?;
+        let unicode_indexer = file("unicode_indexer.bin")?;
+        let voice_style = file("voice.bin")?;
+        let provider = CString::new("cpu").unwrap();
+        unsafe {
+            let mut config: TtsConfig = std::mem::zeroed();
+            config.model.supertonic = TtsSupertonic {
+                duration_predictor: duration_predictor.as_ptr(),
+                text_encoder: text_encoder.as_ptr(),
+                vector_estimator: vector_estimator.as_ptr(),
+                vocoder: vocoder.as_ptr(),
+                tts_json: tts_json.as_ptr(),
+                unicode_indexer: unicode_indexer.as_ptr(),
+                voice_style: voice_style.as_ptr(),
+            };
+            config.model.num_threads = 2;
+            config.model.provider = provider.as_ptr();
+            config.max_num_sentences = 1;
+            config.silence_scale = 0.2;
+
+            let create: CreateTts = library.function("SherpaOnnxCreateOfflineTts")?;
+            let mut speaker = Self {
+                tts: std::ptr::null(),
+                destroy: library.function("SherpaOnnxDestroyOfflineTts")?,
+                generate: library.function("SherpaOnnxOfflineTtsGenerateWithConfig")?,
+                destroy_audio: library.function("SherpaOnnxDestroyOfflineTtsGeneratedAudio")?,
+                _library: library,
+            };
+            speaker.tts = create(&config);
+            if speaker.tts.is_null() {
+                return Err("the voice could not be loaded".into());
+            }
+            Ok(speaker)
+        }
+    }
+
+    /// The sentence as sound: mono samples (-1…1) and their rate. Empty when
+    /// there is nothing to say or it could not be said.
+    pub fn say(&self, text: &str, voice: Voice) -> (Vec<f32>, u32) {
+        let Ok(text) = CString::new(text.trim()) else { return (Vec::new(), 0) };
+        if text.as_bytes().is_empty() {
+            return (Vec::new(), 0);
+        }
+        unsafe {
+            let mut config: GenerationConfig = std::mem::zeroed();
+            config.silence_scale = 0.2;
+            config.speed = voice.speed;
+            config.sid = voice.speaker;
+            config.num_steps = STEPS;
+            let audio = (self.generate)(self.tts, text.as_ptr(), &config, std::ptr::null(), std::ptr::null_mut());
+            if audio.is_null() {
+                return (Vec::new(), 0);
+            }
+            let out = if (*audio).samples.is_null() || (*audio).n <= 0 {
+                (Vec::new(), 0)
+            } else {
+                (std::slice::from_raw_parts((*audio).samples, (*audio).n as usize).to_vec(), (*audio).sample_rate.max(0) as u32)
+            };
+            (self.destroy_audio)(audio);
+            out
+        }
+    }
+}
+
+impl Drop for Speaker {
+    fn drop(&mut self) {
+        if !self.tts.is_null() {
+            unsafe { (self.destroy)(self.tts) };
+        }
+    }
+}
+
 // ── Loading the library ───────────────────────────────────────────────────────
 
 #[cfg(windows)]
@@ -358,6 +607,49 @@ mod tests {
         assert_eq!(std::mem::size_of::<Qwen3Asr>(), 64);
         assert_eq!(std::mem::size_of::<ModelConfig>(), 504);
         assert_eq!(std::mem::size_of::<RecognizerConfig>(), 608);
+    }
+
+    /// With the real engine and voice on disk (`COUCOU_VOICE_RUNTIME`,
+    /// `COUCOU_VOICE_SPEAKER`), a sentence comes out as sound, and when
+    /// `COUCOU_VOICE_MODEL` is there too, it is heard back as its words.
+    /// `cargo test -p coucou voice::sherpa -- --ignored --nocapture`
+    #[test]
+    #[ignore = "needs the downloaded engine"]
+    fn a_sentence_is_said_and_heard_back() {
+        let var = |name: &str| std::path::PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set")));
+        let speaker = Speaker::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_SPEAKER")).expect("speaker");
+        for voice in [Voice::FEMALE, Voice::MALE] {
+            let started = std::time::Instant::now();
+            let (samples, rate) = speaker.say("GitHub is added.", voice);
+            let seconds = samples.len() as f64 / f64::from(rate.max(1));
+            println!("said {seconds:.2} s at {rate} Hz in {:?}", started.elapsed());
+            assert!(rate >= 16_000 && (0.6..4.0).contains(&seconds), "{seconds} s at {rate}");
+            assert!(samples.iter().all(|s| s.is_finite() && s.abs() <= 1.5));
+            assert!(samples.iter().any(|s| s.abs() > 0.05), "it is not silence");
+            if let Ok(model) = std::env::var("COUCOU_VOICE_MODEL") {
+                let engine = Engine::load(&var("COUCOU_VOICE_RUNTIME"), Path::new(&model)).expect("engine");
+                let heard = engine.transcribe(rate, &samples).to_lowercase();
+                println!("heard back: {heard:?}");
+                assert!(heard.contains("added"), "{heard:?}");
+            }
+        }
+        assert_eq!(speaker.say("   ", Voice::FEMALE).0.len(), 0);
+    }
+
+    /// The struct sizes c-api.h 1.13.8 gives on a 64-bit target, for the voice.
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn the_voices_layout_is_the_headers() {
+        assert_eq!(std::mem::size_of::<TtsVits>(), 56);
+        assert_eq!(std::mem::size_of::<TtsMatcha>(), 56);
+        assert_eq!(std::mem::size_of::<TtsKokoro>(), 64);
+        assert_eq!(std::mem::size_of::<TtsKitten>(), 40);
+        assert_eq!(std::mem::size_of::<TtsZipvoice>(), 64);
+        assert_eq!(std::mem::size_of::<TtsPocket>(), 64);
+        assert_eq!(std::mem::size_of::<TtsSupertonic>(), 56);
+        assert_eq!(std::mem::size_of::<TtsModelConfig>(), 416);
+        assert_eq!(std::mem::size_of::<TtsConfig>(), 448);
+        assert_eq!(std::mem::size_of::<GenerationConfig>(), 56);
     }
 
     /// With the real engine and model on disk, a spoken sentence comes back as
