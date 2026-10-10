@@ -865,6 +865,8 @@ pub fn run() {
             toast::toast_keys,
             voice::voice_status,
             voice::voice_cancel,
+            voice::voice_grammar,
+            voice::voice_talk,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();

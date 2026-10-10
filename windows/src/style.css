@@ -952,6 +952,11 @@ body {
   color: #c8cbd0;
 }
 
+/* A question Mochi asked, waiting for its answer. */
+.view .sub.asked {
+  color: #f97316;
+}
+
 .mic-dot {
   width: 8px;
   height: 8px;

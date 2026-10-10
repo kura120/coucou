@@ -1,6 +1,7 @@
 // Windows' own speech recogniser (SAPI 5), in this process, with a fixed
 // grammar: it can only ever hear the wake phrases and the commands it was
-// given. It ships with Windows, runs on the machine and needs no download —
+// given (grammar.rs). A slot of a command is a rule of its own, so "replace
+// {pill} with {pill}" is one path and not every pair of pills written out. It ships with Windows, runs on the machine and needs no download —
 // only the English speech pack, which an English Windows has.
 //
 // SAPI opens the microphone itself and closes it when told to stop: there is
@@ -20,11 +21,14 @@ use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED,
 };
 
-use super::session::{Listen, Raw, Rule, COMMANDS, WAKE_PHRASES};
+use super::grammar::{Grammar, Part};
+use super::session::{Listen, Raw, Rule, WAKE_PHRASES};
 use super::Unavailable;
 
 const RULE_WAKE: u32 = 1;
 const RULE_COMMAND: u32 = 2;
+/// Slot rules are numbered from here, in the grammar's order.
+const RULE_SLOTS: u32 = 10;
 /// "Every element of the phrase" (SPPR_ALL_ELEMENTS).
 const WHOLE_PHRASE: u32 = u32::MAX;
 
@@ -53,7 +57,7 @@ const fn interest(event: SPEVENTENUM) -> u64 {
 
 impl Recogniser {
     /// The recogniser, ready and silent: the microphone opens on `listen`.
-    pub fn open() -> Result<Self, Unavailable> {
+    pub fn open(commands: &Grammar) -> Result<Self, Unavailable> {
         unsafe {
             CoInitializeEx(None, COINIT_MULTITHREADED).ok().map_err(Unavailable::error)?;
             let com = Com;
@@ -75,8 +79,8 @@ impl Recogniser {
             context.SetInterest(events, events).map_err(Unavailable::error)?;
 
             let grammar = context.CreateGrammar(1).map_err(Unavailable::error)?;
-            add_rule(&grammar, w!("wake"), RULE_WAKE, WAKE_PHRASES).map_err(Unavailable::error)?;
-            add_rule(&grammar, w!("command"), RULE_COMMAND, COMMANDS).map_err(Unavailable::error)?;
+            add_wake_rule(&grammar).map_err(Unavailable::error)?;
+            add_command_rule(&grammar, commands).map_err(Unavailable::error)?;
             grammar.Commit(0).map_err(Unavailable::error)?;
 
             Ok(Self { recognizer, context, grammar, _com: com })
@@ -159,22 +163,64 @@ unsafe fn read(result: &ISpRecoResult) -> Option<(Rule, String, f32)> {
     }
 }
 
-/// A top-level rule that hears exactly these phrases. Left inactive.
-unsafe fn add_rule(grammar: &ISpRecoGrammar, name: PCWSTR, id: u32, phrases: &[&str]) -> windows::core::Result<()> {
+/// Where a rule ends.
+const END: SPSTATEHANDLE = SPSTATEHANDLE(std::ptr::null_mut());
+
+/// A rule's first state. `top_level`: one the recogniser listens for by
+/// itself, left inactive; else one that only other rules lead to.
+unsafe fn rule(grammar: &ISpRecoGrammar, name: &str, id: u32, top_level: bool) -> windows::core::Result<SPSTATEHANDLE> {
     unsafe {
-        let mut start = SPSTATEHANDLE(std::ptr::null_mut());
-        grammar.GetRule(name, id, SPRAF_TopLevel.0 as u32, true, &mut start)?;
-        for phrase in phrases {
-            // No end state: the phrase ends the rule.
-            grammar.AddWordTransition(
-                start,
-                SPSTATEHANDLE(std::ptr::null_mut()),
-                &HSTRING::from(*phrase),
-                w!(" "),
-                SPWT_LEXICAL,
-                1.0,
-                std::ptr::null(),
-            )?;
+        let mut start = END;
+        let attributes = if top_level { SPRAF_TopLevel.0 as u32 } else { 0 };
+        grammar.GetRule(&HSTRING::from(name), id, attributes, true, &mut start)?;
+        Ok(start)
+    }
+}
+
+unsafe fn say(grammar: &ISpRecoGrammar, from: SPSTATEHANDLE, to: SPSTATEHANDLE, words: &str) -> windows::core::Result<()> {
+    unsafe { grammar.AddWordTransition(from, to, &HSTRING::from(words), w!(" "), SPWT_LEXICAL, 1.0, std::ptr::null()) }
+}
+
+unsafe fn add_wake_rule(grammar: &ISpRecoGrammar) -> windows::core::Result<()> {
+    unsafe {
+        let start = rule(grammar, "wake", RULE_WAKE, true)?;
+        for phrase in WAKE_PHRASES {
+            say(grammar, start, END, phrase)?;
+        }
+        Ok(())
+    }
+}
+
+/// One rule per slot, hearing any of its values, and the command rule: each
+/// command a path of words and slots from its start to its end.
+unsafe fn add_command_rule(grammar: &ISpRecoGrammar, commands: &Grammar) -> windows::core::Result<()> {
+    unsafe {
+        let mut slots = std::collections::BTreeMap::new();
+        for (index, (name, values)) in commands.slots.iter().enumerate() {
+            let start = rule(grammar, &format!("slot_{name}"), RULE_SLOTS + index as u32, false)?;
+            for value in values {
+                say(grammar, start, END, value)?;
+            }
+            slots.insert(name.as_str(), start);
+        }
+        let start = rule(grammar, "command", RULE_COMMAND, true)?;
+        for command in &commands.commands {
+            let mut from = start;
+            for (index, part) in command.iter().enumerate() {
+                let to = if index + 1 == command.len() {
+                    END
+                } else {
+                    let mut next = END;
+                    grammar.CreateNewState(start, &mut next)?;
+                    next
+                };
+                match part {
+                    Part::Words(words) => say(grammar, from, to, words)?,
+                    // Grammar::parse only lets through slots that have values.
+                    Part::Slot(name) => grammar.AddRuleTransition(from, to, slots[name.as_str()], 1.0, std::ptr::null())?,
+                }
+                from = to;
+            }
         }
         Ok(())
     }
@@ -217,7 +263,11 @@ mod tests {
     #[test]
     #[ignore = "opens the microphone"]
     fn the_recogniser_opens_listens_and_closes() {
-        let mut recogniser = Recogniser::open().expect("recogniser");
+        let slots = std::collections::BTreeMap::from([("pill".to_string(), vec!["github".to_string(), "n eight n".to_string()])]);
+        let commands: Vec<String> =
+            ["next track", "add {pill}", "replace {pill} with {pill}", "{pill}"].iter().map(|s| s.to_string()).collect();
+        let grammar = Grammar::parse(&commands, &slots).expect("grammar");
+        let mut recogniser = Recogniser::open(&grammar).expect("recogniser");
         recogniser.listen(Listen::Wake).expect("wake");
         let _ = recogniser.next(Duration::from_millis(500));
         recogniser.listen(Listen::Command).expect("command");
