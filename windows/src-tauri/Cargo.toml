@@ -33,6 +33,12 @@ windows = { version = "0.61", features = [
   # The Spotify pill: Spotify's session in the System Media Transport Controls,
   # and its cover (spotify.rs).
   "Media_Control",
+  # "OK Coucou": Windows' own speech recogniser, in this process (voice/sapi.rs).
+  "Win32_Media_Speech",
+  "Win32_System_Variant",
+  # Voice stops listening while the screen is locked or on battery saver.
+  "Win32_System_Power",
+  "Win32_System_StationsAndDesktops",
   "Storage_Streams",
   "Win32_Foundation",
   "Win32_Security",

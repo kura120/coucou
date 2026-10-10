@@ -127,6 +127,32 @@ session, and they are forgotten an hour after the last edit or when the session
 ends. When Claude finishes, the card keeps the first paragraph of its final
 answer on one line, still, until the next prompt.
 
+### "OK Coucou"
+
+Off by default. Turn it on in **Settings… → Voice**, say **"OK Coucou"** (or
+"Hey Coucou"), wait for the island to open on Mochi listening, then say a
+command. This first version only listens: it shows what it heard and goes back
+to where the island was. Nothing acts on a command yet.
+
+- **Windows only, English only, for now.** It uses Windows' own speech
+  recogniser, which needs the English speech pack (Settings → Time & language →
+  Speech) and nothing downloaded. Linux has no system recogniser and waits for
+  a bundled one; Settings says so there.
+- **On this computer only.** No audio and no text leaves it, and there is no
+  online recogniser to fall back on. Nothing is recorded, and the log says that
+  something was recognised, never what.
+- **The microphone.** While voice is on, Windows shows a microphone in the
+  taskbar. Turn off **Listen for « OK Coucou »** to keep the microphone closed
+  until you press the **Talk to Coucou** shortcut (`Ctrl+Alt+V`, off by
+  default, in Settings → Shortcuts). The microphone is also closed while Coucou
+  is paused from the tray, while the screen is locked and on battery saver.
+- **It can only hear what it was given**: the wake phrases and a short list of
+  commands (play, pause, next track, show github, decline…). The wake phrase
+  and the command are two sentences, with a pause between them. "Coucou" alone
+  does not wake it, and a wake phrase is ignored while a permission or a
+  question waits for you, or while the chat is open.
+- Voice never approves a permission and never sends anything.
+
 ## Your pills
 
 **Settings… → Active pills** lists the tools you use, from the same catalog as
@@ -386,10 +412,11 @@ windows/
     mochi/             Mochi and the launch greeting, in Canvas 2D
     desktop/           Mochi's own little window, when he lives on the desktop
     toast/             the toasts' window: the stack, its timings and its look
-    island/            state machine, hooks, integrations
+    island/            state machine, hooks, integrations, what voice reports
     views/             every island view
     settings/          the settings window
   src-tauri/           Rust backend: window, named pipe, Claude API, pollers
+    src/voice/         "OK Coucou": the session, and Windows' recogniser behind it
   hook/                coucou-hook.exe, the Claude Code relay
   scripts/             icon generator
 ```
@@ -454,6 +481,8 @@ own window.
 
 ## What's different from the Mac version
 
+- "OK Coucou" only listens and wakes here, in English, on Windows (see
+  ["OK Coucou"](#ok-coucou)). The Mac's ten voice functions are not ported yet.
 - No notch, so the island lives at the top centre of the screen and retracts into
   the top edge instead of hiding in a notch.
 - Permission approval works from **any** terminal; the Mac build only listens to

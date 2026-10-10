@@ -39,7 +39,7 @@ interface Tween {
 type PropKey =
   | "yaw" | "pitch" | "roll" | "tilt" | "open" | "sx" | "sy"
   | "oy" | "ox" | "tint" | "morph" | "hands" | "blush" | "es" | "badgeS"
-  | "outfitPresence";
+  | "outfitPresence" | "listenHand";
 
 interface BotStateCfg {
   color: RGB;
@@ -290,6 +290,14 @@ export class BotEngine {
   private miniLookTarget = { x: 0, y: 0 };
   private miniLookNextTime = 0;
 
+  // Listening ("OK Coucou"): head tilted, eyes wide, right hand to the ear.
+  /** 0 = at rest, 1 = raised beside the head. */
+  listenHand = 0;
+  isListening = false;
+  /** Words are coming: he stops swaying and looks at who is speaking. */
+  listeningHasWords = false;
+  private emoteBeforeListening: BotEmoteName | null = null;
+
   /** Fired when three slaps land inside 1.7 s (→ dizzy + confused view). */
   onDizzy: (() => void) | null = null;
 
@@ -437,6 +445,38 @@ export class BotEngine {
     this.anim("hands", [[0, 150, Ease.inOut]]);
   }
 
+  /** The island opens on the listening view (BotEngine.enterListening). */
+  enterListening() {
+    if (this.isListening) return;
+    this.isListening = true;
+    this.listeningHasWords = false;
+    this.emoteBeforeListening = this.permanentEmote;
+    this.interruptGreet();
+
+    // A small jump.
+    this.anim("oy", [[-0.2, 130, Ease.out], [0, 280, Ease.back]]);
+    this.squash();
+    // Wide eyes that survive the blinks.
+    this.permanentEye = "wide";
+    this.eyeOverride = "wide";
+    this.eyeOverrideUntil = Number.POSITIVE_INFINITY;
+    // The right hand comes up; update() holds the head tilted.
+    this.anim("hands", [[1, 150, Ease.out]]);
+    this.anim("listenHand", [[1, 280, Ease.out]]);
+    this.nextBlink = now() + 2.5 + Math.random();
+  }
+
+  /** The island leaves the listening view (BotEngine.exitListening). */
+  exitListening() {
+    if (!this.isListening) return;
+    this.isListening = false;
+    this.listeningHasWords = false;
+    this.setPermanentEmote(this.emoteBeforeListening);
+    this.emoteBeforeListening = null;
+    this.anim("listenHand", [[0, 220, Ease.inOut]]);
+    this.anim("hands", [[1, 220, Ease.lin], [0, 200, Ease.inOut]]);
+  }
+
   setPermanentEmote(emote: BotEmoteName | null) {
     this.permanentEmote = emote;
     if (emote === "wink") {
@@ -568,6 +608,7 @@ export class BotEngine {
       this.cfg.bounces || this.cfg.scans || this.cfg.breathes || this.cfg.zz || this.cfg.sweat ||
       this.isMini ||
       this.isDancing || this.dancingLevel > 0.001 ||
+      this.isListening ||
       Math.abs(this.tgYaw - this.yaw) > 0.002 ||
       Math.abs(this.tgPitch - this.pitch) > 0.002 ||
       Math.abs(this.tgTilt - this.tilt) > 0.002 ||
@@ -641,9 +682,15 @@ export class BotEngine {
       tp = this.miniLookTarget.y * 0.5;
     }
 
+    if (this.isListening && !this.listeningHasWords) {
+      // Waiting: a gentle sway, looking slightly up.
+      ty += Math.sin(t * 1.1) * 0.06;
+      tp -= 0.12;
+    }
+
     this.tgYaw = ty;
     this.tgPitch = tp;
-    this.tgTilt = this.cfg.tilt;
+    this.tgTilt = this.isListening ? -0.1 : this.cfg.tilt;
 
     if (n > this.waveStart && n < this.waveUntil) {
       const wt = n - this.waveStart;
@@ -683,7 +730,7 @@ export class BotEngine {
         this.blink();
         if (Math.random() < 0.22) setTimeout(() => this.blink(), 230);
       }
-      this.nextBlink = n + 2.2 + Math.random() * 3.2;
+      this.nextBlink = n + (this.isListening ? 3 + Math.random() * 1.5 : 2.2 + Math.random() * 3.2);
     }
 
     if (this.eyeOverride && n > this.eyeOverrideUntil) {
@@ -1164,6 +1211,12 @@ export class BotEngine {
         const wt = n - this.waveStart;
         localX = -hwB * 1.08;
         localY = hhB * 0.7 + Math.sin(6 * wt) * 0.04 * bodyH;
+      } else if (sd > 0 && this.listenHand > 0.01) {
+        // Raised beside the head, attentive, not waving.
+        const up = this.listenHand;
+        localX = hwB * (1.08 + (1.05 - 1.08) * up);
+        localY = hhB * (0.7 + (-0.28 - 0.7) * up);
+        handRot = -0.45 * up;
       } else {
         localX = sd * hwB * 1.08;
         localY = hhB * 0.7;

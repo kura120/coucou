@@ -75,6 +75,24 @@ pub struct Settings {
     /// Mochi on the desktop: whether he lives there, and his spot. Owned by
     /// the Rust side (desktop.rs) — what a webview sends back is ignored.
     pub desktop_mochi: DesktopMochiPref,
+    /// "OK Coucou" (voice/mod.rs). Off until the user turns it on: off means
+    /// the microphone is closed and nothing runs.
+    pub voice: VoicePref,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct VoicePref {
+    pub enabled: bool,
+    /// Listen for the wake phrase all the time. Off: the microphone opens only
+    /// for the "Talk to Coucou" shortcut.
+    pub wake: bool,
+}
+
+impl Default for VoicePref {
+    fn default() -> Self {
+        Self { enabled: false, wake: true }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -133,6 +151,7 @@ impl Default for Settings {
             pill_colors: BTreeMap::new(),
             language: String::new(),
             desktop_mochi: DesktopMochiPref::default(),
+            voice: VoicePref::default(),
         }
     }
 }
@@ -412,7 +431,8 @@ mod tests {
   "mochiOutfit": "witchHat",
   "pillColors": { "integration_claude": "#2DD4BF" },
   "language": "pt-BR",
-  "desktopMochi": { "onDesktop": true, "spot": { "x": 1500.5, "y": -300.0, "space": "screen" } }
+  "desktopMochi": { "onDesktop": true, "spot": { "x": 1500.5, "y": -300.0, "space": "screen" } },
+  "voice": { "enabled": true, "wake": false }
 }"##;
 
     fn custom() -> Value {
@@ -819,6 +839,7 @@ mod tests {
                 "pillColors",
                 "language",
                 "desktopMochi",
+                "voice",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

@@ -4040,6 +4040,83 @@
    "pt-BR": "Responder “não” à notificação",
    "ru": "Ответить «нет» на уведомление",
    "id": "Jawab “tidak” pada notifikasi"
+  },
+  "Waiting for the shortcut": {
+   "zh-Hans": "等待快捷键",
+   "hi": "शॉर्टकट की प्रतीक्षा में",
+   "es": "Esperando el atajo",
+   "ar": "بانتظار الاختصار",
+   "fr": "En attente du raccourci",
+   "bn": "শর্টকাটের অপেক্ষায়",
+   "pt-BR": "Aguardando o atalho",
+   "ru": "Ожидание сочетания клавиш",
+   "id": "Menunggu pintasan"
+  },
+  "Listen for « OK Coucou »": {
+   "zh-Hans": "监听« OK Coucou »",
+   "hi": "« OK Coucou » सुनें",
+   "es": "Escuchar « OK Coucou »",
+   "ar": "الاستماع إلى « OK Coucou »",
+   "fr": "Écouter « OK Coucou »",
+   "bn": "« OK Coucou » শুনুন",
+   "pt-BR": "Ouvir « OK Coucou »",
+   "ru": "Слушать « OK Coucou »",
+   "id": "Dengarkan « OK Coucou »"
+  },
+  "Voice is not on Linux yet.": {
+   "zh-Hans": "语音功能尚不支持 Linux。",
+   "hi": "वॉइस अभी Linux पर उपलब्ध नहीं है।",
+   "es": "La voz aún no está disponible en Linux.",
+   "ar": "الصوت غير متاح على Linux بعد.",
+   "fr": "La voix n’est pas encore disponible sur Linux.",
+   "bn": "ভয়েস এখনও Linux-এ নেই।",
+   "pt-BR": "A voz ainda não está disponível no Linux.",
+   "ru": "Голосовое управление пока недоступно в Linux.",
+   "id": "Suara belum tersedia di Linux."
+  },
+  "No English speech recognition is installed. Add it in Windows Settings → Time & language → Speech.": {
+   "zh-Hans": "未安装英语语音识别。请在 Windows 设置 → 时间和语言 → 语音中添加。",
+   "hi": "अंग्रेज़ी वाक् पहचान इंस्टॉल नहीं है। इसे Windows सेटिंग्स → समय और भाषा → वाक् में जोड़ें।",
+   "es": "No hay reconocimiento de voz en inglés instalado. Añádelo en Configuración de Windows → Hora e idioma → Voz.",
+   "ar": "لم يتم تثبيت التعرف على الكلام بالإنجليزية. أضفه من إعدادات Windows ← الوقت واللغة ← الكلام.",
+   "fr": "Aucune reconnaissance vocale en anglais n’est installée. Ajoutez-la dans Paramètres Windows → Heure et langue → Voix.",
+   "bn": "ইংরেজি স্পিচ রিকগনিশন ইনস্টল করা নেই। Windows সেটিংস → সময় ও ভাষা → স্পিচ থেকে যোগ করুন।",
+   "pt-BR": "Não há reconhecimento de fala em inglês instalado. Adicione-o em Configurações do Windows → Hora e idioma → Fala.",
+   "ru": "Распознавание английской речи не установлено. Добавьте его в Параметрах Windows → Время и язык → Речь.",
+   "id": "Pengenalan ucapan bahasa Inggris belum terpasang. Tambahkan di Pengaturan Windows → Waktu & bahasa → Ucapan."
+  },
+  "No microphone, or Windows refuses it. Check Windows Settings → Privacy & security → Microphone.": {
+   "zh-Hans": "没有麦克风，或 Windows 拒绝访问。请检查 Windows 设置 → 隐私和安全性 → 麦克风。",
+   "hi": "कोई माइक्रोफ़ोन नहीं है, या Windows उसे अनुमति नहीं देता। Windows सेटिंग्स → गोपनीयता और सुरक्षा → माइक्रोफ़ोन देखें।",
+   "es": "No hay micrófono, o Windows lo deniega. Revisa Configuración de Windows → Privacidad y seguridad → Micrófono.",
+   "ar": "لا يوجد ميكروفون، أو أن Windows يرفض الوصول إليه. تحقق من إعدادات Windows ← الخصوصية والأمان ← الميكروفون.",
+   "fr": "Pas de microphone, ou Windows le refuse. Vérifiez Paramètres Windows → Confidentialité et sécurité → Microphone.",
+   "bn": "কোনো মাইক্রোফোন নেই, অথবা Windows অনুমতি দিচ্ছে না। Windows সেটিংস → গোপনীয়তা ও নিরাপত্তা → মাইক্রোফোন দেখুন।",
+   "pt-BR": "Não há microfone, ou o Windows o recusa. Verifique Configurações do Windows → Privacidade e segurança → Microfone.",
+   "ru": "Микрофона нет, или Windows запрещает доступ к нему. Проверьте Параметры Windows → Конфиденциальность и защита → Микрофон.",
+   "id": "Tidak ada mikrofon, atau Windows menolaknya. Periksa Pengaturan Windows → Privasi & keamanan → Mikrofon."
+  },
+  "Say « OK Coucou », then your command. Coucou listens on this computer only: nothing is recorded and no audio leaves it. English only for now.": {
+   "zh-Hans": "说« OK Coucou »，然后说出命令。Coucou 只在这台电脑上监听：不录音，音频也不会离开电脑。目前仅支持英语。",
+   "hi": "« OK Coucou » कहें, फिर अपना आदेश। Coucou केवल इसी कंप्यूटर पर सुनता है: कुछ भी रिकॉर्ड नहीं होता और कोई ऑडियो बाहर नहीं जाता। अभी केवल अंग्रेज़ी।",
+   "es": "Di « OK Coucou » y luego tu orden. Coucou solo escucha en este equipo: no se graba nada y ningún audio sale de él. Por ahora solo en inglés.",
+   "ar": "قل « OK Coucou » ثم أمرك. يستمع Coucou على هذا الحاسوب فقط: لا يُسجَّل شيء ولا يغادره أي صوت. بالإنجليزية فقط حاليًا.",
+   "fr": "Dites « OK Coucou », puis votre commande. Coucou écoute uniquement sur cet ordinateur : rien n’est enregistré et aucun audio ne le quitte. En anglais seulement pour l’instant.",
+   "bn": "« OK Coucou » বলুন, তারপর আপনার কমান্ড। Coucou শুধু এই কম্পিউটারেই শোনে: কিছুই রেকর্ড হয় না এবং কোনো অডিও বাইরে যায় না। আপাতত শুধু ইংরেজি।",
+   "pt-BR": "Diga « OK Coucou » e depois o seu comando. O Coucou escuta apenas neste computador: nada é gravado e nenhum áudio sai dele. Apenas em inglês por enquanto.",
+   "ru": "Скажите « OK Coucou », затем команду. Coucou слушает только на этом компьютере: ничего не записывается, и звук его не покидает. Пока только на английском.",
+   "id": "Ucapkan « OK Coucou », lalu perintah Anda. Coucou hanya mendengarkan di komputer ini: tidak ada yang direkam dan tidak ada audio yang keluar. Untuk saat ini hanya bahasa Inggris."
+  },
+  "Off: the microphone opens only for the “Talk to Coucou” shortcut. While it listens, Windows shows a microphone in the taskbar.": {
+   "zh-Hans": "关闭时：仅在使用“与 Coucou 对话”快捷键时打开麦克风。监听期间，Windows 会在任务栏显示麦克风图标。",
+   "hi": "बंद: माइक्रोफ़ोन केवल “Coucou से बात करें” शॉर्टकट के लिए खुलता है। सुनते समय Windows टास्कबार में माइक्रोफ़ोन दिखाता है।",
+   "es": "Desactivado: el micrófono solo se abre con el atajo “Hablar con Coucou”. Mientras escucha, Windows muestra un micrófono en la barra de tareas.",
+   "ar": "عند الإيقاف: يُفتح الميكروفون فقط عند استخدام اختصار “التحدث إلى Coucou”. أثناء الاستماع يعرض Windows ميكروفونًا في شريط المهام.",
+   "fr": "Désactivé : le microphone ne s’ouvre que pour le raccourci « Parler à Coucou ». Pendant l’écoute, Windows affiche un microphone dans la barre des tâches.",
+   "bn": "বন্ধ থাকলে: মাইক্রোফোন শুধু “Coucou-এর সাথে কথা বলুন” শর্টকাটের জন্য খোলে। শোনার সময় Windows টাস্কবারে একটি মাইক্রোফোন দেখায়।",
+   "pt-BR": "Desativado: o microfone só abre com o atalho “Falar com o Coucou”. Enquanto escuta, o Windows mostra um microfone na barra de tarefas.",
+   "ru": "Выключено: микрофон включается только по сочетанию клавиш «Поговорить с Coucou». Пока идёт прослушивание, Windows показывает микрофон на панели задач.",
+   "id": "Mati: mikrofon hanya terbuka untuk pintasan “Bicara dengan Coucou”. Selama mendengarkan, Windows menampilkan mikrofon di bilah tugas."
   }
  }
 }

@@ -33,6 +33,10 @@ export interface BootInfo {
   cursorPoll: boolean;
 }
 
+/** src-tauri/src/voice/mod.rs `Status`. */
+export type VoiceStatus =
+  | "off" | "listening" | "shortcut" | "paused" | "noRecogniser" | "microphone" | "unsupported" | "error";
+
 export const Bridge = {
   boot: () => call<BootInfo>("boot"),
   /** The system's languages as the webview sees them, for Rust's own texts (i18n.rs). */
@@ -238,6 +242,12 @@ export const Bridge = {
   spotifyOpen: () => call<boolean>("spotify_open"),
   /** Whether there is a Spotify to launch (Settings). */
   spotifyInstalled: () => call<boolean>("spotify_installed"),
+
+  // ── Voice ─────────────────────────────────────────────────────────────────
+  /** Whether "OK Coucou" is listening, and why not (Settings). */
+  voiceStatus: () => call<VoiceStatus>("voice_status"),
+  /** The island left the listening view itself: the command is not waited for. */
+  voiceCancel: () => call<void>("voice_cancel"),
 };
 
 export type SpotifyAction = "playPause" | "next" | "previous" | "seek" | "shuffle" | "repeat" | "volume";

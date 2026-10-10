@@ -3,7 +3,9 @@
 // integrations land here too in a later stage.
 
 import "./settings.css";
-import { Bridge, onEvent, type HookPreview, type HookStatus, type ShortcutsReport } from "../core/bridge";
+import {
+  Bridge, onEvent, type HookPreview, type HookStatus, type ShortcutsReport, type VoiceStatus,
+} from "../core/bridge";
 import { CUSTOM_SERVER_KEY, providerDef, urlExposure } from "../core/providers";
 import {
   ISLAND_SHORTCUTS, SHORTCUTS, SHORTCUT_TEXT, activeKeys, displayKeys, duplicates, effective,
@@ -1025,6 +1027,52 @@ const SHORTCUTS_UI = {
   get refused() { return t("Not set by your desktop"); },
 };
 
+/** Settings → Voice: off by default; off means the microphone is closed. */
+function voiceSection(): HTMLElement {
+  const status = h("span", { class: "hint" });
+  const problem = h("div", { class: "hint" });
+  const show = (s: VoiceStatus | null) => {
+    status.textContent =
+      s === "listening" ? t("Listening…")
+      : s === "paused" ? t("Paused")
+      : s === "shortcut" ? t("Waiting for the shortcut")
+      : s === "error" ? t("Microphone unavailable")
+      : "";
+    problem.textContent =
+      s === "noRecogniser" ? t("No English speech recognition is installed. Add it in Windows Settings → Time & language → Speech.")
+      : s === "microphone" ? t("No microphone, or Windows refuses it. Check Windows Settings → Privacy & security → Microphone.")
+      : s === "unsupported" ? t("Voice is not on Linux yet.")
+      : "";
+    problem.style.display = problem.textContent ? "" : "none";
+  };
+  show(null);
+  void Bridge.voiceStatus().then(show);
+  voiceListener = show;
+  const change = (patch: Partial<Settings["voice"]>) => {
+    settings.voice = { ...settings.voice, ...patch };
+    void save();
+  };
+  return h(
+    "section",
+    {},
+    h("h2", {}, h("span", { text: t("Voice") })),
+    h("div", { class: "row" },
+      h("label", { text: t("Enable voice command") }),
+      toggle(settings.voice.enabled, (v) => change({ enabled: v })),
+      status,
+    ),
+    problem,
+    h("div", { class: "hint", text: t("Say « OK Coucou », then your command. Coucou listens on this computer only: nothing is recorded and no audio leaves it. English only for now.") }),
+    h("div", { class: "row" },
+      h("label", { text: t("Listen for « OK Coucou »") }),
+      toggle(settings.voice.wake, (v) => change({ wake: v })),
+    ),
+    h("div", { class: "hint", text: t("Off: the microphone opens only for the “Talk to Coucou” shortcut. While it listens, Windows shows a microphone in the taskbar.") }),
+  );
+}
+
+let voiceListener: ((s: VoiceStatus | null) => void) | null = null;
+
 function shortcutsSection(initial: ShortcutsReport | null): HTMLElement {
   let report = initial;
   const list = h("div", { class: "shortcut-list" });
@@ -1312,6 +1360,7 @@ async function main() {
   await render();
 
   void onEvent<ShortcutsReport>("shortcuts-status", (fresh) => shortcutsListener?.report(fresh));
+  void onEvent<VoiceStatus>("voice-status", (s) => voiceListener?.(s));
   void onEvent<Settings>("settings-changed", (s) => {
     const before = `${settings.chatProvider}|${settings.ollamaUrl}|${settings.lmstudioUrl}|${settings.customUrl}`;
     settings = { ...settings, ...s };
@@ -1377,6 +1426,7 @@ async function render() {
     activePillsSection(connected),
     integrationsSection(present),
     generalSection(),
+    voiceSection(),
     shortcutsSection(shortcutReport),
     h("div", {
       class: "hint",
