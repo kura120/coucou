@@ -27,9 +27,7 @@ function dropPendingCard(island: Island): void {
   if (!State.pendingApproval) return;
   State.endApproval();
   island.dropPin();
-  if (State.view === "approval" || State.view === "question") {
-    island.setView(State.defaultView());
-  }
+  if (State.view === "approval" || State.view === "question") island.cardGone();
   State.notify();
 }
 
@@ -312,6 +310,9 @@ function handleHook(island: Island, payload: HookPayload) {
   // Read after the card above is dropped: its pill may have handed the front
   // back to the pill you were on.
   const focused = State.focusId === agentId;
+  // The chat's own Claude Code turn: its answer is in the chat, which already
+  // says so. No card comes over the chat for it, and no second chime.
+  const ownChat = sessionId !== "" && sessionId === State.chatSessionId;
 
   switch (name) {
     case "SessionStart":
@@ -397,9 +398,9 @@ function handleHook(island: Island, payload: HookPayload) {
         const t = State.tasks.find((x) => x.id === agentId);
         if (t) t.finalLine = finalText;
       }
-      Sound.play("finish");
+      if (!ownChat) Sound.play("finish");
       // A card waiting for an answer is never covered by another alert.
-      if (focused && !State.pendingApproval) surface("finished", true);
+      if (focused && !State.pendingApproval && !ownChat) surface("finished", true);
       else State.setPillBadge(agentId, "finished");
       cancelStopTimer(agentId);
       stopTimers.set(
@@ -427,8 +428,8 @@ function handleHook(island: Island, payload: HookPayload) {
     case "StopFailure":
       supersedeStop();
       State.updateTask(agentId, "error");
-      Sound.play("error");
-      if (focused && !State.pendingApproval) surface("error", true);
+      if (!ownChat) Sound.play("error");
+      if (focused && !State.pendingApproval && !ownChat) surface("error", true);
       else State.setPillBadge(agentId, "error");
       break;
 

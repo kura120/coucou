@@ -17,6 +17,7 @@ const island = {
   setView: (view) => asked.push(`setView:${view}`),
   reveal: () => asked.push("reveal"),
   dropPin: () => asked.push("dropPin"),
+  cardGone: () => asked.push("cardGone"),
 };
 registerHookHandlers(island);
 
@@ -35,6 +36,7 @@ beforeEach(() => {
   State.paused = false;
   State.isPinned = false;
   State.pendingApproval = null;
+  State.chatSessionId = null;
   State.settings = { ...DEFAULT_SETTINGS };
   State.loadIntegrationTasks();
 });
@@ -165,6 +167,32 @@ test("an alert on an island that is already open only switches its view", () => 
   State.mode = "expanded";
   hook({ hook_event_name: "Stop" });
   assert.deepEqual(asked, ["setView:finished"]);
+});
+
+test("the chat's own Claude Code turn ending raises no card over the chat", () => {
+  State.mode = "expanded";
+  State.view = "prompt";
+  State.chatSessionId = "chat-1";
+  hook({ hook_event_name: "Stop", session_id: "chat-1", last_assistant_message: "Done." });
+  assert.deepEqual(asked, []);
+  assert.equal(State.view, "prompt");
+  assert.equal(task().state, "finished");
+  assert.equal(task().finalLine, "Done.");
+  // Nor does its failing: the chat shows the error itself.
+  hook({ hook_event_name: "StopFailure", session_id: "chat-1" });
+  assert.deepEqual(asked, []);
+  // Any other session still gets its card.
+  hook({ hook_event_name: "Stop", session_id: "terminal-1" });
+  assert.deepEqual(asked, ["setView:finished"]);
+});
+
+test("the chat's own turn still gets its permission card", () => {
+  State.mode = "expanded";
+  State.view = "prompt";
+  State.chatSessionId = "chat-1";
+  hook({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "chat-1", tool_name: "Bash", tool_input: { command: "ls" } });
+  assert.deepEqual(asked, ["alert:approval"]);
+  assert.equal(State.pendingApproval.requestId, "r1");
 });
 
 test("a session finishing behind another pill only badges its own, for 5.2 s", () => {
@@ -528,7 +556,8 @@ test("an unanswered card is withdrawn after 110 s", () => {
   assert.equal(State.isPinned, false);
   assert.equal(task().state, "working");
   assert.equal(task().pillBadge, null);
-  assert.deepEqual(asked, ["dropPin", "setView:overview"]);
+  // The island decides where the card leaves it: back where it was.
+  assert.deepEqual(asked, ["dropPin", "cardGone"]);
 });
 
 test("a card answered in time leaves nothing for the 110 s timer to undo", () => {

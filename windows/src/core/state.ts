@@ -240,6 +240,16 @@ class AppState {
   /** The chat's lower edge is being dragged: the island follows without easing. */
   chatResizing = false;
   pendingApproval: ApprovalInfo | null = null;
+  /**
+   * The last view one stays in (island/restore.ts): what the island opens on
+   * again. Kept while the app runs, not across a restart.
+   */
+  lastPlace: IslandViewName = "overview";
+  /**
+   * The Claude Code session the chat's own turn runs in: its end is the answer
+   * in the chat, not a card over it.
+   */
+  chatSessionId: string | null = null;
   /** The pill that was in front when the card came up; it comes back after. */
   focusBeforeApproval: string | null = null;
 
@@ -522,6 +532,16 @@ class AppState {
   defaultView(): IslandViewName {
     if (this.pendingApproval) return this.pendingApproval.questions ? "question" : "approval";
     return this.tasks.length === 0 ? "empty" : "overview";
+  }
+
+  /**
+   * What the island opens on again: a waiting card first, then where the user
+   * last was — the chat or the settings — and the overview otherwise.
+   */
+  resumeView(): IslandViewName {
+    const home = this.defaultView();
+    if (this.pendingApproval) return home;
+    return this.lastPlace === "prompt" || this.lastPlace === "settings" ? this.lastPlace : home;
   }
 }
 

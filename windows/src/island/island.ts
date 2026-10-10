@@ -27,6 +27,7 @@ import { refreshHookPills } from "./integrations";
 import { DesktopLink } from "./desktop";
 import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
+import { interruptedAfter, isPlace } from "./restore";
 
 const BOT_OVERHANG = 40;
 const CLAUDE_DESKTOP_ID = "agent_claude-desktop";
@@ -103,7 +104,10 @@ export class Island {
 
   private confusedRecovery: number | null = null;
   private prevViewBeforeConfused: IslandViewName = "overview";
-  private lastSyncedView: IslandViewName | null = null;
+  /** The chat is on screen and the island has taken the keyboard for it. */
+  private chatHasKeyboard = false;
+  /** The card on screen came up over a view the user was in (island/restore.ts). */
+  private interrupted = false;
 
   /** The launch greeting ended, or the island came out of hidden — two of the
    *  moments the Monday recap may open (see src/recap/recap.ts). */
@@ -145,7 +149,28 @@ export class Island {
   private closeApproval() {
     State.endApproval();
     this.fsm.pinned = false;
-    this.setView(State.defaultView());
+    this.cardGone();
+  }
+
+  /**
+   * A card is done with. One that came up over what the user was doing gives
+   * it back; one that opened the island does `otherwise` — by default, shows
+   * the session it was about.
+   */
+  private afterCard(otherwise: () => void) {
+    if (this.interrupted && State.mode === "expanded") this.setView(State.resumeView());
+    else otherwise();
+  }
+
+  /** A permission or a question is answered, or was withdrawn. */
+  cardGone() {
+    this.afterCard(() => this.setView(State.defaultView()));
+  }
+
+  /** Before the view changes: remembers the place, and what a card interrupts. */
+  private arriving(view: IslandViewName, wasOpen = State.mode === "expanded") {
+    this.interrupted = interruptedAfter(this.interrupted, view, State.view, wasOpen);
+    if (isPlace(view)) State.lastPlace = view;
   }
 
   /**
@@ -167,6 +192,8 @@ export class Island {
       setView: (v) => this.setView(v),
       cancelDrop: () => this.discardDrop(),
       collapse: () => this.collapse(),
+      dismissCard: (otherwise) =>
+        this.afterCard(otherwise === "collapse" ? () => this.collapse() : () => this.setView(State.defaultView())),
       foldApproval: () => this.foldApproval(),
       setFocus: (id) => {
         State.setFocus(id);
@@ -329,11 +356,12 @@ export class Island {
           if (from === "coucou") this.greeting.interrupt();
           else if (from === "hidden" && !this.silentReveal) Sound.play("peek");
           this.setMode("compact");
-          if (from === "coucou") State.view = State.defaultView();
+          if (from === "coucou") State.view = State.resumeView();
           if (!this.wasInIsland) this.fsm.mouseLeft();
           break;
         case "home":
-          this.expand(State.defaultView());
+          // Where it was: a waiting card, else the place the user left.
+          this.expand(State.resumeView());
           if (!this.wasInIsland) this.fsm.mouseLeft();
           // Hooks may have been installed in a terminal since: the idle cards
           // say so on the next open, without polling while the island is shut.
@@ -365,8 +393,12 @@ export class Island {
     if (mode === "expanded") Sound.play("open");
     if (prev === "expanded") {
       Sound.play("close");
-      // A folded card is still waiting: it keeps the island pinned.
-      if (!State.pendingApproval) State.isPinned = false;
+      // A folded card is still waiting: it keeps the island pinned, and what
+      // it interrupted. Any other card is over once the island shuts.
+      if (!State.pendingApproval) {
+        State.isPinned = false;
+        this.interrupted = false;
+      }
       void Bridge.focusWindow(false);
     }
     if (mode !== "expanded") {
@@ -392,9 +424,10 @@ export class Island {
     if (UploadSeq.isActive && !UPLOAD_VIEWS.has(view)) UploadSeq.deactivate();
   }
 
-  expand(view: IslandViewName) {
+  expand(view: IslandViewName, wasOpen = State.mode === "expanded") {
     this.stopSequenceIfLeaving(view);
     if (view !== "overview") closePlanCard();
+    this.arriving(view, wasOpen);
     State.view = view;
     if (State.mode !== "expanded") this.setMode("expanded");
     else this.animateGeometry(false);
@@ -407,12 +440,14 @@ export class Island {
     if (view !== "overview") closePlanCard();
     if (State.mode !== "expanded") {
       this.fsm.forceHome();
+      this.arriving(view, false);
       State.view = view;
       this.animateGeometry(false);
       State.notify();
       return;
     }
     const grew = VIEW_LAYOUTS[view].height >= VIEW_LAYOUTS[State.view].height;
+    this.arriving(view);
     State.view = view;
     State.lastActivity = performance.now();
     this.animateGeometry(!grew);
@@ -435,9 +470,11 @@ export class Island {
 
   /** Alert from the hook server: open on this view. Pinned alerts never auto-close. */
   alert(view: IslandViewName) {
+    // Read before the island opens: a card only interrupts an island that was open.
+    const wasOpen = State.mode === "expanded";
     this.fsm.pinned = State.isPinned;
     this.fsm.forceHome();
-    this.expand(view);
+    this.expand(view, wasOpen);
   }
 
   reveal() {
@@ -787,8 +824,13 @@ export class Island {
     this.islandEl.addEventListener("mousedown", (e) => {
       Sound.resume();
       State.lastActivity = performance.now();
-      // A click makes a hover-opened island an ordinary open one.
-      this.fsm.userInteracted();
+      // A click makes a hover-opened island an ordinary open one — and one
+      // that may take the keyboard for the chat (syncDom).
+      if (this.fsm.openedByHover) {
+        this.fsm.userInteracted();
+        this.dirty = true;
+        this.ensureRunning();
+      }
       // A press on Mochi may become a drag out to the desktop.
       if (e.button === 0 && this.isBotHit(e.clientX, e.clientY)) {
         this.botPress = { x: e.clientX, y: e.clientY };
@@ -1225,14 +1267,17 @@ export class Island {
     }
 
     // The chat is the only view with a text field, so it is the only time the
-    // island is allowed to take keyboard focus.
-    if (this.lastSyncedView !== State.view) {
-      const wasChat = this.lastSyncedView === "prompt";
-      this.lastSyncedView = State.view;
-      if (State.view === "prompt") {
+    // island is allowed to take keyboard focus: whenever the chat comes on
+    // screen, an island reopened on it included. Not for a pointer that only
+    // passes over, though: an island opened by hover leaves the keyboard where
+    // it is until it is clicked.
+    const chatKeyboard = expanded && State.view === "prompt" && !this.fsm.openedByHover;
+    if (chatKeyboard !== this.chatHasKeyboard) {
+      this.chatHasKeyboard = chatKeyboard;
+      if (chatKeyboard) {
         void Bridge.focusWindow(true);
         window.setTimeout(() => this.views.get("prompt")?.focus?.(), 120);
-      } else if (wasChat) {
+      } else {
         void Bridge.focusWindow(false);
       }
     }
