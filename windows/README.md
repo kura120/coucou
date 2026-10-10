@@ -353,6 +353,17 @@ Coucou-Windows-X.Y.Z-setup.exe    the versioned installer
 Coucou-Windows-setup.exe          the same file under the rolling name
 ```
 
+Toasts — the notes and Yes/No questions in the top-right corner — have no
+caller yet. To see them, send sample ones to the running app:
+
+```powershell
+coucou.exe --toast-sample all        # or info, success, warning, error, decision
+```
+
+The decision samples answer to Shift+Y and Shift+N while they are on screen. In
+code, `toast::warn(&app, title, text)` (Rust) or `showToast` / `askToast`
+(`src/toast/api.ts`) show one.
+
 Installing is optional — `target/release/coucou.exe` runs on its own. There is no
 window in the taskbar and no console: the island at the top of the screen and the
 Mochi in the notification area are the whole app, and Quit lives in its menu.
@@ -374,6 +385,7 @@ windows/
   src/                 island front end (TypeScript, no framework)
     mochi/             Mochi and the launch greeting, in Canvas 2D
     desktop/           Mochi's own little window, when he lives on the desktop
+    toast/             the toasts' window: the stack, its timings and its look
     island/            state machine, hooks, integrations
     views/             every island view
     settings/          the settings window

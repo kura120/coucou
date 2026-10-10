@@ -3996,6 +3996,50 @@
    "pt-BR": "Novo",
    "ru": "Новый",
    "id": "Baru"
+  },
+  "Yes": {
+   "zh-Hans": "是",
+   "hi": "हाँ",
+   "es": "Sí",
+   "ar": "نعم",
+   "fr": "Oui",
+   "bn": "হ্যাঁ",
+   "pt-BR": "Sim",
+   "ru": "Да",
+   "id": "Ya"
+  },
+  "No": {
+   "zh-Hans": "否",
+   "hi": "नहीं",
+   "es": "No",
+   "ar": "لا",
+   "fr": "Non",
+   "bn": "না",
+   "pt-BR": "Não",
+   "ru": "Нет",
+   "id": "Tidak"
+  },
+  "Answer yes to the notification": {
+   "zh-Hans": "对通知回答“是”",
+   "hi": "सूचना का जवाब “हाँ” में दें",
+   "es": "Responder «sí» a la notificación",
+   "ar": "الإجابة بـ«نعم» على الإشعار",
+   "fr": "Répondre oui à la notification",
+   "bn": "বিজ্ঞপ্তির উত্তরে “হ্যাঁ” দিন",
+   "pt-BR": "Responder “sim” à notificação",
+   "ru": "Ответить «да» на уведомление",
+   "id": "Jawab “ya” pada notifikasi"
+  },
+  "Answer no to the notification": {
+   "zh-Hans": "对通知回答“否”",
+   "hi": "सूचना का जवाब “नहीं” में दें",
+   "es": "Responder «no» a la notificación",
+   "ar": "الإجابة بـ«لا» على الإشعار",
+   "fr": "Répondre non à la notification",
+   "bn": "বিজ্ঞপ্তির উত্তরে “না” দিন",
+   "pt-BR": "Responder “não” à notificação",
+   "ru": "Ответить «нет» на уведомление",
+   "id": "Jawab “tidak” pada notifikasi"
   }
  }
 }

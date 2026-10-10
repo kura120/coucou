@@ -598,3 +598,12 @@ pub fn set_layer_overlay(_win: &WebviewWindow, _on: bool) {}
 pub fn layer_display(_island: &WebviewWindow, _mochi: &WebviewWindow) -> Option<(f64, f64)> {
     None
 }
+
+// ── Toast window ──────────────────────────────────────────────────────────────
+
+/// The toasts' window (toast.rs): never activated, never in Alt-Tab, like the
+/// island. It is placed with `set_position`, in desktop pixels.
+pub fn prepare_toast_window(win: &WebviewWindow, _mode: super::DesktopMode, _margin: f64) -> bool {
+    make_non_activating(win);
+    true
+}

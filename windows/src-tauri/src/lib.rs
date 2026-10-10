@@ -34,6 +34,7 @@ mod settings;
 mod shortcuts;
 mod sounds;
 mod spotify;
+mod toast;
 mod tray;
 #[cfg(windows)]
 mod webview_drop;
@@ -746,6 +747,10 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             // `coucou --shortcut <action>`: what a desktop's own keyboard
             // settings run where we can't listen for keys ourselves (Wayland).
+            if let Some(which) = toast::sample_from_args(&argv) {
+                toast::show_sample(app, &which);
+                return;
+            }
             match shortcuts::from_args(&argv) {
                 Some(action) => shortcuts::dispatch(app, action),
                 None => {
@@ -848,6 +853,13 @@ pub fn run() {
             spotify::spotify_control,
             spotify::spotify_open,
             spotify::spotify_installed,
+            toast::toast_ready,
+            toast::toast_show,
+            toast::toast_ask,
+            toast::toast_dismiss,
+            toast::toast_answer,
+            toast::toast_layout,
+            toast::toast_keys,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -856,6 +868,8 @@ pub fn run() {
             create_settings_window(&handle);
             // Same rule for Mochi's desktop window.
             desktop::setup(&handle);
+            // And for the toasts' window.
+            toast::setup(&handle);
 
             if let Some(win) = island::window(&handle) {
                 // Where Tauri takes the drop itself (Linux), its paths are the
@@ -886,6 +900,9 @@ pub fn run() {
             integrations::start(handle.clone());
             spotify::sync(&handle, &loaded.active_integrations);
             shortcuts::apply(&handle, &loaded.shortcuts);
+            if let Some(which) = toast::sample_from_args(&std::env::args().collect::<Vec<_>>()) {
+                toast::show_sample(&handle, &which);
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
