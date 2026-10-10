@@ -3279,6 +3279,13 @@ input[type="range"]::-webkit-slider-thumb {
   min-width: 0;
 }
 
+/* The mark of the app that plays. */
+.np-app {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+}
+
 .np-title.marquee {
   text-overflow: clip;
 }

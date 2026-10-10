@@ -27,6 +27,26 @@ function lighter(hex: string, amount: number): string {
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 
+// ── Which app is playing ─────────────────────────────────────────────────────
+
+/** The music apps the island can show a player for. Today there is one. */
+const MUSIC_APPS = {
+  spotify: { name: "Spotify", color: SPOTIFY_GREEN, icon: ICONS.spotify },
+} as const;
+
+export type MusicApp = keyof typeof MUSIC_APPS;
+
+/**
+ * The mark of the app the music comes from, in its colour, next to the title:
+ * the player says whose it is. A second app would only add its entry above.
+ */
+export function musicAppBadge(app: MusicApp = "spotify", size = 12): HTMLElement {
+  const { name, color, icon } = MUSIC_APPS[app];
+  const badge = h("span", { class: "np-app", title: name, "aria-label": name }, svg(icon, size, { stroke: 2.1 }));
+  badge.style.color = color;
+  return badge;
+}
+
 // ── Controls (shared by the pill and the card) ───────────────────────────────
 
 /** Play/pause, at once on the page, then in Spotify (SpotifyController.playPause). */
@@ -278,7 +298,12 @@ export function buildSpotifyMini(onOpen: () => void): SpotifyCardHost {
   // A title longer than the card passes through its place.
   const title = createMarquee("np-title");
   const subtitle = h("div", { class: "np-sub" });
-  const head = h("button", { class: "np-mini-head" }, art, h("div", { class: "np-text" }, title.el, subtitle));
+  const head = h(
+    "button",
+    { class: "np-mini-head" },
+    art,
+    h("div", { class: "np-text" }, h("div", { class: "np-title-row" }, musicAppBadge(), title.el), subtitle),
+  );
   head.addEventListener("click", onOpen);
 
   const fill = h("i", { class: "np-fill" });
@@ -381,7 +406,7 @@ export function buildSpotifyCard(): SpotifyCardHost {
   const subtitle = h("div", { class: "np-sub" });
   const head = h("div", { class: "np-head" },
     art,
-    h("div", { class: "np-text" }, h("div", { class: "np-title-row" }, dot(green, 6), title.el), subtitle),
+    h("div", { class: "np-text" }, h("div", { class: "np-title-row" }, musicAppBadge(), title.el), subtitle),
   );
 
   let dragFraction: number | null = null;

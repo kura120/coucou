@@ -15,7 +15,7 @@ import { EXPANDED_W, MUSIC_CARD_GAP, MUSIC_CARD_W, PANEL_W, islandSize, nowPlayi
 import { createMarquee } from "../src/views/marquee.ts";
 import { BotEngine, danceTransform, stepDanceLevel } from "../src/mochi/engine.ts";
 import { registerSpotifyHandlers } from "../src/island/spotify.ts";
-import { buildSpotifyCard, buildSpotifyMini, buildSpotifyPill } from "../src/views/spotify.ts";
+import { buildSpotifyCard, buildSpotifyMini, buildSpotifyPill, musicAppBadge } from "../src/views/spotify.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
 import { lookup, setLanguage } from "../src/i18n/i18n.ts";
 
@@ -431,6 +431,20 @@ test("the music card: cover, title and artist, and previous, play, next", () => 
   mini.sync();
   assert.equal(mini.el.querySelector("np-title").textContent, "Advertisement");
   assert.equal(mini.el.querySelector("np-sub").style.display, "none");
+});
+
+test("the player says which app the music comes from", () => {
+  const badge = musicAppBadge();
+  assert.equal(badge.getAttribute("title"), "Spotify");
+  assert.equal(badge.find("svg").length, 1);
+  // On both players, before the title.
+  Spotify.state = playing();
+  for (const player of [buildSpotifyCard(), buildSpotifyMini(() => {})]) {
+    player.sync();
+    const row = player.el.querySelector("np-title-row");
+    assert.equal(row.children[0].getAttribute("title"), "Spotify");
+    assert.ok(row.children[1].classList.contains("np-title"));
+  }
 });
 
 test("the card has no volume where Spotify's cannot be read", () => {
