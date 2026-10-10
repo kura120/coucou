@@ -20,7 +20,8 @@
 
 import { h, svg, clear } from "./dom";
 import { ICONS } from "./icons";
-import { renderMarkdown } from "./markdown";
+import { renderMarkdown, writeClipboard } from "./markdown";
+import { provideMenu } from "./menu";
 import {
   Bridge, onEvent, type ChatContext, type ChatEdit, type ConversationSummary, type ModelInfo, type RepoPulls,
 } from "../core/bridge";
@@ -66,6 +67,18 @@ const STRINGS = {
   noLocal: N_("No local branch waiting for a pull request."),
   draft: N_("Draft"),
   notPushed: N_("Not pushed"),
+  // The right-click menu (views/menu.ts).
+  copyAnswer: N_("Copy answer"),
+  open: N_("Open"),
+  delete: N_("Delete"),
+  fold: N_("Fold"),
+  unfold: N_("Unfold"),
+  openOnGitHub: N_("Open on GitHub"),
+  copyBranch: N_("Copy branch name"),
+  showDiff: N_("Show diff"),
+  hideDiff: N_("Hide diff"),
+  openFile: N_("Open file"),
+  copyPath: N_("Copy path"),
 };
 
 /** Claude Code's `--effort` levels; "" leaves it to Claude Code. */
@@ -103,6 +116,11 @@ export function editPill(diff: FileDiff): HTMLElement {
   );
   const el = h("div", { class: "edit" }, pill);
   let body: HTMLElement | null = null;
+  provideMenu(el, () => [
+    { label: t(body ? STRINGS.hideDiff : STRINGS.showDiff), icon: ICONS.doc, action: () => pill.click() },
+    { label: t(STRINGS.openFile), icon: ICONS.arrowUpRight, action: () => void Bridge.openFileInVSCode(diff.path) },
+    { label: t(STRINGS.copyPath), icon: ICONS.copy, action: () => void writeClipboard(diff.path) },
+  ]);
   pill.addEventListener("click", () => {
     if (body) {
       body.remove();
@@ -143,6 +161,9 @@ function bubble(message: ChatMessage): HTMLElement {
   }
   const reply = h("div", { class: "reply" });
   renderMarkdown(reply, message.content);
+  provideMenu(reply, () => [
+    { label: t(STRINGS.copyAnswer), icon: ICONS.copy, action: () => void writeClipboard(message.content) },
+  ]);
   if (!message.edits?.length) return h("div", { class: "chat-row" }, reply);
   return h("div", { class: "chat-row stacked" }, reply, h("div", { class: "edits" }, ...message.edits.map(editPill)));
 }
@@ -463,6 +484,10 @@ function buildConversations(
       node.classList.toggle("folded", folded.has(dir));
       Sound.play("blip");
     });
+    provideMenu(head, () => [
+      { label: t(dir ? STRINGS.newChatHere : STRINGS.newChat), icon: ICONS.plus, action: () => start(dir) },
+      { label: t(folded.has(dir) ? STRINGS.unfold : STRINGS.fold), action: () => head.click() },
+    ]);
     return node;
   }
 
@@ -472,11 +497,14 @@ function buildConversations(
       { class: "convo-icon", title: tl(STRINGS.deleteConversation) },
       svg(ICONS.xmark, 10),
     );
-    remove.addEventListener("click", async (e) => {
-      e.stopPropagation();
+    const forget = async () => {
       await Bridge.conversationDelete(c.id);
       if (State.conversationId === c.id) State.conversationId = null;
       void load();
+    };
+    remove.addEventListener("click", (e) => {
+      e.stopPropagation();
+      void forget();
     });
     const el = h(
       "div",
@@ -487,6 +515,11 @@ function buildConversations(
       c.external ? null : remove,
     );
     el.addEventListener("click", () => pick(c.id));
+    provideMenu(el, () => [
+      { label: t(STRINGS.open), icon: ICONS.bubble, action: () => pick(c.id) },
+      // Claude Code's own sessions are Claude Code's to delete.
+      ...(c.external ? [] : [{ label: t(STRINGS.delete), icon: ICONS.xmark, danger: true, action: () => void forget() }]),
+    ]);
     return el;
   }
 
@@ -548,6 +581,10 @@ export function drawPulls(el: HTMLElement, pulls: RepoPulls) {
       h("span", { class: "convo-when", text: pr.branch }),
     );
     row.addEventListener("click", () => void Bridge.openUrl(pr.url));
+    provideMenu(row, () => [
+      { label: t(STRINGS.openOnGitHub), icon: ICONS.arrowUpRight, action: () => void Bridge.openUrl(pr.url) },
+      { label: t(STRINGS.copyBranch), icon: ICONS.copy, action: () => void writeClipboard(pr.branch) },
+    ]);
     el.append(row);
   }
   if (pulls.remote.length === 0) {
@@ -556,16 +593,18 @@ export function drawPulls(el: HTMLElement, pulls: RepoPulls) {
 
   el.append(heading(t(STRINGS.localOnly), null));
   for (const b of pulls.local) {
-    el.append(
-      h(
-        "div",
-        { class: b.current ? "convo-row on" : "convo-row", title: b.branch },
-        svg(ICONS.pull, 10, { stroke: 2.2 }),
-        h("span", { class: "convo-title", text: b.branch }),
-        b.pushed ? null : h("span", { class: "pull-tag", text: t(STRINGS.notPushed) }),
-        h("span", { class: "convo-when", text: tn("{count} commit", "{count} commits", b.ahead) }),
-      ),
+    const row = h(
+      "div",
+      { class: b.current ? "convo-row on" : "convo-row", title: b.branch },
+      svg(ICONS.pull, 10, { stroke: 2.2 }),
+      h("span", { class: "convo-title", text: b.branch }),
+      b.pushed ? null : h("span", { class: "pull-tag", text: t(STRINGS.notPushed) }),
+      h("span", { class: "convo-when", text: tn("{count} commit", "{count} commits", b.ahead) }),
     );
+    provideMenu(row, () => [
+      { label: t(STRINGS.copyBranch), icon: ICONS.copy, action: () => void writeClipboard(b.branch) },
+    ]);
+    el.append(row);
   }
   if (pulls.local.length === 0) el.append(h("div", { class: "picker-status", text: t(STRINGS.noLocal) }));
 }
