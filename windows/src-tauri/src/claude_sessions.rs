@@ -11,12 +11,14 @@
 // is a Claude Code session from its first turn (claude_code.rs), so it is in
 // this same store for `claude --resume` to find.
 
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use serde_json::{json, Value};
 
+use crate::claude_code::{kept_edit, EDIT_TOOLS, MAX_EDIT_BYTES, TURN_EDIT_BYTES};
 use crate::platform;
 
 /// How much of a transcript's beginning is read to list it: its folder, its
@@ -39,7 +41,9 @@ pub struct Found {
     pub updated: u64,
 }
 
-/// A session opened: the same, with its conversation as plain turns.
+/// A session opened: the same, with its conversation as plain turns. An answer
+/// during which files were edited carries them as `"edits"`, the way Coucou's
+/// own conversations keep them (claude_code::kept_edit).
 #[derive(Debug, PartialEq)]
 pub struct Transcript {
     pub found: Found,
@@ -137,6 +141,24 @@ struct Reading {
     named: Option<String>,
     first_question: Option<String>,
     turns: Vec<Value>,
+    /// File edits asked for, until their tool says whether it went through.
+    asked: HashMap<String, (String, Value)>,
+    /// Edits that went through before the answer had any text to hang them on.
+    loose: Vec<Value>,
+    /// What is left of this answer's share of kept edits.
+    edit_budget: usize,
+}
+
+/// The blocks of a line's message that are Claude's own, not a subagent's.
+fn blocks_of(line: &Value) -> &[Value] {
+    if line.get("isSidechain").and_then(Value::as_bool).unwrap_or(false) {
+        return &[];
+    }
+    line.pointer("/message/content").and_then(Value::as_array).map(Vec::as_slice).unwrap_or(&[])
+}
+
+fn kind_of(block: &Value) -> &str {
+    block.get("type").and_then(Value::as_str).unwrap_or("")
 }
 
 impl Reading {
@@ -153,15 +175,23 @@ impl Reading {
                 }
             }
             Some("user") => {
+                if keep_turns {
+                    self.tool_results(&line);
+                }
                 let Some(text) = user_text(&line) else { return };
                 if self.first_question.is_none() {
                     self.first_question = Some(text.clone());
                 }
                 if keep_turns {
+                    // A new question: the edits of the answer before it are settled.
+                    self.asked.clear();
+                    self.loose.clear();
+                    self.edit_budget = TURN_EDIT_BYTES;
                     self.turns.push(json!({ "role": "user", "content": text }));
                 }
             }
             Some("assistant") if keep_turns => {
+                self.edits_asked(&line);
                 let Some(text) = assistant_text(&line) else { return };
                 // Between two tools Claude speaks in several messages: one answer.
                 match self.turns.last_mut() {
@@ -173,8 +203,50 @@ impl Reading {
                     // An answer before any question is not shown.
                     None => {}
                 }
+                self.settle_edits();
             }
             _ => {}
+        }
+    }
+
+    /// The file edits an `assistant` line asks for.
+    fn edits_asked(&mut self, line: &Value) {
+        for block in blocks_of(line).iter().filter(|b| kind_of(b) == "tool_use") {
+            let tool = block.get("name").and_then(Value::as_str).filter(|name| EDIT_TOOLS.contains(name));
+            let input = block.get("input").filter(|i| i.is_object() && i.to_string().len() <= MAX_EDIT_BYTES);
+            if let (Some(id), Some(tool), Some(input)) = (block.get("id").and_then(Value::as_str), tool, input) {
+                self.asked.insert(id.to_string(), (tool.to_string(), input.clone()));
+            }
+        }
+    }
+
+    /// The tools a `user` line reports on: an edit that went through is kept.
+    fn tool_results(&mut self, line: &Value) {
+        for block in blocks_of(line).iter().filter(|b| kind_of(b) == "tool_result") {
+            let Some((tool, input)) = block.get("tool_use_id").and_then(Value::as_str).and_then(|id| self.asked.remove(id))
+            else {
+                continue;
+            };
+            if !block.get("is_error").and_then(Value::as_bool).unwrap_or(false) {
+                self.loose.push(kept_edit(&tool, &input, &mut self.edit_budget));
+            }
+        }
+        self.settle_edits();
+    }
+
+    /// Hands the edits that went through to the answer they belong to, once
+    /// that answer has said something.
+    fn settle_edits(&mut self) {
+        if self.loose.is_empty() {
+            return;
+        }
+        let Some(Value::Object(last)) = self.turns.last_mut() else { return };
+        if last.get("role").and_then(Value::as_str) != Some("assistant") {
+            return;
+        }
+        let edits = last.entry("edits").or_insert_with(|| json!([]));
+        if let Value::Array(edits) = edits {
+            edits.append(&mut self.loose);
         }
     }
 
@@ -326,6 +398,77 @@ mod tests {
         assert!(read_in(&projects, "../C--work-app/x").is_none());
         assert!(read_in(&projects, "").is_none());
         let _ = std::fs::remove_dir_all(&projects);
+    }
+
+    #[test]
+    fn the_files_a_session_edited_come_back_with_the_answer_that_edited_them() {
+        let said = |text: &str| json!({"type":"assistant","message":{"content":[{"type":"text","text":text}]}});
+        let asks = |id: &str, tool: &str, input: Value| {
+            json!({"type":"assistant","message":{"content":[{"type":"tool_use","id":id,"name":tool,"input":input}]}})
+        };
+        let result = |id: &str, failed: bool| {
+            json!({"type":"user","toolUseResult":{},"message":{"content":[{"type":"tool_result","tool_use_id":id,"is_error":failed}]}})
+        };
+        let edit = json!({"file_path":"/w/a.rs","old_string":"a","new_string":"b"});
+        let write = json!({"file_path":"/w/b.rs","content":"x"});
+        let lines = [
+            json!({"type":"user","cwd":"/w","message":{"content":"rename it"}}),
+            // Edited before a word was said: it waits for the answer's text.
+            asks("t1", "Edit", edit.clone()),
+            result("t1", false),
+            said("Renamed."),
+            asks("t2", "Write", write.clone()),
+            asks("t3", "Bash", json!({"command":"ls"})),
+            asks("t4", "Edit", json!({"file_path":"/w/refused.rs","old_string":"a","new_string":"b"})),
+            result("t2", false),
+            result("t3", false),
+            result("t4", true),
+            // A subagent's edit is not this conversation's.
+            json!({"type":"assistant","isSidechain":true,"message":{"content":[{"type":"tool_use","id":"t5","name":"Write","input":{"file_path":"/w/sub.rs","content":"y"}}]}}),
+            result("t5", false),
+            said("And a new file."),
+            json!({"type":"user","message":{"content":"thanks"}}),
+            said("Welcome."),
+        ];
+        let projects = store("edits");
+        let text: String = lines.iter().map(|l| format!("{l}\n")).collect();
+        std::fs::write(projects.join("C--work-app").join(format!("{ID}.jsonl")), text).unwrap();
+        let t = read_in(&projects, ID).unwrap();
+        assert_eq!(
+            t.turns,
+            vec![
+                json!({"role":"user","content":"rename it"}),
+                json!({"role":"assistant","content":"Renamed.\n\nAnd a new file.","edits":[
+                    {"tool":"Edit","input":edit},
+                    {"tool":"Write","input":write},
+                ]}),
+                json!({"role":"user","content":"thanks"}),
+                json!({"role":"assistant","content":"Welcome."}),
+            ]
+        );
+        // The list reads no conversation, so no edits either.
+        assert_eq!(list_in(&projects).len(), 1);
+        let _ = std::fs::remove_dir_all(&projects);
+    }
+
+    #[test]
+    fn an_answer_keeps_only_so_much_of_its_edits() {
+        let mut reading = Reading::default();
+        let big = "x".repeat(TURN_EDIT_BYTES / 2 + 10);
+        let line = |v: Value| format!("{v}\n").into_bytes();
+        reading.line(&line(json!({"type":"user","cwd":"/w","message":{"content":"write three"}})), true);
+        for id in ["a", "b", "c"] {
+            let input = json!({"file_path": format!("/w/{id}.txt"), "content": big});
+            reading.line(&line(json!({"type":"assistant","message":{"content":[{"type":"tool_use","id":id,"name":"Write","input":input}]}})), true);
+            reading.line(&line(json!({"type":"user","toolUseResult":{},"message":{"content":[{"type":"tool_result","tool_use_id":id}]}})), true);
+        }
+        reading.line(&line(json!({"type":"assistant","message":{"content":[{"type":"text","text":"Done."}]}})), true);
+        let edits = reading.turns[1]["edits"].as_array().unwrap();
+        assert_eq!(edits.len(), 3);
+        assert!(edits[0].get("input").is_some());
+        // Past the answer's share, the file's name alone: its pill says the diff is too large.
+        assert_eq!(edits[1], json!({"tool":"Write","path":"/w/b.txt","tooLarge":true}));
+        assert_eq!(edits[2], json!({"tool":"Write","path":"/w/c.txt","tooLarge":true}));
     }
 
     #[test]

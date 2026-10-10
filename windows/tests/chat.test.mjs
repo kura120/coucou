@@ -383,7 +383,7 @@ test("an answer names the conversation it was saved in, and deleting it forgets 
 });
 
 test("a file Claude Code edits shows as a pill under the answer, and opens its diff", async () => {
-  State.settings = { ...State.settings, chatProvider: "claudecode" };
+  State.settings = { ...State.settings, chatProvider: "claudecode", claudeCodeDir: "/w" };
   let finish;
   answers.chat_send = () => new Promise((resolve) => (finish = resolve));
   $(".chat-input").value = "rename it";
@@ -401,11 +401,20 @@ test("a file Claude Code edits shows as a pill under the answer, and opens its d
   const reply = State.chatHistory.at(-1);
   assert.equal(reply.edits.length, 1);
   assert.deepEqual([reply.edits[0].added, reply.edits[0].removed], [2, 1]);
+  // The pill says where the file is from the folder Claude Code works in, its
+  // name, the counts, and their proportion: two squares in, one out of three…
   const pill = $(".edit-pill");
-  assert.equal(pill.textContent, "app.rs+2−1");
+  assert.equal(pill.textContent, "src/app.rs+2−1");
+  assert.equal(pill.find(".edit-dir")[0].textContent, "src/");
+  assert.deepEqual(pill.find("I").map((i) => i.className), ["plus", "plus", "plus", "minus", "minus"]);
+  assert.equal(pill.find(".edit-tag").length, 0);
   assert.equal(view.el.find(".edit-diff").length, 0);
   pill.fire("click");
-  assert.deepEqual($(".edit-diff").find(".diff-line").map((l) => l.textContent), ["−let a = 1;", "+let b = 1;", "+let c = 2;"]);
+  // The diff under it: the path, then each line with its number.
+  assert.equal($(".edit-diff-path").textContent, "src/app.rs");
+  assert.deepEqual($(".edit-diff").find(".diff-line").map((l) => l.textContent), ["1−let a = 1;", "1+let b = 1;", "2+let c = 2;"]);
+  $(".edit-diff-head").find("BUTTON")[0].fire("click");
+  assert.deepEqual(sent("open_file_in_vscode"), [{ path: "/w/src/app.rs" }]);
   pill.fire("click");
   assert.equal(view.el.find(".edit-diff").length, 0);
 
@@ -415,6 +424,111 @@ test("a file Claude Code edits shows as a pill under the answer, and opens its d
   $(".send-btn").fire("click");
   await flush();
   assert.equal(State.chatHistory.at(-1).edits, undefined);
+});
+
+test("a diff that was opened stays open when the next message comes", async () => {
+  State.settings = { ...State.settings, chatProvider: "claudecode", claudeCodeDir: "/w" };
+  let finish;
+  answers.chat_send = () => new Promise((resolve) => (finish = resolve));
+  $(".chat-input").value = "rename it";
+  $(".send-btn").fire("click");
+  await flush();
+  view.sync();
+  emit("chat-edit", { tool: "Write", input: { file_path: "/w/notes.md", content: "one\ntwo" } });
+  emit("chat-delta", "Writing…");
+  // Opened while the answer is still coming.
+  $(".edit-pill").fire("click");
+  const opened = $(".edit-diff");
+  assert.ok(opened);
+  assert.equal($(".edit-tag").textContent, "New");
+
+  finish({ text: "Written." });
+  await flush();
+  view.sync();
+  // The finished answer took the running row over: the same pill, still open.
+  assert.equal($(".edit-diff"), opened);
+  assert.equal(view.el.find(".edit-pill").length, 1);
+  assert.equal(view.el.find(".reply").length, 1);
+  assert.equal(view.el.find(".reply")[0].textContent, "Written.");
+
+  // And the next question and its answer leave it alone.
+  answers.chat_send = { text: "Nothing else." };
+  $(".chat-input").value = "anything else?";
+  $(".send-btn").fire("click");
+  view.sync();
+  await flush();
+  view.sync();
+  assert.equal($(".edit-diff"), opened);
+  assert.deepEqual(view.el.find(".reply").map((r) => r.textContent), ["Written.", "Nothing else."]);
+  assert.equal(view.el.find(".bubble").length, 2);
+  assert.equal(view.el.find(".typing").length, 0);
+});
+
+test("a stopped or failed answer keeps the pills of the files it had edited", async () => {
+  State.settings = { ...State.settings, chatProvider: "claudecode", claudeCodeDir: "/w" };
+  let fail;
+  answers.chat_send = () => new Promise((_, reject) => (fail = reject));
+  $(".chat-input").value = "rename it";
+  $(".send-btn").fire("click");
+  await flush();
+  emit("chat-edit", { tool: "Edit", input: { file_path: "/w/a.rs", old_string: "a", new_string: "b" } });
+  fail(new Error("Stopped."));
+  await flush();
+  view.sync();
+  assert.equal(State.noteMessage, "Stopped.");
+  assert.deepEqual(view.el.find(".edit-name").map((n) => n.textContent), ["a.rs"]);
+  assert.deepEqual(State.chatHistory.map((m) => [m.role, m.edits?.length ?? 0]), [["user", 0], ["assistant", 1]]);
+
+  // One that edited nothing leaves no row behind.
+  answers.chat_send = () => new Promise((_, reject) => (fail = reject));
+  $(".chat-input").value = "again";
+  $(".send-btn").fire("click");
+  await flush();
+  emit("chat-delta", "Let me");
+  fail(new Error("Stopped."));
+  await flush();
+  view.sync();
+  assert.equal(view.el.find(".reply").length, 1);
+  assert.equal(State.chatHistory.length, 3);
+});
+
+test("a conversation opened again shows the files its answers edited", async () => {
+  State.settings = { ...State.settings, chatProvider: "claudecode" };
+  view.sync();
+  answers.conversations_list = [{ id: "a", title: "rename it", provider: "claudecode", dir: "/w", updated: 1 }];
+  answers.conversation_open = () => ({
+    id: "a", title: "rename it", provider: "claudecode", dir: "/w", updated: 1, model: "",
+    turns: [
+      { role: "user", content: "rename it" },
+      {
+        role: "assistant",
+        content: "Renamed.",
+        edits: [
+          { tool: "Edit", input: { file_path: "/w/src/app.rs", old_string: "let a = 1;", new_string: "let b = 1;" } },
+          // Too large to have been kept: its file's name only.
+          { tool: "Write", path: "/w/big.json", tooLarge: true },
+          // Nothing Coucou can draw.
+          { tool: "Bash", input: { command: "ls" } },
+          null,
+        ],
+      },
+      { role: "user", content: "thanks" },
+      { role: "assistant", content: "Welcome." },
+    ],
+  });
+  $(".convo-btn").fire("click");
+  await flush();
+  view.el.find(".convo-row")[0].fire("click");
+  await flush();
+  view.sync();
+
+  assert.deepEqual(State.chatHistory.map((m) => m.edits?.length ?? 0), [0, 2, 0, 0]);
+  const pills = view.el.find(".edit-pill");
+  assert.deepEqual(pills.map((p) => p.textContent), ["src/app.rs+1−1", "big.jsonNew"]);
+  pills[0].fire("click");
+  assert.deepEqual($(".edit-diff").find(".diff-line").map((l) => l.textContent), ["1−let a = 1;", "1+let b = 1;"]);
+  pills[1].fire("click");
+  assert.match(view.el.find(".edit-diff")[1].textContent, /Diff too large/);
 });
 
 test("the folder's pull requests are listed in two halves, and only asked for when opened", async () => {

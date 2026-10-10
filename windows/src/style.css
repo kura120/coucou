@@ -1582,12 +1582,67 @@ input[type="range"]::-webkit-slider-thumb {
   flex: 0 0 auto;
 }
 
-.edit-name {
+/* Where the file is, then its name: the folder gives way first. */
+.edit-file {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.edit-dir {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: #6b7079;
+}
+
+.edit-name {
+  flex: 0 1 auto;
+  min-width: 2ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #c8cdd4;
+}
+
+.edit-tag {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(74, 222, 128, 0.14);
+  color: #4ade80;
+  font-size: 9.5px;
+}
+
+/* Additions to removals, at a glance. */
+.edit-bar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  gap: 1.5px;
+}
+
+.edit-bar i {
+  width: 4px;
+  height: 6px;
+  border-radius: 1px;
+}
+
+.edit-bar .plus {
+  background: #4ade80;
+}
+
+.edit-bar .minus {
+  background: #f87171;
+}
+
+.edit-chevron {
+  color: #5c6370;
+  transition: transform 0.15s ease-out;
+}
+
+.edit-pill.open .edit-chevron {
+  transform: rotate(90deg);
 }
 
 .edit-plus {
@@ -1608,6 +1663,41 @@ input[type="range"]::-webkit-slider-thumb {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
   user-select: text;
+}
+
+.edit-diff-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding: 0 10px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font: 500 10.5px var(--font);
+  color: #8a8f98;
+}
+
+.edit-diff-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The line's number, kept out of what a selection copies. */
+.edit-diff .diff-line .num {
+  flex: 0 0 34px;
+  padding-right: 8px;
+  text-align: right;
+  color: #454850;
+  user-select: none;
+}
+
+.edit-gap {
+  padding: 0 10px 0 16px;
+  font: 400 10.5px/1.35 var(--mono);
+  color: #454850;
+  user-select: none;
 }
 
 /* ── Conversations (the list behind the title, left of the model) ─────────── */

@@ -17,6 +17,9 @@
 // With Claude Code in a folder: each file it edits shows as a pill under the
 // answer, which opens the diff; and next to the conversations sits the list of
 // the folder's pull requests — on GitHub, and local branches without one yet.
+// The edits are saved with the conversation, so its pills are there again when
+// it is opened; and the log is added to, never rebuilt, so a diff that was
+// opened stays open when the next message comes.
 
 import { h, svg, clear } from "./dom";
 import { ICONS } from "./icons";
@@ -25,7 +28,9 @@ import { provideMenu } from "./menu";
 import {
   Bridge, onEvent, type ChatContext, type ChatEdit, type ConversationSummary, type ModelInfo, type RepoPulls,
 } from "../core/bridge";
-import { buildFileDiff, fileName, type DiffKind, type FileDiff } from "../core/diff";
+import {
+  buildFileDiff, changeBar, diffOfSaved, fileName, folderLabel, relativePath, type DiffKind, type FileDiff,
+} from "../core/diff";
 import {
   activeModel, pickModel, providerDef, visibleProviders, withModel, type ProviderDef,
 } from "../core/providers";
@@ -83,6 +88,7 @@ const STRINGS = {
   hideDiff: N_("Hide diff"),
   openFile: N_("Open file"),
   copyPath: N_("Copy path"),
+  newFile: N_("New"),
 };
 
 /** Claude Code's `--effort` levels; "" leaves it to Claude Code. */
@@ -106,17 +112,37 @@ let nextId = 1;
 const DIFF_SYMBOLS: Record<DiffKind, string> = { added: "+", removed: "−", context: " " };
 
 /**
- * A file Claude Code edited, as a pill: its name and how many lines went in
- * and out. A click opens the diff under it, another folds it away.
+ * A file Claude Code edited, as a pill: the folder it is in (from `base`, the
+ * folder Claude Code works in), its name, whether it is new, how many lines
+ * went in and out and in what proportion. A click opens the diff under it —
+ * the file's path, its lines with their numbers — another folds it away.
  */
-export function editPill(diff: FileDiff): HTMLElement {
+export function editPill(diff: FileDiff, base = State.settings.claudeCodeDir): HTMLElement {
+  const dir = folderLabel(diff.path, base);
+  const { plus, minus } = changeBar(diff.added, diff.removed);
+  const chevron = svg(ICONS.chevronRight, 8, { stroke: 2.4 });
+  chevron.setAttribute("class", "edit-chevron");
   const pill = h(
     "button",
     { class: "edit-pill", title: diff.path },
     svg(ICONS.doc, 10),
-    h("span", { class: "edit-name", text: fileName(diff.path) }),
+    h(
+      "span",
+      { class: "edit-file" },
+      dir ? h("span", { class: "edit-dir", text: dir }) : null,
+      h("span", { class: "edit-name", text: fileName(diff.path) }),
+    ),
+    diff.isNewFile ? h("span", { class: "edit-tag", text: t(STRINGS.newFile) }) : null,
     diff.added > 0 ? h("span", { class: "edit-plus", text: `+${diff.added}` }) : null,
     diff.removed > 0 ? h("span", { class: "edit-minus", text: `−${diff.removed}` }) : null,
+    plus + minus > 0
+      ? h(
+          "span",
+          { class: "edit-bar" },
+          ...Array.from({ length: plus + minus }, (_, i) => h("i", { class: i < plus ? "plus" : "minus" })),
+        )
+      : null,
+    chevron,
   );
   const el = h("div", { class: "edit" }, pill);
   let body: HTMLElement | null = null;
@@ -132,21 +158,39 @@ export function editPill(diff: FileDiff): HTMLElement {
       pill.classList.remove("open");
       return;
     }
-    const lines = diff.hunks.flatMap((hunk) => hunk.lines);
-    body = h("div", { class: "edit-diff" });
-    if (diff.tooLarge || lines.length === 0) {
+    body = h(
+      "div",
+      { class: "edit-diff" },
+      h(
+        "div",
+        { class: "edit-diff-head" },
+        h("span", { class: "edit-diff-path", title: diff.path, text: relativePath(diff.path, base) }),
+        h("button", {
+          class: "picker-link",
+          text: t(STRINGS.openFile),
+          onclick: () => void Bridge.openFileInVSCode(diff.path),
+        }),
+      ),
+    );
+    if (diff.tooLarge || diff.hunks.every((hunk) => hunk.lines.length === 0)) {
       body.append(h("div", { class: "picker-status", text: t(STRINGS.tooLarge) }));
     } else {
-      for (const line of lines) {
-        body.append(
-          h(
-            "div",
-            { class: `diff-line ${line.kind}` },
-            h("span", { class: "sym", text: DIFF_SYMBOLS[line.kind] }),
-            h("span", { class: "txt", text: line.text }),
-          ),
-        );
-      }
+      diff.hunks.forEach((hunk, index) => {
+        // What lies between two hunks is not shown: say so.
+        if (index > 0) body!.append(h("div", { class: "edit-gap", text: "⋯" }));
+        for (const line of hunk.lines) {
+          body!.append(
+            h(
+              "div",
+              { class: `diff-line ${line.kind}` },
+              // Where the line is now; a removed one, where it was.
+              h("span", { class: "num", text: String(line.newLine > 0 ? line.newLine : line.origLine) }),
+              h("span", { class: "sym", text: DIFF_SYMBOLS[line.kind] }),
+              h("span", { class: "txt", text: line.text }),
+            ),
+          );
+        }
+      });
     }
     el.append(body);
     pill.classList.add("open");
@@ -169,7 +213,8 @@ function bubble(message: ChatMessage): HTMLElement {
     { label: t(STRINGS.copyAnswer), icon: ICONS.copy, action: () => void writeClipboard(message.content) },
   ]);
   if (!message.edits?.length) return h("div", { class: "chat-row" }, reply);
-  return h("div", { class: "chat-row stacked" }, reply, h("div", { class: "edits" }, ...message.edits.map(editPill)));
+  const pills = message.edits.map((diff) => editPill(diff));
+  return h("div", { class: "chat-row stacked" }, reply, h("div", { class: "edits" }, ...pills));
 }
 
 function typingDots(): HTMLElement {
@@ -747,6 +792,31 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   // Claude Code is answering: the send button stops it.
   let stoppable = false;
   let renderedCount = -1;
+  // The rows on screen, by message: the log is added to and pruned, never
+  // rebuilt, so what the user opened in a row (a diff) stays as they left it.
+  const rows = new Map<number, HTMLElement>();
+  let dots: HTMLElement | null = null;
+
+  function drawLog(thinking: boolean) {
+    const kept = new Set(State.chatHistory.map((m) => m.id));
+    for (const [id, row] of rows) {
+      if (kept.has(id)) continue;
+      row.remove();
+      rows.delete(id);
+    }
+    dots?.remove();
+    dots = null;
+    empty.remove();
+    for (const m of State.chatHistory) {
+      if (rows.has(m.id)) continue;
+      const row = bubble(m);
+      rows.set(m.id, row);
+      log.append(row);
+    }
+    if (thinking) log.append((dots = typingDots()));
+    else if (State.chatHistory.length === 0) log.append(empty);
+    log.scrollTop = log.scrollHeight;
+  }
   // A local model answers token by token: where its text so far is shown.
   let live: HTMLElement | null = null;
 
@@ -856,11 +926,16 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       State.notify();
       return;
     }
-    State.chatHistory = saved.turns.map((turn) => ({
-      id: nextId++,
-      role: turn.role === "assistant" ? "assistant" : "user",
-      content: String(turn.content),
-    }));
+    State.chatHistory = saved.turns.map((turn) => {
+      // The files that answer edited, drawn again from what was saved of them.
+      const edits = (turn.edits ?? []).map(diffOfSaved).filter((diff): diff is FileDiff => diff != null);
+      return {
+        id: nextId++,
+        role: turn.role === "assistant" ? "assistant" : "user",
+        content: String(turn.content),
+        ...(edits.length > 0 ? { edits } : {}),
+      };
+    });
     State.conversationId = saved.id;
     // The conversation comes back with who answered it, and where it worked.
     const provider = providerDef(saved.provider);
@@ -886,16 +961,33 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   // The files Claude Code edited in the turn that is running, and where their pills show.
   let turnEdits: FileDiff[] = [];
   let liveEdits: HTMLElement | null = null;
+  let liveRowEl: HTMLElement | null = null;
 
   /** The row the running answer grows in: its text, then the pills of its edits. */
   function liveRow(): HTMLElement {
     if (!live) {
       live = h("div", { class: "reply" });
       liveEdits = h("div", { class: "edits" });
-      log.querySelector(".typing")?.parentElement?.remove();
-      log.append(h("div", { class: "chat-row stacked" }, live, liveEdits));
+      dots?.remove();
+      dots = null;
+      liveRowEl = h("div", { class: "chat-row stacked" }, live, liveEdits);
+      log.append(liveRowEl);
     }
     return live;
+  }
+
+  /**
+   * The running answer's row becomes `message`'s: nothing is drawn again, so a
+   * diff opened while the answer was still coming stays open.
+   */
+  function keepLiveRow(message: ChatMessage) {
+    if (!liveRowEl || !live) return;
+    renderMarkdown(live, message.content);
+    provideMenu(live, () => [
+      { label: t(STRINGS.copyAnswer), icon: ICONS.copy, action: () => void writeClipboard(message.content) },
+    ]);
+    rows.set(message.id, liveRowEl);
+    liveRowEl = null;
   }
 
   void onEvent<string>("chat-delta", (text) => {
@@ -942,12 +1034,14 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
 
     try {
       const reply = await Bridge.chatSend(query, context);
-      State.chatHistory.push({
+      const message: ChatMessage = {
         id: nextId++,
         role: "assistant",
         content: reply.text,
         ...(turnEdits.length > 0 ? { edits: turnEdits } : {}),
-      });
+      };
+      State.chatHistory.push(message);
+      keepLiveRow(message);
       if (reply.conversationId) State.conversationId = reply.conversationId;
       State.stateOverride = null;
       Sound.play("finish");
@@ -956,7 +1050,18 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       State.noteMessage = String(err).replace(/^Error:\s*/, "");
       State.view = "note";
       Sound.play("error");
+      // Stopped or failed, the files it had edited by then are edited all the
+      // same: their pills stay, under whatever of the answer had come.
+      if (turnEdits.length > 0) {
+        const message: ChatMessage = { id: nextId++, role: "assistant", content: "", edits: turnEdits };
+        State.chatHistory.push(message);
+        if (liveRowEl) rows.set(message.id, liveRowEl);
+        liveRowEl = null;
+      }
     } finally {
+      // An answer that came to nothing leaves no row.
+      liveRowEl?.remove();
+      liveRowEl = null;
       sending = false;
       stoppable = false;
       live = null;
@@ -1002,11 +1107,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       const count = State.chatHistory.length + (thinking ? 0.5 : 0);
       if (count !== renderedCount && !live) {
         renderedCount = count;
-        clear(log);
-        for (const m of State.chatHistory) log.append(bubble(m));
-        if (thinking) log.append(typingDots());
-        else if (State.chatHistory.length === 0) log.append(empty);
-        log.scrollTop = log.scrollHeight;
+        drawLog(thinking);
       }
       // Where Claude Code works when it has a folder; else what to do next.
       const dir = State.settings.chatProvider === "claudecode" ? State.settings.claudeCodeDir : "";

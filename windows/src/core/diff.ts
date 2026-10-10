@@ -152,6 +152,69 @@ export function buildFileDiff(tool: string, input: Record<string, unknown>): Fil
   }
 }
 
+/**
+ * A file edit as a saved conversation keeps it (kept_edit in
+ * src-tauri/src/claude_code.rs): the tool and its input, or — for one too
+ * large to keep — the file's name alone.
+ */
+export interface SavedEdit {
+  tool: string;
+  input?: Record<string, unknown>;
+  path?: string;
+  tooLarge?: boolean;
+}
+
+/**
+ * The diff of a saved edit, drawn again from the tool's input. One kept by
+ * name only still gets its pill, which says the diff is too large.
+ */
+export function diffOfSaved(edit: SavedEdit | null | undefined): FileDiff | null {
+  if (!edit || typeof edit.tool !== "string") return null;
+  if (edit.input && typeof edit.input === "object") return buildFileDiff(edit.tool, edit.input);
+  if (typeof edit.path !== "string" || !edit.path) return null;
+  return {
+    id: 0, path: edit.path, added: 0, removed: 0, hunks: [], tooLarge: true, isNewFile: edit.tool === "Write",
+  };
+}
+
+// ── Where a file is ───────────────────────────────────────────────────────────
+
+const slashes = (path: string) => path.replace(/\\/g, "/").replace(/\/+$/, "");
+
+/** `path` from `base` down when it is under it, else as it is; forward slashes. */
+export function relativePath(path: string, base = ""): string {
+  const full = slashes(path);
+  const root = slashes(base);
+  if (root && full.toLowerCase().startsWith(`${root.toLowerCase()}/`)) return full.slice(root.length + 1);
+  return full;
+}
+
+/**
+ * The folder a file is in, for a pill next to its name: under `base` its path
+ * from there, and never more than the two folders nearest the file.
+ * "src/views/", "…/island/views/", "" for a file at the root of `base`.
+ */
+export function folderLabel(path: string, base = ""): string {
+  const parts = relativePath(path, base).split("/").filter(Boolean);
+  parts.pop();
+  if (parts.length === 0) return "";
+  const near = parts.slice(-2);
+  return `${parts.length > near.length ? "…/" : ""}${near.join("/")}/`;
+}
+
+/**
+ * How many of `segments` squares are additions, the rest removals: the
+ * proportion at a glance. Whatever was done has at least one square.
+ */
+export function changeBar(added: number, removed: number, segments = 5): { plus: number; minus: number } {
+  const total = added + removed;
+  if (total <= 0) return { plus: 0, minus: 0 };
+  let plus = Math.round((segments * added) / total);
+  if (added > 0) plus = Math.max(1, plus);
+  if (removed > 0) plus = Math.min(segments - 1, plus);
+  return { plus, minus: segments - plus };
+}
+
 // ── Line splitting ────────────────────────────────────────────────────────────
 
 function splitLines(text: string): string[] {
