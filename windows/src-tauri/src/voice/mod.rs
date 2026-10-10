@@ -724,8 +724,12 @@ struct Recogniser;
 
 #[cfg(not(windows))]
 impl Recogniser {
-    fn open(_commands: &Grammar) -> Result<Self, Unavailable> {
+    fn open(_commands: &Grammar, _tails: bool) -> Result<Self, Unavailable> {
         Err(Unavailable::Unsupported)
+    }
+
+    fn wake_length(&self) -> Duration {
+        Duration::ZERO
     }
 
     fn listen(&mut self, _what: Listen) -> Result<(), Unavailable> {
