@@ -146,6 +146,23 @@ export const DEFAULT_MAIN_PILL = "integration_claude";
 export const MAX_DECLARED = 6;
 
 /**
+ * What is declared like a pill but is shown as a card of its own, next to the
+ * pills: it takes none of their slots and is never drawn among them. Spotify:
+ * its player is the music card.
+ */
+const OWN_CARD: ReadonlySet<string> = new Set(["integration_spotify"]);
+
+/** True for a pill that sits among the pills, and so takes one of their slots. */
+export function takesSlot(id: string): boolean {
+  return !OWN_CARD.has(id);
+}
+
+/** How many of the pill slots a declared list uses. */
+export function slotsUsed(activeIntegrations: readonly string[]): number {
+  return activeIntegrations.filter(takesSlot).length;
+}
+
+/**
  * The compact island's little Mochis sit in two rows: two columns for up to
  * four of them, three for five or six.
  */
@@ -223,13 +240,14 @@ export function sanitizeDeclared(d: Declared, os: HostOs = HOST_OS): Declared {
 /**
  * Declares or undeclares a pill. Returns the new list, or null when the click
  * changes nothing: the main pill is never toggled, an unknown pill never
- * declared, and a seventh pill never added.
+ * declared, and a seventh pill never added (Spotify is not a pill: `takesSlot`).
  */
 export function toggleDeclared(d: Declared, id: string, os: HostOs = HOST_OS): string[] | null {
   if (id === d.mainPill) return null;
   if (!availablePills(os).some((p) => p.id === id)) return null;
   if (d.activeIntegrations.includes(id)) return d.activeIntegrations.filter((x) => x !== id);
-  if (d.activeIntegrations.length >= MAX_DECLARED) return null;
+  // What has a card of its own can always be declared: it takes no slot.
+  if (takesSlot(id) && slotsUsed(d.activeIntegrations) >= MAX_DECLARED) return null;
   return [...d.activeIntegrations, id];
 }
 

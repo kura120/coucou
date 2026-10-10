@@ -3,7 +3,7 @@
 import type { BotEmoteName, BotStateName, IslandMode, IslandViewName } from "./layout";
 import type { EyeShape } from "../mochi/engine";
 import {
-  DEFAULT_MAIN_PILL, HOST_OS, MAX_DECLARED, availablePills, orderPills, pillDefinition, sanitizeDeclared,
+  DEFAULT_MAIN_PILL, HOST_OS, MAX_DECLARED, availablePills, takesSlot, orderPills, pillDefinition, sanitizeDeclared,
   toggleDeclared, type HostOs, type PillDefinition,
 } from "./pills";
 import type { CodexPlanUsage, PlanUsage } from "./plan";
@@ -12,7 +12,7 @@ import type { FileDiff } from "./diff";
 import type { Bindings } from "./shortcuts";
 import { DEFAULT_OUTFIT, type Outfit } from "../mochi/wardrobe";
 import { pillColor } from "./pill-colors";
-import { SPOTIFY_ID, Spotify, musicCardShown, musicPlaying } from "./spotify";
+import { Spotify, musicCardShown, musicPlaying } from "./spotify";
 
 export type AgentSource = "claudeCode" | "n8n" | "agent";
 export type PillBadge = "approval" | "finished" | "error";
@@ -325,19 +325,16 @@ class AppState {
     );
   }
 
-  /** The pills of the open island: Spotify's leaves them for its card. */
-  get overviewPills(): AgentTask[] {
-    const music = this.musicCard;
-    return this.otherTasks.filter((t) => !(music && t.id === SPOTIFY_ID)).slice(0, MAX_DECLARED);
-  }
-
   get otherTasks(): AgentTask[] {
     return this.tasks.filter((t) => t.id !== this.focusId);
   }
 
-  /** The pills next to the one in front, as many as the island has room for. */
+  /**
+   * The pills next to the one in front, as many as the island has room for.
+   * Spotify is not one of them: its place is the music card.
+   */
   get shownPills(): AgentTask[] {
-    return this.otherTasks.slice(0, MAX_DECLARED);
+    return this.otherTasks.filter((t) => takesSlot(t.id)).slice(0, MAX_DECLARED);
   }
 
   setFocus(id: string) {

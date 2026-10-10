@@ -15,7 +15,7 @@ import { EXPANDED_W, MUSIC_CARD_GAP, MUSIC_CARD_W, PANEL_W, islandSize, nowPlayi
 import { createMarquee } from "../src/views/marquee.ts";
 import { BotEngine, danceTransform, stepDanceLevel } from "../src/mochi/engine.ts";
 import { registerSpotifyHandlers } from "../src/island/spotify.ts";
-import { buildSpotifyCard, buildSpotifyMini, buildSpotifyPill, musicAppBadge } from "../src/views/spotify.ts";
+import { buildSpotifyCard, buildSpotifyMini, musicAppBadge } from "../src/views/spotify.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
 import { lookup, setLanguage } from "../src/i18n/i18n.ts";
 
@@ -371,16 +371,16 @@ test("the music card shows while Spotify has a track on a declared pill that is 
   assert.ok(!musicCardShown(playing(), declared, SPOTIFY_ID));
 });
 
-test("with the music card up, Spotify's pill leaves the pills and the overview widens", () => {
-  const pills = () => State.overviewPills.map((t) => t.id);
+test("Spotify is never one of the pills; with a track its card is up and the overview widens", () => {
+  const pills = () => State.shownPills.map((t) => t.id);
+  // Declared, nothing loaded: no card, and no pill either.
+  assert.ok(State.tasks.some((t) => t.id === SPOTIFY_ID));
   assert.ok(!State.musicCard);
-  assert.ok(pills().includes(SPOTIFY_ID));
+  assert.ok(!pills().includes(SPOTIFY_ID));
   Spotify.state = playing();
   assert.ok(State.musicCard);
   assert.ok(!pills().includes(SPOTIFY_ID));
-  // The compact island's little Mochis are not the overview's pills: Spotify's stays.
-  assert.ok(State.shownPills.some((t) => t.id === SPOTIFY_ID));
-  // In front, Spotify has the left card: no second one, and nothing to leave.
+  // In front, Spotify has the left card: no second one.
   State.setFocus(SPOTIFY_ID);
   assert.ok(!State.musicCard);
 
@@ -464,22 +464,4 @@ test("the card has no volume where Spotify's cannot be read", () => {
   Spotify.state = playing({ volume: 30, volumeKnown: true });
   card.sync();
   assert.equal(volume().style.display, "");
-});
-
-test("the pill shows play/pause and next on hover, only with a track", () => {
-  const task = spotifyTask();
-  const pill = buildSpotifyPill(task, () => {});
-  pill.el.fire("mouseenter");
-  assert.ok(!pill.el.classList.contains("controls"), "nothing loaded: no controls");
-  Spotify.state = playing();
-  pill.sync();
-  assert.ok(pill.el.classList.contains("controls"));
-  const [playBtn] = pill.el.querySelector("np-pill-controls").children;
-  assert.equal(playBtn.title, "Pause");
-  const before = sent("spotify_control").length;
-  playBtn.fire("click");
-  assert.deepEqual(sent("spotify_control").slice(before), [{ action: "playPause", value: null }]);
-  assert.equal(Spotify.state.playing, false);
-  pill.el.fire("mouseleave");
-  assert.ok(!pill.el.classList.contains("controls"));
 });
