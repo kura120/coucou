@@ -1,10 +1,7 @@
-// The Spotify pill on the page: what src-tauri/src/spotify.rs reports (Linux,
-// through MPRIS), and the pure rules the views and Mochi follow — ports of
-// SpotifyController.swift, NowPlayingViews.swift and the Mac's dance rules
-// (BotCanvasView, DesktopMochi.swift).
-//
-// Windows has no music source yet: nothing ever reports a track there, so
-// nothing plays and Mochi never dances, through the same code.
+// The Spotify pill on the page: what src-tauri/src/spotify.rs reports (MPRIS
+// on Linux, Windows' media session on Windows), and the pure rules the views
+// and Mochi follow — ports of SpotifyController.swift, NowPlayingViews.swift
+// and the Mac's dance rules (BotCanvasView, DesktopMochi.swift).
 
 import type { BotStateName, IslandMode, IslandViewName } from "./layout";
 
@@ -13,7 +10,7 @@ export const SPOTIFY_ID = "integration_spotify";
 export const SPOTIFY_GREEN = "#1DB954";
 
 export interface SpotifyTrack {
-  /** spotify:track:…, spotify:episode:…, spotify:ad:… */
+  /** spotify:track:…, spotify:episode:…, spotify:ad:… (Windows: smtc:… or spotify:ad:…). */
   id: string;
   title: string;
   artist: string;
