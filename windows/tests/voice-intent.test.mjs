@@ -63,6 +63,9 @@ const TABLE = [
   ["repeat", { kind: "musicRepeat", on: null }],
   ["repeat on", { kind: "musicRepeat", on: true }],
   ["repeat off", { kind: "musicRepeat", on: false }],
+  ["stop repeating this", { kind: "musicRepeat", on: false }], // not "stop"
+  ["stop shuffling", { kind: "musicShuffle", on: false }],
+  ["no shuffle", { kind: "musicShuffle", on: false }],
   ["play Get Lucky", { kind: "musicPlaySearch", name: "Get Lucky" }],
   ["play some Daft Punk", { kind: "musicPlaySearch", name: "Daft Punk" }],
   ["play playlist Focus", { kind: "musicPlayPlaylist", name: "Focus" }],
@@ -262,19 +265,12 @@ test("the recogniser is never given a way to approve or to send", () => {
 
 function fakes({ active = [], mainPill = "integration_claude", limit = 6, music = {} } = {}) {
   const calls = [];
-<<<<<<< HEAD
   const state = { enabled: true, running: true, playing: false, shuffle: false, repeat: false, ...music };
-=======
-  const state = { running: true, playing: false, shuffle: false, repeat: false, ...music };
->>>>>>> 4d51bc057f665b771fcb4200287732b9d3f44dff
   const pills = { active: [...active], main: mainPill };
   const takesSlot = (id) => id !== "integration_spotify";
   const runner = new VoiceRunner(
     {
-<<<<<<< HEAD
       enabled: () => state.enabled,
-=======
->>>>>>> 4d51bc057f665b771fcb4200287732b9d3f44dff
       running: () => state.running,
       playing: () => state.playing,
       shuffle: () => state.shuffle,
@@ -339,7 +335,6 @@ test("music: without Spotify, play opens it and the rest says there is nothing t
   assert.deepEqual(f.calls, ["open"]);
 });
 
-<<<<<<< HEAD
 test("music: with Spotify switched off in Settings, nothing is played, opened or pretended", () => {
   for (const running of [true, false]) {
     const f = fakes({ music: { enabled: false, running } });
@@ -353,8 +348,6 @@ test("music: with Spotify switched off in Settings, nothing is played, opened or
   assert.equal(f.say("add github").outcome, "success");
 });
 
-=======
->>>>>>> 4d51bc057f665b771fcb4200287732b9d3f44dff
 test("music: what Spotify cannot be asked here says so, and does nothing", () => {
   const f = fakes();
   for (const said of ["play Get Lucky", "play playlist Focus", "volume up", "volume 50"]) {

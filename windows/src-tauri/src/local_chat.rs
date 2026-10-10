@@ -253,6 +253,26 @@ fn request_body(model: &str, system: &str, history: &[Value], user: &Value) -> V
     json!({ "model": model, "messages": messages, "stream": true, "max_tokens": MAX_TOKENS })
 }
 
+/// One request answered whole, not streamed: what voice asks (voice/brain.rs).
+/// The errors are for the log; the island shows its own card.
+pub async fn complete(server: &Server, body: &Value, timeout: Duration) -> Result<Value, String> {
+    let base = base_url(server)?;
+    let reply = net::client(&base, timeout)?
+        .post(net::join(&base, "v1/chat/completions"))
+        .header("Authorization", bearer(server.key.as_deref()))
+        .json(body)
+        .send()
+        .await
+        .map_err(|_| unreachable(&base))?;
+    let status = reply.status();
+    let bytes = net::read_capped(reply, net::MAX_BODY).await?;
+    if !status.is_success() {
+        let detail = net::error_detail(&bytes);
+        return Err(if detail.is_empty() { format!("HTTP {}", status.as_u16()) } else { detail });
+    }
+    serde_json::from_slice(&bytes).map_err(|_| "the answer is not JSON".to_string())
+}
+
 /// One chat turn with a model server.
 pub async fn send(
     app: &AppHandle,

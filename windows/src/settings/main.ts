@@ -1052,6 +1052,38 @@ function voiceSection(): HTMLElement {
     settings.voice = { ...settings.voice, ...patch };
     void save();
   };
+
+  // The model that is asked what a sentence means: one of the servers
+  // connected in Local models, and one of its models.
+  const server = h("select", {}) as HTMLSelectElement;
+  const model = h("select", {}) as HTMLSelectElement;
+  const connected = (Object.keys(LOCAL) as LocalId[]).filter((id) => settings[providerDef(id).urlField!]);
+  server.append(h("option", { value: "", text: t("None") }));
+  for (const id of connected) server.append(h("option", { value: id, text: t(LOCAL[id].name) }));
+  server.value = connected.includes(settings.voice.brain as LocalId) ? settings.voice.brain : "";
+  const fillModels = async () => {
+    clear(model);
+    model.style.display = server.value ? "" : "none";
+    if (!server.value) return;
+    const wanted = settings.voice.brainModel;
+    let ids: string[] = [];
+    try {
+      ids = (await Bridge.chatModels(server.value)).map((m) => m.id);
+    } catch {
+      // The server is not running: the model already chosen stays in the list.
+    }
+    if (wanted && !ids.includes(wanted)) ids.unshift(wanted);
+    for (const id of ids) model.append(h("option", { value: id, text: id }));
+    model.value = ids.includes(wanted) ? wanted : (ids[0] ?? "");
+    if (model.value !== wanted) change({ brainModel: model.value });
+  };
+  server.addEventListener("change", () => {
+    change({ brain: server.value, brainModel: "" });
+    void fillModels();
+  });
+  model.addEventListener("change", () => change({ brainModel: model.value }));
+  void fillModels();
+
   return h(
     "section",
     {},
@@ -1068,6 +1100,8 @@ function voiceSection(): HTMLElement {
       toggle(settings.voice.wake, (v) => change({ wake: v })),
     ),
     h("div", { class: "hint", text: t("Off: the microphone opens only for the “Talk to Coucou” shortcut. While it listens, Windows shows a microphone in the taskbar.") }),
+    h("div", { class: "row" }, h("label", { text: t("Understand free speech with") }), server, model),
+    h("div", { class: "hint", text: t("A sentence Coucou does not know is put to this model, with the tools Coucou offers. The model proposes; Coucou checks before acting, and never approves a permission. Connect a server in Local models first.") }),
   );
 }
 

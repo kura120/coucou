@@ -1426,7 +1426,7 @@
    "es": "Ninguno",
    "ar": "لا شيء",
    "fr": "Aucun",
-   "bn": "কিছু না",
+   "bn": "কোনোটি নয়",
    "pt-BR": "Nenhum",
    "ru": "Нет",
    "id": "Tidak ada"
@@ -4128,6 +4128,138 @@
    "pt-BR": "{0} ativas — qual remover?",
    "ru": "{0} активно — что удалить?",
    "id": "{0} aktif — mana yang dihapus?"
+  },
+  "Thinking…": {
+   "zh-Hans": "思考中…",
+   "hi": "सोच रहा है…",
+   "es": "Pensando…",
+   "ar": "يفكّر…",
+   "fr": "Réflexion…",
+   "bn": "ভাবছে…",
+   "pt-BR": "Pensando…",
+   "ru": "Думаю…",
+   "id": "Berpikir…"
+  },
+  "No request is waiting": {
+   "zh-Hans": "没有等待中的请求",
+   "hi": "कोई अनुरोध प्रतीक्षा में नहीं है",
+   "es": "No hay ninguna solicitud en espera",
+   "ar": "لا يوجد طلب بالانتظار",
+   "fr": "Aucune demande en attente",
+   "bn": "কোনো অনুরোধ অপেক্ষায় নেই",
+   "pt-BR": "Nenhuma solicitação em espera",
+   "ru": "Нет ожидающих запросов",
+   "id": "Tidak ada permintaan yang menunggu"
+  },
+  "Timer set: {0} min": {
+   "zh-Hans": "已设置计时器：{0} 分钟",
+   "hi": "टाइमर सेट: {0} मिनट",
+   "es": "Temporizador: {0} min",
+   "ar": "تم ضبط المؤقت: {0} د",
+   "fr": "Minuteur : {0} min",
+   "bn": "টাইমার সেট: {0} মিনিট",
+   "pt-BR": "Temporizador: {0} min",
+   "ru": "Таймер: {0} мин",
+   "id": "Timer disetel: {0} mnt"
+  },
+  "Timer cancelled": {
+   "zh-Hans": "计时器已取消",
+   "hi": "टाइमर रद्द किया गया",
+   "es": "Temporizador cancelado",
+   "ar": "تم إلغاء المؤقت",
+   "fr": "Minuteur annulé",
+   "bn": "টাইমার বাতিল হয়েছে",
+   "pt-BR": "Temporizador cancelado",
+   "ru": "Таймер отменён",
+   "id": "Timer dibatalkan"
+  },
+  "No timer is running": {
+   "zh-Hans": "没有正在运行的计时器",
+   "hi": "कोई टाइमर नहीं चल रहा",
+   "es": "No hay ningún temporizador en marcha",
+   "ar": "لا يوجد مؤقت يعمل",
+   "fr": "Aucun minuteur en cours",
+   "bn": "কোনো টাইমার চলছে না",
+   "pt-BR": "Nenhum temporizador em andamento",
+   "ru": "Таймер не запущен",
+   "id": "Tidak ada timer yang berjalan"
+  },
+  "Time's up": {
+   "zh-Hans": "时间到",
+   "hi": "समय समाप्त",
+   "es": "Se acabó el tiempo",
+   "ar": "انتهى الوقت",
+   "fr": "C’est l’heure",
+   "bn": "সময় শেষ",
+   "pt-BR": "Tempo esgotado",
+   "ru": "Время вышло",
+   "id": "Waktu habis"
+  },
+  "{0} opened": {
+   "zh-Hans": "已打开 {0}",
+   "hi": "{0} खोला गया",
+   "es": "{0} abierto",
+   "ar": "تم فتح {0}",
+   "fr": "{0} ouvert",
+   "bn": "{0} খোলা হয়েছে",
+   "pt-BR": "{0} aberto",
+   "ru": "{0} открыто",
+   "id": "{0} dibuka"
+  },
+  "What you say goes to another computer": {
+   "zh-Hans": "你说的话会发送到另一台电脑",
+   "hi": "आप जो कहते हैं वह दूसरे कंप्यूटर पर जाता है",
+   "es": "Lo que dices va a otro equipo",
+   "ar": "ما تقوله يُرسل إلى حاسوب آخر",
+   "fr": "Ce que vous dites part vers un autre ordinateur",
+   "bn": "আপনি যা বলেন তা অন্য কম্পিউটারে যায়",
+   "pt-BR": "O que você diz vai para outro computador",
+   "ru": "Ваши слова отправляются на другой компьютер",
+   "id": "Yang Anda ucapkan dikirim ke komputer lain"
+  },
+  "Voice asks the model server at {url}, which is not this machine.": {
+   "zh-Hans": "语音功能会询问位于 {url} 的模型服务器，它不在这台电脑上。",
+   "hi": "वॉइस {url} पर मौजूद मॉडल सर्वर से पूछता है, जो यह कंप्यूटर नहीं है।",
+   "es": "La voz consulta al servidor de modelos en {url}, que no es este equipo.",
+   "ar": "يسأل الصوت خادم النماذج على {url}، وهو ليس هذا الحاسوب.",
+   "fr": "La voix interroge le serveur de modèles à {url}, qui n’est pas cet ordinateur.",
+   "bn": "ভয়েস {url}-এর মডেল সার্ভারকে জিজ্ঞাসা করে, যা এই কম্পিউটার নয়।",
+   "pt-BR": "A voz consulta o servidor de modelos em {url}, que não é este computador.",
+   "ru": "Голосовое управление обращается к серверу моделей по адресу {url}, а это не этот компьютер.",
+   "id": "Suara bertanya ke server model di {url}, yang bukan komputer ini."
+  },
+  "Understand free speech with": {
+   "zh-Hans": "理解自由语音所用的模型",
+   "hi": "खुली बातचीत समझने के लिए",
+   "es": "Entender el habla libre con",
+   "ar": "فهم الكلام الحر باستخدام",
+   "fr": "Comprendre la parole libre avec",
+   "bn": "মুক্ত কথা বোঝার জন্য",
+   "pt-BR": "Entender fala livre com",
+   "ru": "Понимать свободную речь с помощью",
+   "id": "Pahami ucapan bebas dengan"
+  },
+  "A sentence Coucou does not know is put to this model, with the tools Coucou offers. The model proposes; Coucou checks before acting, and never approves a permission. Connect a server in Local models first.": {
+   "zh-Hans": "Coucou 不认识的句子会连同它提供的工具一起交给这个模型。模型提出建议；Coucou 在执行前检查，并且绝不批准权限请求。请先在“本地模型”中连接服务器。",
+   "hi": "जो वाक्य Coucou नहीं जानता, वह Coucou के टूल्स के साथ इस मॉडल को दिया जाता है। मॉडल सुझाव देता है; Coucou कार्रवाई से पहले जाँचता है और कभी अनुमति स्वीकृत नहीं करता। पहले «स्थानीय मॉडल» में सर्वर कनेक्ट करें।",
+   "es": "Una frase que Coucou no conoce se envía a este modelo, con las herramientas que Coucou ofrece. El modelo propone; Coucou comprueba antes de actuar y nunca aprueba un permiso. Conecta primero un servidor en Modelos locales.",
+   "ar": "الجملة التي لا يعرفها Coucou تُعرض على هذا النموذج مع الأدوات التي يوفّرها Coucou. النموذج يقترح، و Coucou يتحقق قبل التنفيذ ولا يوافق أبدًا على إذن. اربط خادمًا في «النماذج المحلية» أولًا.",
+   "fr": "Une phrase que Coucou ne connaît pas est soumise à ce modèle, avec les outils que Coucou propose. Le modèle propose ; Coucou vérifie avant d’agir et n’approuve jamais une autorisation. Connectez d’abord un serveur dans Modèles locaux.",
+   "bn": "Coucou যে বাক্য চেনে না, তা Coucou-এর টুলসহ এই মডেলকে দেওয়া হয়। মডেল প্রস্তাব করে; Coucou কাজ করার আগে যাচাই করে এবং কখনও অনুমতি অনুমোদন করে না। আগে «লোকাল মডেল»-এ একটি সার্ভার সংযুক্ত করুন।",
+   "pt-BR": "Uma frase que o Coucou não conhece é enviada a este modelo, com as ferramentas que o Coucou oferece. O modelo propõe; o Coucou verifica antes de agir e nunca aprova uma permissão. Conecte primeiro um servidor em Modelos locais.",
+   "ru": "Фраза, которую Coucou не знает, передаётся этой модели вместе с инструментами Coucou. Модель предлагает; Coucou проверяет перед действием и никогда не одобряет разрешение. Сначала подключите сервер в разделе «Локальные модели».",
+   "id": "Kalimat yang tidak dikenal Coucou diberikan ke model ini, beserta alat yang disediakan Coucou. Model mengusulkan; Coucou memeriksa sebelum bertindak dan tidak pernah menyetujui izin. Hubungkan server di Model lokal terlebih dahulu."
+  },
+  "Spotify is off in Settings": {
+   "zh-Hans": "Spotify 已在设置中关闭",
+   "hi": "Spotify सेटिंग्स में बंद है",
+   "es": "Spotify está desactivado en Ajustes",
+   "ar": "Spotify متوقف في الإعدادات",
+   "fr": "Spotify est désactivé dans les Réglages",
+   "bn": "Spotify সেটিংসে বন্ধ আছে",
+   "pt-BR": "O Spotify está desativado nos Ajustes",
+   "ru": "Spotify выключен в настройках",
+   "id": "Spotify dimatikan di Pengaturan"
   }
  }
 }

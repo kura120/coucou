@@ -179,5 +179,5 @@ test("talking to Coucou has the Mac's key and is off until turned on", () => {
 });
 
 test("voice is off by default, with the wake phrase ready for when it is turned on", () => {
-  assert.deepEqual(DEFAULT_SETTINGS.voice, { enabled: false, wake: true });
+  assert.deepEqual(DEFAULT_SETTINGS.voice, { enabled: false, wake: true, brain: "", brainModel: "" });
 });

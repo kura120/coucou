@@ -771,8 +771,8 @@ function buildListening(): ViewHost {
   return {
     el: h("div", { class: "view" }, card("cyan", body)),
     sync() {
-      const { text, question } = State.voice;
-      title.textContent = t("Listening…");
+      const { text, question, thinking } = State.voice;
+      title.textContent = thinking ? t("Thinking…") : t("Listening…");
       // A question Mochi asked stays until its answer is being said.
       line.textContent = text || question || t("Say your command");
       line.classList.toggle("heard", text !== "");

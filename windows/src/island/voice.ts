@@ -6,12 +6,17 @@
 import { Bridge, onEvent } from "../core/bridge";
 import type { IslandMode, IslandViewName } from "../core/layout";
 import {
-  MAX_DECLARED, availablePills, chooseMainPill, sanitizeDeclared, slotsUsed, takesSlot,
+  MAX_DECLARED, availablePills, chooseMainPill, pillDefinition, sanitizeDeclared, slotsUsed, takesSlot,
 } from "../core/pills";
+import { lastTextStep } from "../core/diff";
+import { Sound } from "../core/sound";
+import { t } from "../i18n/i18n";
+import { showToast } from "../toast/api";
+import { describeState, runProposal, systemPrompt, toolSchemas, type VoiceWorld } from "../voice/tools";
 import { SPOTIFY_ID, Spotify } from "../core/spotify";
 import { State } from "../core/state";
 import { buildGrammar } from "../voice/grammar";
-import { VoiceRunner, type MusicControls, type PillControls } from "../voice/runner";
+import { VoiceRunner, type MusicControls, type PillControls, type VoiceResult } from "../voice/runner";
 
 /** How long a result stays on screen before the island goes back. */
 export const RESULT_SHOWN_MS = 2000;
@@ -26,6 +31,14 @@ export interface VoiceHost {
   voiceHeard(text: string, final: boolean): void;
   voiceMissed(): void;
   voiceCancelled(): void;
+}
+
+/** What the tools need of the island itself. */
+export interface VoiceCards {
+  /** Brings the waiting permission card up, answering nothing. */
+  showWaitingCard(): void;
+  /** Declines the waiting permission, as a click on Deny does. */
+  declineWaiting(): void;
 }
 
 /**
@@ -116,6 +129,92 @@ const livePills: PillControls = {
     State.notify();
   },
 };
+
+// ── What the tools reach (voice/tools.ts) ─────────────────────────────────────
+
+const CLAUDE_DESKTOP_ID = "agent_claude-desktop";
+
+let timer: { label: string; endsAt: number; handle: number } | null = null;
+
+function stopTimer(): boolean {
+  if (!timer) return false;
+  window.clearTimeout(timer.handle);
+  timer = null;
+  return true;
+}
+
+export function createWorld(cards: VoiceCards): VoiceWorld {
+  const pillName = (id: string) => pillDefinition(id)?.name ?? id;
+  return {
+    agents: () =>
+      State.tasks
+        .filter((task) => !task.isIntegration && (task.state !== "idle" || task.steps.length > 0))
+        .map((task) => ({
+          id: task.id,
+          name: pillName(task.id),
+          state: task.state,
+          doing: (task.finalLine || lastTextStep(task.steps) || "").slice(0, 120),
+        })),
+    openSession(id) {
+      const task = State.tasks.find((x) => x.id === id);
+      if (!task) return false;
+      State.setFocus(id);
+      if (id === CLAUDE_DESKTOP_ID) void Bridge.openClaudeDesktop();
+      else void Bridge.openSession(task.sessionId ?? null, task.sessionCwd ?? null);
+      return true;
+    },
+    permission() {
+      const pending = State.pendingApproval;
+      if (!pending || pending.questions) return null;
+      return { agent: pillName(pending.pillId), request: `${pending.tool}: ${pending.command}`.slice(0, 160) };
+    },
+    showPermission: () => cards.showWaitingCard(),
+    declinePermission: () => cards.declineWaiting(),
+    timer: () =>
+      timer ? { label: timer.label, minutesLeft: Math.max(0, Math.ceil((timer.endsAt - Date.now()) / 60_000)) } : null,
+    setTimer(minutes, label) {
+      stopTimer();
+      const ms = minutes * 60_000;
+      const handle = window.setTimeout(() => {
+        timer = null;
+        Sound.play("finish");
+        void showToast({ kind: "info", title: t("Time's up"), text: label || undefined, durationMs: 15_000 });
+      }, ms);
+      timer = { label, endsAt: Date.now() + ms, handle };
+    },
+    cancelTimer: stopTimer,
+    openApp: async (name) => (await Bridge.voiceOpenApp(name)) ?? null,
+    openFolder: async (name) => (await Bridge.voiceOpenFolder(name)) ?? null,
+    openUrl: (url) => void Bridge.openUrl(url),
+    nowPlaying() {
+      const { track, playing } = Spotify.state;
+      return track && playing ? `${track.title} — ${track.artist}` : null;
+    },
+    reports() {
+      const out: Record<string, string> = {};
+      for (const task of State.tasks) {
+        const line = task.isIntegration ? lastTextStep(task.steps) : undefined;
+        if (line) out[pillName(task.id)] = line.slice(0, 120);
+      }
+      return out;
+    },
+  };
+}
+
+/** A model server and a model are chosen for voice in Settings. */
+export const brainChosen = () => Boolean(State.settings.voice.brain && State.settings.voice.brainModel);
+
+/**
+ * What a sentence the parser does not know means, asked of the model, checked
+ * and done. Null: nothing to show. A model that cannot be asked, or answers
+ * nothing usable, is "not recognised" like before there was one.
+ */
+export async function askBrain(said: string, world: VoiceWorld): Promise<VoiceResult | null> {
+  const pills = voicePills();
+  const system = systemPrompt(describeState(world, voiceRunner, pills));
+  const proposal = await Bridge.voiceBrain(system, said, toolSchemas(pills));
+  return runProposal(proposal ?? { calls: [], text: "" }, said, voiceRunner, world, pills);
+}
 
 /** The pills a command may name: the ones this build offers. */
 export const voicePills = () => availablePills(State.os);
