@@ -2,7 +2,7 @@
 // colours and wording are copied from the Swift views so both platforms read
 // identically.
 
-import { h, svg, clear, dot } from "./dom";
+import { h, svg, clear, dot, fitPillLabel } from "./dom";
 import { ICONS } from "./icons";
 import { Ticker } from "./ticker";
 import { State, type AgentTask } from "../core/state";
@@ -113,13 +113,17 @@ function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElem
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
-export function buildHeader(actions: ViewActions): ViewHost {
-  const tabHome = h("button", { class: "tab", title: tl("Overview"), onclick: () => go("overview") }, svg(ICONS.house, 13));
-  const tabChat = h("button", { class: "tab", title: tl("Ask"), onclick: () => go("prompt") }, svg(ICONS.bubble, 13));
-  const tabDrop = h("button", { class: "tab", title: tl("Drop"), onclick: () => go("upload") }, svg(ICONS.plus, 13));
+/** The header's icons: the three tabs on the left, settings and sound on the right. */
+const TAB_ICON = 16;
+const ACTION_ICON = 17;
 
-  const gearBtn = h("button", { title: tl("Settings"), onclick: () => go("settings") }, svg(ICONS.gear, 14));
-  const soundBtn = h("button", { title: tl("Mute"), onclick: () => actions.toggleSound() }, svg(ICONS.speakerOn, 14));
+export function buildHeader(actions: ViewActions): ViewHost {
+  const tabHome = h("button", { class: "tab", title: tl("Overview"), onclick: () => go("overview") }, svg(ICONS.house, TAB_ICON));
+  const tabChat = h("button", { class: "tab", title: tl("Ask"), onclick: () => go("prompt") }, svg(ICONS.bubble, TAB_ICON));
+  const tabDrop = h("button", { class: "tab", title: tl("Drop"), onclick: () => go("upload") }, svg(ICONS.plus, TAB_ICON));
+
+  const gearBtn = h("button", { title: tl("Settings"), onclick: () => go("settings") }, svg(ICONS.gear, ACTION_ICON));
+  const soundBtn = h("button", { title: tl("Mute"), onclick: () => actions.toggleSound() }, svg(ICONS.speakerOn, ACTION_ICON));
   // Plan usage pills (off by default): before the gear, Claude first, as on the Mac.
   const claudePill = buildPlanPill(false);
   const codexPill = buildPlanPill(true);
@@ -148,9 +152,9 @@ export function buildHeader(actions: ViewActions): ViewHost {
       tabDrop.classList.toggle("on", v === "upload");
       gearBtn.classList.toggle("on", v === "settings");
       clear(gearBtn);
-      gearBtn.append(svg(v === "settings" ? ICONS.gearFill : ICONS.gear, 14));
+      gearBtn.append(svg(v === "settings" ? ICONS.gearFill : ICONS.gear, ACTION_ICON));
       clear(soundBtn);
-      soundBtn.append(svg(State.settings.soundEnabled ? ICONS.speakerOn : ICONS.speakerOff, 14));
+      soundBtn.append(svg(State.settings.soundEnabled ? ICONS.speakerOn : ICONS.speakerOff, ACTION_ICON));
       syncPlanPills();
       el.style.opacity = v === "confused" ? "0" : "1";
     },
@@ -429,27 +433,6 @@ export function hasSessionTicker(task: AgentTask): boolean {
   const isSession = category === "workspace" || category === "agent" ||
     (category == null && task.id.startsWith("agent_"));
   return isSession && (task.state !== "idle" || task.steps.length > 0);
-}
-
-/**
- * How far from the pill's edge a centred name must stay to clear the little
- * Mochi (he ends at 31 px) with some air; `.pill .lbl.long` in style.css.
- */
-const PILL_BOT_CLEARANCE = 38;
-
-/**
- * The name is centred across the whole pill, the little Mochi included. One
- * wide enough to reach him is marked `long`, and starts after him instead.
- */
-function fitPillLabel(pill: HTMLElement, lbl: HTMLElement) {
-  requestAnimationFrame(() => {
-    if (!pill.isConnected || !lbl.firstChild) return;
-    const range = document.createRange();
-    range.selectNodeContents(lbl);
-    const text = range.getBoundingClientRect().width;
-    const room = pill.offsetWidth - 2 * PILL_BOT_CLEARANCE;
-    lbl.classList.toggle("long", text > room);
-  });
 }
 
 function buildPill(task: AgentTask, actions: ViewActions): HTMLElement {

@@ -136,6 +136,29 @@ export function clear(el: Element) {
   while (el.firstChild) el.removeChild(el.firstChild);
 }
 
+/**
+ * How far from a pill's edge a centred name must stay to clear the little
+ * Mochi (he ends at 31 px) with some air; `.pill .lbl.long` in style.css.
+ */
+const PILL_BOT_CLEARANCE = 38;
+
+/**
+ * A pill's name is centred across the whole pill, the little Mochi included.
+ * One wide enough to reach him is marked `long`: it starts after him instead,
+ * and is cut with an ellipsis at the pill's other end. Called again whenever
+ * the name changes (a track's title on the Spotify pill).
+ */
+export function fitPillLabel(pill: HTMLElement, lbl: HTMLElement) {
+  requestAnimationFrame(() => {
+    if (!pill.isConnected || !lbl.firstChild) return;
+    const range = document.createRange();
+    range.selectNodeContents(lbl);
+    const text = range.getBoundingClientRect().width;
+    const room = pill.offsetWidth - 2 * PILL_BOT_CLEARANCE;
+    lbl.classList.toggle("long", text > room);
+  });
+}
+
 /** Card dot used in every "who" row. */
 export function dot(color: string, size = 7): HTMLElement {
   return h("i", {

@@ -6,7 +6,7 @@
 // island/spotify.ts. A click changes the page's copy at once and Spotify
 // confirms it, as the Mac's controller does.
 
-import { h, svg, clear, dot } from "./dom";
+import { h, svg, clear, dot, fitPillLabel } from "./dom";
 import { ICONS } from "./icons";
 import { Bridge } from "../core/bridge";
 import { State, type AgentTask } from "../core/state";
@@ -127,7 +127,12 @@ export function buildSpotifyPill(task: AgentTask, onTap: () => void): SpotifyPil
     const s = Spotify.state;
     const current = State.tasks.find((x) => x.id === task.id);
     const name = current?.name ?? task.name;
-    if (label.textContent !== name) label.textContent = name;
+    if (label.textContent !== name) {
+      label.textContent = name;
+      // A track's title is often longer than the pill: it starts after the
+      // little Mochi then, and is cut at the other end.
+      fitPillLabel(pill, label);
+    }
     const show = hovered && s.track != null;
     pill.classList.toggle("controls", show);
     if (playing !== s.playing) {
@@ -156,6 +161,7 @@ export function buildSpotifyPill(task: AgentTask, onTap: () => void): SpotifyPil
     sync();
   });
   sync();
+  fitPillLabel(pill, label);
   return { el: pill, sync };
 }
 
