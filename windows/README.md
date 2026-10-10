@@ -458,8 +458,18 @@ own window.
   the island, and reopened by clicking the island, Open in the tray or **Go to
   alert**.
 - Apple Music, the one pill from the Mac catalog with nothing behind it here,
-  is left out. Spotify is on Linux only (see [Linux](#linux)): Windows has
-  nothing to read it from yet.
+  is left out.
+- **Spotify** (Settings → Integrations) is read from Windows' own media
+  controls on Windows — the ones behind the volume flyout and the media keys
+  — and over MPRIS on Linux (see [Linux](#linux)); the Mac uses AppleScript.
+  On Windows nothing is polled: one thread sleeps until Windows says Spotify's
+  track, status or timeline changed, and ends when the pill is turned off.
+  The cover is the one Windows holds, never fetched from the network. The
+  volume is Spotify's level in the Windows volume mixer, not the slider in
+  Spotify's own window: Windows offers nothing else, and there is no level to
+  move until Spotify has played something. Ads are told from tracks by a
+  guess (a short title with no artist and no album). Both the installer's
+  Spotify and the Microsoft Store's are found.
 - Not in this version: sending a dropped file by email and dragging Mochi onto
   a window to attach it as context. On the Mac, email goes through Resend or
   Apple Mail's scripting; neither has a safe equivalent that attaches a file
@@ -522,8 +532,7 @@ own window.
   without a restart (the Mac's **Restart Coucou** isn't needed). Arabic turns
   the island's text right to left but not its layout: Mochi and the pills keep
   their sides.
-- Mochi on the desktop dances only on Linux, to Spotify; on Windows there is
-  no music integration to dance to yet. While he dances he stays awake (the
+- Mochi on the desktop dances to Spotify. While he dances he stays awake (the
   Mac lets him doze off mid-dance). Dropping him on a window doesn't attach it
   to the chat. While he
   sleeps, the transparent square around him (120 px) takes the first mouse
