@@ -19,8 +19,11 @@
 // one thread sleeps on a channel that Windows' change events post to — nothing
 // is polled there either. What that session says is turned into the same
 // properties MPRIS gives (`smtc` below), so one state machine serves both. The
-// cover comes from Windows, not from the network; the volume is Spotify's own
-// level in the Windows mixer, which is all Windows offers.
+// cover comes from Windows, not from the network. Spotify's volume is not
+// among what Windows is told: the island has no volume slider there
+// (`volume_known`). Its level in the Windows mixer is another thing — it stays
+// at 100 % while Spotify's own slider moves — and showing it as Spotify's
+// volume was wrong.
 
 // The MPRIS parsing is only reached from the Linux client and the tests.
 #![cfg_attr(not(target_os = "linux"), allow(dead_code))]
@@ -128,6 +131,9 @@ pub struct PlayerState {
     pub repeat: bool,
     /// 0…100.
     pub volume: i32,
+    /// Whether `volume` is Spotify's: false where nothing can read it
+    /// (Windows), and the island then shows no volume at all.
+    pub volume_known: bool,
 }
 
 impl Default for PlayerState {
@@ -142,6 +148,7 @@ impl Default for PlayerState {
             shuffle: false,
             repeat: false,
             volume: 50,
+            volume_known: !cfg!(windows),
         }
     }
 }
@@ -673,7 +680,7 @@ mod smtc {
             }
             "shuffle" => Some(("Shuffle".into(), Value::Bool(v != 0.0))),
             "repeat" => Some(("LoopStatus".into(), Value::Str(if v != 0.0 { "Playlist" } else { "None" }.into()))),
-            "volume" => Some(("Volume".into(), Value::Float((v / 100.0).clamp(0.0, 1.0)))),
+            // Not "volume": Windows has no hold on Spotify's.
             _ => None,
         }
     }
@@ -689,7 +696,6 @@ mod windows {
     use std::sync::{LazyLock, Mutex};
     use std::time::Duration;
 
-    use ::windows::core::Interface;
     use ::windows::Foundation::TypedEventHandler;
     use ::windows::Media::Control::{
         GlobalSystemMediaTransportControlsSession as Session,
@@ -699,13 +705,7 @@ mod windows {
     };
     use ::windows::Media::MediaPlaybackAutoRepeatMode;
     use ::windows::Storage::Streams::{DataReader, IRandomAccessStreamReference};
-    use ::windows::Win32::Media::Audio::{
-        eMultimedia, eRender, IAudioSessionControl2, IAudioSessionManager2, IMMDeviceEnumerator, ISimpleAudioVolume,
-        MMDeviceEnumerator,
-    };
-    use ::windows::Win32::System::Com::{
-        CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED,
-    };
+    use ::windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
     use tauri::Emitter;
 
     const EXE: &str = "Spotify.exe";
@@ -848,7 +848,7 @@ mod windows {
         ))?;
         // Spotify may have started before the pill was declared.
         let mut link = attach(&manager, tx);
-        read(app, generation, link.as_ref(), true);
+        read(app, generation, link.as_ref());
 
         while let Ok(msg) = rx.recv() {
             if !current(generation) {
@@ -862,12 +862,12 @@ mod windows {
                         old.detach();
                     }
                     link = attach(&manager, tx);
-                    read(app, generation, link.as_ref(), true);
+                    read(app, generation, link.as_ref());
                 }
-                Msg::Changed => read(app, generation, link.as_ref(), false),
+                Msg::Changed => read(app, generation, link.as_ref()),
                 Msg::Timeline => timeline(app, generation, link.as_ref()),
                 Msg::Refresh(reply) => {
-                    read(app, generation, link.as_ref(), true);
+                    read(app, generation, link.as_ref());
                     tell(app, generation, true);
                     let _ = reply.send(Some(SHARED.lock().unwrap().state.clone()));
                 }
@@ -983,10 +983,9 @@ mod windows {
     }
 
     /// Reads Spotify's session (or its absence) into the state and tells the
-    /// island. The mixer is only asked `with_volume`: it has no event of ours.
-    fn read(app: &AppHandle, generation: u64, link: Option<&Link>, with_volume: bool) {
+    /// island.
+    fn read(app: &AppHandle, generation: u64, link: Option<&Link>) {
         let seen = link.map(|l| snapshot(&l.session));
-        let level = if with_volume { volume() } else { None };
         {
             let mut s = SHARED.lock().unwrap();
             if !(s.active && s.generation == generation) {
@@ -1007,9 +1006,6 @@ mod windows {
                 }
                 None => s.state.clear(now),
             }
-            if let Some(level) = level {
-                s.state.volume = level;
-            }
         }
         tell(app, generation, false);
     }
@@ -1025,7 +1021,7 @@ mod windows {
         let Some((duration_us, position_us)) = clock(&link.session, playing) else { return };
         let longer = (duration_us as f64 / 1_000_000.0 - duration).abs() > 0.5;
         if longer || smtc::is_seek(position_us as f64 / 1_000_000.0, expected) {
-            read(app, generation, Some(link), false);
+            read(app, generation, Some(link));
         }
     }
 
@@ -1033,9 +1029,7 @@ mod windows {
 
     fn act(app: &AppHandle, generation: u64, link: Option<&Link>, action: &str, v: f64) -> bool {
         let duration = SHARED.lock().unwrap().state.track.as_ref().map_or(0.0, |t| t.duration);
-        let done = if action == "volume" {
-            set_volume(v)
-        } else {
+        let done = {
             let Some(session) = link.map(|l| &l.session) else { return false };
             let asked = match action {
                 "playPause" => session.TryTogglePlayPauseAsync(),
@@ -1085,51 +1079,6 @@ mod windows {
             && answer.recv_timeout(REPLY).unwrap_or(false)
     }
 
-    // ── Volume: Spotify's level in the Windows mixer ──────────────────────────
-
-    /// Spotify's audio sessions on the default output. There is none until it
-    /// has played something, and it runs as several processes.
-    fn mixer() -> Vec<ISimpleAudioVolume> {
-        let pids = crate::platform::pids_named(EXE);
-        let mut out = Vec::new();
-        if pids.is_empty() {
-            return out;
-        }
-        let found = (|| unsafe {
-            let devices: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
-            let manager: IAudioSessionManager2 =
-                devices.GetDefaultAudioEndpoint(eRender, eMultimedia)?.Activate(CLSCTX_ALL, None)?;
-            let sessions = manager.GetSessionEnumerator()?;
-            for i in 0..sessions.GetCount()? {
-                let Ok(session) = sessions.GetSession(i) else { continue };
-                let Ok(pid) = session.cast::<IAudioSessionControl2>().and_then(|s| s.GetProcessId()) else { continue };
-                if pids.contains(&pid) {
-                    if let Ok(level) = session.cast::<ISimpleAudioVolume>() {
-                        out.push(level);
-                    }
-                }
-            }
-            ::windows::core::Result::Ok(())
-        })();
-        if let Err(err) = found {
-            crate::log::line(format!("spotify: no mixer: {err}"));
-        }
-        out
-    }
-
-    /// 0…100, or None while Spotify has no audio session.
-    fn volume() -> Option<i32> {
-        let level = unsafe { mixer().first()?.GetMasterVolume().ok()? };
-        Some((level * 100.0).round().clamp(0.0, 100.0) as i32)
-    }
-
-    fn set_volume(v: f64) -> bool {
-        let level = (v / 100.0).clamp(0.0, 1.0) as f32;
-        let sessions = mixer();
-        !sessions.is_empty()
-            && sessions.iter().all(|s| unsafe { s.SetMasterVolume(level, std::ptr::null()).is_ok() })
-    }
-
     // ── Launching ─────────────────────────────────────────────────────────────
 
     /// The installer's Spotify, or the Store's. The Store's is an app alias:
@@ -1169,7 +1118,7 @@ mod windows {
                 let (snap, cover) = snapshot(&link.session);
                 println!("{snap:?}");
                 println!("cover: {:?} bytes, {:?}", cover.as_ref().map(Vec::len), cover.as_deref().and_then(sniff_image));
-                println!("volume: {:?}, installed: {}", volume(), installed());
+                println!("installed: {}", installed());
                 assert!(!snap.title.is_empty());
                 let mut state = PlayerState::default();
                 state.apply(&smtc::props(&snap), now_ms());
@@ -2159,7 +2108,7 @@ mod tests {
         assert_eq!(smtc::optimistic("seek", 500.0, 369.0), Some(("Position".into(), Value::Int(368_000_000))));
         assert_eq!(smtc::optimistic("shuffle", 1.0, 0.0), Some(("Shuffle".into(), Value::Bool(true))));
         assert_eq!(smtc::optimistic("repeat", 0.0, 0.0), Some(("LoopStatus".into(), s("None"))));
-        assert_eq!(smtc::optimistic("volume", 150.0, 0.0), Some(("Volume".into(), Value::Float(1.0))));
+        assert_eq!(smtc::optimistic("volume", 150.0, 0.0), None);
         assert_eq!(smtc::optimistic("playPause", 0.0, 0.0), None);
     }
 
@@ -2287,6 +2236,8 @@ mod tests {
         assert_eq!(json["track"]["artUrl"], "https://i.scdn.co/image/abc");
         assert_eq!(json["track"]["id"], "spotify:track:ID1");
         assert!(json["track"].get("objectPath").is_none());
+        // Where Spotify's volume cannot be read, the island is told so.
+        assert_eq!(json["volumeKnown"], !cfg!(windows));
     }
 
     #[test]

@@ -285,6 +285,25 @@ test("the playing card: title, artist · album, times, and the controls", () => 
   assert.ok(card.el.textContent.includes("Advertisement"));
 });
 
+test("the card has no volume where Spotify's cannot be read", () => {
+  const card = buildSpotifyCard();
+  const volume = () => card.el.querySelector("np-volume");
+  // Linux reads it over MPRIS: the slider is there, at Spotify's level.
+  Spotify.state = playing({ volume: 30 });
+  card.sync();
+  assert.equal(volume().style.display, "");
+  assert.equal(volume().title, "Volume 30%");
+  // Windows is not told it: no slider, rather than one that says 100 %.
+  Spotify.state = playing({ volume: 100, volumeKnown: false });
+  card.sync();
+  assert.equal(volume().style.display, "none");
+  // The rest of the card is as it was.
+  assert.equal(card.el.querySelector("np-buttons").children.length, 5);
+  Spotify.state = playing({ volume: 30, volumeKnown: true });
+  card.sync();
+  assert.equal(volume().style.display, "");
+});
+
 test("the pill shows play/pause and next on hover, only with a track", () => {
   const task = spotifyTask();
   const pill = buildSpotifyPill(task, () => {});

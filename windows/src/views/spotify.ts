@@ -393,6 +393,10 @@ export function buildSpotifyCard(): SpotifyCardHost {
     }
     play.title = s.playing ? t("Pause") : t("Play");
 
+    // No slider where the volume would not be Spotify's own (Windows).
+    const hasVolume = s.volumeKnown !== false;
+    volumeBox.style.display = hasVolume ? "" : "none";
+    if (!hasVolume) return;
     const level = volumeLevel(s.volume);
     if (level !== volIconLevel) {
       volIconLevel = level;

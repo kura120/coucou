@@ -34,6 +34,11 @@ export interface SpotifyState {
   repeat: boolean;
   /** 0…100. */
   volume: number;
+  /**
+   * False where Spotify's volume cannot be read (Windows): the card then shows
+   * no volume. Absent means it is known.
+   */
+  volumeKnown?: boolean;
 }
 
 export const IDLE_SPOTIFY: SpotifyState = {

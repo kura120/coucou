@@ -465,9 +465,9 @@ own window.
   On Windows nothing is polled: one thread sleeps until Windows says Spotify's
   track, status or timeline changed, and ends when the pill is turned off.
   The cover is the one Windows holds, never fetched from the network. The
-  volume is Spotify's level in the Windows volume mixer, not the slider in
-  Spotify's own window: Windows offers nothing else, and there is no level to
-  move until Spotify has played something. Ads are told from tracks by a
+  card has no volume slider on Windows: Windows is not told Spotify's volume,
+  and Spotify's level in the Windows volume mixer is a different thing. Ads
+  are told from tracks by a
   guess (a short title with no artist and no album). Both the installer's
   Spotify and the Microsoft Store's are found.
 - Not in this version: sending a dropped file by email and dragging Mochi onto
