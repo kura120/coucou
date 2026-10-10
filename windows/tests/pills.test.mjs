@@ -4,6 +4,7 @@ import { beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_MAIN_PILL, MAX_DECLARED, PILL_CATALOG, PILL_CATEGORIES, availablePills, chooseMainPill, miniGridColumns,
+  slotsUsed, takesSlot,
   isComingSoon, isHookPill, mainPillChoices, orderPills, pillDefinition, sanitizeDeclared, sessionSubtitle,
   toggleDeclared,
 } from "../src/core/pills.ts";
@@ -289,6 +290,34 @@ test("a Claude Code session gets its pill even when it is not loaded", () => {
   assert.equal(t.name, "proj");
   assert.equal(t.sessionCwd, "/p");
   assert.equal(State.upsertWorkspacePill("not_a_pill", "x", ""), null);
+});
+
+test("Spotify is a card of its own: it takes no slot, and six pills fit next to it", () => {
+  assert.ok(!takesSlot("integration_spotify"));
+  assert.ok(takesSlot("integration_github") && takesSlot("agent_gemini"));
+  const six = ["integration_n8n", "integration_github", "integration_stripe", "integration_vercel", "ai_openai", "agent_gemini"];
+  const full = { mainPill: "integration_claude", activeIntegrations: six };
+  assert.equal(slotsUsed(six), 6);
+  // Six pills declared: Spotify is still added, a seventh pill is not.
+  const withSpotify = toggleDeclared(full, "integration_spotify", "windows");
+  assert.deepEqual(withSpotify, [...six, "integration_spotify"]);
+  assert.equal(slotsUsed(withSpotify), 6);
+  assert.equal(toggleDeclared({ ...full, activeIntegrations: withSpotify }, "ai_anthropic", "windows"), null);
+  // Declared first, it leaves all six slots free.
+  let d = { mainPill: "integration_claude", activeIntegrations: ["integration_spotify"] };
+  for (const id of six) d = { ...d, activeIntegrations: toggleDeclared(d, id, "windows") };
+  assert.equal(d.activeIntegrations.length, 7);
+  // And it is taken off like any other.
+  assert.deepEqual(toggleDeclared(d, "integration_spotify", "windows"), six);
+
+  // On the island: all six pills next to the main one, Spotify not among them.
+  State.settings.activeIntegrations = d.activeIntegrations;
+  State.os = "windows";
+  State.loadIntegrationTasks();
+  assert.equal(State.shownPills.length, 6);
+  assert.ok(State.shownPills.every((t) => t.id !== "integration_spotify"));
+  assert.ok(State.tasks.some((t) => t.id === "integration_spotify"));
+  State.os = "linux";
 });
 
 test("toggling declares up to six pills and never the main one", () => {

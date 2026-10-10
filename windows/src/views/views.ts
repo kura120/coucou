@@ -21,7 +21,7 @@ import { lastTextStep } from "../core/diff";
 import { Bridge } from "../core/bridge";
 import { buildRecap } from "./recap";
 import { buildWardrobe } from "./wardrobe";
-import { buildSpotifyCard, buildSpotifyMini, buildSpotifyPill, type SpotifyPillHost } from "./spotify";
+import { buildSpotifyCard, buildSpotifyMini } from "./spotify";
 import { provideMenu } from "./menu";
 import { SPOTIFY_ID } from "../core/spotify";
 import type { Outfit, OutfitSelection } from "../mochi/wardrobe";
@@ -209,9 +209,8 @@ function buildOverview(actions: ViewActions): ViewHost {
   // Spotify's card and pill are kept and updated in place: the progress bar
   // runs on, and a slider being dragged must not be rebuilt under the pointer.
   const spotifyCard = buildSpotifyCard();
-  let spotifyPill: SpotifyPillHost | null = null;
-  // While Spotify has a track its pill gives way to a card of its own, next to
-  // the pills, and the island widens for it (State.musicCard).
+  // Spotify is not a pill: while it has a track it has a card of its own, next
+  // to the pills, and the island widens for it (State.musicCard).
   const spotifyMini = buildSpotifyMini(() => actions.setFocus(SPOTIFY_ID));
   const music = h("div", { class: "music" }, card(null, spotifyMini.el));
 
@@ -409,23 +408,14 @@ function buildOverview(actions: ViewActions): ViewHost {
       el.classList.toggle("with-music", withMusic);
       if (withMusic) spotifyMini.sync();
 
-      const others = State.overviewPills;
+      const others = State.shownPills;
       const pillKey = others.map((t) => `${t.id}:${t.color}:${t.pillBadge ?? ""}`).join("|");
       if (pillKey !== pillIds) {
         pillIds = pillKey;
         clear(pills);
-        spotifyPill = null;
-        for (const t of others) {
-          if (t.id === SPOTIFY_ID) {
-            spotifyPill = buildSpotifyPill(t, () => actions.setFocus(t.id));
-            pills.append(spotifyPill.el);
-          } else {
-            pills.append(buildPill(t, actions));
-          }
-        }
+        for (const t of others) pills.append(buildPill(t, actions));
         pruneMiniBots();
       }
-      spotifyPill?.sync();
     },
   };
 }

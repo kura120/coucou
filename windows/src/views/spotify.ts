@@ -6,26 +6,19 @@
 // island/spotify.ts. A click changes the page's copy at once and Spotify
 // confirms it, as the Mac's controller does.
 
-import { h, svg, clear, dot, fitPillLabel } from "./dom";
+import { h, svg, clear, dot } from "./dom";
 import { ICONS } from "./icons";
 import { Bridge } from "../core/bridge";
-import { State, type AgentTask } from "../core/state";
+import { State } from "../core/state";
 import {
   SPOTIFY_GREEN, SPOTIFY_ID, Spotify, currentArtwork, formatTime, isAd, spotifyPosition, volumeLevel,
   withPlaying,
   type SpotifyTrack,
 } from "../core/spotify";
-import { createMiniBot } from "../mochi/minibots";
 import { createMarquee } from "./marquee";
 import { pillDefinition } from "../core/pills";
 import { N_, t } from "../i18n/i18n";
 
-
-function lighter(hex: string, amount: number): string {
-  const v = parseInt(hex.replace("#", ""), 16);
-  const c = [(v >> 16) & 255, (v >> 8) & 255, v & 255].map((x) => Math.min(255, Math.round(x + amount * 255)));
-  return `rgb(${c[0]},${c[1]},${c[2]})`;
-}
 
 // ── Which app is playing ─────────────────────────────────────────────────────
 
@@ -47,7 +40,7 @@ export function musicAppBadge(app: MusicApp = "spotify", size = 12): HTMLElement
   return badge;
 }
 
-// ── Controls (shared by the pill and the card) ───────────────────────────────
+// ── Controls (shared by the two cards) ──────────────────────────────────────
 
 /** Play/pause, at once on the page, then in Spotify (SpotifyController.playPause). */
 export function togglePlay() {
@@ -97,94 +90,6 @@ function setVolume(value: number) {
     volumeTimer = window.setTimeout(send, 120);
   };
   send();
-}
-
-// ── Pill (overview right column) ──────────────────────────────────────────────
-
-export interface SpotifyPillHost {
-  el: HTMLElement;
-  sync(): void;
-}
-
-/** MusicControlButton: a 20 px round button in the pill's colour. */
-function pillButton(color: string, icon: string, onClick: () => void): HTMLElement {
-  const b = h("button", { class: "np-pill-btn" }, svg(icon, 8));
-  b.style.borderColor = `${color}24`;
-  b.addEventListener("click", (e) => {
-    e.stopPropagation();
-    onClick();
-  });
-  b.addEventListener("mouseenter", () => {
-    b.style.background = `${color}2e`;
-    b.style.borderColor = `${color}8c`;
-    b.style.color = lighter(color, 0.3);
-    b.style.boxShadow = `0 0 6px ${color}59`;
-  });
-  b.addEventListener("mouseleave", () => {
-    b.style.background = "";
-    b.style.borderColor = `${color}24`;
-    b.style.color = "";
-    b.style.boxShadow = "";
-  });
-  return b;
-}
-
-/**
- * SpotifyPill: the agent pill's look, with a mini Mochi that dances while
- * Spotify plays, and play/pause + next on hover when a track is loaded.
- */
-export function buildSpotifyPill(task: AgentTask, onTap: () => void): SpotifyPillHost {
-  const color = task.color;
-  const mini = createMiniBot(task, 24, () => State.spotifyPlaying);
-  const label = h("span", { class: "lbl", text: task.name });
-  const playBtn = pillButton(color, ICONS.play, togglePlay);
-  const nextBtn = pillButton(color, ICONS.forward, () => void Bridge.spotifyControl("next"));
-  const controls = h("div", { class: "np-pill-controls" }, playBtn, nextBtn);
-  const pill = h("div", { class: "pill np-pill", onclick: onTap }, mini, label, controls);
-  pill.style.borderColor = `${color}24`;
-  let hovered = false;
-  let playing: boolean | null = null;
-
-  const sync = () => {
-    const s = Spotify.state;
-    const current = State.tasks.find((x) => x.id === task.id);
-    const name = current?.name ?? task.name;
-    if (label.textContent !== name) {
-      label.textContent = name;
-      // A track's title is often longer than the pill: it starts after the
-      // little Mochi then, and is cut at the other end.
-      fitPillLabel(pill, label);
-    }
-    const show = hovered && s.track != null;
-    pill.classList.toggle("controls", show);
-    if (playing !== s.playing) {
-      playing = s.playing;
-      clear(playBtn);
-      playBtn.append(svg(s.playing ? ICONS.pause : ICONS.play, 8));
-    }
-    playBtn.title = s.playing ? t("Pause") : t("Play");
-    nextBtn.title = t("Next");
-  };
-
-  pill.addEventListener("mouseenter", () => {
-    hovered = true;
-    pill.style.background = `${color}2e`;
-    pill.style.borderColor = `${color}8c`;
-    pill.style.boxShadow = `0 2px 10px ${color}59`;
-    label.style.color = lighter(color, 0.3);
-    sync();
-  });
-  pill.addEventListener("mouseleave", () => {
-    hovered = false;
-    pill.style.background = "";
-    pill.style.borderColor = `${color}24`;
-    pill.style.boxShadow = "";
-    label.style.color = "";
-    sync();
-  });
-  sync();
-  fitPillLabel(pill, label);
-  return { el: pill, sync };
 }
 
 // ── Card (overview left card) ─────────────────────────────────────────────────
