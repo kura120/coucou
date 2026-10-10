@@ -213,9 +213,49 @@ body {
 }
 
 /* Compact 2×2 mini grid, to the right of the notch. */
+/* A line that passes through its place when it is too long for it
+   (views/marquee.ts): a second copy follows the first, a beat at rest lets its
+   beginning be read. Like the island's other motion, it plays whatever
+   Windows' "Animation effects" setting says. */
+.marquee {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.marquee-run {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 36px;
+}
+
+.marquee.scroll {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 14px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 14px), transparent);
+}
+
+.marquee.scroll .marquee-run {
+  animation: marquee-pass var(--mq-seconds, 8s) linear infinite;
+}
+
+@keyframes marquee-pass {
+  0%, 14% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(var(--mq-distance, -100%));
+  }
+}
+
+/* Nothing inside the island's content moves while it is not open: an endless
+   animation there would keep the webview drawing behind a closed island. */
+#content:not(.live) * {
+  animation-play-state: paused;
+}
+
 /* What is playing, in the middle of the compact island (Island.syncNowPlaying):
-   between Mochi and the little Mochis. A long line passes through, its ends
-   fading out; clicks go through it to the island. */
+   between Mochi and the little Mochis. Clicks go through it to the island. */
 #now-playing {
   position: absolute;
   top: 0;
@@ -223,54 +263,27 @@ body {
   height: 32px;
   display: none;
   align-items: center;
-  justify-content: center;
-  overflow: hidden;
   pointer-events: none;
   font: 500 11px var(--font);
   color: var(--dim);
-  white-space: nowrap;
 }
 
 #now-playing.on {
   display: flex;
 }
 
+/* A line that fits sits in the middle; one that passes starts at the left. */
+#now-playing:not(.scroll) {
+  justify-content: center;
+}
+
 #now-playing.scroll {
-  justify-content: flex-start;
   -webkit-mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent);
   mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent);
 }
 
-.np-run {
-  display: flex;
-  gap: 36px;
-  flex: 0 0 auto;
-}
-
-#now-playing.scroll .np-run {
+#now-playing.scroll .marquee-run {
   padding-left: 12px;
-  animation: np-pass var(--np-seconds, 8s) linear infinite;
-}
-
-@keyframes np-pass {
-  /* A beat at rest, so the beginning of the line can be read. */
-  0%, 12% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(var(--np-distance, -100%));
-  }
-}
-
-/* With reduced motion the line stays still and is cut at its end. */
-@media (prefers-reduced-motion: reduce) {
-  #now-playing.scroll .np-run {
-    animation: none;
-  }
-
-  #now-playing.scroll .np-run span + span {
-    display: none;
-  }
 }
 
 #mini-grid {
@@ -1424,14 +1437,6 @@ input[type="range"]::-webkit-slider-thumb {
   from {
     opacity: 0;
     transform: translateY(-6px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chat-body.picking .picker,
-  .chat-body.listing .convos,
-  .chat-log {
-    animation: none;
   }
 }
 
@@ -3272,6 +3277,10 @@ input[type="range"]::-webkit-slider-thumb {
   align-items: center;
   gap: 5px;
   min-width: 0;
+}
+
+.np-title.marquee {
+  text-overflow: clip;
 }
 
 .np-title,

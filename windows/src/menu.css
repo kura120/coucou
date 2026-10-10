@@ -74,9 +74,3 @@
 .ctx-item.danger svg {
   color: #ff8d97;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .ctx-menu {
-    animation: none;
-  }
-}

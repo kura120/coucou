@@ -128,13 +128,15 @@ export function nowPlayingLine(track: SpotifyTrack | null | undefined, adLabel: 
 export const MARQUEE_GAP = 36;
 /** How fast the line passes, px a second: slow enough to read. */
 const MARQUEE_SPEED = 26;
+/** A line this close to fitting is not worth a pass: sub-pixel rounding, not text. */
+const MARQUEE_SLACK = 1;
 
 /**
  * How a line `textW` wide scrolls through a frame `frameW` wide: how far one
  * pass goes and how long it takes — or null when it fits, and stays still.
  */
 export function marquee(textW: number, frameW: number): { distance: number; seconds: number } | null {
-  if (!(textW > 0) || !(frameW > 0) || textW <= frameW) return null;
+  if (!(textW > 0) || !(frameW > 0) || textW <= frameW + MARQUEE_SLACK) return null;
   const distance = Math.round(textW + MARQUEE_GAP);
   return { distance, seconds: Math.round((distance / MARQUEE_SPEED) * 10) / 10 };
 }
