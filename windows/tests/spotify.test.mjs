@@ -416,7 +416,7 @@ test("Spotify is never one of the pills; with a track its card is up and the ove
   assert.ok(wide < PANEL_W);
 });
 
-test("the music card: cover, title and artist, and previous, play, next", () => {
+test("the music card: cover, title and artist, seek, and the five buttons", () => {
   let opened = 0;
   const mini = buildSpotifyMini(() => (opened += 1));
   State.mode = "expanded";
@@ -429,20 +429,41 @@ test("the music card: cover, title and artist, and previous, play, next", () => 
   // A quarter of the way through.
   assert.match(mini.el.querySelector("np-mini-bar").find(".np-fill")[0].style.width, /^25(\.\d+)?%$/);
 
-  const [prev, play, next] = mini.el.querySelector("np-buttons").children;
+  // The app's mark sits in the card's last row, before the buttons, not by the title.
+  const foot = mini.el.querySelector("np-mini-foot");
+  assert.equal(foot.children[0].getAttribute("title"), "Spotify");
+  assert.equal(foot.children[0].find("svg")[0].getAttribute("width"), "18");
+  assert.equal(mini.el.querySelector("np-mini-head").find(".np-app").length, 0);
+
+  const [shuffle, prev, play, next, repeat] = mini.el.querySelector("np-buttons").children;
   assert.equal(play.title, "Pause");
+  assert.equal(shuffle.title, "Shuffle off");
+  assert.equal(repeat.title, "Repeat off");
   const before = sent("spotify_control").length;
+  shuffle.fire("click");
+  repeat.fire("click");
   prev.fire("click");
   next.fire("click");
   play.fire("click");
   assert.deepEqual(sent("spotify_control").slice(before), [
+    { action: "shuffle", value: 1 },
+    { action: "repeat", value: 1 },
     { action: "previous", value: null },
     { action: "next", value: null },
     { action: "playPause", value: null },
   ]);
   assert.equal(Spotify.state.playing, false, "shown at once");
+  assert.ok(Spotify.state.shuffle && Spotify.state.repeat);
   mini.sync();
   assert.equal(play.title, "Play");
+  // On, they are Spotify's green and say so; a second click turns them off.
+  assert.equal(shuffle.title, "Shuffle on");
+  assert.equal(repeat.title, "Repeat on");
+  assert.equal(shuffle.style.color, "#1DB954");
+  shuffle.fire("click");
+  mini.sync();
+  assert.equal(shuffle.title, "Shuffle off");
+  assert.deepEqual(sent("spotify_control").at(-1), { action: "shuffle", value: 0 });
 
   // The cover and the names bring Spotify's own card to the front.
   mini.el.querySelector("np-mini-head").fire("click");
@@ -458,14 +479,20 @@ test("the player says which app the music comes from", () => {
   const badge = musicAppBadge();
   assert.equal(badge.getAttribute("title"), "Spotify");
   assert.equal(badge.find("svg").length, 1);
-  // On both players, before the title.
+  // On Spotify's own card: before the title.
   Spotify.state = playing();
-  for (const player of [buildSpotifyCard(), buildSpotifyMini(() => {})]) {
-    player.sync();
-    const row = player.el.querySelector("np-title-row");
-    assert.equal(row.children[0].getAttribute("title"), "Spotify");
-    assert.ok(row.children[1].classList.contains("np-title"));
-  }
+  const card = buildSpotifyCard();
+  card.sync();
+  const row = card.el.querySelector("np-title-row");
+  assert.equal(row.children[0].getAttribute("title"), "Spotify");
+  assert.equal(row.children[0].find("svg")[0].getAttribute("width"), "14");
+  assert.ok(row.children[1].classList.contains("np-title"));
+  // On the music card: larger, in the lower left corner.
+  const mini = buildSpotifyMini(() => {});
+  mini.sync();
+  const mark = mini.el.querySelector("np-mini-foot").children[0];
+  assert.equal(mark.getAttribute("title"), "Spotify");
+  assert.equal(mark.find("svg")[0].getAttribute("width"), "18");
 });
 
 test("the card has no volume where Spotify's cannot be read", () => {

@@ -29,11 +29,15 @@ const MUSIC_APPS = {
 
 export type MusicApp = keyof typeof MUSIC_APPS;
 
+/** The mark's size: before a title, and alone in the music card's corner. */
+const TITLE_APP_MARK = 14;
+const MINI_APP_MARK = 18;
+
 /**
  * The mark of the app the music comes from, in its colour, next to the title:
  * the player says whose it is. A second app would only add its entry above.
  */
-export function musicAppBadge(app: MusicApp = "spotify", size = 12): HTMLElement {
+export function musicAppBadge(app: MusicApp = "spotify", size = TITLE_APP_MARK): HTMLElement {
   const { name, color, icon } = MUSIC_APPS[app];
   const badge = h("span", { class: "np-app", title: name, "aria-label": name }, svg(icon, size, { stroke: 2.1 }));
   badge.style.color = color;
@@ -189,9 +193,11 @@ export interface SpotifyCardHost {
 
 /**
  * The player in small, for while another pill is in front: the cover, the
- * title and the artist, how far the track is, and previous / play / next.
- * Everything else — seek, shuffle, repeat — is on Spotify's own card, which a
- * click on the cover or the title brings to the front (`onOpen`).
+ * title and the artist; the track's progress, which can be dragged to seek;
+ * and, under it, the app's mark on the left, then shuffle, previous, play,
+ * next and repeat. All of Spotify's own card but the times — and the album,
+ * which a click on the cover or the title shows by bringing that card to the
+ * front (`onOpen`).
  */
 export function buildSpotifyMini(onOpen: () => void): SpotifyCardHost {
   const green = SPOTIFY_GREEN;
@@ -207,19 +213,40 @@ export function buildSpotifyMini(onOpen: () => void): SpotifyCardHost {
     "button",
     { class: "np-mini-head" },
     art,
-    h("div", { class: "np-text" }, h("div", { class: "np-title-row" }, musicAppBadge(), title.el), subtitle),
+    h("div", { class: "np-text" }, title.el, subtitle),
   );
   head.addEventListener("click", onOpen);
 
-  const fill = h("i", { class: "np-fill" });
-  const bar = h("div", { class: "np-mini-bar" }, h("i", { class: "np-track" }), fill);
+  // Drag or click to seek, as on Spotify's own card.
+  let dragFraction: number | null = null;
+  const progress = new NowPlayingBar(
+    (f) => {
+      dragFraction = f;
+      paintProgress();
+    },
+    (f) => {
+      const d = Spotify.state.track?.duration ?? 0;
+      dragFraction = null;
+      seek(f * d);
+    },
+  );
+  progress.el.classList.add("np-mini-bar");
 
-  const prev = iconButton(ICONS.backward, 12, 0, () => void Bridge.spotifyControl("previous"));
-  const next = iconButton(ICONS.forward, 12, 0, () => void Bridge.spotifyControl("next"));
+  const shuffle = iconButton(ICONS.shuffle, 10, 2.2, () => setFlag("shuffle", !Spotify.state.shuffle));
+  const prev = iconButton(ICONS.backward, 11, 0, () => void Bridge.spotifyControl("previous"));
+  const next = iconButton(ICONS.forward, 11, 0, () => void Bridge.spotifyControl("next"));
+  const repeat = iconButton(ICONS.repeat, 10, 2.2, () => setFlag("repeat", !Spotify.state.repeat));
   prev.style.color = "#C5C8CD";
   next.style.color = "#C5C8CD";
   const play = h("button", { class: "np-play", onclick: togglePlay });
-  const el = h("div", { class: "np-mini" }, head, bar, h("div", { class: "np-buttons" }, prev, play, next));
+  // The app's mark in the card's lower left corner, large enough to tell at a glance.
+  const foot = h(
+    "div",
+    { class: "np-mini-foot" },
+    musicAppBadge("spotify", MINI_APP_MARK),
+    h("div", { class: "np-buttons" }, shuffle, prev, play, next, repeat),
+  );
+  const el = h("div", { class: "np-mini" }, head, progress.el, foot);
 
   let shownTrack: SpotifyTrack | null = null;
   let playIcon: boolean | null = null;
@@ -232,8 +259,9 @@ export function buildSpotifyMini(onOpen: () => void): SpotifyCardHost {
   function paintProgress() {
     const s = Spotify.state;
     const d = s.track?.duration ?? 0;
-    const f = d > 0 ? Math.min(1, Math.max(0, spotifyPosition(s, Date.now()) / d)) : 0;
-    fill.style.width = `${f * 100}%`;
+    const at = d > 0 ? Math.min(1, Math.max(0, spotifyPosition(s, Date.now()) / d)) : 0;
+    // Under the pointer the bar is where it is dragged, not where the track is.
+    progress.set(dragFraction ?? at);
   }
 
   /** The bar moves on its own clock, once a second, only while it plays on screen. */
@@ -280,7 +308,13 @@ export function buildSpotifyMini(onOpen: () => void): SpotifyCardHost {
         artImg.removeAttribute("src");
       }
       title.fit();
+      // An ad cannot be skipped through, and a track of unknown length has nowhere to seek to.
+      progress.enabled = !isAd(track) && track.duration > 0;
       paintProgress();
+      shuffle.style.color = s.shuffle ? green : "#6B7079";
+      shuffle.title = s.shuffle ? t("Shuffle on") : t("Shuffle off");
+      repeat.style.color = s.repeat ? green : "#6B7079";
+      repeat.title = s.repeat ? t("Repeat on") : t("Repeat off");
       if (playIcon !== s.playing) {
         playIcon = s.playing;
         clear(play);

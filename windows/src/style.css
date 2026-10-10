@@ -3176,18 +3176,24 @@ input[type="range"]::-webkit-slider-thumb {
   color: #fff;
 }
 
+/* In a column the bar must not take the height that is left (`.np-bar` grows
+   along a row on Spotify's own card). */
 .np-mini-bar {
-  position: relative;
-  height: 3px;
+  flex: 0 0 10px;
 }
 
-.np-mini-bar .np-fill {
-  background: #c5c8cd;
+/* The card's last row: the app's mark in the corner, then the five buttons
+   across what is left. */
+.np-mini-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .np-mini .np-buttons {
-  justify-content: center;
-  gap: 16px;
+  flex: 1 1 auto;
+  justify-content: space-between;
+  gap: 0;
 }
 
 .np-card {
