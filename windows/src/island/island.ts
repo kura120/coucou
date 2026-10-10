@@ -770,7 +770,7 @@ export class Island {
     };
   }
 
-  /** Island rect in window coordinates (origin top-left of the 720×640 window). */
+  /** Island rect in window coordinates (origin top-left of the 720×800 window). */
   private islandRect(): { x: number; y: number; w: number; h: number } {
     const w = this.width.value;
     const hh = this.height.value;

@@ -182,17 +182,109 @@ test("while Claude Code answers, the send button stops it", async () => {
 });
 
 test("the chat keeps the height it was dragged to, within what the window shows", async () => {
-  const { CHAT_MAX_H, CHAT_MIN_H, CHAT_PICKER_H, chatPromptHeight } = await import("../src/core/layout.ts");
-  // Never dragged: it follows the conversation, as on the Mac.
-  assert.equal(chatPromptHeight(0), 240);
-  assert.equal(chatPromptHeight(9), 300);
+  const { CHAT_MAX_H, CHAT_MIN_H, CHAT_PICKER_H, PANEL_H, chatMaxHeight, chatPromptHeight } = await import("../src/core/layout.ts");
+  // Never dragged: it follows the conversation, up to a point.
+  assert.equal(chatPromptHeight(0), 300);
+  assert.equal(chatPromptHeight(2), 350);
+  assert.equal(chatPromptHeight(9), 400);
   assert.equal(chatPromptHeight(0, true), CHAT_PICKER_H);
+  assert.equal(CHAT_PICKER_H, 520);
   // Dragged: that height, whatever the conversation; the picker never gets less than its own.
-  assert.equal(chatPromptHeight(9, false, 520), 520);
-  assert.equal(chatPromptHeight(0, true, 520), 520);
-  assert.equal(chatPromptHeight(0, true, 260), CHAT_PICKER_H);
+  assert.equal(chatPromptHeight(9, false, 600), 600);
+  assert.equal(chatPromptHeight(0, true, 600), 600);
+  assert.equal(chatPromptHeight(0, true, 320), CHAT_PICKER_H);
   assert.equal(chatPromptHeight(0, false, 5000), CHAT_MAX_H);
   assert.equal(chatPromptHeight(0, false, 10), CHAT_MIN_H);
+  assert.deepEqual([CHAT_MIN_H, CHAT_MAX_H, PANEL_H], [300, 780, 800]);
+
+  // A screen shorter than the window: the chat stops above its bottom edge,
+  // and the picker with it.
+  globalThis.screen = { availHeight: 728 };
+  try {
+    assert.equal(chatMaxHeight(), 688);
+    assert.equal(chatPromptHeight(0, false, 5000), 688);
+    assert.equal(chatPromptHeight(0, true), CHAT_PICKER_H);
+    globalThis.screen = { availHeight: 500 };
+    assert.equal(chatPromptHeight(0, true), 460);
+    // Never shorter than the shortest chat, however small the screen.
+    globalThis.screen = { availHeight: 200 };
+    assert.equal(chatMaxHeight(), CHAT_MIN_H);
+  } finally {
+    delete globalThis.screen;
+  }
+  assert.equal(chatMaxHeight(), CHAT_MAX_H);
+});
+
+test("an empty chat says what it is for, until the first question", async () => {
+  const empty = () => view.el.find(".chat-empty");
+  assert.equal(empty().length, 1);
+  assert.equal($(".chat-empty-title").textContent, "Ask Mochi anything");
+  assert.equal($(".chat-empty-sub").textContent, "Pick a model below, or just start typing.");
+  // With Claude Code in a folder, it says where it works.
+  State.settings = { ...State.settings, chatProvider: "claudecode", claudeCodeDir: "C:\\dev\\coucou" };
+  view.sync();
+  assert.equal($(".chat-empty-sub").textContent, "Claude Code works in coucou");
+  State.settings = { ...State.settings, claudeCodeDir: "" };
+  view.sync();
+  assert.equal($(".chat-empty-sub").textContent, "Pick a model below, or just start typing.");
+
+  answers.chat_send = { text: "hi" };
+  $(".chat-input").value = "hello";
+  $(".send-btn").fire("click");
+  view.sync();
+  assert.equal(empty().length, 0, "gone with the first question");
+  await flush();
+  view.sync();
+  assert.equal(empty().length, 0);
+  // A new chat is empty again.
+  State.chatHistory = [];
+  view.sync();
+  assert.equal(empty().length, 1);
+});
+
+test("the conversation's dot is orange while its answer is on its way, gray otherwise", async () => {
+  State.settings = { ...State.settings, chatProvider: "claudecode" };
+  State.chatHistory = [{ id: 1, role: "user", content: "earlier" }, { id: 2, role: "assistant", content: "yes" }];
+  State.conversationId = "c1";
+  view.sync();
+  const dot = () => $(".convo-btn").find(".convo-dot")[0];
+  assert.ok(!dot().classList.contains("on"));
+
+  let finish;
+  answers.chat_send = () => new Promise((resolve) => (finish = resolve));
+  answers.conversations_list = [
+    { id: "c1", title: "earlier", provider: "claudecode", dir: "", updated: 2 },
+    { id: "c2", title: "another", provider: "claudecode", dir: "", updated: 1 },
+  ];
+  $(".chat-input").value = "and now?";
+  $(".send-btn").fire("click");
+  await flush();
+  assert.ok(dot().classList.contains("on"));
+
+  // The list opens during the answer: only the conversation being answered is orange.
+  assert.ok(!$(".convo-btn").disabled);
+  $(".convo-btn").fire("click");
+  await flush();
+  assert.ok($(".chat-body").classList.contains("listing"));
+  const rows = () => view.el.find(".convo-row");
+  assert.deepEqual(rows().map((r) => r.find(".convo-dot")[0].classList.contains("on")), [true, false]);
+  assert.ok($(".convos").classList.contains("busy"));
+  // And it is only read: nothing opens, nothing is deleted, no new chat starts.
+  rows()[1].fire("click");
+  rows()[1].find(".convo-icon")[0].fire("click");
+  view.el.find(".convo-group")[0].find(".convo-icon")[0].fire("click");
+  await flush();
+  assert.deepEqual(sent("conversation_open"), []);
+  assert.deepEqual(sent("conversation_delete"), []);
+  assert.deepEqual(sent("chat_reset"), []);
+  assert.equal(State.conversationId, "c1");
+
+  finish({ text: "Done.", conversationId: "c1" });
+  await flush();
+  assert.ok(!dot().classList.contains("on"));
+  // The open list is drawn again: every dot gray, and its rows work again.
+  assert.deepEqual(rows().map((r) => r.find(".convo-dot")[0].classList.contains("on")), [false, false]);
+  assert.ok(!$(".convos").classList.contains("busy"));
 });
 
 test("the text field tells the island when it has the keyboard", async () => {
@@ -221,7 +313,9 @@ test("Claude Code's conversations are listed by folder, and opening one puts it 
   State.settings = { ...State.settings, chatProvider: "claudecode" };
   view.sync();
   assert.equal($(".convo-btn").style.display, "");
-  assert.equal($(".convo-name").textContent, "Conversations");
+  // Nothing asked yet: a new conversation. The button still says what it opens.
+  assert.equal($(".convo-name").textContent, "New conversation");
+  assert.equal($(".convo-btn").getAttribute("title"), "Conversations");
 
   answers.conversations_list = list;
   answers.conversation_open = ({ id }) => ({
@@ -264,6 +358,7 @@ test("Claude Code's conversations are listed by folder, and opening one puts it 
   assert.deepEqual(State.chatHistory, []);
   assert.equal(State.conversationId, null);
   assert.equal(State.settings.claudeCodeDir, "");
+  assert.equal($(".convo-name").textContent, "New conversation");
 });
 
 test("an answer names the conversation it was saved in, and deleting it forgets that", async () => {
