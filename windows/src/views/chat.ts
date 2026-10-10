@@ -54,6 +54,10 @@ const STRINGS = {
   chatOnly: N_("Without a folder, Claude Code only chats and searches the web."),
   inFolder: N_("Claude Code can read, edit and run commands in this folder. What it must ask for shows in the island."),
   conversations: N_("Conversations"),
+  newConversation: N_("New conversation"),
+  emptyTitle: N_("Ask Mochi anything"),
+  emptyHint: N_("Pick a model below, or just start typing."),
+  emptyFolder: N_("Claude Code works in {folder}"),
   newChat: N_("New chat"),
   newChatHere: N_("New chat in this folder"),
   anyFolder: N_("No folder"),
@@ -436,17 +440,22 @@ interface ConversationList {
   el: HTMLElement;
   open(): void;
   close(): void;
+  /** Draws the list again, as it now stands. */
+  refresh(): void;
   readonly isOpen: boolean;
 }
 
 /**
  * The saved conversations, by folder. `pick` opens one; `start` begins a new
- * one in a folder ("" for none).
+ * one in a folder ("" for none). While an answer is on its way (`busy`) the
+ * list can be read — the conversation being answered wears the orange dot —
+ * but nothing in it can be opened, started or deleted.
  */
 function buildConversations(
   onChange: () => void,
   pick: (id: string) => void,
   start: (dir: string) => void,
+  busy: () => boolean,
 ): ConversationList {
   const el = h("div", { class: "convos" });
   let isOpen = false;
@@ -498,6 +507,7 @@ function buildConversations(
       svg(ICONS.xmark, 10),
     );
     const forget = async () => {
+      if (busy()) return;
       await Bridge.conversationDelete(c.id);
       if (State.conversationId === c.id) State.conversationId = null;
       void load();
@@ -509,7 +519,8 @@ function buildConversations(
     const el = h(
       "div",
       { class: c.id === State.conversationId ? "convo-row on" : "convo-row", title: c.title },
-      h("i", { class: "model-dot", style: `background:${providerDef(c.provider).accent}` }),
+      // Orange while its answer is on its way, gray the rest of the time.
+      h("i", { class: busy() && c.id === State.conversationId ? "convo-dot on" : "convo-dot" }),
       h("span", { class: "convo-title", text: c.title }),
       h("span", { class: "convo-when", text: when(c.updated) }),
       c.external ? null : remove,
@@ -528,6 +539,7 @@ function buildConversations(
     const list = (await Bridge.conversationsList()) ?? [];
     if (ticket !== request) return;
     clear(el);
+    el.classList.toggle("busy", busy());
     const groups = groupByFolder(list);
     // The folder in use is always there to start a chat in, even with nothing saved in it yet.
     const current = State.settings.claudeCodeDir;
@@ -548,6 +560,9 @@ function buildConversations(
       isOpen = false;
       request++;
       onChange();
+    },
+    refresh() {
+      if (isOpen) void load();
     },
     get isOpen() {
       return isOpen;
@@ -672,10 +687,12 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   );
   // The conversation's title, left of the model: opens the list of the saved ones.
   const convoName = h("span", { class: "convo-name" });
+  // The model button's twin: a dot, orange while an answer is on its way.
+  const convoDot = h("i", { class: "convo-dot" });
   const convoBtn = h(
     "button",
     { class: "convo-btn", title: tl(STRINGS.conversations) },
-    svg(ICONS.bubble, 9),
+    convoDot,
     convoName,
     svg(ICONS.chevronUpDown, 9, { stroke: 2 }),
   );
@@ -705,7 +722,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     }
   };
   const picker = buildPicker(panelChanged);
-  const convos = buildConversations(panelChanged, (id) => void openConversation(id), startIn);
+  const convos = buildConversations(panelChanged, (id) => void openConversation(id), startIn, () => sending);
   const pulls = buildPulls(panelChanged);
   /** At most one of the three is open. */
   const closePanels = () => {
@@ -721,6 +738,10 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   const grip = h("div", { class: "chat-grip" });
   const el = h("div", { class: "view" }, h("div", { class: "card wash chat-card" }, body, grip));
   (el.querySelector(".card") as HTMLElement).style.setProperty("--wash", "rgba(99,102,241,0.5)");
+
+  // What an empty chat says, in the middle of the card, until the first question.
+  const emptyHint = h("div", { class: "chat-empty-sub" });
+  const empty = h("div", { class: "chat-empty" }, h("div", { class: "chat-empty-title", text: tl(STRINGS.emptyTitle) }), emptyHint);
 
   let sending = false;
   // Claude Code is answering: the send button stops it.
@@ -738,14 +759,15 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     // Only a provider whose conversations are saved has the list.
     convoBtn.style.display = p.conversations || convos.isOpen ? "" : "none";
     convoBtn.classList.toggle("open", convos.isOpen);
-    convoBtn.disabled = sending;
+    convoDot.classList.toggle("on", sending);
     // Pull requests belong to a folder: Claude Code's.
     const inFolder = p.id === "claudecode" && State.settings.claudeCodeDir !== "";
     pullBtn.style.display = inFolder || pulls.isOpen ? "" : "none";
     pullBtn.classList.toggle("open", pulls.isOpen);
     pullBtn.disabled = sending;
-    const first = State.conversationId ? State.chatHistory.find((m) => m.role === "user") : undefined;
-    convoName.textContent = first ? first.content.replace(/\s+/g, " ").trim() : t(STRINGS.conversations);
+    // Named after its first question; before there is one, a new conversation.
+    const first = State.chatHistory.find((m) => m.role === "user");
+    convoName.textContent = first ? first.content.replace(/\s+/g, " ").trim() : t(STRINGS.newConversation);
     send.classList.toggle("stop", stoppable);
     send.title = t(stoppable ? STRINGS.stop : STRINGS.send);
   }
@@ -797,8 +819,8 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     if (!was) picker.open();
   });
 
+  // The list opens during an answer too: that is when its orange dot shows.
   convoBtn.addEventListener("click", () => {
-    if (sending) return;
     const was = convos.isOpen;
     closePanels();
     if (!was) convos.open();
@@ -942,6 +964,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       turnEdits = [];
       renderedCount = -1; // the finished answer replaces the streamed one
       drawModelButton();
+      convos.refresh(); // its dot goes gray, and it can be opened again
       State.notify();
       onHeightChange();
       input.focus();
@@ -982,8 +1005,13 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
         clear(log);
         for (const m of State.chatHistory) log.append(bubble(m));
         if (thinking) log.append(typingDots());
+        else if (State.chatHistory.length === 0) log.append(empty);
         log.scrollTop = log.scrollHeight;
       }
+      // Where Claude Code works when it has a folder; else what to do next.
+      const dir = State.settings.chatProvider === "claudecode" ? State.settings.claudeCodeDir : "";
+      const hint = dir ? t(STRINGS.emptyFolder, { folder: folderName(dir) }) : t(STRINGS.emptyHint);
+      if (emptyHint.textContent !== hint) emptyHint.textContent = hint;
 
       // Leaving the chat folds the picker and the list away.
       if (State.view !== "prompt") closePanels();

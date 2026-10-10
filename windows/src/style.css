@@ -1061,6 +1061,30 @@ input[type="range"]::-webkit-slider-thumb {
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
+/* What an empty chat says. Centred on the island, not on the log: the log
+   starts after Mochi (84 px), the card's other side has 16. */
+.chat-empty {
+  position: relative;
+  left: -34px;
+  margin: auto;
+  padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  text-align: center;
+}
+
+.chat-empty-title {
+  font: 600 14px var(--font);
+  color: var(--ink-2);
+}
+
+.chat-empty-sub {
+  font: 400 11.5px var(--font);
+  color: var(--dim-3);
+}
+
 .chat-row {
   display: flex;
 }
@@ -1297,6 +1321,40 @@ input[type="range"]::-webkit-slider-thumb {
 
 .chat-body.picking .picker {
   display: flex;
+}
+
+/* The picker and the lists rise into place as the island grows for them; the
+   conversation comes back down when they close. One short run each, on the
+   element that appears: nothing is animated while nothing changes. */
+.chat-body.picking .picker,
+.chat-body.listing .convos {
+  animation: panel-in 0.26s cubic-bezier(0.3, 1.2, 0.4, 1) both;
+}
+
+.chat-log {
+  animation: log-back 0.2s ease-out both;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes log-back {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-body.picking .picker,
+  .chat-body.listing .convos,
+  .chat-log {
+    animation: none;
+  }
 }
 
 .chat-body.picking .chat-log,
@@ -1581,6 +1639,26 @@ input[type="range"]::-webkit-slider-thumb {
 
 .convo-btn svg {
   flex: 0 0 auto;
+}
+
+/* Whether an answer is on its way: orange then, gray the rest of the time —
+   on the pill, and on that conversation's row of the list. */
+.convo-dot {
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #5c6370;
+  transition: background 0.2s ease-out;
+}
+
+.convo-dot.on {
+  background: var(--amber);
+}
+
+/* During an answer the list is only read. */
+.convos.busy .convo-icon {
+  display: none;
 }
 
 .convo-name {

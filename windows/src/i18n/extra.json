@@ -3963,6 +3963,39 @@
    "pt-BR": "Trazer para a frente",
    "ru": "На передний план",
    "id": "Bawa ke depan"
+  },
+  "Ask Mochi anything": {
+   "zh-Hans": "向 Mochi 提问任何事",
+   "hi": "Mochi से कुछ भी पूछें",
+   "es": "Pregúntale lo que quieras a Mochi",
+   "ar": "اسأل Mochi أي شيء",
+   "fr": "Demande ce que tu veux à Mochi",
+   "bn": "Mochi-কে যেকোনো কিছু জিজ্ঞেস করুন",
+   "pt-BR": "Pergunte qualquer coisa ao Mochi",
+   "ru": "Спроси Mochi о чём угодно",
+   "id": "Tanyakan apa saja ke Mochi"
+  },
+  "Pick a model below, or just start typing.": {
+   "zh-Hans": "在下方选择模型，或直接开始输入。",
+   "hi": "नीचे एक मॉडल चुनें, या बस लिखना शुरू करें।",
+   "es": "Elige un modelo abajo o empieza a escribir.",
+   "ar": "اختر نموذجاً أدناه، أو ابدأ الكتابة مباشرة.",
+   "fr": "Choisis un modèle ci-dessous, ou commence à écrire.",
+   "bn": "নিচে একটি মডেল বেছে নিন, অথবা সরাসরি লিখতে শুরু করুন।",
+   "pt-BR": "Escolha um modelo abaixo ou comece a digitar.",
+   "ru": "Выбери модель ниже или просто начни писать.",
+   "id": "Pilih model di bawah, atau langsung mulai mengetik."
+  },
+  "Claude Code works in {folder}": {
+   "zh-Hans": "Claude Code 在 {folder} 中工作",
+   "hi": "Claude Code {folder} में काम करता है",
+   "es": "Claude Code trabaja en {folder}",
+   "ar": "يعمل Claude Code في {folder}",
+   "fr": "Claude Code travaille dans {folder}",
+   "bn": "Claude Code {folder}-এ কাজ করে",
+   "pt-BR": "O Claude Code trabalha em {folder}",
+   "ru": "Claude Code работает в {folder}",
+   "id": "Claude Code bekerja di {folder}"
   }
  }
 }
