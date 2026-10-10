@@ -72,8 +72,31 @@ const MAX_LINE: usize = 8 * 1024 * 1024;
 const MAX_ANSWER: usize = 4 * 1024 * 1024;
 /// The tools whose calls are file edits, and how large an edit may be to be
 /// shown (the island stops diffing at 200 KB a side anyway).
-const EDIT_TOOLS: &[&str] = &["Edit", "MultiEdit", "Write"];
-const MAX_EDIT_BYTES: usize = 512 * 1024;
+pub(crate) const EDIT_TOOLS: &[&str] = &["Edit", "MultiEdit", "Write"];
+pub(crate) const MAX_EDIT_BYTES: usize = 512 * 1024;
+/// How much of one answer's edits is kept with the conversation, so its pills
+/// are still there when it is opened again. Past it an edit keeps its file's
+/// name only, and its pill says the diff is too large.
+pub(crate) const TURN_EDIT_BYTES: usize = 192 * 1024;
+
+/// A file edit as a conversation keeps it: the tool and its input, which is
+/// what the island draws the diff from — or, once `budget` is spent, the
+/// file's name alone.
+pub(crate) fn kept_edit(tool: &str, input: &Value, budget: &mut usize) -> Value {
+    let size = input.to_string().len();
+    if size <= *budget {
+        *budget -= size;
+        return json!({ "tool": tool, "input": input });
+    }
+    *budget = 0;
+    edit_stub(tool, input)
+}
+
+/// An edit without what it changed: enough for a pill that names the file.
+pub(crate) fn edit_stub(tool: &str, input: &Value) -> Value {
+    let path = input.get("file_path").and_then(Value::as_str).unwrap_or("");
+    json!({ "tool": tool, "path": path, "tooLarge": true })
+}
 
 /// Mochi's voice on top of Claude Code's own instructions, when it works in a folder.
 const AGENT_PROMPT: &str = "You are answering as Mochi, in Coucou's small chat window at the top of the user's screen. \
@@ -333,6 +356,8 @@ pub async fn send(
         _ => json!({ "role": "user", "content": content }),
     };
     chat.commit(&turn, user, json!({ "role": "assistant", "content": answer.text }), &plain, &answer.text);
+    // Kept with the answer, for the day the conversation is opened again.
+    chat.attach_edits(&turn, answer.edits);
     Ok(ChatReply { text: answer.text })
 }
 
@@ -340,6 +365,8 @@ pub async fn send(
 struct Answer {
     text: String,
     session: Option<String>,
+    /// The file edits that went through, as `kept_edit` keeps them.
+    edits: Vec<Value>,
 }
 
 /// What a running turn has to show.
@@ -401,6 +428,8 @@ fn run(
     // Edits asked for, until their tool says whether it went through (a
     // permission refused in the island is an error here, and shows nothing).
     let mut pending: HashMap<String, (String, Value)> = HashMap::new();
+    let mut edits = Vec::new();
+    let mut edit_budget = TURN_EDIT_BYTES;
     let mut stopped = false;
     let mut finished = false;
     let mut heard = Instant::now();
@@ -444,6 +473,7 @@ fn run(
             Event::ToolResults(results) => {
                 for (id, succeeded) in results {
                     if let (Some((tool, input)), true) = (pending.remove(&id), succeeded) {
+                        edits.push(kept_edit(&tool, &input, &mut edit_budget));
                         on_update(Update::Edit { tool, input });
                     }
                 }
@@ -471,7 +501,7 @@ fn run(
                 return Err(if stopped { t("Stopped.") } else { no_answer() });
             }
             on_update(Update::Text(answer.clone()));
-            Ok(Answer { text: answer, session })
+            Ok(Answer { text: answer, session, edits })
         }
         Err(message) if message.is_empty() => Err(no_answer()),
         Err(message) => Err(message),

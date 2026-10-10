@@ -14,6 +14,11 @@
 // conversation gets an answer here. One Coucou already saved shows once, and
 // opens with whatever was said in it elsewhere since.
 //
+// An answer during which Claude Code edited files keeps those edits with it
+// (`"edits"` on the turn: the tool and its input), so the chat shows their
+// pills and diffs again. They are the bulk of the file: a conversation keeps
+// only so much of them, the newest first.
+//
 // Only Claude Code's conversations are saved today. Nothing else here is about
 // Claude Code, though. To save another provider's:
 //   1. add its id to SAVED (and `conversations: true` to its entry in
@@ -41,6 +46,9 @@ const SAVED: &[&str] = &[claude_code::ID];
 /// The oldest conversations go once there are more than this.
 const MAX_CONVERSATIONS: usize = 100;
 const MAX_TITLE_CHARS: usize = 60;
+/// How much of its file edits a saved conversation keeps whole, newest first.
+/// Older ones keep their file's name, and their pill says the diff is too large.
+const CONVERSATION_EDIT_BYTES: usize = 1024 * 1024;
 /// The id of a conversation that is only in Claude Code yet: this, then its session id.
 const CLAUDE_PREFIX: &str = "claude:";
 
@@ -165,6 +173,26 @@ fn native_for(saved: &Saved) -> Option<Vec<Value>> {
     }
 }
 
+/// The turns with no more than `budget` bytes of edits kept whole, counted from
+/// the last answer back.
+fn within_budget(mut turns: Vec<Value>, mut budget: usize) -> Vec<Value> {
+    for turn in turns.iter_mut().rev() {
+        let Some(Value::Array(edits)) = turn.get_mut("edits") else { continue };
+        for edit in edits.iter_mut().rev() {
+            let Some(input) = edit.get("input") else { continue };
+            let size = input.to_string().len();
+            if size <= budget {
+                budget -= size;
+            } else {
+                budget = 0;
+                let tool = edit.get("tool").and_then(Value::as_str).unwrap_or("");
+                *edit = claude_code::edit_stub(tool, input);
+            }
+        }
+    }
+    turns
+}
+
 /// What a chat looks like saved: None when there is nothing to keep (no turn
 /// yet, or a provider whose conversations are not saved).
 fn saved_from(snapshot: &Snapshot, id: String, provider: &str, model: &str, dir: &str, updated: u64) -> Option<Saved> {
@@ -180,7 +208,7 @@ fn saved_from(snapshot: &Snapshot, id: String, provider: &str, model: &str, dir:
         dir: dir.to_string(),
         handle,
         updated,
-        turns: snapshot.plain.clone(),
+        turns: within_budget(snapshot.plain.clone(), CONVERSATION_EDIT_BYTES),
     })
 }
 
@@ -452,6 +480,34 @@ mod tests {
         assert_eq!(caught_up(saved.clone(), Some(session("s1", 40, longer))), saved);
         assert_eq!(caught_up(saved.clone(), Some(session("s1", 90, vec![]))), saved);
         assert_eq!(caught_up(saved.clone(), None), saved);
+    }
+
+    #[test]
+    fn a_conversation_s_edits_are_saved_with_it_the_newest_whole() {
+        let edit = |path: &str, content: &str| json!({"tool":"Write","input":{"file_path":path,"content":content}});
+        let mut plain = turns();
+        plain[1]["edits"] = json!([edit("/w/old.rs", "old"), edit("/w/older.rs", "x")]);
+        plain.push(json!({"role":"user","content":"more"}));
+        plain.push(json!({"role":"assistant","content":"Done.","edits":[edit("/w/new.rs", "new")]}));
+        let s = Snapshot { plain: plain.clone(), ..snapshot(Some("claudecode"), vec![]) };
+        // Everything fits: saved as it is, and it comes back from the file.
+        let saved = saved_from(&s, "c1".into(), "claudecode", "m", "/w", 1).unwrap();
+        assert_eq!(saved.turns, plain);
+        let round: Saved = serde_json::from_slice(&serde_json::to_vec(&saved).unwrap()).unwrap();
+        assert_eq!(round.turns[3]["edits"][0]["input"]["content"], "new");
+
+        // Room for the last answer's edit and one more: the oldest keeps its name only.
+        let one = edit("/w/new.rs", "new")["input"].to_string().len();
+        let kept = within_budget(plain.clone(), one + edit("/w/older.rs", "x")["input"].to_string().len());
+        assert_eq!(kept[3]["edits"], plain[3]["edits"]);
+        assert_eq!(kept[1]["edits"][1], plain[1]["edits"][1]);
+        assert_eq!(kept[1]["edits"][0], json!({"tool":"Write","path":"/w/old.rs","tooLarge":true}));
+        // No room at all: every pill still names its file. Done twice, nothing more changes.
+        let none = within_budget(plain.clone(), 0);
+        assert_eq!(none[3]["edits"], json!([{"tool":"Write","path":"/w/new.rs","tooLarge":true}]));
+        assert_eq!(within_budget(none.clone(), 0), none);
+        // What was said is never touched.
+        assert_eq!(none[1]["content"], "Done.");
     }
 
     #[test]

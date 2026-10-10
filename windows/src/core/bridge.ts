@@ -5,6 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import type { SavedEdit } from "./diff";
 import type { Settings } from "./state";
 import type { RecapHistory, RecapPrefs } from "../recap/summary";
 import type { SpotifyState } from "./spotify";
@@ -323,7 +324,8 @@ export interface ChatEdit {
 
 export interface SavedConversation extends ConversationSummary {
   model: string;
-  turns: { role: string; content: string }[];
+  /** An answer during which Claude Code edited files carries them (core/diff.ts, diffOfSaved). */
+  turns: { role: string; content: string; edits?: SavedEdit[] }[];
 }
 
 export interface LocalServer {

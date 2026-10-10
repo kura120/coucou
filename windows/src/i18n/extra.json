@@ -3996,6 +3996,17 @@
    "pt-BR": "O Claude Code trabalha em {folder}",
    "ru": "Claude Code работает в {folder}",
    "id": "Claude Code bekerja di {folder}"
+  },
+  "New": {
+   "zh-Hans": "新建",
+   "hi": "नई",
+   "es": "Nuevo",
+   "ar": "جديد",
+   "fr": "Nouveau",
+   "bn": "নতুন",
+   "pt-BR": "Novo",
+   "ru": "Новый",
+   "id": "Baru"
   }
  }
 }
