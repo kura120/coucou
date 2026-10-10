@@ -52,6 +52,7 @@ mod grammar;
 #[cfg(windows)]
 mod sapi;
 mod sherpa;
+mod speak;
 mod vad;
 mod session;
 
@@ -109,6 +110,8 @@ enum Control {
     Talk,
     Cancel,
     Paused(bool),
+    /// Mochi is speaking until then: nothing heard meanwhile is a command.
+    Hush(Instant),
     Stop,
 }
 
@@ -145,6 +148,9 @@ fn shared() -> MutexGuard<'static, Shared> {
 /// Starts, stops or restarts the listener to match the settings. Called at
 /// launch and on every save.
 pub fn sync(app: &AppHandle, pref: &VoicePref) {
+    if !(pref.enabled && pref.speak) {
+        speak::unload();
+    }
     let want = pref.enabled.then(|| Plan {
         wake: pref.wake,
         free: pref.engine == "bundled",
@@ -209,6 +215,19 @@ pub fn set_paused(paused: bool) {
     send(&s, Control::Paused(paused));
 }
 
+/// Mochi speaks for this long: the listener does not take him for the user.
+fn hush(length: Duration) {
+    send(&shared(), Control::Hush(Instant::now() + length));
+}
+
+/// The island has something for Mochi to say. Said only when speaking is on
+/// in Settings and the voice is installed.
+pub fn say(app: &AppHandle, pref: &VoicePref, text: &str) {
+    if pref.enabled && pref.speak {
+        speak::say(app, text, speak::voice_named(&pref.speaker));
+    }
+}
+
 /// The "Talk to Coucou" shortcut. Does nothing while voice is off.
 pub fn talk() {
     send(&shared(), Control::Talk);
@@ -251,7 +270,8 @@ pub fn voice_open_folder(name: String) -> Option<String> {
     Some(folder)
 }
 
-/// Whether the bundled speech engine is on this machine, and what getting it costs.
+/// Whether a part of the bundled speech engine is on this machine, and what
+/// getting it costs.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineStatus {
@@ -262,21 +282,23 @@ pub struct EngineStatus {
 }
 
 #[tauri::command]
-pub fn voice_engine_status() -> EngineStatus {
-    EngineStatus { installed: engine::installed(), download_bytes: engine::DOWNLOAD_BYTES, available: cfg!(windows) }
+pub fn voice_engine_status(part: engine::Part) -> EngineStatus {
+    EngineStatus { installed: engine::installed(part), download_bytes: engine::download_bytes(part), available: cfg!(windows) }
 }
 
-/// Settings → Voice → Download: fetches the engine, then listens with it.
+/// Settings → Voice → Download: fetches that part of the engine. The listener
+/// starts again, to hear with it if that is what came.
 #[tauri::command]
-pub async fn voice_engine_install(app: AppHandle) -> Result<(), String> {
-    engine::install(&app).await?;
+pub async fn voice_engine_install(app: AppHandle, part: engine::Part) -> Result<(), String> {
+    engine::install(&app, part).await?;
     restart(&app, shared());
     Ok(())
 }
 
 /// Settings → Voice → Remove: the engine is let go of first, then deleted.
 #[tauri::command]
-pub fn voice_engine_remove(app: AppHandle) {
+pub fn voice_engine_remove(app: AppHandle, part: engine::Part) {
+    speak::unload();
     {
         let mut s = shared();
         s.generation += 1;
@@ -284,9 +306,9 @@ pub fn voice_engine_remove(app: AppHandle) {
             let _ = tx.send(Control::Stop);
         }
     }
-    // The listener unloads the library as it stops.
-    std::thread::sleep(Duration::from_millis(600));
-    engine::remove();
+    // The threads unload the library as they stop.
+    std::thread::sleep(Duration::from_millis(800));
+    engine::remove(part);
     restart(&app, shared());
 }
 
@@ -349,11 +371,11 @@ impl Free {
     /// None when the engine is not installed or will not load: the grammar
     /// recogniser then hears commands as before.
     fn load() -> Option<Self> {
-        if !engine::installed() {
+        if !engine::installed(engine::Part::Hearing) {
             crate::log::line("voice: the bundled engine is chosen but not installed");
             return None;
         }
-        match sherpa::Engine::load(&engine::runtime_dir(), &engine::model_dir()) {
+        match sherpa::Engine::load(&engine::runtime_dir(), &engine::model_dir(engine::Part::Hearing)) {
             Ok(engine) => Some(Self { engine, capture: None, sentences: vad::Sentences::default(), buffer: Vec::new() }),
             Err(why) => {
                 crate::log::line(format!("voice: bundled engine: {why}"));
@@ -449,6 +471,7 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
     let mut paused = false;
     let mut ear = Listen::Nothing;
     let mut held_checked: Option<Instant> = None;
+    let mut hush_until: Option<Instant> = None;
 
     loop {
         // Messages first: a wait for speech below never lasts longer than POLL.
@@ -456,13 +479,18 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
             let heard = match rx.try_recv() {
                 Ok(Control::Stop) | Err(TryRecvError::Disconnected) => return crate::log::line("voice: off"),
                 Err(TryRecvError::Empty) => break,
-                Ok(control) => apply(&mut session, &mut paused, &mut held_checked, control),
+                Ok(control) => apply(&mut session, &mut paused, &mut held_checked, &mut hush_until, control),
             };
             if let Some(heard) = heard {
                 tell(app, heard);
             }
         }
         let now = Instant::now();
+        // While Mochi speaks, what is waited for waits on, and nothing heard counts.
+        let hushed = hush_until.is_some_and(|until| now < until);
+        if hushed {
+            session.speaking(now);
+        }
         if held_checked.is_none_or(|at| now.duration_since(at) >= HOLD_CHECK) {
             held_checked = Some(now);
             if let Some(heard) = session.hold(paused || system_hold()) {
@@ -508,7 +536,7 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
                 Ok(Control::Stop) | Err(RecvTimeoutError::Disconnected) => return crate::log::line("voice: off"),
                 Err(RecvTimeoutError::Timeout) => {}
                 Ok(control) => {
-                    if let Some(heard) = apply(&mut session, &mut paused, &mut held_checked, control) {
+                    if let Some(heard) = apply(&mut session, &mut paused, &mut held_checked, &mut hush_until, control) {
                         tell(app, heard);
                     }
                 }
@@ -529,9 +557,14 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
                         return give_up(app, generation, why);
                     }
                 }
-                if freely && free.speaking() {
+                if hushed {
+                    free.start_over();
+                } else if freely && free.speaking() {
                     session.speaking(Instant::now());
                 }
+            }
+            if hushed {
+                raw = None;
             }
             if let Some(heard) = raw.and_then(|raw| session.heard(raw, Instant::now())) {
                 tell(app, heard);
@@ -540,8 +573,18 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
     }
 }
 
-fn apply(session: &mut Session, paused: &mut bool, held_checked: &mut Option<Instant>, control: Control) -> Option<Heard> {
+fn apply(
+    session: &mut Session,
+    paused: &mut bool,
+    held_checked: &mut Option<Instant>,
+    hush_until: &mut Option<Instant>,
+    control: Control,
+) -> Option<Heard> {
     match control {
+        Control::Hush(until) => {
+            *hush_until = Some(until);
+            None
+        }
         Control::Talk => session.talk(Instant::now()),
         Control::Cancel => {
             session.cancel();

@@ -33,6 +33,9 @@ export interface BootInfo {
   cursorPoll: boolean;
 }
 
+/** The bundled engine's parts (src-tauri/src/voice/engine.rs): what hears free speech, and Mochi's voice. */
+export type VoiceEnginePart = "hearing" | "speaking";
+
 /** src-tauri/src/voice/mod.rs `Status`. */
 export type VoiceStatus =
   | "off" | "listening" | "shortcut" | "paused" | "noRecogniser" | "microphone" | "unsupported" | "error";
@@ -261,12 +264,14 @@ export const Bridge = {
     call<{ calls: { name: string; arguments: Record<string, unknown> }[]; text: string }>(
       "voice_brain", { system, said, tools },
     ),
-  /** Whether the free-speech engine is on this machine, and what getting it costs. */
-  voiceEngineStatus: () =>
-    call<{ installed: boolean; downloadBytes: number; available: boolean }>("voice_engine_status"),
-  /** Downloads the free-speech engine; progress arrives as `voice-engine` events. */
-  voiceEngineInstall: () => call<void>("voice_engine_install"),
-  voiceEngineRemove: () => call<void>("voice_engine_remove"),
+  /** Whether a part of the bundled engine is on this machine, and what getting it costs. */
+  voiceEngineStatus: (part: VoiceEnginePart) =>
+    call<{ installed: boolean; downloadBytes: number; available: boolean }>("voice_engine_status", { part }),
+  /** Downloads that part; progress arrives as `voice-engine` events. */
+  voiceEngineInstall: (part: VoiceEnginePart) => call<void>("voice_engine_install", { part }),
+  voiceEngineRemove: (part: VoiceEnginePart) => call<void>("voice_engine_remove", { part }),
+  /** Mochi says this out loud, when speaking is on and his voice is installed. */
+  voiceSay: (text: string) => call<void>("voice_say", { text }),
   /** Starts the Start-menu app that name means; its name, or null. */
   voiceOpenApp: (name: string) => call<string | null>("voice_open_app", { name }),
   /** Opens one of the user's own folders; its name, or null. */

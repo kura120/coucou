@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { IslandStateMachine } from "../src/island/fsm.ts";
-import { applyVoice, wakeBlocked } from "../src/island/voice.ts";
+import { applyVoice, decodeSpeech, speechGain, wakeBlocked } from "../src/island/voice.ts";
 import { VIEW_LAYOUTS, islandSize } from "../src/core/layout.ts";
 import { isCard, isPlace } from "../src/island/restore.ts";
 import { SHORTCUTS, activeKeys } from "../src/core/shortcuts.ts";
@@ -153,6 +153,29 @@ test("each report reaches the island as what it is", () => {
   assert.equal(calls.length, 5);
 });
 
+// ── Mochi's voice ─────────────────────────────────────────────────────────────
+
+test("speech arrives as 16-bit samples in base64 and plays as it was made", () => {
+  // 0, full scale up, full scale down, a quarter: little-endian, as Rust writes them.
+  const bytes = Uint8Array.from([0x00, 0x00, 0xff, 0x7f, 0x00, 0x80, 0x00, 0x20]);
+  const samples = decodeSpeech(Buffer.from(bytes).toString("base64"));
+  assert.equal(samples.length, 4);
+  assert.equal(samples[0], 0);
+  assert.ok(Math.abs(samples[1] - 1) < 0.001);
+  assert.equal(samples[2], -1);
+  assert.equal(samples[3], 0.25);
+  assert.equal(decodeSpeech("").length, 0);
+  // A byte left over is not half a sample.
+  assert.equal(decodeSpeech(Buffer.from([1, 2, 3]).toString("base64")).length, 1);
+});
+
+test("Mochi speaks at full level at the usual volume, quieter below, never louder", () => {
+  assert.equal(speechGain(0.12), 1);
+  assert.equal(speechGain(0.2), 1);
+  assert.equal(speechGain(0.06), 0.5);
+  assert.equal(speechGain(0), 0);
+});
+
 // ── The view, the shortcut, the setting ───────────────────────────────────────
 
 test("the listening view is the Mac's: 160 high, Mochi at 68, 58 wide", () => {
@@ -181,5 +204,6 @@ test("talking to Coucou has the Mac's key and is off until turned on", () => {
 test("voice is off by default, with the wake phrase ready for when it is turned on", () => {
   assert.deepEqual(DEFAULT_SETTINGS.voice, {
     enabled: false, wake: true, brain: "", brainModel: "", engine: "system", followUp: 8,
+    speak: false, speaker: "female",
   });
 });

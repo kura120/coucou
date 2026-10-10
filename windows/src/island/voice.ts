@@ -10,7 +10,7 @@ import {
 } from "../core/pills";
 import { lastTextStep } from "../core/diff";
 import { Sound } from "../core/sound";
-import { t } from "../i18n/i18n";
+import { language, t } from "../i18n/i18n";
 import { showToast } from "../toast/api";
 import { describeState, runProposal, systemPrompt, toolSchemas, type VoiceWorld } from "../voice/tools";
 import { SPOTIFY_ID, Spotify } from "../core/spotify";
@@ -221,8 +221,73 @@ export const voicePills = () => availablePills(State.os);
 
 export const voiceRunner = new VoiceRunner(liveMusic, livePills, voicePills);
 
+// ── Mochi's voice (src-tauri/src/voice/speak.rs) ──────────────────────────────
+
+/** The sound effects' default volume: Mochi speaks at full level there. */
+const USUAL_VOLUME = 0.12;
+
+let speechContext: AudioContext | null = null;
+let speaking: AudioBufferSourceNode | null = null;
+
+/** 16-bit mono PCM in base64 → samples, -1…1. */
+export function decodeSpeech(pcm: string): Float32Array {
+  const bytes = atob(pcm);
+  const samples = new Float32Array(bytes.length >> 1);
+  for (let i = 0; i < samples.length; i++) {
+    const value = bytes.charCodeAt(i * 2) | (bytes.charCodeAt(i * 2 + 1) << 8);
+    samples[i] = (value >= 0x8000 ? value - 0x10000 : value) / 0x8000;
+  }
+  return samples;
+}
+
+/** How loud Mochi speaks for a Sound volume: the usual volume and above is full. */
+export function speechGain(soundVolume: number): number {
+  return Math.max(0, Math.min(1, soundVolume / USUAL_VOLUME));
+}
+
+export function stopSpeaking() {
+  try {
+    speaking?.stop();
+  } catch {
+    // Already over.
+  }
+  speaking = null;
+}
+
+function playSpeech(speech: { sampleRate: number; pcm: string }) {
+  // Muted is muted, for Mochi's voice like for his sounds.
+  if (!State.settings.soundEnabled || !speech.sampleRate) return;
+  const samples = decodeSpeech(speech.pcm);
+  if (!samples.length) return;
+  stopSpeaking();
+  speechContext ??= new AudioContext();
+  if (speechContext.state === "suspended") void speechContext.resume();
+  const buffer = speechContext.createBuffer(1, samples.length, speech.sampleRate);
+  buffer.getChannelData(0).set(samples);
+  const source = speechContext.createBufferSource();
+  const gain = speechContext.createGain();
+  gain.gain.value = speechGain(State.settings.soundVolume);
+  source.buffer = buffer;
+  source.connect(gain).connect(speechContext.destination);
+  source.onended = () => {
+    if (speaking === source) speaking = null;
+  };
+  speaking = source;
+  source.start();
+}
+
+/**
+ * Has Mochi say what a command did, when speaking is on. English only for
+ * now, like listening: in another language the card says it.
+ */
+export function sayResult(result: VoiceResult) {
+  if (!State.settings.voice.speak || language() !== "en") return;
+  void Bridge.voiceSay(result.message.replace(/[«»]/g, ""));
+}
+
 export function registerVoiceHandlers(island: VoiceHost) {
   void onEvent<VoiceEvent>("voice", (event) => applyVoice(island, event));
+  void onEvent<{ sampleRate: number; pcm: string }>("voice-speech", playSpeech);
   // What the recogniser can hear: nothing listens until it has this.
   const grammar = buildGrammar(voicePills());
   void Bridge.voiceGrammar(grammar.commands, grammar.slots);

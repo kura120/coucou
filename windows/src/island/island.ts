@@ -31,7 +31,9 @@ import { DesktopLink } from "./desktop";
 import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
 import { interruptedAfter, isPlace } from "./restore";
-import { RESULT_SHOWN_MS, askBrain, brainChosen, createWorld, voicePills, voiceRunner, wakeBlocked } from "./voice";
+import {
+  RESULT_SHOWN_MS, askBrain, brainChosen, createWorld, sayResult, stopSpeaking, voicePills, voiceRunner, wakeBlocked,
+} from "./voice";
 import { parseIntent, parseSeveral } from "../voice/intent";
 import type { VoiceResult } from "../voice/runner";
 import { installContextMenu, type ContextMenu, type Rect } from "../views/menu";
@@ -565,6 +567,8 @@ export class Island {
       return;
     }
     this.clearVoiceTimer();
+    // Spoken to: he stops talking and listens.
+    stopSpeaking();
     // The wake phrase, or the answer to a question Mochi just asked.
     State.voice = { text: "", question: voiceRunner.asking ? State.voice.question : "" };
     this.engine.listeningHasWords = false;
@@ -654,6 +658,7 @@ export class Island {
   }
 
   private voiceResult(result: VoiceResult) {
+    sayResult(result);
     if (result.outcome === "question") {
       // Mochi asks and listens again, without the wake phrase.
       State.voice = { text: "", question: result.message };

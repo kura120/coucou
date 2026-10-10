@@ -518,6 +518,13 @@ async fn chat_models(shared: State<'_, Shared>, provider: String) -> Result<Vec<
     chat::models(&settings, &provider).await
 }
 
+/// Mochi says this out loud, when speaking is on in Settings → Voice.
+#[tauri::command]
+fn voice_say(app: AppHandle, shared: State<Shared>, text: String) {
+    let pref = shared.settings.lock().unwrap().voice.clone();
+    voice::say(&app, &pref, &text);
+}
+
 /// What a spoken sentence means, asked of the model server chosen for voice:
 /// the tool calls it proposes, or its answer. The island decides what is done.
 #[tauri::command]
@@ -891,6 +898,7 @@ pub fn run() {
             voice::voice_engine_install,
             voice::voice_engine_remove,
             voice_brain,
+            voice_say,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
