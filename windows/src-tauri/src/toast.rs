@@ -560,7 +560,7 @@ pub fn show_sample(app: &AppHandle, which: &str) {
             Some("Your question goes to a model server that is not on this machine.".into()),
         );
     }
-    if which == "error" {
+    if all || which == "error" {
         show(app, Toast::new(Kind::Error, "Sample: error").text("Something went wrong."));
     }
     if all || which == "decision" {
