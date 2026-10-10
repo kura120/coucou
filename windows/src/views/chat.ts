@@ -843,6 +843,12 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     log.scrollTop = log.scrollHeight;
   });
 
+  // The session Claude Code answers in, so its end is not announced over the
+  // chat as another session's would be (island/hooks.ts).
+  void onEvent<string>("chat-session", (session) => {
+    if (sending && session) State.chatSessionId = session;
+  });
+
   void onEvent<ChatEdit>("chat-edit", (edit) => {
     if (!sending || !edit) return;
     const diff = buildFileDiff(edit.tool, edit.input ?? {});

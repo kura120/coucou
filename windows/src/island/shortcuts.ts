@@ -54,8 +54,9 @@ export function runGlobalShortcut(host: ShortcutHost, action: string, resume: ()
         host.collapse();
       } else {
         resume();
-        // A waiting card is what the island opens on (State.defaultView).
-        host.alert(State.defaultView());
+        // A waiting card is what the island opens on, else where it was left
+        // (State.resumeView).
+        host.alert(State.resumeView());
         host.takeKeyboard();
       }
       break;

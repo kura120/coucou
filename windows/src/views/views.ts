@@ -32,6 +32,12 @@ export interface ViewActions {
   /** "Cancel" on a dropped file: forgets it and goes back home. */
   cancelDrop(): void;
   collapse(): void;
+  /**
+   * A card's own button sends it away. Over what the user was doing, that
+   * comes back; a card that opened the island folds it ("collapse") or shows
+   * the session it was about ("home").
+   */
+  dismissCard(otherwise: "collapse" | "home"): void;
   /** Folds a waiting card to the compact island without answering it. */
   foldApproval(): void;
   setFocus(id: string): void;
@@ -675,7 +681,7 @@ function buildError(actions: ViewActions): ViewHost {
   const title = h("div", { class: "title" });
   const detail = h("div", { class: "detail" });
   const row = h("div", { class: "actions" },
-    btn(tl("Retry"), "primary", () => actions.setView(State.defaultView())),
+    btn(tl("Retry"), "primary", () => actions.dismissCard("home")),
     btn(tl("Open in n8n"), "secondary", () => actions.openUrl("")),
   );
   const el = h("div", { class: "view" }, card("red", stack(116, 16, who, title, detail, row)));
@@ -701,7 +707,7 @@ function buildFinished(actions: ViewActions): ViewHost {
   const open = btn(tl("Open terminal"), "primary", () => actions.openTerminal());
   const row = h("div", { class: "actions" },
     open,
-    btn(tl("OK"), "secondary", () => actions.collapse()),
+    btn(tl("OK"), "secondary", () => actions.dismissCard("collapse")),
   );
   const el = h("div", { class: "view" }, card("green", stack(116, 16, who, title, row)));
   return {

@@ -60,7 +60,7 @@ async function main() {
         break;
       case "open":
         setPaused(false);
-        island.alert(State.defaultView());
+        island.alert(State.resumeView());
         break;
       case "recap":
         setPaused(false);

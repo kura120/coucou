@@ -313,6 +313,7 @@ pub async fn send(
     let answer = tauri::async_runtime::spawn_blocking(move || {
         run(&exe, &args, &cwd, &line, quiet, |update| {
             let _ = match update {
+                Update::Session(session) => island.emit_to(WINDOW_LABEL, "chat-session", session),
                 Update::Text(visible) => island.emit_to(WINDOW_LABEL, "chat-delta", visible),
                 Update::Edit { tool, input } => {
                     island.emit_to(WINDOW_LABEL, "chat-edit", json!({ "tool": tool, "input": input }))
@@ -344,6 +345,9 @@ struct Answer {
 /// What a running turn has to show.
 #[derive(Debug, PartialEq)]
 enum Update {
+    /// The session the turn runs in, as soon as Claude Code names it: its
+    /// hooks fire under that name, and the island must know them for its own.
+    Session(String),
     /// The visible text so far.
     Text(String),
     /// A file edit that went through: the tool and its input.
@@ -416,7 +420,10 @@ fn run(
         };
         heard = Instant::now();
         match event {
-            Event::Session(id) => session = Some(id),
+            Event::Session(id) => {
+                on_update(Update::Session(id.clone()));
+                session = Some(id);
+            }
             Event::Delta(delta) => {
                 text.push_str(&delta);
                 if text.len() > MAX_ANSWER {
