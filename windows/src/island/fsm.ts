@@ -1,7 +1,8 @@
 // Island open/close FSM — port of IslandStateMachine.swift.
 // No DOM, no Tauri: it only reports transitions.
 
-export type FsmState = "hidden" | "petit" | "home" | "coucou";
+/** "listening": open on the voice view, from the wake phrase to the end of the command. */
+export type FsmState = "hidden" | "petit" | "home" | "coucou" | "listening";
 
 export class IslandStateMachine {
   state: FsmState = "hidden";
@@ -63,6 +64,7 @@ export class IslandStateMachine {
   private homeDelay = 15;
   private byHover = false;
   private isTyping = false;
+  private beforeListening: FsmState = "hidden";
   private petitHide: number | null = null;
   private homeCollapse: number | null = null;
   private greetCollapse: number | null = null;
@@ -95,6 +97,8 @@ export class IslandStateMachine {
       case "coucou":
         this.scheduleGreetCollapse(this.greetHoverCollapseDelay);
         break;
+      case "listening":
+        break;
     }
   }
 
@@ -112,6 +116,9 @@ export class IslandStateMachine {
         this.clear("greetCollapse");
         this.transition("petit");
         break;
+      case "listening":
+        // Never folds while it listens.
+        break;
     }
   }
 
@@ -120,6 +127,27 @@ export class IslandStateMachine {
     if (this.state !== "petit") return;
     this.cancelTimers();
     this.transition("home");
+  }
+
+  // ── Voice ───────────────────────────────────────────────────────────────────
+
+  /** The wake phrase was heard: open on the listening view, from any state. */
+  voiceWoke() {
+    if (this.state === "listening") return;
+    this.beforeListening = this.state;
+    this.cancelTimers();
+    this.byHover = false;
+    this.transition("listening");
+  }
+
+  /**
+   * The command is over: an island that was open is open again, any other
+   * goes back to compact (IslandStateMachine.voiceFinished). The island starts
+   * the usual countdowns, as it does for every open or compact island.
+   */
+  voiceFinished() {
+    if (this.state !== "listening") return;
+    this.transition(this.beforeListening === "home" ? "home" : "petit");
   }
 
   /** Greeting animation finished (T.end). Doesn't override a running hover timer. */

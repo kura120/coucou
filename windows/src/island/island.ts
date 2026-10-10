@@ -31,6 +31,7 @@ import { DesktopLink } from "./desktop";
 import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
 import { interruptedAfter, isPlace } from "./restore";
+import { HEARD_SHOWN_MS, MISSED_SHOWN_MS, wakeBlocked } from "./voice";
 import { installContextMenu, type ContextMenu, type Rect } from "../views/menu";
 
 const BOT_OVERHANG = 40;
@@ -121,6 +122,7 @@ export class Island {
   private botHoverStart = { x: 0, y: 0 };
 
   private confusedRecovery: number | null = null;
+  private voiceTimer: number | null = null;
   private prevViewBeforeConfused: IslandViewName = "overview";
   /** The chat is on screen and the island has taken the keyboard for it. */
   private chatHasKeyboard = false;
@@ -368,6 +370,7 @@ export class Island {
     this.fsm.onTransition = (from, to) => {
       // The greeting is over, however it ended: back to his desktop spot.
       if (from === "coucou" && to !== "coucou") this.desktop.launch();
+      if (from === "listening") this.leftListening();
       switch (to) {
         case "hidden":
           this.setMode("hidden");
@@ -376,7 +379,7 @@ export class Island {
           if (from === "coucou") this.greeting.interrupt();
           else if (from === "hidden" && !this.silentReveal) Sound.play("peek");
           this.setMode("compact");
-          if (from === "coucou") State.view = State.resumeView();
+          if (from === "coucou" || from === "listening") State.view = State.resumeView();
           if (!this.wasInIsland) this.fsm.mouseLeft();
           break;
         case "home":
@@ -390,6 +393,12 @@ export class Island {
         case "coucou":
           this.expand("greeting");
           this.greeting.start();
+          break;
+        case "listening":
+          if (from === "coucou") this.greeting.interrupt();
+          this.expand("listening");
+          this.engine.enterListening();
+          Sound.play("question");
           break;
       }
       State.notify();
@@ -456,6 +465,8 @@ export class Island {
   }
 
   setView(view: IslandViewName) {
+    // Going anywhere else ends the listening: the island is simply open again.
+    if (this.fsm.state === "listening" && view !== "listening") this.fsm.forceHome();
     this.stopSequenceIfLeaving(view);
     if (view !== "overview") closePlanCard();
     if (State.mode !== "expanded") {
@@ -537,6 +548,67 @@ export class Island {
     }
     if (State.paused) return;
     this.alert("wardrobe");
+  }
+
+  // ── Voice (island/voice.ts) ─────────────────────────────────────────────────
+
+  /** The wake phrase, or the "Talk to Coucou" shortcut. */
+  voiceWoke() {
+    if (wakeBlocked(State.view, State.mode, State.pendingApproval != null, State.paused)) {
+      void Bridge.voiceCancel();
+      return;
+    }
+    this.clearVoiceTimer();
+    State.voice = { text: "", outcome: "listening" };
+    this.engine.listeningHasWords = false;
+    this.fsm.voiceWoke();
+    State.notify();
+  }
+
+  /** Words so far, or the whole command (`final`), which then stays a moment. */
+  voiceHeard(text: string, final: boolean) {
+    if (this.fsm.state !== "listening") return;
+    State.voice = { text, outcome: final ? "heard" : "listening" };
+    this.engine.listeningHasWords = text !== "";
+    if (final) {
+      this.engine.triggerEmote("happy");
+      this.voiceEndsIn(HEARD_SHOWN_MS);
+    }
+    State.notify();
+  }
+
+  /** Something was said and it was no command. */
+  voiceMissed() {
+    if (this.fsm.state !== "listening") return;
+    State.voice = { text: "", outcome: "missed" };
+    this.voiceEndsIn(MISSED_SHOWN_MS);
+    State.notify();
+  }
+
+  /** Nothing was said: back to where the island was. */
+  voiceCancelled() {
+    this.fsm.voiceFinished();
+  }
+
+  private voiceEndsIn(ms: number) {
+    this.clearVoiceTimer();
+    this.voiceTimer = window.setTimeout(() => {
+      this.voiceTimer = null;
+      this.fsm.voiceFinished();
+    }, ms);
+  }
+
+  private clearVoiceTimer() {
+    if (this.voiceTimer != null) window.clearTimeout(this.voiceTimer);
+    this.voiceTimer = null;
+  }
+
+  /** The island is no longer on the listening view, however that happened. */
+  private leftListening() {
+    this.clearVoiceTimer();
+    this.engine.exitListening();
+    // Rust stops waiting for a command; it has nothing to stop when it ended this itself.
+    void Bridge.voiceCancel();
   }
 
   /** An alert stopped waiting for an answer: let the island auto-close again. */

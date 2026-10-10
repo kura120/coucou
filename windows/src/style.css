@@ -939,6 +939,38 @@ body {
   gap: 5px;
 }
 
+/* ── Listening ("OK Coucou") ────────────────────────────────────────────── */
+
+.listening-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* What was heard reads brighter than the hint it replaces. */
+.view .sub.heard {
+  color: #c8cbd0;
+}
+
+.mic-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: #f97316;
+}
+
+.mic-dot.on {
+  animation: mic-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes mic-pulse {
+  to {
+    transform: scale(1.35);
+    opacity: 0.65;
+  }
+}
+
 .actions {
   display: flex;
   gap: 8px;

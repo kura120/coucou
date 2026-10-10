@@ -156,7 +156,9 @@ export function buildHeader(actions: ViewActions): ViewHost {
       clear(soundBtn);
       soundBtn.append(svg(State.settings.soundEnabled ? ICONS.speakerOn : ICONS.speakerOff, ACTION_ICON));
       syncPlanPills();
-      el.style.opacity = v === "confused" ? "0" : "1";
+      // Nothing to navigate to while Mochi is dizzy or listening.
+      el.style.opacity = v === "confused" || v === "listening" ? "0" : "1";
+      el.style.pointerEvents = v === "listening" ? "none" : "";
     },
   };
 
@@ -754,6 +756,30 @@ function buildConfused(): ViewHost {
 
 // ── Note ──────────────────────────────────────────────────────────────────────
 
+/** "OK Coucou": what Mochi hears, as he hears it (VoiceListeningView). */
+function buildListening(): ViewHost {
+  const micDot = h("span", { class: "mic-dot" });
+  const title = h("div", { class: "title" });
+  const line = h("div", { class: "sub" });
+  const body = h(
+    "div",
+    { class: "stack", style: "padding:0 18px 0 110px" },
+    h("div", { class: "listening-head" }, micDot, title),
+    line,
+  );
+  return {
+    el: h("div", { class: "view" }, card("cyan", body)),
+    sync() {
+      const { text, outcome } = State.voice;
+      title.textContent = outcome === "missed" ? t("Command not recognised") : t("Listening…");
+      line.textContent = text || (outcome === "listening" ? t("Say your command") : "");
+      line.classList.toggle("heard", text !== "");
+      // Pulses only while it is on screen and still listening.
+      micDot.classList.toggle("on", outcome === "listening" && State.mode === "expanded" && State.view === "listening");
+    },
+  };
+}
+
 function buildNote(): ViewHost {
   const title = h("div", { class: "title" });
   const el = h("div", { class: "view" }, card(null, h("div", { class: "stack", style: "padding:0 18px 0 98px" }, title)));
@@ -863,6 +889,7 @@ export function buildViews(
   map.set("choose", buildChoose(actions));
   map.set("recap", buildRecap(actions));
   map.set("wardrobe", buildWardrobe(actions));
+  map.set("listening", buildListening());
   // Not in the Windows v1: sending a file by email, window attach + web result.
   map.set("mail", buildPlaceholder(tl("Sending by email isn't in this version."), ""));
   map.set("searching", buildPlaceholder(tl("Claude is searching…"), ""));
