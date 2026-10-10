@@ -261,6 +261,12 @@ export const Bridge = {
     call<{ calls: { name: string; arguments: Record<string, unknown> }[]; text: string }>(
       "voice_brain", { system, said, tools },
     ),
+  /** Whether the free-speech engine is on this machine, and what getting it costs. */
+  voiceEngineStatus: () =>
+    call<{ installed: boolean; downloadBytes: number; available: boolean }>("voice_engine_status"),
+  /** Downloads the free-speech engine; progress arrives as `voice-engine` events. */
+  voiceEngineInstall: () => call<void>("voice_engine_install"),
+  voiceEngineRemove: () => call<void>("voice_engine_remove"),
   /** Starts the Start-menu app that name means; its name, or null. */
   voiceOpenApp: (name: string) => call<string | null>("voice_open_app", { name }),
   /** Opens one of the user's own folders; its name, or null. */

@@ -35,6 +35,9 @@ windows = { version = "0.61", features = [
   "Media_Control",
   # "OK Coucou": Windows' own speech recogniser, in this process (voice/sapi.rs).
   "Win32_Media_Speech",
+  # The microphone for the bundled speech engine (voice/capture.rs).
+  "Win32_Media_Audio",
+  "Win32_System_Com_StructuredStorage",
   "Win32_System_Variant",
   # Voice stops listening while the screen is locked or on battery saver.
   "Win32_System_Power",
@@ -49,6 +52,8 @@ windows = { version = "0.61", features = [
   "Win32_System_Com",
   # Paste in the right-click menu reads the clipboard's text (clipboard.rs).
   "Win32_System_DataExchange",
+  # The bundled speech engine is a DLL loaded from the user's folder (voice/sherpa.rs).
+  "Win32_System_LibraryLoader",
   "Win32_System_Memory",
   "Win32_System_Ole",
   "Win32_System_Pipes",

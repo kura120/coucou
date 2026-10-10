@@ -18,6 +18,12 @@
 // recogniser is the one engine for now (sapi.rs), English only. Linux has no
 // system recogniser: it waits for the bundled engine.
 //
+// With the bundled engine installed and chosen (engine.rs, sherpa.rs), the
+// wake phrase is still Windows' — it hears "coucou" where the free engine does
+// not — and the command after it is free speech: the microphone is read here
+// (capture.rs), a sentence is cut out of it (vad.rs) and written down. For a
+// few seconds after a command, another may follow without the wake phrase.
+//
 // A fixed-grammar recogniser hears only what it was given. The commands come
 // from the island (`voice_grammar`), which writes them next to the parser
 // that understands them: nothing listens until it has sent them.
@@ -39,15 +45,20 @@ use crate::settings::VoicePref;
 
 mod apps;
 pub mod brain;
+#[cfg(windows)]
+mod capture;
+pub mod engine;
 mod grammar;
 #[cfg(windows)]
 mod sapi;
+mod sherpa;
+mod vad;
 mod session;
 
 #[cfg(windows)]
 use sapi::Recogniser;
 use grammar::Grammar;
-use session::{Heard, Listen, Session};
+use session::{Heard, Listen, Raw, Rule, Session};
 
 const EVENT: &str = "voice";
 const STATUS_EVENT: &str = "voice-status";
@@ -101,10 +112,22 @@ enum Control {
     Stop,
 }
 
+/// How the listener runs, from the settings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Plan {
+    wake: bool,
+    /// The bundled engine writes down the command, when it is installed.
+    free: bool,
+    follow_up: u32,
+}
+
+/// The longest follow-up time a settings file can ask for, in seconds.
+const MAX_FOLLOW_UP: u32 = 30;
+
 struct Shared {
     generation: u64,
-    /// The wake setting, when voice is on in Settings.
-    want: Option<bool>,
+    /// The plan, when voice is on in Settings.
+    want: Option<Plan>,
     /// What the island said can be heard; None until it has.
     grammar: Option<Arc<Grammar>>,
     tx: Option<Sender<Control>>,
@@ -122,7 +145,11 @@ fn shared() -> MutexGuard<'static, Shared> {
 /// Starts, stops or restarts the listener to match the settings. Called at
 /// launch and on every save.
 pub fn sync(app: &AppHandle, pref: &VoicePref) {
-    let want = pref.enabled.then_some(pref.wake);
+    let want = pref.enabled.then(|| Plan {
+        wake: pref.wake,
+        free: pref.engine == "bundled",
+        follow_up: pref.follow_up.min(MAX_FOLLOW_UP),
+    });
     let mut s = shared();
     if s.want == want {
         return;
@@ -154,7 +181,7 @@ fn restart(app: &AppHandle, mut s: MutexGuard<'static, Shared>) {
     if let Some(tx) = s.tx.take() {
         let _ = tx.send(Control::Stop);
     }
-    let (Some(wake), Some(grammar)) = (s.want, s.grammar.clone()) else {
+    let (Some(plan), Some(grammar)) = (s.want, s.grammar.clone()) else {
         drop(s);
         set_status(app, None, Status::Off);
         return;
@@ -169,7 +196,7 @@ fn restart(app: &AppHandle, mut s: MutexGuard<'static, Shared>) {
     let app = app.clone();
     let spawned = std::thread::Builder::new()
         .name("voice".into())
-        .spawn(move || listen(&app, generation, wake, &grammar, &rx));
+        .spawn(move || listen(&app, generation, plan, &grammar, &rx));
     if let Err(err) = spawned {
         crate::log::line(format!("voice: no thread: {err}"));
     }
@@ -224,6 +251,45 @@ pub fn voice_open_folder(name: String) -> Option<String> {
     Some(folder)
 }
 
+/// Whether the bundled speech engine is on this machine, and what getting it costs.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EngineStatus {
+    installed: bool,
+    download_bytes: u64,
+    /// False where there is no build of it for this system yet.
+    available: bool,
+}
+
+#[tauri::command]
+pub fn voice_engine_status() -> EngineStatus {
+    EngineStatus { installed: engine::installed(), download_bytes: engine::DOWNLOAD_BYTES, available: cfg!(windows) }
+}
+
+/// Settings → Voice → Download: fetches the engine, then listens with it.
+#[tauri::command]
+pub async fn voice_engine_install(app: AppHandle) -> Result<(), String> {
+    engine::install(&app).await?;
+    restart(&app, shared());
+    Ok(())
+}
+
+/// Settings → Voice → Remove: the engine is let go of first, then deleted.
+#[tauri::command]
+pub fn voice_engine_remove(app: AppHandle) {
+    {
+        let mut s = shared();
+        s.generation += 1;
+        if let Some(tx) = s.tx.take() {
+            let _ = tx.send(Control::Stop);
+        }
+    }
+    // The listener unloads the library as it stops.
+    std::thread::sleep(Duration::from_millis(600));
+    engine::remove();
+    restart(&app, shared());
+}
+
 /// The island left the listening view by itself (Escape, a card coming up).
 #[tauri::command]
 pub fn voice_cancel() {
@@ -255,6 +321,11 @@ fn tell(app: &AppHandle, heard: Heard) {
         Heard::Final(text) => ("final", text),
         Heard::Missed => ("missed", String::new()),
         Heard::Cancelled => ("cancelled", String::new()),
+        // The island opens on its listening view again, then hears the command.
+        Heard::Again(text) => {
+            tell(app, Heard::Woke);
+            ("final", text)
+        }
     };
     // Never the words: docs/VOICE.md.
     if phase != "partial" {
@@ -263,13 +334,118 @@ fn tell(app: &AppHandle, heard: Heard) {
     let _ = app.emit_to(WINDOW_LABEL, EVENT, Event { phase, text });
 }
 
-fn listen(app: &AppHandle, generation: u64, wake: bool, grammar: &Grammar, rx: &Receiver<Control>) {
+/// The bundled engine at work: the microphone, the sentence being said, and
+/// what writes it down.
+#[cfg(windows)]
+struct Free {
+    engine: sherpa::Engine,
+    capture: Option<capture::Capture>,
+    sentences: vad::Sentences,
+    buffer: Vec<f32>,
+}
+
+#[cfg(windows)]
+impl Free {
+    /// None when the engine is not installed or will not load: the grammar
+    /// recogniser then hears commands as before.
+    fn load() -> Option<Self> {
+        if !engine::installed() {
+            crate::log::line("voice: the bundled engine is chosen but not installed");
+            return None;
+        }
+        match sherpa::Engine::load(&engine::runtime_dir(), &engine::model_dir()) {
+            Ok(engine) => Some(Self { engine, capture: None, sentences: vad::Sentences::default(), buffer: Vec::new() }),
+            Err(why) => {
+                crate::log::line(format!("voice: bundled engine: {why}"));
+                None
+            }
+        }
+    }
+
+    /// Opens or closes the microphone.
+    fn open(&mut self, on: bool) -> Result<(), Unavailable> {
+        if on && self.capture.is_none() {
+            self.capture = Some(capture::Capture::open()?);
+        } else if !on {
+            if let Some(capture) = self.capture.take() {
+                capture::release_com(capture);
+            }
+        }
+        Ok(())
+    }
+
+    /// What is being said so far is not part of what comes next.
+    fn start_over(&mut self) {
+        self.sentences.clear();
+    }
+
+    /// Reads the microphone for at most `wait`. A sentence that just ended
+    /// comes back written down — or `Rejected` when it was not words — when
+    /// `wanted`; else it is only listened to, so the room stays known.
+    fn next(&mut self, wait: Duration, wanted: bool) -> Result<Option<Raw>, Unavailable> {
+        let Some(capture) = self.capture.as_mut() else { return Ok(None) };
+        self.buffer.clear();
+        capture.read(wait, &mut self.buffer)?;
+        let Some(sentence) = self.sentences.feed(&self.buffer) else { return Ok(None) };
+        if !wanted {
+            return Ok(None);
+        }
+        let text = session::without_wake(&self.engine.transcribe(vad::SAMPLE_RATE, &sentence));
+        Ok(Some(if text.chars().any(char::is_alphanumeric) {
+            Raw::Phrase { rule: Rule::Command, text, confidence: 1.0 }
+        } else {
+            Raw::Rejected
+        }))
+    }
+
+    fn speaking(&self) -> bool {
+        self.sentences.speaking()
+    }
+}
+
+#[cfg(windows)]
+impl Drop for Free {
+    fn drop(&mut self) {
+        let _ = self.open(false);
+    }
+}
+
+/// No bundled engine for this system yet.
+#[cfg(not(windows))]
+struct Free;
+
+#[cfg(not(windows))]
+impl Free {
+    fn load() -> Option<Self> {
+        None
+    }
+
+    fn open(&mut self, _on: bool) -> Result<(), Unavailable> {
+        Ok(())
+    }
+
+    fn start_over(&mut self) {}
+
+    fn next(&mut self, _wait: Duration, _wanted: bool) -> Result<Option<Raw>, Unavailable> {
+        Ok(None)
+    }
+
+    fn speaking(&self) -> bool {
+        false
+    }
+}
+
+fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &Receiver<Control>) {
+    let wake = plan.wake;
     let mut recogniser = match Recogniser::open(grammar) {
         Ok(recogniser) => recogniser,
         Err(why) => return give_up(app, generation, why),
     };
-    crate::log::line("voice: on");
-    let mut session = Session::new(wake);
+    let mut free = if plan.free { Free::load() } else { None };
+    crate::log::line(if free.is_some() { "voice: on, free speech" } else { "voice: on" });
+    // Another command without the wake phrase only where any sentence can be heard.
+    let follow_up = if free.is_some() { Duration::from_secs(u64::from(plan.follow_up)) } else { Duration::ZERO };
+    let mut session = Session::new(wake, follow_up);
     let mut paused = false;
     let mut ear = Listen::Nothing;
     let mut held_checked: Option<Instant> = None;
@@ -299,7 +475,19 @@ fn listen(app: &AppHandle, generation: u64, wake: bool, grammar: &Grammar, rx: &
 
         let want = session.listen();
         if want != ear {
-            if let Err(why) = recogniser.listen(want) {
+            // With the free engine, Windows' recogniser only ever hears the wake phrase.
+            let freely = free.is_some() && matches!(want, Listen::Command | Listen::FollowUp);
+            let system = if freely { Listen::Nothing } else { want };
+            let mut turned = recogniser.listen(system);
+            if let (Ok(()), Some(free)) = (&turned, free.as_mut()) {
+                // The microphone stays open through the wake phrase too, so the
+                // room is known and a command's first sound is not lost.
+                turned = free.open(want != Listen::Nothing);
+                if want == Listen::Command {
+                    free.start_over();
+                }
+            }
+            if let Err(why) = turned {
                 if ear == Listen::Command || want == Listen::Command {
                     tell(app, Heard::Cancelled);
                 }
@@ -325,8 +513,27 @@ fn listen(app: &AppHandle, generation: u64, wake: bool, grammar: &Grammar, rx: &
                     }
                 }
             }
-        } else if let Some(raw) = recogniser.next(POLL) {
-            if let Some(heard) = session.heard(raw, Instant::now()) {
+        } else {
+            let freely = free.is_some() && matches!(ear, Listen::Command | Listen::FollowUp);
+            // Windows' recogniser when it is the one listening; else a short nap
+            // is the microphone's wait below.
+            let mut raw = if freely { None } else { recogniser.next(POLL) };
+            if let Some(free) = free.as_mut() {
+                let wait = if freely { POLL } else { Duration::ZERO };
+                match free.next(wait, freely) {
+                    Ok(sentence) => raw = raw.or(sentence),
+                    Err(why) => {
+                        if ear == Listen::Command {
+                            tell(app, Heard::Cancelled);
+                        }
+                        return give_up(app, generation, why);
+                    }
+                }
+                if freely && free.speaking() {
+                    session.speaking(Instant::now());
+                }
+            }
+            if let Some(heard) = raw.and_then(|raw| session.heard(raw, Instant::now())) {
                 tell(app, heard);
             }
         }
@@ -405,5 +612,51 @@ impl Recogniser {
     fn next(&mut self, wait: Duration) -> Option<session::Raw> {
         std::thread::sleep(wait);
         None
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    /// The free-speech path on real audio, without a microphone: a recorded
+    /// sentence with quiet around it is fed as a microphone would give it, cut
+    /// out by the voice detector and written down by the engine.
+    /// `COUCOU_VOICE_RUNTIME`, `COUCOU_VOICE_MODEL` and `COUCOU_VOICE_WAV`
+    /// (16-bit mono) say where things are.
+    /// `cargo test -p coucou voice::tests -- --ignored --nocapture`
+    #[test]
+    #[ignore = "needs the downloaded engine"]
+    fn a_sentence_in_a_stream_is_cut_out_and_written_down() {
+        let var = |name: &str| std::path::PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set")));
+        let engine = sherpa::Engine::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_MODEL")).expect("engine");
+        let bytes = std::fs::read(var("COUCOU_VOICE_WAV")).expect("wav");
+        let rate = u32::from_le_bytes(bytes[24..28].try_into().unwrap()) as f64;
+        let data = bytes.windows(4).position(|w| w == b"data").expect("data chunk") + 8;
+        let recorded: Vec<f32> = bytes[data..].chunks_exact(2).map(|b| f32::from(i16::from_le_bytes([b[0], b[1]])) / 32768.0).collect();
+        // To the microphone's rate, the plain way: this is a test, not the capture.
+        let step = rate / f64::from(vad::SAMPLE_RATE);
+        let speech: Vec<f32> = (0..(recorded.len() as f64 / step) as usize).map(|i| recorded[(i as f64 * step) as usize]).collect();
+        let quiet = |seconds: f64| -> Vec<f32> {
+            (0..(seconds * f64::from(vad::SAMPLE_RATE)) as usize).map(|i| if i % 3 == 0 { 0.0006 } else { -0.0004 }).collect()
+        };
+        let stream = [quiet(1.5), speech, quiet(1.5)].concat();
+
+        let mut sentences = vad::Sentences::default();
+        let mut heard = Vec::new();
+        // 10 ms at a time, like the microphone.
+        for chunk in stream.chunks(160) {
+            if let Some(sentence) = sentences.feed(chunk) {
+                let seconds = sentence.len() as f64 / f64::from(vad::SAMPLE_RATE);
+                let text = session::without_wake(&engine.transcribe(vad::SAMPLE_RATE, &sentence));
+                println!("a sentence of {seconds:.1} s: {text:?}");
+                heard.push(text);
+            }
+        }
+        assert_eq!(heard.len(), 1, "one sentence was said");
+        let expected = std::env::var("COUCOU_VOICE_EXPECT").unwrap_or_default().to_lowercase();
+        for word in expected.split_whitespace() {
+            assert!(heard[0].to_lowercase().contains(word), "{word:?} not in {:?}", heard[0]);
+        }
     }
 }

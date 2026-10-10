@@ -4260,6 +4260,83 @@
    "pt-BR": "O Spotify está desativado nos Ajustes",
    "ru": "Spotify выключен в настройках",
    "id": "Spotify dimatikan di Pengaturan"
+  },
+  "Hear free speech": {
+   "zh-Hans": "听懂自由语音",
+   "hi": "खुली बातचीत सुनें",
+   "es": "Oír habla libre",
+   "ar": "سماع الكلام الحر",
+   "fr": "Entendre la parole libre",
+   "bn": "মুক্ত কথা শুনুন",
+   "pt-BR": "Ouvir fala livre",
+   "ru": "Слышать свободную речь",
+   "id": "Dengar ucapan bebas"
+  },
+  "Download ({0} MB)": {
+   "zh-Hans": "下载（{0} MB）",
+   "hi": "डाउनलोड करें ({0} MB)",
+   "es": "Descargar ({0} MB)",
+   "ar": "تنزيل ({0} م.ب)",
+   "fr": "Télécharger ({0} Mo)",
+   "bn": "ডাউনলোড ({0} MB)",
+   "pt-BR": "Baixar ({0} MB)",
+   "ru": "Скачать ({0} МБ)",
+   "id": "Unduh ({0} MB)"
+  },
+  "Downloading… {0} %": {
+   "zh-Hans": "正在下载… {0}%",
+   "hi": "डाउनलोड हो रहा है… {0}%",
+   "es": "Descargando… {0} %",
+   "ar": "جارٍ التنزيل… {0}٪",
+   "fr": "Téléchargement… {0} %",
+   "bn": "ডাউনলোড হচ্ছে… {0}%",
+   "pt-BR": "Baixando… {0}%",
+   "ru": "Загрузка… {0} %",
+   "id": "Mengunduh… {0}%"
+  },
+  "The download failed. Try again.": {
+   "zh-Hans": "下载失败，请重试。",
+   "hi": "डाउनलोड विफल रहा। फिर से प्रयास करें।",
+   "es": "La descarga ha fallado. Inténtalo de nuevo.",
+   "ar": "فشل التنزيل. حاول مرة أخرى.",
+   "fr": "Le téléchargement a échoué. Réessayez.",
+   "bn": "ডাউনলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
+   "pt-BR": "O download falhou. Tente novamente.",
+   "ru": "Не удалось скачать. Попробуйте ещё раз.",
+   "id": "Unduhan gagal. Coba lagi."
+  },
+  "Lets a command be said in your own words, not only the sentences Windows was given. The engine and its English model (sherpa-onnx and Moonshine) are downloaded from GitHub when you ask, checked, and run on this computer. The wake phrase stays Windows' own.": {
+   "zh-Hans": "让你可以用自己的话说出命令，而不只是 Windows 已知的句子。引擎及其英语模型（sherpa-onnx 和 Moonshine）在你要求时从 GitHub 下载并校验，在这台电脑上运行。唤醒词仍由 Windows 自己识别。",
+   "hi": "आदेश को अपने शब्दों में कहने देता है, केवल उन वाक्यों तक सीमित नहीं जो Windows को दिए गए थे। इंजन और उसका अंग्रेज़ी मॉडल (sherpa-onnx और Moonshine) आपके कहने पर GitHub से डाउनलोड होते हैं, जाँचे जाते हैं और इसी कंप्यूटर पर चलते हैं। वेक वाक्यांश Windows का ही रहता है।",
+   "es": "Permite decir una orden con tus propias palabras, no solo las frases que se le dieron a Windows. El motor y su modelo en inglés (sherpa-onnx y Moonshine) se descargan de GitHub cuando lo pides, se comprueban y se ejecutan en este equipo. La frase de activación sigue siendo la de Windows.",
+   "ar": "يتيح قول الأمر بكلماتك أنت، لا بالجمل التي أُعطيت لـ Windows فقط. يُنزَّل المحرك ونموذجه الإنجليزي (sherpa-onnx و Moonshine) من GitHub عند طلبك، ويُتحقق منهما، ويعملان على هذا الحاسوب. تبقى عبارة التنبيه خاصة بـ Windows.",
+   "fr": "Permet de dire une commande avec vos propres mots, pas seulement les phrases données à Windows. Le moteur et son modèle anglais (sherpa-onnx et Moonshine) sont téléchargés depuis GitHub quand vous le demandez, vérifiés, et tournent sur cet ordinateur. La phrase de réveil reste celle de Windows.",
+   "bn": "কমান্ড নিজের ভাষায় বলা যায়, শুধু Windows-কে দেওয়া বাক্যগুলো নয়। ইঞ্জিন ও তার ইংরেজি মডেল (sherpa-onnx এবং Moonshine) আপনি চাইলে GitHub থেকে ডাউনলোড হয়, যাচাই করা হয় এবং এই কম্পিউটারেই চলে। ওয়েক ফ্রেজটি Windows-এরই থাকে।",
+   "pt-BR": "Permite dizer um comando com as suas palavras, não só as frases dadas ao Windows. O mecanismo e seu modelo em inglês (sherpa-onnx e Moonshine) são baixados do GitHub quando você pede, verificados e executados neste computador. A frase de ativação continua sendo a do Windows.",
+   "ru": "Позволяет произносить команду своими словами, а не только фразами, заданными Windows. Движок и его английская модель (sherpa-onnx и Moonshine) скачиваются с GitHub по вашей просьбе, проверяются и работают на этом компьютере. Фразу активации по-прежнему распознаёт Windows.",
+   "id": "Memungkinkan perintah diucapkan dengan kata-kata Anda sendiri, bukan hanya kalimat yang diberikan ke Windows. Mesin dan model bahasa Inggrisnya (sherpa-onnx dan Moonshine) diunduh dari GitHub saat Anda memintanya, diperiksa, dan dijalankan di komputer ini. Frasa pembangun tetap milik Windows."
+  },
+  "Keep listening after a command": {
+   "zh-Hans": "命令之后继续聆听",
+   "hi": "आदेश के बाद सुनते रहें",
+   "es": "Seguir escuchando tras una orden",
+   "ar": "متابعة الاستماع بعد الأمر",
+   "fr": "Continuer d’écouter après une commande",
+   "bn": "কমান্ডের পরে শুনতে থাকুন",
+   "pt-BR": "Continuar ouvindo após um comando",
+   "ru": "Продолжать слушать после команды",
+   "id": "Tetap mendengarkan setelah perintah"
+  },
+  "For a few seconds after a command, another can be said without « OK Coucou ». Only with free speech.": {
+   "zh-Hans": "命令之后的几秒内，无需说« OK Coucou »即可再说一条命令。仅适用于自由语音。",
+   "hi": "आदेश के बाद कुछ सेकंड तक, « OK Coucou » कहे बिना दूसरा आदेश दिया जा सकता है। केवल खुली बातचीत के साथ।",
+   "es": "Durante unos segundos tras una orden, se puede decir otra sin « OK Coucou ». Solo con habla libre.",
+   "ar": "لبضع ثوانٍ بعد الأمر، يمكن قول أمر آخر دون « OK Coucou ». مع الكلام الحر فقط.",
+   "fr": "Pendant quelques secondes après une commande, une autre peut être dite sans « OK Coucou ». Seulement avec la parole libre.",
+   "bn": "কমান্ডের পরে কয়েক সেকেন্ড, « OK Coucou » ছাড়াই আরেকটি বলা যায়। শুধু মুক্ত কথার সাথে।",
+   "pt-BR": "Por alguns segundos após um comando, outro pode ser dito sem « OK Coucou ». Apenas com fala livre.",
+   "ru": "Несколько секунд после команды можно произнести следующую без « OK Coucou ». Только со свободной речью.",
+   "id": "Selama beberapa detik setelah perintah, perintah lain dapat diucapkan tanpa « OK Coucou ». Hanya dengan ucapan bebas."
   }
  }
 }
