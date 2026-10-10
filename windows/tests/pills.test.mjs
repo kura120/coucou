@@ -3,7 +3,7 @@
 import { beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  DEFAULT_MAIN_PILL, MAX_DECLARED, PILL_CATALOG, PILL_CATEGORIES, availablePills, chooseMainPill,
+  DEFAULT_MAIN_PILL, MAX_DECLARED, PILL_CATALOG, PILL_CATEGORIES, availablePills, chooseMainPill, miniGridColumns,
   isComingSoon, isHookPill, mainPillChoices, orderPills, pillDefinition, sanitizeDeclared, sessionSubtitle,
   toggleDeclared,
 } from "../src/core/pills.ts";
@@ -173,19 +173,22 @@ test("a declaration from an older or edited settings file is made usable", () =>
     "integration_claude");
 });
 
-test("up to four pills next to the main one, never the main one itself", () => {
+test("up to six pills next to the main one, never the main one itself", () => {
   const d = {
     mainPill: "integration_claude",
-    activeIntegrations: ["integration_n8n", "integration_github", "integration_stripe"],
+    activeIntegrations: ["integration_n8n", "integration_github", "integration_stripe", "integration_vercel", "ai_openai"],
   };
-  const four = toggleDeclared(d, "agent_gemini", "linux");
-  assert.equal(four.length, MAX_DECLARED);
-  assert.equal(toggleDeclared({ ...d, activeIntegrations: four }, "ai_anthropic", "linux"), null);
+  assert.equal(MAX_DECLARED, 6);
+  const six = toggleDeclared(d, "agent_gemini", "linux");
+  assert.equal(six.length, MAX_DECLARED);
+  assert.equal(toggleDeclared({ ...d, activeIntegrations: six }, "ai_anthropic", "linux"), null);
+  // A full list can still let one go.
+  assert.equal(toggleDeclared({ ...d, activeIntegrations: six }, "agent_gemini", "linux").length, 5);
   assert.equal(toggleDeclared(d, "integration_claude", "linux"), null);
   assert.equal(toggleDeclared(d, "integration_music", "linux"), null);
   assert.equal(toggleDeclared(d, "agent_claude-desktop", "linux"), null);
   assert.ok(toggleDeclared(d, "agent_claude-desktop", "windows").includes("agent_claude-desktop"));
-  assert.deepEqual(toggleDeclared(d, "integration_github", "linux"), ["integration_n8n", "integration_stripe"]);
+  assert.deepEqual(toggleDeclared(d, "integration_github", "linux"), ["integration_n8n", "integration_stripe", "integration_vercel", "ai_openai"]);
   // Every chat provider can be declared now that the chat talks to it.
   assert.ok(toggleDeclared(d, "ai_google", "linux").includes("ai_google"));
   assert.ok(toggleDeclared(d, "ai_ollama", "linux").includes("ai_ollama"));
@@ -288,15 +291,19 @@ test("a Claude Code session gets its pill even when it is not loaded", () => {
   assert.equal(State.upsertWorkspacePill("not_a_pill", "x", ""), null);
 });
 
-test("toggling declares up to four pills and never the main one", () => {
+test("toggling declares up to six pills and never the main one", () => {
   State.settings.activeIntegrations = [];
   State.loadIntegrationTasks();
-  for (const id of ["integration_n8n", "agent_gemini", "ai_anthropic", "integration_stripe", "integration_github"]) {
-    State.toggleIntegration(id);
-  }
-  assert.deepEqual(State.settings.activeIntegrations, [
-    "integration_n8n", "agent_gemini", "ai_anthropic", "integration_stripe",
-  ]);
+  const wanted = [
+    "integration_n8n", "agent_gemini", "ai_anthropic", "integration_stripe", "integration_github", "integration_vercel",
+    "ai_openai",
+  ];
+  for (const id of wanted) State.toggleIntegration(id);
+  assert.deepEqual(State.settings.activeIntegrations, wanted.slice(0, 6));
+  // All six are on the island next to the one in front, and no seventh.
+  assert.equal(State.shownPills.length, 6);
+  assert.ok(State.shownPills.every((t) => t.id !== State.focusId));
+  assert.deepEqual([0, 1, 4, 5, 6].map(miniGridColumns), [2, 2, 2, 3, 3]);
   State.toggleIntegration("integration_claude");
   assert.ok(ids().includes("integration_claude"));
   State.setFocus("agent_gemini");

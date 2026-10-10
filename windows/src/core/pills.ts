@@ -139,8 +139,19 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
 /** The always-on pill unless the user picks another workspace tool. */
 export const DEFAULT_MAIN_PILL = "integration_claude";
 
-/** How many declared pills may sit next to the main one. */
-export const MAX_DECLARED = 4;
+/**
+ * How many declared pills may sit next to the main one: three rows of two in
+ * the open island. The Mac keeps four.
+ */
+export const MAX_DECLARED = 6;
+
+/**
+ * The compact island's little Mochis sit in two rows: two columns for up to
+ * four of them, three for five or six.
+ */
+export function miniGridColumns(count: number): number {
+  return count > 4 ? 3 : 2;
+}
 
 /** The OS this page runs on. Only the Windows webview says "Windows". */
 export const HOST_OS: HostOs =
@@ -212,7 +223,7 @@ export function sanitizeDeclared(d: Declared, os: HostOs = HOST_OS): Declared {
 /**
  * Declares or undeclares a pill. Returns the new list, or null when the click
  * changes nothing: the main pill is never toggled, an unknown pill never
- * declared, and a fifth pill never added.
+ * declared, and a seventh pill never added.
  */
 export function toggleDeclared(d: Declared, id: string, os: HostOs = HOST_OS): string[] | null {
   if (id === d.mainPill) return null;

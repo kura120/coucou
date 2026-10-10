@@ -13,6 +13,7 @@ import {
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
 import { SPOTIFY_ID, islandDances } from "../core/spotify";
+import { miniGridColumns } from "../core/pills";
 import { BotEngine, hexToRGB } from "../mochi/engine";
 import { Greeting } from "../mochi/greeting";
 import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../mochi/minibots";
@@ -43,6 +44,9 @@ const UPLOAD_VIEWS: ReadonlySet<IslandViewName> = new Set(["upload", "uploading"
 /** Seconds between the drop and the moment the progress bar starts filling. */
 const PRE_PROGRESS = USC.T_PROG_START - USC.T_DROP;
 
+/** A little Mochi of the compact island and the gap after it (#mini-grid). */
+const MINI_PITCH = 16;
+
 const modeOrder = (m: IslandMode) => (m === "hidden" ? 0 : m === "compact" ? 1 : 2);
 
 /** style.css `hover-glow-burst`, with a little slack. */
@@ -66,6 +70,7 @@ export class Island {
   private botGlow!: HTMLElement;
   private greetingCanvas!: HTMLCanvasElement;
   private miniGrid!: HTMLElement;
+  private miniColumns = 2;
   private countdown!: HTMLElement;
   private wakeStrip!: HTMLElement;
 
@@ -735,7 +740,8 @@ export class Island {
     this.islandEl.style.transform = `translateX(-50%)`;
     // These follow the island as it resizes, so they belong here rather than in
     // the state-driven DOM sync.
-    this.miniGrid.style.left = `${w - 40 - 14.5}px`;
+    // Its right edge stays put: a third column grows to the left.
+    this.miniGrid.style.left = `${w - 40 - 14.5 - (this.miniColumns - 2) * MINI_PITCH}px`;
     this.miniGrid.style.top = `${hh / 2 - 14.5}px`;
     this.greetingCanvas.style.left = `${(w - EXPANDED_W) / 2}px`;
     this.uploadCanvas.el.style.left = `${(w - EXPANDED_W) / 2}px`;
@@ -1326,10 +1332,15 @@ export class Island {
     const showGrid = State.mode === "compact";
     this.miniGrid.style.opacity = showGrid ? "1" : "0";
     if (showGrid) {
-      const others = State.otherTasks.slice(0, 4);
+      const others = State.shownPills;
       const key = others.map((t) => t.id).join("|");
       if (this.miniGrid.dataset.key !== key) {
         this.miniGrid.dataset.key = key;
+        // Two rows always: a fifth and a sixth Mochi make a third column.
+        this.miniColumns = miniGridColumns(others.length);
+        this.miniGrid.style.gridTemplateColumns = `repeat(${this.miniColumns}, 13px)`;
+        this.miniGrid.style.width = `${this.miniColumns * MINI_PITCH - 3}px`;
+        this.applyGeometry();
         this.miniGrid.replaceChildren();
         for (const t of others) {
           this.miniGrid.append(createMiniBot(t, 13));
