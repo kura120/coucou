@@ -68,6 +68,8 @@ export const ICONS = {
   // repeat (stroked)
   repeat: "M4 11.5V10a3 3 0 0 1 3-3h13.5M17.6 4.1 20.5 7l-2.9 2.9M20 12.5V14a3 3 0 0 1-3 3H3.5M6.4 19.9 3.5 17l2.9-2.9",
   // music.note
+  // Spotify's mark, as lines: the disc and its three waves. Drawn stroked.
+  spotify: "M12 2.6a9.4 9.4 0 1 0 0 18.8 9.4 9.4 0 0 0 0-18.8zM6.9 9.5c3.7-1.1 7.5-.7 10.6 1.1M7.6 12.8c3-.8 5.9-.5 8.4 1M8.4 15.9c2.2-.6 4.2-.4 6 .7",
   musicNote: "M12.2 3.6h1.7c.3 2.3 1.8 3.5 4.2 4.6l-.6 1.6c-1.4-.5-2.7-1.2-3.6-2.1v9.5a3.3 3.3 0 1 1-1.7-2.88V3.6z",
   // speaker.slash.fill / speaker.wave.1-3.fill (stroked, the body outlined round)
   volume0: "M3.5 9.5h3L11 5.8v12.4l-4.5-3.7h-3zM15 9.5l5 5M20 9.5l-5 5",
