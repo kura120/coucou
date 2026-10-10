@@ -432,6 +432,11 @@ fn process_table() -> HashMap<u32, Proc> {
     out
 }
 
+/// The IDs of every process running `exe` (its file name, whatever the case).
+pub fn pids_named(exe: &str) -> Vec<u32> {
+    process_table().into_iter().filter(|(_, p)| p.exe.eq_ignore_ascii_case(exe)).map(|(pid, _)| pid).collect()
+}
+
 /// The ancestors of a process, nearest first, below the desktop shell.
 pub fn process_ancestors(pid: u32) -> Vec<u32> {
     session_window::ancestors(&process_table(), pid)
