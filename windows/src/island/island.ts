@@ -16,7 +16,7 @@ import { SPOTIFY_ID, Spotify, islandDances, nowPlayingLine } from "../core/spoti
 import { createMarquee } from "../views/marquee";
 import { t } from "../i18n/i18n";
 import { miniGridColumns } from "../core/pills";
-import { BotEngine, hexToRGB } from "../mochi/engine";
+import { BotEngine, hexToRGB, stepBodyColor, type RGB } from "../mochi/engine";
 import { Greeting } from "../mochi/greeting";
 import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../mochi/minibots";
 import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
@@ -73,6 +73,9 @@ export class Island {
   private greetingCanvas!: HTMLCanvasElement;
   private miniGrid!: HTMLElement;
   private miniColumns = 2;
+  /** The colour Mochi is on his way to: the pill's in front, null for his own. */
+  private bodyHex: string | null = null;
+  private bodyTarget: RGB | null = null;
   /** What is playing, passing through the middle of the compact island. */
   private nowPlaying = createMarquee("now-playing");
   /** The music card was there at the last sync: the island is wider with it. */
@@ -1214,11 +1217,16 @@ export class Island {
 
     const focus = State.focusTask;
     // While a plan card is open Mochi wears the plan's colour, like its pill.
-    this.engine.bodyColor = planCardOpen()
-      ? hexToRGB(openPlanColor())
-      : focus?.isIntegration
-        ? hexToRGB(focus.color)
-        : null;
+    const wears = planCardOpen() ? openPlanColor() : focus?.isIntegration ? focus.color : null;
+    if (wears !== this.bodyHex) {
+      this.bodyHex = wears;
+      this.bodyTarget = wears ? hexToRGB(wears) : null;
+    }
+    // He takes a moment to change colour when another pill comes to the front —
+    // in the open island, where it is seen; anywhere else it is his at once.
+    this.engine.bodyColor = State.mode === "expanded"
+      ? stepBodyColor(this.engine.bodyColor, this.bodyTarget, dt)
+      : this.bodyTarget;
     this.engine.particleOverhang = BOT_OVERHANG;
     this.engine.lookX = this.lookX();
     this.engine.lookY = this.lookY();

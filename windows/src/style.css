@@ -2283,6 +2283,33 @@ input[type="range"]::-webkit-slider-thumb {
   height: 100%;
 }
 
+/* Another pill comes to the front (views.ts `easeIn`): its card rises into
+   place, and the pills follow one after the other, with the island's own
+   slight overshoot. `backwards` only: once played, a pill is its own again
+   and answers the pointer as before. */
+.left-body.switch-in {
+  animation: card-switch 0.34s cubic-bezier(0.3, 1.2, 0.4, 1) backwards;
+}
+
+.pills.switch-in .pill {
+  animation: pill-switch 0.3s cubic-bezier(0.3, 1.2, 0.4, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 30ms);
+}
+
+@keyframes card-switch {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
+@keyframes pill-switch {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.94);
+  }
+}
+
 .int-card {
   padding: 10px 12px 0 108px;
   display: flex;

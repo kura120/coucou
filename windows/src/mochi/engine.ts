@@ -121,6 +121,29 @@ const EMOTE_EYE: Record<BotEmoteName, EyeShape> = {
 
 const now = () => performance.now() / 1000;
 
+/**
+ * How fast Mochi changes colour when another pill comes to the front: each
+ * 70 ms he covers most of what is left, so he is there in about a quarter of
+ * a second, quickly at first.
+ */
+const BODY_BLEND = 0.07;
+
+/**
+ * The colour Mochi wears a frame later, on its way from `shown` to `target`
+ * (null is his own white). Changing pill changes his colour over a moment
+ * instead of at once. He is his own white again — gradient, reflection and
+ * all — only once the blend has reached it.
+ */
+export function stepBodyColor(shown: RGB | null, target: RGB | null, dt: number): RGB | null {
+  if (shown === target || (shown == null && target == null)) return target;
+  const from = shown ?? BASE_TOP;
+  const to = target ?? BASE_TOP;
+  const k = 1 - Math.exp(-Math.max(0, dt) / BODY_BLEND);
+  const next: RGB = [from[0] + (to[0] - from[0]) * k, from[1] + (to[1] - from[1]) * k, from[2] + (to[2] - from[2]) * k];
+  const close = Math.abs(next[0] - to[0]) + Math.abs(next[1] - to[1]) + Math.abs(next[2] - to[2]) < 0.012;
+  return close ? target : next;
+}
+
 export function hexToRGB(hex: string): RGB {
   const h = hex.replace("#", "");
   const v = parseInt(h, 16);

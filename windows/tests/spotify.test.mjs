@@ -13,7 +13,7 @@ import {
 } from "../src/core/spotify.ts";
 import { EXPANDED_W, MUSIC_CARD_GAP, MUSIC_CARD_W, PANEL_W, islandSize, nowPlayingRoom } from "../src/core/layout.ts";
 import { createMarquee } from "../src/views/marquee.ts";
-import { BotEngine, danceTransform, stepDanceLevel } from "../src/mochi/engine.ts";
+import { BotEngine, danceTransform, hexToRGB, stepBodyColor, stepDanceLevel } from "../src/mochi/engine.ts";
 import { registerSpotifyHandlers } from "../src/island/spotify.ts";
 import { buildSpotifyCard, buildSpotifyMini, musicAppBadge } from "../src/views/spotify.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
@@ -138,6 +138,27 @@ test("112 BPM: still on the beat, highest half a beat later, nothing at level 0"
   assert.ok(Math.abs(top.sx - 1) < 1e-9 && Math.abs(top.sy - 1) < 1e-9);
   const off = danceTransform(0.3, 0, R);
   assert.deepEqual([off.dx, off.dy, off.rotate, off.sx, off.sy].map((v) => Math.abs(v)), [0, 0, 0, 1, 1]);
+});
+
+test("Mochi changes colour over a moment when another pill comes to the front", () => {
+  const green = hexToRGB("#1DB954");
+  const red = hexToRGB("#F4505E");
+  // Already there: nothing to do.
+  assert.equal(stepBodyColor(green, green, 0.016), green);
+  assert.equal(stepBodyColor(null, null, 0.016), null);
+  // On his way: between the two, nearer the target frame after frame.
+  let c = stepBodyColor(green, red, 0.016);
+  assert.ok(c[0] > green[0] && c[0] < red[0]);
+  for (let i = 0; i < 40 && c !== red; i++) c = stepBodyColor(c, red, 0.016);
+  assert.equal(c, red, "and there within the moment");
+  // To his own white and back: through white, then exactly his own again.
+  c = stepBodyColor(red, null, 0.016);
+  assert.ok(c !== null && c[1] > red[1]);
+  for (let i = 0; i < 40 && c !== null; i++) c = stepBodyColor(c, null, 0.016);
+  assert.equal(c, null);
+  assert.ok(stepBodyColor(null, green, 0.016)[0] < 0.93);
+  // A frame as long as the whole blend lands on the target.
+  assert.equal(stepBodyColor(green, red, 1), red);
 });
 
 test("the engine dances only once asked, and keeps its frames going meanwhile", () => {
