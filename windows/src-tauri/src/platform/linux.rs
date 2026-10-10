@@ -773,6 +773,61 @@ pub fn set_layer_overlay(win: &WebviewWindow, on: bool) {
     }
 }
 
+// ── Toast window ──────────────────────────────────────────────────────────────
+//
+// The toasts sit in the top-right corner of the island's display (toast.rs).
+// A layer-shell compositor gets an overlay surface anchored to that corner, so
+// it follows the work area's corner by itself and only its size changes; X11
+// gets an ordinary always-on-top window that never takes focus, moved with
+// set_position. GNOME on Wayland has neither: the window manager decides.
+
+/// Sets the toast window up before it is ever shown. `margin`: logical pixels
+/// kept from the top and right edges. False: it can't be used.
+pub fn prepare_toast_window(win: &WebviewWindow, mode: super::DesktopMode, margin: f64) -> bool {
+    let Ok(gw) = win.gtk_window() else { return false };
+    gw.set_accept_focus(false);
+    if mode != super::DesktopMode::Layer {
+        if !gw.is_realized() {
+            gw.set_type_hint(gtk::gdk::WindowTypeHint::Notification);
+        }
+        gw.set_keep_above(true);
+        return true;
+    }
+    if gw.is_realized() {
+        crate::log::line("toasts: window already shown, no layer surface");
+        return false;
+    }
+    gw.set_titlebar(None::<&gtk::Widget>);
+    let ptr = gtk_window_ptr(&gw);
+    let margin = margin.round() as i32;
+    unsafe {
+        layer::gtk_layer_init_for_window(ptr);
+        layer::gtk_layer_set_namespace(ptr, c"coucou-toast".as_ptr());
+        // Above everything, like the island: a decision must be seen.
+        layer::gtk_layer_set_layer(ptr, layer::LAYER_OVERLAY);
+        layer::gtk_layer_set_anchor(ptr, layer::EDGE_TOP, 1);
+        layer::gtk_layer_set_anchor(ptr, layer::EDGE_RIGHT, 1);
+        layer::gtk_layer_set_margin(ptr, layer::EDGE_TOP, margin);
+        layer::gtk_layer_set_margin(ptr, layer::EDGE_RIGHT, margin);
+        // 0: below the top panel and beside any side panel, not over them.
+        layer::gtk_layer_set_exclusive_zone(ptr, 0);
+        layer::gtk_layer_set_keyboard_mode(ptr, layer::KEYBOARD_NONE);
+    }
+    // Same first-frame problem as the island (see make_non_activating).
+    let remapped = std::cell::Cell::new(false);
+    gw.connect_map_event(move |w, _| {
+        if !remapped.replace(true) {
+            let w = w.clone();
+            gtk::glib::idle_add_local_once(move || {
+                w.hide();
+                w.show_all();
+            });
+        }
+        gtk::glib::Propagation::Proceed
+    });
+    true
+}
+
 /// Layer surface only: puts the desktop Mochi on the island's display and
 /// returns that display's logical size. Main thread.
 pub fn layer_display(island: &WebviewWindow, mochi: &WebviewWindow) -> Option<(f64, f64)> {

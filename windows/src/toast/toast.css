@@ -1,0 +1,138 @@
+/* The toasts' window (toast.html). Built from the island's own pieces —
+   style.css's .card + wash, .dot, .btn with its .kbd, .icon-btn — on the
+   island's black, so a toast reads as a piece of the island set down in the
+   corner. Timings are stack.ts's ENTER_MS and LEAVE_MS. */
+
+#toasts {
+  position: fixed;
+  inset: 0;
+}
+
+.toast {
+  --x: 0px;
+  --y: 0px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 340px;
+  transform: translate(var(--x), var(--y));
+  opacity: 1;
+  /* The island's overshoot (style.css .view.on). */
+  transition:
+    transform 0.38s cubic-bezier(0.3, 1.2, 0.4, 1),
+    opacity 0.24s ease-out;
+}
+
+/* Off to the right, ready to slide in. */
+.toast.entering {
+  --x: calc(100% + 16px);
+  opacity: 0;
+}
+
+/* Leaves the way it came. */
+.toast.leaving {
+  --x: calc(100% + 16px);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.26s cubic-bezier(0.45, 0, 0.2, 1),
+    opacity 0.26s ease-in;
+}
+
+/* Its first place in the stack is taken without travel. */
+.toast.no-move {
+  transition: none;
+}
+
+.toast-card {
+  height: auto;
+  background: #000;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.toast-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 13px 12px 13px 14px;
+}
+
+.toast-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.toast-words {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.toast-title {
+  font: 600 13px var(--font);
+  color: var(--ink);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.toast-text {
+  margin-top: 3px;
+  font: 400 12px var(--font);
+  color: var(--dim);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.toast-close {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.toast-close:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.toast-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+/* Runs out with the toast's life; stops while the pointer is on the stack. */
+.toast-life {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  opacity: 0.55;
+  transform-origin: left center;
+  animation: toast-life var(--life, 5000ms) linear forwards;
+}
+
+#toasts.paused .toast-life {
+  animation-play-state: paused;
+}
+
+[dir="rtl"] .toast-life {
+  transform-origin: right center;
+}
+
+@keyframes toast-life {
+  from { transform: scaleX(var(--from, 1)); }
+  to { transform: scaleX(0); }
+}
