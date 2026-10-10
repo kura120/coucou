@@ -21,7 +21,7 @@ import { lastTextStep } from "../core/diff";
 import { Bridge } from "../core/bridge";
 import { buildRecap } from "./recap";
 import { buildWardrobe } from "./wardrobe";
-import { buildSpotifyCard, buildSpotifyPill, type SpotifyPillHost } from "./spotify";
+import { buildSpotifyCard, buildSpotifyMini, buildSpotifyPill, type SpotifyPillHost } from "./spotify";
 import { provideMenu } from "./menu";
 import { SPOTIFY_ID } from "../core/spotify";
 import type { Outfit, OutfitSelection } from "../mochi/wardrobe";
@@ -210,10 +210,15 @@ function buildOverview(actions: ViewActions): ViewHost {
   // runs on, and a slider being dragged must not be rebuilt under the pointer.
   const spotifyCard = buildSpotifyCard();
   let spotifyPill: SpotifyPillHost | null = null;
+  // While Spotify has a track its pill gives way to a card of its own, next to
+  // the pills, and the island widens for it (State.musicCard).
+  const spotifyMini = buildSpotifyMini(() => actions.setFocus(SPOTIFY_ID));
+  const music = h("div", { class: "music" }, card(null, spotifyMini.el));
 
   const el = h("div", { class: "view overview" },
     h("div", { class: "left" }, left),
     h("div", { class: "right" }, right),
+    music,
   );
 
   let pillIds = "";
@@ -400,7 +405,11 @@ function buildOverview(actions: ViewActions): ViewHost {
       highlightRow(rows, State.cardSelection, State.cardSelection !== shownSelection);
       shownSelection = State.cardSelection;
 
-      const others = State.shownPills;
+      const withMusic = State.musicCard;
+      el.classList.toggle("with-music", withMusic);
+      if (withMusic) spotifyMini.sync();
+
+      const others = State.overviewPills;
       const pillKey = others.map((t) => `${t.id}:${t.color}:${t.pillBadge ?? ""}`).join("|");
       if (pillKey !== pillIds) {
         pillIds = pillKey;

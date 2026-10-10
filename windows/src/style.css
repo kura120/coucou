@@ -456,6 +456,24 @@ body {
   flex: 1 1 auto;
 }
 
+/* The music card, while Spotify has a track: the island is wider by exactly
+   its width and the gap, so the pills keep theirs — fixed, so that the card
+   is uncovered as the island widens instead of squeezing them meanwhile. */
+.overview > .music {
+  display: none;
+  flex: 0 0 176px;
+  width: 176px;
+}
+
+.overview.with-music > .music {
+  display: block;
+}
+
+.overview.with-music > .right {
+  flex: 0 0 288px;
+  width: 288px;
+}
+
 .card-body {
   position: relative;
   z-index: 1;
@@ -3067,6 +3085,63 @@ input[type="range"]::-webkit-slider-thumb {
 
 .np-root {
   height: 100%;
+}
+
+/* The player in small (buildSpotifyMini): cover and names, where the track
+   is, and the three buttons. */
+.np-mini {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  padding: 10px 12px 9px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.np-mini-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: start;
+  cursor: default;
+}
+
+.np-mini-head .np-art {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+}
+
+.np-mini-head .np-title {
+  font-size: 11.5px;
+}
+
+.np-mini-head .np-sub {
+  font-size: 10.5px;
+}
+
+.np-mini-head:hover .np-title {
+  color: #fff;
+}
+
+.np-mini-bar {
+  position: relative;
+  height: 3px;
+}
+
+.np-mini-bar .np-fill {
+  background: #c5c8cd;
+}
+
+.np-mini .np-buttons {
+  justify-content: center;
+  gap: 16px;
 }
 
 .np-card {

@@ -12,7 +12,7 @@ import type { FileDiff } from "./diff";
 import type { Bindings } from "./shortcuts";
 import { DEFAULT_OUTFIT, type Outfit } from "../mochi/wardrobe";
 import { pillColor } from "./pill-colors";
-import { Spotify, musicPlaying } from "./spotify";
+import { SPOTIFY_ID, Spotify, musicCardShown, musicPlaying } from "./spotify";
 
 export type AgentSource = "claudeCode" | "n8n" | "agent";
 export type PillBadge = "approval" | "finished" | "error";
@@ -311,6 +311,24 @@ class AppState {
   /** Spotify plays on a declared pill: Mochi dances. */
   get spotifyPlaying(): boolean {
     return musicPlaying(Spotify.state, sanitizeDeclared(this.settings, this.os).activeIntegrations);
+  }
+
+  /**
+   * The music card sits next to the pills: Spotify has a track, on a declared
+   * pill that is not the one in front (in front, its own card is already up).
+   */
+  get musicCard(): boolean {
+    return musicCardShown(
+      Spotify.state,
+      sanitizeDeclared(this.settings, this.os).activeIntegrations,
+      this.focusTask?.id,
+    );
+  }
+
+  /** The pills of the open island: Spotify's leaves them for its card. */
+  get overviewPills(): AgentTask[] {
+    const music = this.musicCard;
+    return this.otherTasks.filter((t) => !(music && t.id === SPOTIFY_ID)).slice(0, MAX_DECLARED);
   }
 
   get otherTasks(): AgentTask[] {

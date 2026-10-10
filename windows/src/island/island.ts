@@ -71,6 +71,8 @@ export class Island {
   private greetingCanvas!: HTMLCanvasElement;
   private miniGrid!: HTMLElement;
   private miniColumns = 2;
+  /** The music card was there at the last sync: the island is wider with it. */
+  private hadMusicCard = false;
   private countdown!: HTMLElement;
   private wakeStrip!: HTMLElement;
 
@@ -702,7 +704,7 @@ export class Island {
 
   private targetSize(): { w: number; h: number; r: number } {
     let { w, h } = islandSize(
-      State.mode, State.view, State.chatHistory.length, State.chatPicking, State.chatUserHeight,
+      State.mode, State.view, State.chatHistory.length, State.chatPicking, State.chatUserHeight, State.musicCard,
     );
     if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
       h = QUESTION_PICKER_H;
@@ -1296,6 +1298,14 @@ export class Island {
     this.greetingShown = greetingActive;
     // A wardrobe try-on never outlives the wardrobe.
     if (State.wardrobePreview && !(expanded && State.view === "wardrobe")) State.wardrobePreview = null;
+
+    // The music card comes and goes with the music: the island widens for it,
+    // and narrows again.
+    const musicCard = State.musicCard;
+    if (musicCard !== this.hadMusicCard) {
+      this.hadMusicCard = musicCard;
+      this.animateGeometry(!musicCard);
+    }
 
     this.header.sync();
     for (const [name, view] of this.views) {
