@@ -45,6 +45,8 @@ pub struct Recogniser {
     recognizer: ISpRecognizer,
     context: ISpRecoContext,
     grammar: ISpRecoGrammar,
+    /// How long into its sentence the last wake phrase heard ended.
+    wake_length: Duration,
     // Last: the fields above are released first.
     _com: Com,
 }
@@ -57,7 +59,20 @@ const fn interest(event: SPEVENTENUM) -> u64 {
 
 impl Recogniser {
     /// The recogniser, ready and silent: the microphone opens on `listen`.
-    pub fn open(commands: &Grammar) -> Result<Self, Unavailable> {
+    /// `tails`: the wake phrase may be followed by anything in the same
+    /// breath ("OK Coucou, next track"). It is reported as the wake phrase
+    /// either way; `wake_length` says where in the sentence it ended.
+    pub fn open(commands: &Grammar, tails: bool) -> Result<Self, Unavailable> {
+        Self::open_on(commands, tails, None)
+    }
+
+    /// How long into its sentence the last wake phrase heard ended.
+    pub fn wake_length(&self) -> Duration {
+        self.wake_length
+    }
+
+    /// `recording`: a WAV file to listen to instead of the microphone (tests).
+    pub(super) fn open_on(commands: &Grammar, tails: bool, recording: Option<&std::path::Path>) -> Result<Self, Unavailable> {
         unsafe {
             CoInitializeEx(None, COINIT_MULTITHREADED).ok().map_err(Unavailable::error)?;
             let com = Com;
@@ -69,8 +84,17 @@ impl Recogniser {
             let english = first_token(SPCAT_RECOGNIZERS, w!("Language=409")).ok_or(Unavailable::NoRecogniser)?;
             recognizer.SetRecognizer(&english).map_err(Unavailable::error)?;
 
-            let microphone = default_microphone().ok_or(Unavailable::Microphone)?;
-            recognizer.SetInput(&microphone, true).map_err(|_| Unavailable::Microphone)?;
+            if let Some(file) = recording {
+                use windows::Win32::Media::Speech::{ISpStream, SpStream, SPFM_OPEN_READONLY};
+                let stream: ISpStream = CoCreateInstance(&SpStream, None, CLSCTX_ALL).map_err(Unavailable::error)?;
+                stream
+                    .BindToFile(&HSTRING::from(file.as_os_str()), SPFM_OPEN_READONLY, None, None, 0)
+                    .map_err(Unavailable::error)?;
+                recognizer.SetInput(&stream, true).map_err(Unavailable::error)?;
+            } else {
+                let microphone = default_microphone().ok_or(Unavailable::Microphone)?;
+                recognizer.SetInput(&microphone, true).map_err(|_| Unavailable::Microphone)?;
+            }
             recognizer.SetRecoState(SPRST_INACTIVE).map_err(Unavailable::error)?;
 
             let context = recognizer.CreateRecoContext().map_err(Unavailable::error)?;
@@ -79,11 +103,11 @@ impl Recogniser {
             context.SetInterest(events, events).map_err(Unavailable::error)?;
 
             let grammar = context.CreateGrammar(1).map_err(Unavailable::error)?;
-            add_wake_rule(&grammar).map_err(Unavailable::error)?;
+            add_wake_rule(&grammar, tails).map_err(Unavailable::error)?;
             add_command_rule(&grammar, commands).map_err(Unavailable::error)?;
             grammar.Commit(0).map_err(Unavailable::error)?;
 
-            Ok(Self { recognizer, context, grammar, _com: com })
+            Ok(Self { recognizer, context, grammar, wake_length: Duration::ZERO, _com: com })
         }
     }
 
@@ -122,8 +146,11 @@ impl Recogniser {
             if id == SPEI_FALSE_RECOGNITION.0 {
                 return Some(Raw::Rejected);
             }
-            let (rule, text, confidence) = read(&result?)?;
+            let (rule, text, confidence, said) = read(&result?)?;
             if id == SPEI_RECOGNITION.0 {
+                if rule == Rule::Wake {
+                    self.wake_length = said;
+                }
                 Some(Raw::Phrase { rule, text, confidence })
             } else if id == SPEI_HYPOTHESIS.0 {
                 Some(Raw::Hypothesis { rule, text })
@@ -141,14 +168,30 @@ impl Recogniser {
     }
 }
 
-/// Which rule a result matched, its words, and how sure the engine is (0…1).
-unsafe fn read(result: &ISpRecoResult) -> Option<(Rule, String, f32)> {
+/// Every wake phrase is two words.
+const WAKE_WORDS: usize = 2;
+
+/// Which rule a result matched, its words, how sure the engine is (0…1), and
+/// how long into the sentence its first two words ended.
+unsafe fn read(result: &ISpRecoResult) -> Option<(Rule, String, f32, Duration)> {
     unsafe {
         let phrase = result.GetPhrase().ok()?;
         if phrase.is_null() {
             return None;
         }
         let matched = (*phrase).Base.Rule;
+        // When the wake phrase's last word ended, from the start of the
+        // sentence: its first two elements, whatever was said after them.
+        let elements = (*phrase).Base.pElements;
+        let said = if elements.is_null() {
+            0
+        } else {
+            std::slice::from_raw_parts(elements, (matched.ulCountOfElements as usize).min(WAKE_WORDS))
+                .iter()
+                .map(|e| e.ulAudioTimeOffset + e.ulAudioSizeTime)
+                .max()
+                .unwrap_or(0)
+        };
         CoTaskMemFree(Some(phrase as *const c_void));
         let rule = match matched.ulId {
             RULE_WAKE => Rule::Wake,
@@ -159,7 +202,8 @@ unsafe fn read(result: &ISpRecoResult) -> Option<(Rule, String, f32)> {
         result.GetText(WHOLE_PHRASE, WHOLE_PHRASE, true, &mut words, None).ok()?;
         let text = words.to_string().unwrap_or_default();
         CoTaskMemFree(Some(words.0 as *const c_void));
-        Some((rule, text, matched.SREngineConfidence))
+        // SAPI counts time in 100 ns.
+        Some((rule, text, matched.SREngineConfidence, Duration::from_micros(u64::from(said) / 10)))
     }
 }
 
@@ -181,11 +225,23 @@ unsafe fn say(grammar: &ISpRecoGrammar, from: SPSTATEHANDLE, to: SPSTATEHANDLE, 
     unsafe { grammar.AddWordTransition(from, to, &HSTRING::from(words), w!(" "), SPWT_LEXICAL, 1.0, std::ptr::null()) }
 }
 
-unsafe fn add_wake_rule(grammar: &ISpRecoGrammar) -> windows::core::Result<()> {
+/// SPRULETRANS_WILDCARD: a transition that matches any words at all.
+const ANYTHING: SPSTATEHANDLE = SPSTATEHANDLE(-1isize as *mut c_void);
+
+unsafe fn add_wake_rule(grammar: &ISpRecoGrammar, tails: bool) -> windows::core::Result<()> {
     unsafe {
         let start = rule(grammar, "wake", RULE_WAKE, true)?;
         for phrase in WAKE_PHRASES {
-            say(grammar, start, END, phrase)?;
+            if !tails {
+                say(grammar, start, END, phrase)?;
+                continue;
+            }
+            // The phrase, then either nothing or anything.
+            let mut said = END;
+            grammar.CreateNewState(start, &mut said)?;
+            say(grammar, start, said, phrase)?;
+            grammar.AddWordTransition(said, END, PCWSTR::null(), w!(" "), SPWT_LEXICAL, 1.0, std::ptr::null())?;
+            grammar.AddRuleTransition(said, END, ANYTHING, 1.0, std::ptr::null())?;
         }
         Ok(())
     }
@@ -258,6 +314,44 @@ unsafe fn default_microphone() -> Option<ISpObjectToken> {
 mod tests {
     use super::*;
 
+    /// What the recogniser makes of a recorded sentence, with the one-breath
+    /// wake rule. `COUCOU_VOICE_CLIPS` is a folder of 16-bit WAV files:
+    /// `alone.wav` (the wake phrase), `with-command.wav` (the wake phrase and a
+    /// command in one breath) and `other.wav` (neither).
+    /// `cargo test -p coucou voice::sapi -- --ignored --nocapture`
+    #[test]
+    #[ignore = "needs recorded clips"]
+    fn the_wake_phrase_is_heard_alone_and_with_a_command_after_it() {
+        let folder = std::path::PathBuf::from(std::env::var("COUCOU_VOICE_CLIPS").expect("COUCOU_VOICE_CLIPS"));
+        let commands: Vec<String> = vec!["next track".into()];
+        let grammar = Grammar::parse(&commands, &std::collections::BTreeMap::new()).expect("grammar");
+        let hear = |file: &str| -> Option<Raw> {
+            let mut recogniser = Recogniser::open_on(&grammar, true, Some(&folder.join(file))).expect("recogniser");
+            recogniser.listen(Listen::Wake).expect("listen");
+            let started = std::time::Instant::now();
+            while started.elapsed() < Duration::from_secs(8) {
+                match recogniser.next(Duration::from_millis(200)) {
+                    Some(Raw::Hypothesis { .. }) | None => {}
+                    Some(other) => {
+                        println!("  the wake phrase ended {:?} into the sentence", recogniser.wake_length());
+                        return Some(other);
+                    }
+                }
+            }
+            None
+        };
+        let alone = hear("alone.wav");
+        println!("alone: {alone:?}");
+        let with_command = hear("with-command.wav");
+        println!("with a command: {with_command:?}");
+        let other = hear("other.wav");
+        println!("other: {other:?}");
+        use crate::voice::session::WAKE_FLOOR;
+        assert!(matches!(&alone, Some(Raw::Phrase { rule: Rule::Wake, confidence, .. }) if *confidence >= WAKE_FLOOR));
+        assert!(matches!(&with_command, Some(Raw::Phrase { rule: Rule::Wake, confidence, .. }) if *confidence >= WAKE_FLOOR));
+        assert!(!matches!(&other, Some(Raw::Phrase { rule: Rule::Wake, confidence, .. }) if *confidence >= WAKE_FLOOR));
+    }
+
     /// Opens the real recogniser and the real microphone for a moment:
     /// `cargo test -p coucou voice::sapi -- --ignored`.
     #[test]
@@ -267,7 +361,9 @@ mod tests {
         let commands: Vec<String> =
             ["next track", "add {pill}", "replace {pill} with {pill}", "{pill}"].iter().map(|s| s.to_string()).collect();
         let grammar = Grammar::parse(&commands, &slots).expect("grammar");
-        let mut recogniser = Recogniser::open(&grammar).expect("recogniser");
+        // With and without a tail after the wake phrase: both grammars must build.
+        drop(Recogniser::open(&grammar, false).expect("recogniser"));
+        let mut recogniser = Recogniser::open(&grammar, true).expect("recogniser");
         recogniser.listen(Listen::Wake).expect("wake");
         let _ = recogniser.next(Duration::from_millis(500));
         recogniser.listen(Listen::Command).expect("command");

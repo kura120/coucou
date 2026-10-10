@@ -195,7 +195,10 @@ GitHub releases, checked against a pinned SHA-256) and uses it for the command:
 - **Keep listening after a command**: for a few seconds (8 by default) after a
   command, another can be said without the wake phrase. Anything said nearby in
   that time is heard as a command too, so turn it off in a noisy room.
-- Still two sentences: the wake phrase, a pause, the command.
+- **One breath.** "OK Coucou, next track" as one sentence works too: Windows'
+  recogniser says when the wake phrase ended, and what the microphone gave
+  after that moment is written down. Said with a pause — "OK Coucou" … "next
+  track" — it works as before.
 - It runs on this computer. The sound stays in memory until it is written
   down, and is kept nowhere. **Remove** deletes the engine and its model.
 - Windows only for now.

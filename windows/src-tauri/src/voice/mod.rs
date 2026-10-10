@@ -23,6 +23,9 @@
 // not — and the command after it is free speech: the microphone is read here
 // (capture.rs), a sentence is cut out of it (vad.rs) and written down. For a
 // few seconds after a command, another may follow without the wake phrase.
+// And the two may be one breath, "OK Coucou, next track": Windows' recogniser
+// says when in the sentence the wake phrase ended, and what the microphone
+// gave after that moment is written down.
 //
 // A fixed-grammar recogniser hears only what it was given. The commands come
 // from the island (`voice_grammar`), which writes them next to the parser
@@ -364,7 +367,18 @@ struct Free {
     capture: Option<capture::Capture>,
     sentences: vad::Sentences,
     buffer: Vec<f32>,
+    /// The last sentence that ended while only the wake phrase was listened
+    /// for: it may turn out to have had a command after the wake phrase.
+    recent: Option<(Instant, Vec<f32>)>,
+    /// The sentence being said started with the wake phrase, which ended this
+    /// long into it.
+    after_wake: Option<Duration>,
 }
+
+/// How long ago a sentence may have ended and still be the one Windows'
+/// recogniser is reporting the wake phrase of.
+#[cfg(windows)]
+const SAME_BREATH: Duration = Duration::from_millis(1500);
 
 #[cfg(windows)]
 impl Free {
@@ -376,7 +390,14 @@ impl Free {
             return None;
         }
         match sherpa::Engine::load(&engine::runtime_dir(), &engine::model_dir(engine::Part::Hearing)) {
-            Ok(engine) => Some(Self { engine, capture: None, sentences: vad::Sentences::default(), buffer: Vec::new() }),
+            Ok(engine) => Some(Self {
+                engine,
+                capture: None,
+                sentences: vad::Sentences::default(),
+                buffer: Vec::new(),
+                recent: None,
+                after_wake: None,
+            }),
             Err(why) => {
                 crate::log::line(format!("voice: bundled engine: {why}"));
                 None
@@ -399,6 +420,43 @@ impl Free {
     /// What is being said so far is not part of what comes next.
     fn start_over(&mut self) {
         self.sentences.clear();
+        self.recent = None;
+        self.after_wake = None;
+    }
+
+    fn written(&self, samples: &[f32]) -> Raw {
+        let text = session::without_wake(&self.engine.transcribe(vad::SAMPLE_RATE, samples));
+        if text.chars().any(char::is_alphanumeric) {
+            Raw::Phrase { rule: Rule::Command, text, confidence: 1.0 }
+        } else {
+            Raw::Rejected
+        }
+    }
+
+    /// What was said after the wake phrase in the sentence that had it, or
+    /// None when it was the wake phrase alone.
+    fn tail(&self, sentence: &[f32], wake: Duration) -> Option<Raw> {
+        let from = vad::after_wake(sentence.len(), wake)?;
+        match self.written(&sentence[from..]) {
+            // Only the end of "coucou" was in there: not a command that was missed.
+            Raw::Rejected => None,
+            command => Some(command),
+        }
+    }
+
+    /// The wake phrase was just heard, ending `wake` into its sentence. If
+    /// that sentence went on, the rest of it is the command: written down now
+    /// when it has already ended, else when it does (`next` knows where to cut).
+    fn same_breath(&mut self, wake: Duration) -> Option<Raw> {
+        if let Some((ended, sentence)) = self.recent.take() {
+            if ended.elapsed() <= SAME_BREATH {
+                return self.tail(&sentence, wake);
+            }
+        }
+        if self.sentences.speaking() {
+            self.after_wake = Some(wake);
+        }
+        None
     }
 
     /// Reads the microphone for at most `wait`. A sentence that just ended
@@ -410,14 +468,14 @@ impl Free {
         capture.read(wait, &mut self.buffer)?;
         let Some(sentence) = self.sentences.feed(&self.buffer) else { return Ok(None) };
         if !wanted {
+            self.recent = Some((Instant::now(), sentence));
             return Ok(None);
         }
-        let text = session::without_wake(&self.engine.transcribe(vad::SAMPLE_RATE, &sentence));
-        Ok(Some(if text.chars().any(char::is_alphanumeric) {
-            Raw::Phrase { rule: Rule::Command, text, confidence: 1.0 }
-        } else {
-            Raw::Rejected
-        }))
+        Ok(match self.after_wake.take() {
+            // The wake phrase alone ends its sentence: the command is still to come.
+            Some(wake) => self.tail(&sentence, wake),
+            None => Some(self.written(&sentence)),
+        })
     }
 
     fn speaking(&self) -> bool {
@@ -448,6 +506,10 @@ impl Free {
 
     fn start_over(&mut self) {}
 
+    fn same_breath(&mut self, _wake: Duration) -> Option<Raw> {
+        None
+    }
+
     fn next(&mut self, _wait: Duration, _wanted: bool) -> Result<Option<Raw>, Unavailable> {
         Ok(None)
     }
@@ -459,11 +521,12 @@ impl Free {
 
 fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &Receiver<Control>) {
     let wake = plan.wake;
-    let mut recogniser = match Recogniser::open(grammar) {
+    let mut free = if plan.free { Free::load() } else { None };
+    // One breath only where the rest of the sentence can be written down.
+    let mut recogniser = match Recogniser::open(grammar, free.is_some()) {
         Ok(recogniser) => recogniser,
         Err(why) => return give_up(app, generation, why),
     };
-    let mut free = if plan.free { Free::load() } else { None };
     crate::log::line(if free.is_some() { "voice: on, free speech" } else { "voice: on" });
     // Another command without the wake phrase only where any sentence can be heard.
     let follow_up = if free.is_some() { Duration::from_secs(u64::from(plan.follow_up)) } else { Duration::ZERO };
@@ -472,6 +535,8 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
     let mut ear = Listen::Nothing;
     let mut held_checked: Option<Instant> = None;
     let mut hush_until: Option<Instant> = None;
+    // The command is the rest of the sentence that woke Coucou: not to be forgotten.
+    let mut same_breath = false;
 
     loop {
         // Messages first: a wait for speech below never lasts longer than POLL.
@@ -511,7 +576,7 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
                 // The microphone stays open through the wake phrase too, so the
                 // room is known and a command's first sound is not lost.
                 turned = free.open(want != Listen::Nothing);
-                if want == Listen::Command {
+                if want == Listen::Command && !std::mem::take(&mut same_breath) {
                     free.start_over();
                 }
             }
@@ -566,8 +631,23 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
             if hushed {
                 raw = None;
             }
-            if let Some(heard) = raw.and_then(|raw| session.heard(raw, Instant::now())) {
+            let said_wake = matches!(&raw, Some(Raw::Phrase { rule: Rule::Wake, .. }));
+            let heard = raw.and_then(|raw| session.heard(raw, Instant::now()));
+            let woke = said_wake && heard == Some(Heard::Woke);
+            if let Some(heard) = heard {
                 tell(app, heard);
+            }
+            // "OK Coucou, next track": the sentence the wake phrase was in may
+            // go on, and what follows it is the command.
+            if woke {
+                if let Some(free) = free.as_mut() {
+                    same_breath = true;
+                    if let Some(command) = free.same_breath(recogniser.wake_length()) {
+                        if let Some(heard) = session.heard(command, Instant::now()) {
+                            tell(app, heard);
+                        }
+                    }
+                }
             }
         }
     }
@@ -661,6 +741,55 @@ impl Recogniser {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+
+    /// One breath, on recorded sentences and without a microphone: Windows'
+    /// recogniser hears the wake phrase and says when it ended, the voice
+    /// detector cuts the sentence out, and what follows the wake phrase is
+    /// written down — or there is nothing after it. `COUCOU_VOICE_CLIPS` holds
+    /// `alone.wav` and `with-command.wav` (16 kHz, 16-bit mono, quiet around
+    /// the speech); `COUCOU_VOICE_RUNTIME` and `COUCOU_VOICE_MODEL` the engine.
+    /// `cargo test -p coucou voice::tests -- --ignored --nocapture`
+    #[test]
+    #[ignore = "needs the downloaded engine and recorded clips"]
+    fn a_command_said_in_the_same_breath_as_the_wake_phrase_is_written_down() {
+        let var = |name: &str| std::path::PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set")));
+        let engine = sherpa::Engine::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_MODEL")).expect("engine");
+        let commands: Vec<String> = vec!["next track".into()];
+        let grammar = Grammar::parse(&commands, &BTreeMap::new()).expect("grammar");
+
+        let after_wake = |file: &str| -> Option<String> {
+            let path = var("COUCOU_VOICE_CLIPS").join(file);
+            // Windows' recogniser: is it the wake phrase, and when did it end?
+            let mut recogniser = Recogniser::open_on(&grammar, true, Some(&path)).expect("recogniser");
+            recogniser.listen(Listen::Wake).expect("listen");
+            let started = Instant::now();
+            let mut woke = false;
+            while !woke && started.elapsed() < Duration::from_secs(8) {
+                woke = matches!(recogniser.next(POLL), Some(Raw::Phrase { rule: Rule::Wake, confidence, .. }) if confidence >= session::WAKE_FLOOR);
+            }
+            assert!(woke, "{file}: the wake phrase was not heard");
+            let wake = recogniser.wake_length();
+
+            // The microphone's side: the same sound, 10 ms at a time.
+            let bytes = std::fs::read(&path).expect("wav");
+            assert_eq!(u32::from_le_bytes(bytes[24..28].try_into().unwrap()), vad::SAMPLE_RATE, "{file} must be 16 kHz");
+            let data = bytes.windows(4).position(|w| w == b"data").expect("data chunk") + 8;
+            let samples: Vec<f32> = bytes[data..].chunks_exact(2).map(|b| f32::from(i16::from_le_bytes([b[0], b[1]])) / 32768.0).collect();
+            let mut sentences = vad::Sentences::default();
+            let sentence = samples.chunks(160).find_map(|chunk| sentences.feed(chunk)).unwrap_or_else(|| panic!("{file}: no sentence was cut out"));
+
+            let from = vad::after_wake(sentence.len(), wake)?;
+            let text = engine.transcribe(vad::SAMPLE_RATE, &sentence[from..]);
+            println!("{file}: the wake phrase ended at {wake:?}; after it: {text:?}");
+            Some(text.to_lowercase())
+        };
+
+        assert_eq!(after_wake("alone.wav"), None, "nothing follows the wake phrase said alone");
+        let command = after_wake("with-command.wav").expect("a command follows");
+        for word in std::env::var("COUCOU_VOICE_EXPECT").unwrap_or_default().to_lowercase().split_whitespace() {
+            assert!(command.contains(word), "{word:?} not in {command:?}");
+        }
+    }
 
     /// The free-speech path on real audio, without a microphone: a recorded
     /// sentence with quiet around it is fed as a microphone would give it, cut

@@ -100,6 +100,23 @@ impl EnergyVad {
 
 /// What is kept from before speech was noticed, so its first sound is not cut.
 const LEAD_IN: usize = (SAMPLE_RATE as usize) * 3 / 10;
+/// The silence that ends a sentence, which is still at its end.
+const TRAILING: usize = SILENCE_FRAMES as usize * FRAME;
+/// Under this much speech after the wake phrase, nothing was said after it.
+const SHORTEST_TAIL: usize = (SAMPLE_RATE as usize) * 35 / 100;
+/// The cut is made a little before the wake phrase is said to end: the two
+/// clocks are not the same one, and a command's first sound matters more than
+/// the wake phrase's last.
+const CUT_EARLY: usize = (SAMPLE_RATE as usize) * 5 / 100;
+
+/// For a sentence (as `Sentences` gives it) that began with the wake phrase,
+/// which ended `wake` after speech started: where what was said after it
+/// begins, or None when nothing was — the wake phrase alone.
+pub fn after_wake(sentence_len: usize, wake: std::time::Duration) -> Option<usize> {
+    let wake_end = LEAD_IN + (wake.as_secs_f64() * f64::from(SAMPLE_RATE)) as usize;
+    let speech_end = sentence_len.saturating_sub(TRAILING);
+    (speech_end >= wake_end + SHORTEST_TAIL).then(|| wake_end.saturating_sub(CUT_EARLY))
+}
 /// A sound shorter than this is a click or a cough, not a sentence.
 const SHORTEST: usize = (SAMPLE_RATE as usize) * 3 / 10;
 
@@ -147,9 +164,7 @@ impl Sentences {
                 self.current.extend_from_slice(frame);
                 if event == Event::End {
                     let sentence = std::mem::take(&mut self.current);
-                    // The silence that ended it is not part of it, but a little is left as a tail.
-                    let silence = SILENCE_FRAMES as usize * FRAME;
-                    let spoken = sentence.len().saturating_sub(silence + LEAD_IN);
+                    let spoken = sentence.len().saturating_sub(TRAILING + LEAD_IN);
                     if spoken >= SHORTEST {
                         ended = Some(sentence);
                     }
@@ -280,6 +295,22 @@ mod tests {
         // The quiet lead-in is there, then the speech.
         assert!(sentence[..LEAD_IN / 2].iter().all(|s| s.abs() < 0.01));
         assert!(sentence[LEAD_IN + FRAME..LEAD_IN + FRAME * 2].iter().all(|s| s.abs() > 0.2));
+    }
+
+    #[test]
+    fn what_follows_the_wake_phrase_is_cut_out_or_there_is_nothing() {
+        use std::time::Duration;
+        let seconds = |s: f64| (s * f64::from(SAMPLE_RATE)) as usize;
+        // 0.3 s lead-in, "okay coucou" for 0.9 s, "next track" for 0.8 s, then the silence.
+        let sentence = LEAD_IN + seconds(0.9 + 0.8) + TRAILING;
+        let cut = after_wake(sentence, Duration::from_millis(900)).expect("a command followed");
+        assert_eq!(cut, LEAD_IN + seconds(0.9) - CUT_EARLY);
+        // The wake phrase alone, even with a breath after it.
+        assert_eq!(after_wake(LEAD_IN + seconds(0.9) + TRAILING, Duration::from_millis(900)), None);
+        assert_eq!(after_wake(LEAD_IN + seconds(0.9 + 0.2) + TRAILING, Duration::from_millis(900)), None);
+        // A sentence shorter than the wake phrase is said to be: nothing after it.
+        assert_eq!(after_wake(seconds(0.5), Duration::from_millis(900)), None);
+        assert_eq!(after_wake(0, Duration::ZERO), None);
     }
 
     #[test]
