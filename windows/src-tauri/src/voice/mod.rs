@@ -37,6 +37,8 @@ use tauri::{AppHandle, Emitter};
 use crate::island::WINDOW_LABEL;
 use crate::settings::VoicePref;
 
+mod apps;
+pub mod brain;
 mod grammar;
 #[cfg(windows)]
 mod sapi;
@@ -201,6 +203,25 @@ pub fn voice_status() -> Status {
 #[tauri::command]
 pub fn voice_talk() {
     talk();
+}
+
+/// "Open Figma": starts the Start-menu app that name means, and says which.
+#[tauri::command]
+pub fn voice_open_app(name: String) -> Option<String> {
+    let installed = apps::installed();
+    let app = apps::find(&name, &installed)?;
+    crate::log::line("voice: open app");
+    crate::platform::reveal_folder(&app.path.to_string_lossy());
+    Some(app.name.clone())
+}
+
+/// "Open my downloads": one of the user's own folders, and which.
+#[tauri::command]
+pub fn voice_open_folder(name: String) -> Option<String> {
+    let (folder, path) = apps::folder(&name)?;
+    crate::log::line("voice: open folder");
+    crate::platform::reveal_folder(&path.to_string_lossy());
+    Some(folder)
 }
 
 /// The island left the listening view by itself (Escape, a card coming up).

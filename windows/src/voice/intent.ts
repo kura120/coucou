@@ -65,6 +65,10 @@ const REPLACE_SEPARATORS = ["for", "with", "by"];
 const ONLY = [["keep", "only"]];
 const ARTICLES = new Set(["some", "the", "a", "an", "pill"]);
 const AND = "and";
+const SHUFFLE = new Set(["shuffle", "shuffling", "shuffled"]);
+const REPEAT = new Set(["repeat", "repeating", "repeated"]);
+/** With shuffle or repeat: it is being turned off. */
+const TURN_OFF = new Set(["off", "stop", "no", "disable", "quit"]);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -165,18 +169,19 @@ export function parseIntent(text: string, pills: readonly PillDefinition[]): Voi
 
   if (CANCEL.some((seq) => seq.length === words.length && startsWith(words, seq))) return { kind: "cancel" };
 
+  // Shuffle and repeat first: "stop repeating this" is not "stop".
+  for (const [stems, kind] of [[SHUFFLE, "musicShuffle"], [REPEAT, "musicRepeat"]] as const) {
+    if (!words.some((w) => stems.has(w))) continue;
+    const off = words.some((w) => TURN_OFF.has(w));
+    return { kind, on: off ? false : words.includes("on") ? true : null };
+  }
+
   // 1. Music, said outright.
   if (hasAny(words, PAUSE)) return { kind: "musicPause" };
   if (hasAny(words, NEXT)) return { kind: "musicNext" };
   if (hasAny(words, PREVIOUS)) return { kind: "musicPrevious" };
   if (hasAny(words, VOLUME_UP)) return { kind: "musicVolumeUp" };
   if (hasAny(words, VOLUME_DOWN)) return { kind: "musicVolumeDown" };
-  for (const [word, kind] of [["shuffle", "musicShuffle"], ["repeat", "musicRepeat"]] as const) {
-    if (words[0] === word || (words[0] === "turn" && words.includes(word))) {
-      return { kind, on: words.includes("off") ? false : words.includes("on") ? true : null };
-    }
-  }
-
   // 2. "volume 50", "set volume to 50".
   const volumeAt = words.indexOf("volume");
   const numberAt = words.reduce((last, w, i) => (isNumber(w) ? i : last), -1);

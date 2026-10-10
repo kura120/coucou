@@ -518,6 +518,24 @@ async fn chat_models(shared: State<'_, Shared>, provider: String) -> Result<Vec<
     chat::models(&settings, &provider).await
 }
 
+/// What a spoken sentence means, asked of the model server chosen for voice:
+/// the tool calls it proposes, or its answer. The island decides what is done.
+#[tauri::command]
+async fn voice_brain(
+    app: AppHandle,
+    shared: State<'_, Shared>,
+    system: String,
+    said: String,
+    tools: serde_json::Value,
+) -> Result<voice::brain::Reply, String> {
+    let settings = shared.settings.lock().unwrap().clone();
+    let reply = voice::brain::ask(&app, &settings, &system, &said, &tools).await;
+    if let Err(why) = &reply {
+        log::line(format!("voice: model: {why}"));
+    }
+    reply
+}
+
 /// Settings → Local models → Connect: does the server answer, and with which models?
 #[tauri::command]
 async fn local_connect(provider: String, url: String) -> Result<local_chat::Connected, String> {
@@ -867,6 +885,9 @@ pub fn run() {
             voice::voice_cancel,
             voice::voice_grammar,
             voice::voice_talk,
+            voice::voice_open_app,
+            voice::voice_open_folder,
+            voice_brain,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();

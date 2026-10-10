@@ -87,11 +87,17 @@ pub struct VoicePref {
     /// Listen for the wake phrase all the time. Off: the microphone opens only
     /// for the "Talk to Coucou" shortcut.
     pub wake: bool,
+    /// The model server that is asked what a sentence means when the parser
+    /// does not know (voice/brain.rs): "ollama", "lmstudio", "custom", or ""
+    /// for none. Only ever one the user connected in Settings → Local models.
+    pub brain: String,
+    /// The model asked on that server.
+    pub brain_model: String,
 }
 
 impl Default for VoicePref {
     fn default() -> Self {
-        Self { enabled: false, wake: true }
+        Self { enabled: false, wake: true, brain: String::new(), brain_model: String::new() }
     }
 }
 
@@ -432,7 +438,7 @@ mod tests {
   "pillColors": { "integration_claude": "#2DD4BF" },
   "language": "pt-BR",
   "desktopMochi": { "onDesktop": true, "spot": { "x": 1500.5, "y": -300.0, "space": "screen" } },
-  "voice": { "enabled": true, "wake": false }
+  "voice": { "enabled": true, "wake": false, "brain": "ollama", "brainModel": "qwen2.5:7b-instruct" }
 }"##;
 
     fn custom() -> Value {

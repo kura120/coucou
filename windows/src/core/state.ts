@@ -161,7 +161,13 @@ export interface Settings {
    * "OK Coucou": off by default. `wake` listens for the wake phrase all the
    * time; without it the microphone opens only for the shortcut.
    */
-  voice: { enabled: boolean; wake: boolean };
+  voice: {
+    enabled: boolean;
+    wake: boolean;
+    /** The model server asked what a sentence means when the parser does not know: "" for none. */
+    brain: string;
+    brainModel: string;
+  };
   desktopMochi?: {
     onDesktop: boolean;
     spot: { x: number; y: number; space: string } | null;
@@ -197,7 +203,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mochiOutfit: DEFAULT_OUTFIT,
   pillColors: {},
   language: "",
-  voice: { enabled: false, wake: true },
+  voice: { enabled: false, wake: true, brain: "", brainModel: "" },
 };
 
 type Listener = () => void;
@@ -235,7 +241,7 @@ class AppState {
    * What the listening view shows: the words so far, and the question Mochi
    * asked when he is listening for its answer.
    */
-  voice: { text: string; question: string } = { text: "", question: "" };
+  voice: { text: string; question: string; thinking?: boolean } = { text: "", question: "" };
   /** What the last voice command did, for its card. */
   voiceResult: VoiceResult | null = null;
   searchResult: SearchResult | null = null;

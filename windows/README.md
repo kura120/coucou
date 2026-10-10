@@ -167,6 +167,26 @@ it is. Spotify takes no slot, as everywhere else.
 - Voice never approves a permission and never sends anything: there is no
   sentence for it.
 
+**A local model for what Coucou does not know.** In Settings → Voice, pick a
+model server you connected in Local models (Ollama, LM Studio or your own) and
+one of its models. A sentence the parser does not know is then put to that
+model with the tools Coucou offers — the music, the pills, an agent's session,
+the waiting permission (show it, or decline it), a timer, opening an app from
+the Start menu, one of your folders or a web address — or it answers a question
+about what Coucou shows. The model only proposes: every call is checked against
+what was actually said before anything happens. A pill is touched only if the
+sentence names it, a permission is declined only if the sentence says decline,
+deny, refuse or reject, and asking to allow one just brings its card up. On a
+table of 38 sentences said freely, `qwen2.5:7b-instruct` got 36 right in about
+0.2 s each, none of them dangerous (`node --import ./tests/setup.mjs
+scripts/voice-eval.mjs`); the checks were tuned on that same table, so expect
+less on sentences it has not seen. What you say and what Coucou shows go to
+that server and nowhere else; a toast says so once if it is not this computer.
+
+Until Coucou can hear free speech (the recogniser above only hears the
+sentences it was given), the model is reached by what the parser does not
+understand among those.
+
 ## Your pills
 
 **Settings… → Active pills** lists the tools you use, from the same catalog as
@@ -427,7 +447,8 @@ windows/
     desktop/           Mochi's own little window, when he lives on the desktop
     toast/             the toasts' window: the stack, its timings and its look
     island/            state machine, hooks, integrations, what voice reports
-    voice/             what a command means and what it does (parser, pill names, runner)
+    voice/             what a command means and what it does (parser, pill names, runner,
+                       and the tools a local model may propose)
     views/             every island view
     settings/          the settings window
   src-tauri/           Rust backend: window, named pipe, Claude API, pollers

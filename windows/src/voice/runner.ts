@@ -71,6 +71,11 @@ export class VoiceRunner {
     return this.pendingAdd != null;
   }
 
+  /** The pills as they are now, for what a model is told about the app. */
+  pillState(): { active: string[]; main: string } {
+    return { active: this.pills.active(), main: this.pills.main() };
+  }
+
   /** Forgets a question nobody answered. */
   reset() {
     this.pendingAdd = null;

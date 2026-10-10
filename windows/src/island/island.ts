@@ -31,7 +31,7 @@ import { DesktopLink } from "./desktop";
 import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
 import { interruptedAfter, isPlace } from "./restore";
-import { RESULT_SHOWN_MS, voicePills, voiceRunner, wakeBlocked } from "./voice";
+import { RESULT_SHOWN_MS, askBrain, brainChosen, createWorld, voicePills, voiceRunner, wakeBlocked } from "./voice";
 import { parseIntent, parseSeveral } from "../voice/intent";
 import type { VoiceResult } from "../voice/runner";
 import { installContextMenu, type ContextMenu, type Rect } from "../views/menu";
@@ -125,6 +125,10 @@ export class Island {
 
   private confusedRecovery: number | null = null;
   private voiceTimer: number | null = null;
+  private voiceWorld = createWorld({
+    showWaitingCard: () => this.showWaitingCard(),
+    declineWaiting: () => this.declineWaiting(),
+  });
   private prevViewBeforeConfused: IslandViewName = "overview";
   /** The chat is on screen and the island has taken the keyboard for it. */
   private chatHasKeyboard = false;
@@ -608,9 +612,45 @@ export class Island {
       return;
     }
     // "pause and remove github": each part is done, the last one is shown.
-    const several = intent.kind === "unknown" ? parseSeveral(said, pills) : null;
+    // Looked for first, or its first word alone would be taken for the whole.
+    const several = parseSeveral(said, pills);
+    if (intent.kind === "unknown" && !several && brainChosen()) {
+      void this.voiceAsk(said);
+      return;
+    }
     const results = (several ?? [intent]).map((one) => voiceRunner.run(one, said));
     this.voiceResult(results.find((r) => r.outcome !== "success") ?? results[results.length - 1]);
+  }
+
+  /** Not a sentence the parser knows: the model is asked, and its proposal checked. */
+  private async voiceAsk(said: string) {
+    State.voice = { ...State.voice, thinking: true };
+    State.notify();
+    const result = await askBrain(said, this.voiceWorld);
+    // The island moved on while the model thought: its answer is for nobody.
+    if (this.fsm.state !== "listening" || State.view !== "listening" || State.voice.text !== said) return;
+    State.voice = { ...State.voice, thinking: false };
+    if (result) this.voiceResult(result);
+    else if (this.fsm.state === "listening") this.fsm.voiceFinished();
+  }
+
+  /** The waiting permission card, up and unanswered (voice: "what is the request?"). */
+  private showWaitingCard() {
+    const pending = State.pendingApproval;
+    if (!pending) return;
+    State.setFocus(pending.pillId);
+    this.alert(pending.questions ? "question" : "approval");
+  }
+
+  /** Declines the waiting permission, as a click on Deny does. Never a question, never an Allow. */
+  private declineWaiting() {
+    const pending = State.pendingApproval;
+    if (!pending || pending.questions) return;
+    void Bridge.log(`decide deny (voice) req=${pending.requestId}`);
+    Sound.play("blip");
+    void Bridge.approvalDecision(pending.requestId, "deny");
+    State.endApproval();
+    this.fsm.pinned = false;
   }
 
   private voiceResult(result: VoiceResult) {

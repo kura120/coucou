@@ -253,6 +253,18 @@ export const Bridge = {
     call<void>("voice_grammar", { commands, slots }),
   /** Listens for a command without the wake phrase: the answer to a question. */
   voiceTalk: () => call<void>("voice_talk"),
+  /**
+   * What a sentence means, asked of the model server chosen for voice: the
+   * tool calls it proposes, or its answer. Null when it cannot be asked.
+   */
+  voiceBrain: (system: string, said: string, tools: unknown[]) =>
+    call<{ calls: { name: string; arguments: Record<string, unknown> }[]; text: string }>(
+      "voice_brain", { system, said, tools },
+    ),
+  /** Starts the Start-menu app that name means; its name, or null. */
+  voiceOpenApp: (name: string) => call<string | null>("voice_open_app", { name }),
+  /** Opens one of the user's own folders; its name, or null. */
+  voiceOpenFolder: (name: string) => call<string | null>("voice_open_folder", { name }),
 };
 
 export type SpotifyAction = "playPause" | "next" | "previous" | "seek" | "shuffle" | "repeat" | "volume";
