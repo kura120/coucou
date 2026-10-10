@@ -9,7 +9,7 @@ import { emit, sent } from "./tauri.mjs";
 import { installFakeDom } from "./fakedom.mjs";
 import {
   IDLE_SPOTIFY, SPOTIFY_ID, Spotify, currentArtwork, desktopDances, formatTime, isAd, islandDances,
-  musicCardShown, musicPlaying, spotifyPosition, volumeLevel, withPlaying,
+  marquee, musicCardShown, musicPlaying, nowPlayingLine, spotifyPosition, volumeLevel, withPlaying,
 } from "../src/core/spotify.ts";
 import { EXPANDED_W, MUSIC_CARD_GAP, MUSIC_CARD_W, PANEL_W, islandSize } from "../src/core/layout.ts";
 import { BotEngine, danceTransform, stepDanceLevel } from "../src/mochi/engine.ts";
@@ -284,6 +284,28 @@ test("the playing card: title, artist · album, times, and the controls", () => 
   Spotify.state = playing({ track: track({ id: "spotify:ad:9", title: "x", artist: "", album: "" }) });
   card.sync();
   assert.ok(card.el.textContent.includes("Advertisement"));
+});
+
+// ── The compact island's line ────────────────────────────────────────────────
+
+test("the compact island says the title and the artist on one line", () => {
+  assert.equal(nowPlayingLine(track(), "Advertisement"), "Get Lucky — Daft Punk");
+  assert.equal(nowPlayingLine(track({ artist: "" }), "Advertisement"), "Get Lucky");
+  assert.equal(nowPlayingLine(track({ artist: "  " }), "Advertisement"), "Get Lucky");
+  assert.equal(nowPlayingLine(track({ id: "spotify:ad:1", title: "x" }), "Advertisement"), "Advertisement");
+  assert.equal(nowPlayingLine(null, "Advertisement"), "");
+});
+
+test("a line that fits stays still; a longer one passes at reading speed", () => {
+  assert.equal(marquee(120, 163), null);
+  assert.equal(marquee(163, 163), null);
+  // One pass goes the line's width and the gap after it.
+  assert.deepEqual(marquee(224, 163), { distance: 260, seconds: 10 });
+  assert.ok(marquee(600, 163).seconds > marquee(224, 163).seconds);
+  // Not laid out yet: nothing to scroll.
+  assert.equal(marquee(0, 163), null);
+  assert.equal(marquee(300, 0), null);
+  assert.equal(marquee(NaN, 163), null);
 });
 
 // ── The music card ────────────────────────────────────────────────────────────
