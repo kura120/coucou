@@ -21,6 +21,7 @@
 //   Ctrl+Alt+T       open the terminal       Ctrl+Alt+G      wardrobe
 //   Ctrl+Alt+D       Mochi to the desktop, or home again (the Mac's ⌃⌥D)
 //   Ctrl+Alt+N       open / close the island (off by default, as on the Mac)
+//   Ctrl+Alt+V       talk to Coucou without the wake phrase (off by default, the Mac's ⌃⌥V)
 //
 // ⌃⌥[ and ⌃⌥] became the arrows (brackets are AltGr characters almost
 // everywhere) and ⌃⌥M became S (AltGr+M is µ in German). Layouts outside that
@@ -69,6 +70,7 @@ pub const ACTIONS: &[ActionDef] = &[
     action("muteToggle", "Ctrl+Alt+S", true, true),
     action("desktopToggle", "Ctrl+Alt+D", true, true),
     action("wardrobeToggle", "Ctrl+Alt+G", true, true),
+    action("talkToCoucou", "Ctrl+Alt+V", false, true),
 ];
 
 pub fn find(id: &str) -> Option<&'static ActionDef> {
@@ -92,6 +94,7 @@ pub fn description(id: &str) -> &'static str {
         "muteToggle" => n_("Mute or unmute Mochi"),
         "desktopToggle" => n_("Send Mochi to the desktop"),
         "wardrobeToggle" => n_("Open the wardrobe"),
+        "talkToCoucou" => n_("Talk to Coucou"),
         _ => "Coucou",
     }
 }
@@ -328,6 +331,9 @@ pub fn dispatch<R: Runtime>(app: &AppHandle<R>, action: &str) {
     crate::log::line(format!("shortcut {action}"));
     if action == "wardrobeToggle" {
         let _ = app.emit_to(WINDOW_LABEL, "open-wardrobe", ());
+    } else if action == "talkToCoucou" {
+        // Straight to the listener: the island hears about it when it wakes.
+        crate::voice::talk();
     } else {
         let _ = app.emit_to(WINDOW_LABEL, "shortcut", action.to_string());
     }
@@ -694,10 +700,13 @@ mod wayland {
 mod tests {
     use super::*;
 
-    const MAC_IDS: [&str; 10] = [
+    const MAC_IDS: [&str; 11] = [
         "toggleIsland", "openChat", "goToAlert", "jumpToTerminal", "attachFrontWindow",
-        "nextPill", "prevPill", "muteToggle", "desktopToggle", "wardrobeToggle",
+        "nextPill", "prevPill", "muteToggle", "desktopToggle", "wardrobeToggle", "talkToCoucou",
     ];
+
+    /// As on the Mac: `toggleIsland` and `talkToCoucou`.
+    const OFF_BY_DEFAULT: [&str; 2] = ["toggleIsland", "talkToCoucou"];
 
     fn never(_: &Shortcut) -> Option<String> {
         None
@@ -731,9 +740,9 @@ mod tests {
 
     // testEnabledByDefault
     #[test]
-    fn only_the_island_toggle_is_off_by_default() {
+    fn only_the_island_toggle_and_talking_are_off_by_default() {
         for def in ACTIONS {
-            assert_eq!(def.enabled_by_default, def.id != "toggleIsland", "{}", def.id);
+            assert_eq!(def.enabled_by_default, !OFF_BY_DEFAULT.contains(&def.id), "{}", def.id);
         }
     }
 
@@ -746,7 +755,7 @@ mod tests {
             match outcome {
                 Ok(_) => assert!(def.ported && def.enabled_by_default, "{}", def.id),
                 Err(s) if reserved => assert_eq!(s.status, Status::NotPorted),
-                Err(s) => assert_eq!((def.id, s.status), ("toggleIsland", Status::Off)),
+                Err(s) => assert!(OFF_BY_DEFAULT.contains(&def.id) && s.status == Status::Off, "{}", def.id),
             }
         }
     }
@@ -804,7 +813,7 @@ mod tests {
         // Same key, other modifiers: not a duplicate.
         stored.insert("jumpToTerminal".into(), Binding { keys: "Ctrl+Shift+A".into(), enabled: true });
         let plan = super::plan(&stored, never);
-        assert!(plan.iter().all(|(d, o)| o.is_ok() || !d.ported || d.id == "toggleIsland"));
+        assert!(plan.iter().all(|(d, o)| o.is_ok() || !d.ported || OFF_BY_DEFAULT.contains(&d.id)));
 
         // A disabled action doesn't hold its keys.
         stored.insert("goToAlert".into(), Binding { keys: "Ctrl+Alt+A".into(), enabled: false });

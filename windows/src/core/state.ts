@@ -9,6 +9,7 @@ import {
 import type { CodexPlanUsage, PlanUsage } from "./plan";
 import type { ProviderId } from "./providers";
 import type { FileDiff } from "./diff";
+import type { VoiceResult } from "../voice/runner";
 import type { Bindings } from "./shortcuts";
 import { DEFAULT_OUTFIT, type Outfit } from "../mochi/wardrobe";
 import { pillColor } from "./pill-colors";
@@ -156,6 +157,11 @@ export interface Settings {
    */
   language: string;
   /** Mochi on the desktop. Rust owns it: whatever the page sends back is ignored. */
+  /**
+   * "OK Coucou": off by default. `wake` listens for the wake phrase all the
+   * time; without it the microphone opens only for the shortcut.
+   */
+  voice: { enabled: boolean; wake: boolean };
   desktopMochi?: {
     onDesktop: boolean;
     spot: { x: number; y: number; space: string } | null;
@@ -191,6 +197,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mochiOutfit: DEFAULT_OUTFIT,
   pillColors: {},
   language: "",
+  voice: { enabled: false, wake: true },
 };
 
 type Listener = () => void;
@@ -224,6 +231,13 @@ class AppState {
   promptContext: PromptContext | null = null;
   droppedFile: { name: string; path: string } | null = null;
   noteMessage: string | null = null;
+  /**
+   * What the listening view shows: the words so far, and the question Mochi
+   * asked when he is listening for its answer.
+   */
+  voice: { text: string; question: string } = { text: "", question: "" };
+  /** What the last voice command did, for its card. */
+  voiceResult: VoiceResult | null = null;
   searchResult: SearchResult | null = null;
   chatHistory: ChatMessage[] = [];
   /** The chat's provider and model picker is open: the island is taller. */

@@ -36,6 +36,7 @@ mod sounds;
 mod spotify;
 mod toast;
 mod tray;
+mod voice;
 #[cfg(windows)]
 mod webview_drop;
 
@@ -118,6 +119,7 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
     }
     integrations::settings_saved(&app, &settings.active_integrations);
     spotify::sync(&app, &settings.active_integrations);
+    voice::sync(&app, &settings.voice);
     if shortcuts_changed {
         shortcuts::apply(&app, &settings.shortcuts);
     }
@@ -306,6 +308,7 @@ fn quit_app(app: AppHandle) {
 #[tauri::command]
 fn set_paused(paused: bool) {
     integrations::set_paused(paused);
+    voice::set_paused(paused);
 }
 
 // ── Claude Code hooks ─────────────────────────────────────────────────────────
@@ -860,6 +863,10 @@ pub fn run() {
             toast::toast_answer,
             toast::toast_layout,
             toast::toast_keys,
+            voice::voice_status,
+            voice::voice_cancel,
+            voice::voice_grammar,
+            voice::voice_talk,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -899,7 +906,9 @@ pub fn run() {
             pipe::start(handle.clone());
             integrations::start(handle.clone());
             spotify::sync(&handle, &loaded.active_integrations);
+            voice::sync(&handle, &loaded.voice);
             shortcuts::apply(&handle, &loaded.shortcuts);
+            // Test toasts at launch, to see how every kind looks. Remove when done.
             if let Some(which) = toast::sample_from_args(&std::env::args().collect::<Vec<_>>()) {
                 toast::show_sample(&handle, &which);
             }

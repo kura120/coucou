@@ -23,7 +23,9 @@ export type IslandViewName =
   | "settings"
   | "greeting"
   | "recap"
-  | "wardrobe";
+  | "wardrobe"
+  | "listening"
+  | "voiceResult";
 
 export type BotStateName =
   | "idle"
@@ -98,6 +100,10 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   // to the shared image.
   recap: { height: 184, botX: 62, botY: null, botDiameter: 58, agentMode: "column" },
   wardrobe: { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "none" },
+  // "OK Coucou": Mochi listening on the left, what he hears on the right.
+  listening: { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "none" },
+  // What a voice command did, for two seconds.
+  voiceResult: { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "none" },
 };
 
 // The upload views above are only the fallback geometry. Once a file is actually
