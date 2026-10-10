@@ -114,6 +114,31 @@ export function musicCardShown(
   return s.track != null && activeIntegrations.includes(SPOTIFY_ID) && focusId !== SPOTIFY_ID;
 }
 
+/**
+ * What the compact island says is playing, on one line: "Title — Artist".
+ * The caller says what an ad is called (it has no title of its own).
+ */
+export function nowPlayingLine(track: SpotifyTrack | null | undefined, adLabel: string): string {
+  if (!track) return "";
+  if (isAd(track)) return adLabel;
+  return [track.title, track.artist].filter((part) => part.trim() !== "").join(" — ");
+}
+
+/** The gap between the end of the line and its next pass, px. */
+export const MARQUEE_GAP = 36;
+/** How fast the line passes, px a second: slow enough to read. */
+const MARQUEE_SPEED = 26;
+
+/**
+ * How a line `textW` wide scrolls through a frame `frameW` wide: how far one
+ * pass goes and how long it takes — or null when it fits, and stays still.
+ */
+export function marquee(textW: number, frameW: number): { distance: number; seconds: number } | null {
+  if (!(textW > 0) || !(frameW > 0) || textW <= frameW) return null;
+  const distance = Math.round(textW + MARQUEE_GAP);
+  return { distance, seconds: Math.round((distance / MARQUEE_SPEED) * 10) / 10 };
+}
+
 /** The states Mochi dances in; the rest (an alert, an error, sleep) win. */
 const DANCE_STATES: ReadonlySet<BotStateName> = new Set(["idle", "working", "thinking", "searching", "finished"]);
 

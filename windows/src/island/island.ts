@@ -12,7 +12,8 @@ import {
 } from "../core/layout";
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
-import { SPOTIFY_ID, islandDances } from "../core/spotify";
+import { SPOTIFY_ID, Spotify, islandDances, marquee, nowPlayingLine } from "../core/spotify";
+import { t } from "../i18n/i18n";
 import { miniGridColumns } from "../core/pills";
 import { BotEngine, hexToRGB } from "../mochi/engine";
 import { Greeting } from "../mochi/greeting";
@@ -46,6 +47,9 @@ const PRE_PROGRESS = USC.T_PROG_START - USC.T_DROP;
 
 /** A little Mochi of the compact island and the gap after it (#mini-grid). */
 const MINI_PITCH = 16;
+/** Where the compact island's now-playing line starts, clear of Mochi, and the air it keeps before the little Mochis. */
+const NOW_PLAYING_LEFT = 60;
+const NOW_PLAYING_AIR = 8;
 
 const modeOrder = (m: IslandMode) => (m === "hidden" ? 0 : m === "compact" ? 1 : 2);
 
@@ -71,6 +75,9 @@ export class Island {
   private greetingCanvas!: HTMLCanvasElement;
   private miniGrid!: HTMLElement;
   private miniColumns = 2;
+  /** What is playing, passing through the middle of the compact island. */
+  private nowPlaying = h("div", { id: "now-playing" });
+  private nowPlayingText = "";
   /** The music card was there at the last sync: the island is wider with it. */
   private hadMusicCard = false;
   private countdown!: HTMLElement;
@@ -337,6 +344,7 @@ export class Island {
       this.clipEl,
       this.botGlow,
       this.botCanvas,
+      this.nowPlaying,
       this.miniGrid,
       this.countdown,
     );
@@ -743,8 +751,11 @@ export class Island {
     // These follow the island as it resizes, so they belong here rather than in
     // the state-driven DOM sync.
     // Its right edge stays put: a third column grows to the left.
-    this.miniGrid.style.left = `${w - 40 - 14.5 - (this.miniColumns - 2) * MINI_PITCH}px`;
+    const gridLeft = w - 40 - 14.5 - (this.miniColumns - 2) * MINI_PITCH;
+    this.miniGrid.style.left = `${gridLeft}px`;
     this.miniGrid.style.top = `${hh / 2 - 14.5}px`;
+    // The line has what is left between Mochi and them.
+    this.nowPlaying.style.width = `${Math.max(0, gridLeft - NOW_PLAYING_AIR - NOW_PLAYING_LEFT)}px`;
     this.greetingCanvas.style.left = `${(w - EXPANDED_W) / 2}px`;
     this.uploadCanvas.el.style.left = `${(w - EXPANDED_W) / 2}px`;
 
@@ -1359,8 +1370,43 @@ export class Island {
       }
     }
 
+    this.syncNowPlaying();
+
     syncMiniBotStates(State.tasks);
     this.engine.setState(State.effectiveState);
+  }
+
+  /**
+   * The compact island says what is playing, in the middle. A line longer than
+   * its place passes through it, again and again; a shorter one stays still.
+   * It is only there — and only moves — while music plays in the compact
+   * island: open or hidden, nothing of it is left to animate.
+   */
+  private syncNowPlaying() {
+    const line = State.mode === "compact" && State.spotifyPlaying
+      ? nowPlayingLine(Spotify.state.track, t("Advertisement"))
+      : "";
+    if (line === this.nowPlayingText) return;
+    this.nowPlayingText = line;
+    const el = this.nowPlaying;
+    el.classList.toggle("on", line !== "");
+    el.classList.remove("scroll");
+    el.replaceChildren();
+    if (!line) return;
+    const first = h("span", { text: line });
+    const run = h("div", { class: "np-run" }, first);
+    el.append(run);
+    // Measured once it is laid out: a line that fits is left alone.
+    requestAnimationFrame(() => {
+      if (this.nowPlayingText !== line) return;
+      const pass = marquee(first.offsetWidth, el.clientWidth);
+      if (!pass) return;
+      // A second copy follows the first, so the line never leaves a hole.
+      run.append(h("span", { text: line, "aria-hidden": "true" }));
+      run.style.setProperty("--np-distance", `-${pass.distance}px`);
+      run.style.setProperty("--np-seconds", `${pass.seconds}s`);
+      el.classList.add("scroll");
+    });
   }
 
   /** Applies settings coming from Rust at boot. */

@@ -213,6 +213,66 @@ body {
 }
 
 /* Compact 2×2 mini grid, to the right of the notch. */
+/* What is playing, in the middle of the compact island (Island.syncNowPlaying):
+   between Mochi and the little Mochis. A long line passes through, its ends
+   fading out; clicks go through it to the island. */
+#now-playing {
+  position: absolute;
+  top: 0;
+  left: 60px;
+  height: 32px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+  font: 500 11px var(--font);
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+#now-playing.on {
+  display: flex;
+}
+
+#now-playing.scroll {
+  justify-content: flex-start;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+}
+
+.np-run {
+  display: flex;
+  gap: 36px;
+  flex: 0 0 auto;
+}
+
+#now-playing.scroll .np-run {
+  padding-left: 12px;
+  animation: np-pass var(--np-seconds, 8s) linear infinite;
+}
+
+@keyframes np-pass {
+  /* A beat at rest, so the beginning of the line can be read. */
+  0%, 12% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(var(--np-distance, -100%));
+  }
+}
+
+/* With reduced motion the line stays still and is cut at its end. */
+@media (prefers-reduced-motion: reduce) {
+  #now-playing.scroll .np-run {
+    animation: none;
+  }
+
+  #now-playing.scroll .np-run span + span {
+    display: none;
+  }
+}
+
 #mini-grid {
   position: absolute;
   width: 29px;
