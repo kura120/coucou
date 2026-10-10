@@ -156,6 +156,9 @@ export const Bridge = {
   chatStop: () => call<void>("chat_stop"),
   /** The system's folder dialog; null when cancelled. */
   pickFolder: () => call<string | null>("pick_folder"),
+
+  /** The clipboard's text, for Paste in the right-click menu; null when Rust has none to give. */
+  clipboardText: () => call<string | null>("clipboard_text"),
   /**
    * The models a provider offers, for the picker in the chat view. Rust asks
    * the provider only when it has a key (or a server address).

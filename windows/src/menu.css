@@ -1,0 +1,82 @@
+/* The right-click menu (src/views/menu.ts), in the island and in Settings.
+   The chat's panels' own surface: same fill, hairline, radius and type. */
+
+.ctx-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 150px;
+  max-width: 260px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #16171b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  font: 500 11.5px var(--font);
+  user-select: none;
+  transform-origin: top left;
+  animation: ctx-in 0.12s ease-out;
+}
+
+@keyframes ctx-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.ctx-section + .ctx-section {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #c8cdd4;
+  font: inherit;
+  text-align: start;
+  cursor: default;
+}
+
+.ctx-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctx-item svg,
+.ctx-gap {
+  flex: 0 0 11px;
+  width: 11px;
+  color: #7b8089;
+}
+
+.ctx-item:hover:not(:disabled),
+.ctx-item:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f5f6f8;
+  outline: none;
+}
+
+.ctx-item:disabled {
+  color: #5c6370;
+}
+
+.ctx-item.danger,
+.ctx-item.danger svg {
+  color: #ff8d97;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctx-menu {
+    animation: none;
+  }
+}

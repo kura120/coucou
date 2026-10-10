@@ -6,6 +6,7 @@ mod chat;
 mod claude;
 mod claude_code;
 mod claude_sessions;
+mod clipboard;
 mod codex_plan;
 mod config_file;
 mod conversations;
@@ -526,6 +527,12 @@ fn local_set_key(url: String, key: String) -> Result<(), String> {
     local_chat::set_custom_key(&url, &key)
 }
 
+/// Paste in the right-click menu: the clipboard's text, read when it is clicked.
+#[tauri::command]
+fn clipboard_text() -> Option<String> {
+    clipboard::text()
+}
+
 #[tauri::command]
 fn chat_reset(chat: State<Chat>) {
     chat.reset();
@@ -802,6 +809,7 @@ pub fn run() {
             conversation_delete,
             repo_pulls,
             pick_folder,
+            clipboard_text,
             ingest_file,
             secret_present,
             secret_set,

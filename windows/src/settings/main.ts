@@ -16,6 +16,7 @@ import {
   sanitizeDeclared, toggleDeclared, type PillDefinition,
 } from "../core/pills";
 import { h, clear } from "../views/dom";
+import { installContextMenu } from "../views/menu";
 import { agentsSection } from "./agents";
 import { colorDot } from "./colors";
 import { initMotion } from "./motion";
@@ -1293,6 +1294,9 @@ async function rerender() {
 async function main() {
   // First, so the page is already waiting in its hidden state when shown.
   initMotion(root);
+  // Coucou's right-click menu here too: Cut, Copy, Paste in the fields, and
+  // never the webview's own.
+  installContextMenu(document.body, { clipboardText: () => Bridge.clipboardText() });
   const boot = await Bridge.boot();
   if (boot) {
     settings = { ...settings, ...boot.settings };

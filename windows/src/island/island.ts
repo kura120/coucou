@@ -28,6 +28,7 @@ import { DesktopLink } from "./desktop";
 import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
 import { interruptedAfter, isPlace } from "./restore";
+import { installContextMenu, type ContextMenu, type Rect } from "../views/menu";
 
 const BOT_OVERHANG = 40;
 const CLAUDE_DESKTOP_ID = "agent_claude-desktop";
@@ -95,6 +96,9 @@ export class Island {
   private wasInIsland = false;
   /** Last shape handed to Rust for the click-through test. */
   private pushedRect = { x: -1, y: -1, w: -1, h: -1 };
+  /** The right-click menu, and where it is while it is open. */
+  private menu!: ContextMenu;
+  private menuRect: Rect | null = null;
 
   // Bot hover → love (IslandWindowController.botHoverIn)
   private botHovering = false;
@@ -736,12 +740,34 @@ export class Island {
     this.greetingCanvas.style.left = `${(w - EXPANDED_W) / 2}px`;
     this.uploadCanvas.el.style.left = `${(w - EXPANDED_W) / 2}px`;
 
-    const rect = { x: (PANEL_W - w) / 2, y: 0, w, h: hh };
+    const rect = this.hitRect();
     const p = this.pushedRect;
-    if (Math.abs(p.x - rect.x) > 0.5 || Math.abs(p.w - rect.w) > 0.5 || Math.abs(p.h - rect.h) > 0.5) {
+    if (
+      Math.abs(p.x - rect.x) > 0.5 || Math.abs(p.y - rect.y) > 0.5 ||
+      Math.abs(p.w - rect.w) > 0.5 || Math.abs(p.h - rect.h) > 0.5
+    ) {
       this.pushedRect = rect;
       void Bridge.setIslandRect(rect.x, rect.y, rect.w, rect.h);
     }
+  }
+
+  /**
+   * What takes clicks: the island, and the right-click menu while it is open.
+   * Rust lets everything outside this one rectangle through to the windows
+   * underneath, so a menu that hangs out of the island has to be inside it.
+   */
+  private hitRect(): Rect {
+    const island = this.islandRect();
+    const menu = this.menuRect;
+    if (!menu) return island;
+    const x = Math.min(island.x, menu.x);
+    const y = Math.min(island.y, menu.y);
+    return {
+      x,
+      y,
+      w: Math.max(island.x + island.w, menu.x + menu.w) - x,
+      h: Math.max(island.y + island.h, menu.y + menu.h) - y,
+    };
   }
 
   /** Island rect in window coordinates (origin top-left of the 720×640 window). */
@@ -851,10 +877,22 @@ export class Island {
       }
     });
 
-    // No browser menu over Mochi: his right-click is the wardrobe. Everywhere
-    // else (the chat field) the webview keeps its own menu.
-    this.islandEl.addEventListener("contextmenu", (e) => {
-      if (this.isBotHit(e.clientX, e.clientY)) e.preventDefault();
+    // Never the webview's own menu: Coucou's, made of what the thing under the
+    // pointer offers (views/menu.ts). Over Mochi a right-click is the wardrobe.
+    this.menu = installContextMenu(this.root, {
+      skip: (e) => this.isBotHit(e.clientX, e.clientY),
+      clipboardText: () => Bridge.clipboardText(),
+      onRect: (rect) => {
+        this.menuRect = rect;
+        this.applyGeometry();
+      },
+    });
+    // The menu is about what is on screen: it goes when that changes.
+    let shown = `${State.mode}:${State.view}`;
+    State.subscribe(() => {
+      const now = `${State.mode}:${State.view}`;
+      if (now !== shown) this.menu.close();
+      shown = now;
     });
 
     // Dragging Mochi out of the island puts him on the desktop.
@@ -939,9 +977,11 @@ export class Island {
       UploadSeq.updateCursor(State.mouseInIsland.x, State.mouseInIsland.y);
     }
 
-    const inIsland =
-      x >= rect.x - HIT_MARGIN && x <= rect.x + rect.w + HIT_MARGIN &&
-      y >= rect.y - HIT_MARGIN && y <= rect.y + rect.h + HIT_MARGIN;
+    // The open menu counts as the island: reaching for it is not leaving.
+    const inside = (r: Rect) =>
+      x >= r.x - HIT_MARGIN && x <= r.x + r.w + HIT_MARGIN &&
+      y >= r.y - HIT_MARGIN && y <= r.y + r.h + HIT_MARGIN;
+    const inIsland = inside(rect) || (this.menuRect != null && inside(this.menuRect));
 
     // Recorded before the state machine hears of it: a transition it makes
     // right away (open on hover) reads where the pointer is, and must not see
