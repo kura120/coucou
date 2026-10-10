@@ -3,7 +3,7 @@
 import type { BotEmoteName, BotStateName, IslandMode, IslandViewName } from "./layout";
 import type { EyeShape } from "../mochi/engine";
 import {
-  DEFAULT_MAIN_PILL, HOST_OS, availablePills, orderPills, pillDefinition, sanitizeDeclared,
+  DEFAULT_MAIN_PILL, HOST_OS, MAX_DECLARED, availablePills, orderPills, pillDefinition, sanitizeDeclared,
   toggleDeclared, type HostOs, type PillDefinition,
 } from "./pills";
 import type { CodexPlanUsage, PlanUsage } from "./plan";
@@ -106,7 +106,7 @@ export interface Settings {
   /** Hovering the island opens it all the way (off: hovering only peeks). */
   openOnHover: boolean;
   absenceInterval: number;
-  /** Declared pills next to the main one (at most 4), in the order they were added. */
+  /** Declared pills next to the main one (at most MAX_DECLARED), in the order they were added. */
   activeIntegrations: string[];
   /** The always-on workspace pill: VS Code, Cursor, Codex or Antigravity. */
   mainPill: string;
@@ -317,6 +317,11 @@ class AppState {
     return this.tasks.filter((t) => t.id !== this.focusId);
   }
 
+  /** The pills next to the one in front, as many as the island has room for. */
+  get shownPills(): AgentTask[] {
+    return this.otherTasks.slice(0, MAX_DECLARED);
+  }
+
   setFocus(id: string) {
     const t = this.tasks.find((x) => x.id === id);
     if (!t) return;
@@ -478,7 +483,7 @@ class AppState {
 
   /**
    * Creates the pill of a tagged agent on its first event; no-op if it exists.
-   * Inserted right after the main pill so it is in the visible slice(0,4). A
+   * Inserted right after the main pill so it is among the pills on screen. A
    * catalog agent wears its catalog colour, as on macOS.
    */
   upsertExternalAgent(id: string, name: string, color: string) {
@@ -516,7 +521,7 @@ class AppState {
     this.notify();
   }
 
-  /** Declares or undeclares a pill (max 4 next to the main one). */
+  /** Declares or undeclares a pill (at most MAX_DECLARED next to the main one). */
   toggleIntegration(id: string) {
     const next = toggleDeclared(sanitizeDeclared(this.settings, this.os), id, this.os);
     if (!next) return;
