@@ -33,6 +33,11 @@ const TABLE = [
   ["please play some music", play],
   ["can you play music", play],
   ["play spotify", { kind: "musicPlay", target: "spotify" }],
+  ["open spotify", { kind: "openSpotify" }],
+  ["launch spotify", { kind: "openSpotify" }],
+  ["open up the spotify app", { kind: "openSpotify" }],
+  ["please open my spotify", { kind: "openSpotify" }],
+  ["open figma", unknown], // not something the parser knows: for the model
   ["play music on spotify", { kind: "musicPlay", target: "spotify" }],
   ["pause", { kind: "musicPause" }],
   ["pause music", { kind: "musicPause" }],
@@ -346,6 +351,16 @@ test("music: with Spotify switched off in Settings, nothing is played, opened or
   // Pills are not music: they still work.
   const f = fakes({ music: { enabled: false } });
   assert.equal(f.say("add github").outcome, "success");
+});
+
+test("opening Spotify opens the app, whether or not Coucou follows it", () => {
+  for (const enabled of [true, false]) {
+    for (const running of [true, false]) {
+      const f = fakes({ music: { enabled, running } });
+      assert.deepEqual(f.say("open spotify"), { outcome: "success", message: "Spotify opened" });
+      assert.deepEqual(f.calls, ["open"]);
+    }
+  }
 });
 
 test("music: what Spotify cannot be asked here says so, and does nothing", () => {

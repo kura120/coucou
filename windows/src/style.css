@@ -965,6 +965,22 @@ body {
   background: #f97316;
 }
 
+/* Beside Mochi in the compact and open island, while another command may follow. */
+#follow-dot {
+  position: absolute;
+  top: 5px;
+  left: 22px;
+  width: 6px;
+  height: 6px;
+  display: none;
+  pointer-events: none;
+  z-index: 3;
+}
+
+#follow-dot.on {
+  display: block;
+}
+
 .mic-dot.on {
   animation: mic-pulse 0.8s ease-in-out infinite alternate;
 }

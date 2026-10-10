@@ -22,7 +22,7 @@ import { VoiceRunner, type MusicControls, type PillControls, type VoiceResult } 
 export const RESULT_SHOWN_MS = 2000;
 
 export interface VoiceEvent {
-  phase: "woke" | "partial" | "final" | "missed" | "cancelled";
+  phase: "woke" | "partial" | "final" | "missed" | "cancelled" | "following" | "rested";
   text: string;
 }
 
@@ -31,6 +31,8 @@ export interface VoiceHost {
   voiceHeard(text: string, final: boolean): void;
   voiceMissed(): void;
   voiceCancelled(): void;
+  /** Another command may follow without the wake phrase, or that time is over. */
+  voiceFollowing(on: boolean): void;
 }
 
 /** What the tools need of the island itself. */
@@ -83,6 +85,12 @@ export function applyVoice(island: VoiceHost, event: VoiceEvent) {
       break;
     case "cancelled":
       island.voiceCancelled();
+      break;
+    case "following":
+      island.voiceFollowing(true);
+      break;
+    case "rested":
+      island.voiceFollowing(false);
       break;
   }
 }

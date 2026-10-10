@@ -136,6 +136,7 @@ command. A card says what was done, and the island goes back to where it was.
 | Say | What happens |
 |---|---|
 | "play", "pause", "next track", "previous track", "shuffle off", "repeat on" | Spotify, as from the music card. "play" opens Spotify when it is not running. |
+| "open Spotify" | Opens the app, whether or not its pill is on. |
 | "add GitHub", "show Vercel and Stripe" | Declares the pills, as in Settings → Active pills. |
 | "remove Notion", "hide Stripe and Notion" | Undeclares them. |
 | "replace n8n with GitHub", "keep only GitHub and Vercel" | Both at once. |
@@ -193,8 +194,13 @@ GitHub releases, checked against a pinned SHA-256) and uses it for the command:
   "hold the music for a sec", "get rid of Stripe". It is written down once you
   stop speaking, in a few hundredths of a second.
 - **Keep listening after a command**: for a few seconds (8 by default) after a
-  command, another can be said without the wake phrase. Anything said nearby in
-  that time is heard as a command too, so turn it off in a noisy room.
+  command, another can be said without the wake phrase. The view closes as
+  usual; Mochi keeps his listening look and a small orange dot sits beside him
+  for as long as he still listens. Anything said nearby in that time is heard
+  as a command too, so turn it off in a noisy room.
+- A command is at most about seven seconds: the model that writes it down
+  fails on ten seconds and more, so a longer sentence — or music that never
+  pauses — is cut there.
 - **One breath.** "OK Coucou, next track" as one sentence works too: Windows'
   recogniser says when the wake phrase ended, and what the microphone gave
   after that moment is written down. Said with a pause — "OK Coucou" … "next

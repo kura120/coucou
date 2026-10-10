@@ -25,6 +25,8 @@ export type VoiceIntent =
   // on null: the other way round from now
   | { kind: "musicShuffle"; on: boolean | null }
   | { kind: "musicRepeat"; on: boolean | null }
+  // "open Spotify": the app itself, whether or not Coucou follows it
+  | { kind: "openSpotify" }
   | { kind: "pillAdd"; id: string }
   | { kind: "pillAddMultiple"; ids: string[] }
   | { kind: "pillRemove"; id: string }
@@ -63,8 +65,9 @@ const PLAY = [["play", "music"], ["start", "music"], ["resume", "music"], ["resu
 const REPLACE_STARTS = [["replace"], ["swap"], ["change"]];
 const REPLACE_SEPARATORS = ["for", "with", "by"];
 const ONLY = [["keep", "only"]];
-const ARTICLES = new Set(["some", "the", "a", "an", "pill"]);
+const ARTICLES = new Set(["some", "the", "a", "an", "pill", "my"]);
 const AND = "and";
+const OPEN = new Set(["open", "launch"]);
 const SHUFFLE = new Set(["shuffle", "shuffling", "shuffled"]);
 const REPEAT = new Set(["repeat", "repeating", "repeated"]);
 /** With shuffle or repeat: it is being turned off. */
@@ -168,6 +171,12 @@ export function parseIntent(text: string, pills: readonly PillDefinition[]): Voi
   if (!words.length) return UNKNOWN;
 
   if (CANCEL.some((seq) => seq.length === words.length && startsWith(words, seq))) return { kind: "cancel" };
+
+  // "open spotify", "launch the spotify app": the app, not its music.
+  if (OPEN.has(words[0])) {
+    const thing = stripArticles(words.slice(words[1] === "up" ? 2 : 1)).norm.filter((w) => w !== "app");
+    if (thing.length && resolvePill(thing.join(" "), pills) === "integration_spotify") return { kind: "openSpotify" };
+  }
 
   // Shuffle and repeat first: "stop repeating this" is not "stop".
   for (const [stems, kind] of [[SHUFFLE, "musicShuffle"], [REPEAT, "musicRepeat"]] as const) {

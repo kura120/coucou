@@ -247,6 +247,13 @@ test("opening needs a word for opening, and the app is the one the user named", 
   assert.deepEqual(s.log, ["app:visual studio code"]);
 });
 
+test("a model asked to open Spotify goes through Spotify's own way in, not the Start menu", async () => {
+  // The Store's Spotify has no shortcut to find: "Not found" was the first answer.
+  const s = setup({ apps: [] });
+  assert.deepEqual(await s.propose("could you bring up spotify for me", [call("open_app", { name: "Spotify" })]), { outcome: "success", message: "Spotify opened" });
+  assert.deepEqual(s.log, ["openSpotify"]);
+});
+
 test("opening: an app by name, a folder of the user's, an http address — or not found", async () => {
   const s = setup();
   assert.deepEqual(await s.propose("open figma", [call("open_app", { name: "figma" })]), { outcome: "success", message: "Figma opened" });
