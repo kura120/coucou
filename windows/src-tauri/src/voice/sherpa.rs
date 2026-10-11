@@ -1,5 +1,6 @@
-// The bundled speech engine: sherpa-onnx with a Moonshine model, which writes
-// down a whole sentence once it has been said. Unlike Windows' grammar
+// The bundled speech engine: sherpa-onnx with the hearing model the user chose
+// (Moonshine or Parakeet, voice/engine.rs), which writes down a whole sentence
+// once it has been said. Unlike Windows' grammar
 // recogniser it hears anything, not a list — so this is what lets a command
 // be said freely.
 //
@@ -13,6 +14,8 @@
 
 use std::ffi::{c_char, c_void, CStr, CString};
 use std::path::Path;
+
+use super::engine::Family;
 
 /// The release whose `c-api.h` the structs here are.
 pub const VERSION: &str = "1.13.8";
@@ -206,25 +209,42 @@ unsafe impl Send for Engine {}
 impl Engine {
     /// Loads the library from `runtime` and the model from `model`. Slow (the
     /// model is read): done once, when listening starts.
-    pub fn load(runtime: &Path, model: &Path) -> Result<Self, String> {
+    pub fn load(runtime: &Path, model: &Path, family: Family) -> Result<Self, String> {
         let library = Library::open(&runtime.join(LIBRARY))?;
-        let text = |path: std::path::PathBuf| CString::new(path.to_string_lossy().as_bytes()).map_err(|_| "a path has a NUL".to_string());
-        let encoder = text(model.join("encoder_model.ort"))?;
-        let decoder = text(model.join("decoder_model_merged.ort"))?;
-        let tokens = text(model.join("tokens.txt"))?;
+        let text = |name: &str| CString::new(model.join(name).to_string_lossy().as_bytes()).map_err(|_| "a path has a NUL".to_string());
+        let (encoder, decoder) = match family {
+            Family::Moonshine => (text("encoder_model.ort")?, text("decoder_model_merged.ort")?),
+            Family::Transducer => (text("encoder.int8.onnx")?, text("decoder.int8.onnx")?),
+        };
+        let joiner = text("joiner.int8.onnx")?;
+        let tokens = text("tokens.txt")?;
         let provider = CString::new("cpu").unwrap();
         let greedy = CString::new("greedy_search").unwrap();
-        for file in [&encoder, &decoder, &tokens] {
+        let kind = CString::new("nemo_transducer").unwrap();
+        let needed: &[&CString] = match family {
+            Family::Moonshine => &[&encoder, &decoder, &tokens],
+            Family::Transducer => &[&encoder, &decoder, &joiner, &tokens],
+        };
+        for file in needed {
             if !Path::new(file.to_str().unwrap_or_default()).is_file() {
                 return Err("the speech model is incomplete".into());
             }
         }
         unsafe {
-            // Zeroed, as c-api.h asks; then only what Moonshine needs.
+            // Zeroed, as c-api.h asks; then only what this model needs.
             let mut config: RecognizerConfig = std::mem::zeroed();
             config.feat_config = FeatureConfig { sample_rate: 16000, feature_dim: 80 };
-            config.model_config.moonshine.encoder = encoder.as_ptr();
-            config.model_config.moonshine.merged_decoder = decoder.as_ptr();
+            match family {
+                Family::Moonshine => {
+                    config.model_config.moonshine.encoder = encoder.as_ptr();
+                    config.model_config.moonshine.merged_decoder = decoder.as_ptr();
+                }
+                Family::Transducer => {
+                    config.model_config.transducer =
+                        Transducer { encoder: encoder.as_ptr(), decoder: decoder.as_ptr(), joiner: joiner.as_ptr() };
+                    config.model_config.model_type = kind.as_ptr();
+                }
+            }
             config.model_config.tokens = tokens.as_ptr();
             config.model_config.num_threads = 2;
             config.model_config.provider = provider.as_ptr();
@@ -721,6 +741,16 @@ impl Library {
     }
 }
 
+/// The kind of model `COUCOU_VOICE_MODEL` holds, for the tests that load one:
+/// `COUCOU_VOICE_FAMILY=transducer` for a Parakeet, Moonshine otherwise.
+#[cfg(test)]
+pub fn test_family() -> Family {
+    match std::env::var("COUCOU_VOICE_FAMILY").as_deref() {
+        Ok("transducer") => Family::Transducer,
+        _ => Family::Moonshine,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -758,7 +788,7 @@ mod tests {
             assert!(samples.iter().all(|s| s.is_finite() && s.abs() <= 1.5));
             assert!(samples.iter().any(|s| s.abs() > 0.05), "it is not silence");
             if let Ok(model) = std::env::var("COUCOU_VOICE_MODEL") {
-                let engine = Engine::load(&var("COUCOU_VOICE_RUNTIME"), Path::new(&model)).expect("engine");
+                let engine = Engine::load(&var("COUCOU_VOICE_RUNTIME"), Path::new(&model), test_family()).expect("engine");
                 let heard = engine.transcribe(rate, &samples).to_lowercase();
                 println!("heard back: {heard:?}");
                 assert!(heard.contains("added"), "{heard:?}");
@@ -791,7 +821,7 @@ mod tests {
     #[ignore = "needs the downloaded engine"]
     fn a_spoken_sentence_is_written_down() {
         let var = |name: &str| std::path::PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set")));
-        let engine = Engine::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_MODEL")).expect("engine");
+        let engine = Engine::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_MODEL"), test_family()).expect("engine");
         let bytes = std::fs::read(var("COUCOU_VOICE_WAV")).expect("wav");
         let rate = u32::from_le_bytes(bytes[24..28].try_into().unwrap());
         let data = bytes.windows(4).position(|w| w == b"data").expect("data chunk") + 8;

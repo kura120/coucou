@@ -1052,7 +1052,7 @@ function voiceSection(): HTMLElement {
   voiceListener = show;
   const change = (patch: Partial<Settings["voice"]>) => {
     settings.voice = { ...settings.voice, ...patch };
-    void save();
+    return save();
   };
 
   // The model that is asked what a sentence means: one of the servers
@@ -1129,6 +1129,7 @@ function voiceSection(): HTMLElement {
       });
     draw(false, false, 0);
     refresh();
+    voiceEngineRedraw[part] = () => refresh();
     voiceEngineListeners[part] = (p) => {
       if (p.installed) {
         // Downloaded to be used: it is turned on at once.
@@ -1149,6 +1150,21 @@ function voiceSection(): HTMLElement {
     () => settings.voice.engine === "bundled",
     (on) => change({ engine: on ? "bundled" : "system" }),
   );
+
+  // Which model hears: the row above then shows that one's switch, or its
+  // Download button when it is not on this machine yet.
+  const hearing = h("select", {}) as HTMLSelectElement;
+  const megabytes = (bytes: number) => Math.round(bytes / 1_000_000);
+  void Bridge.voiceHearingModels().then((models) => {
+    for (const m of models ?? []) hearing.append(h("option", { value: m.id, text: `${m.name} · ${megabytes(m.downloadBytes)} MB` }));
+    hearing.value = settings.voice.hearingModel;
+    // A model this build does not know is the first one, as Rust takes it.
+    if (hearing.selectedIndex < 0) hearing.selectedIndex = 0;
+  });
+  hearing.addEventListener("change", () => {
+    // Saved first: Rust answers for the model the settings name.
+    void Promise.resolve(change({ hearingModel: hearing.value })).then(() => voiceEngineRedraw.hearing?.());
+  });
 
   const speaker = h("select", {}) as HTMLSelectElement;
   speaker.append(h("option", { value: "female", text: t("Female voice") }), h("option", { value: "male", text: t("Male voice") }));
@@ -1188,6 +1204,8 @@ function voiceSection(): HTMLElement {
     h("div", { class: "hint", text: t("Off: the microphone opens only for the “Talk to Coucou” shortcut. While it listens, Windows shows a microphone in the taskbar.") }),
     free,
     h("div", { class: "hint", text: t("Lets a command be said in your own words, not only the sentences Windows was given. The engine and its English model (sherpa-onnx and Moonshine) are downloaded from GitHub when you ask, checked, and run on this computer. The wake phrase stays Windows' own.") }),
+    h("div", { class: "row" }, h("label", { text: t("Speech model") }), hearing),
+    h("div", { class: "hint", text: t("A larger model hears names and accents better, and takes a little longer to write a sentence down. Each is downloaded from GitHub when you ask for it. Parakeet is NVIDIA's (CC BY 4.0).") }),
     h("div", { class: "row" }, h("label", { text: t("Keep listening after a command") }), followUp),
     h("div", { class: "hint", text: t("For a few seconds after a command, another can be said without « OK Coucou ». Only with free speech.") }),
     h("div", { class: "row" }, h("label", { text: t("Understand free speech with") }), server, model),
@@ -1202,6 +1220,8 @@ let voiceListener: ((s: VoiceStatus | null) => void) | null = null;
 let voiceServersRedraw: (() => void) | null = null;
 type EngineProgress = { part: VoiceEnginePart; done: number; installed: boolean; error: string | null };
 const voiceEngineListeners: Partial<Record<VoiceEnginePart, (p: EngineProgress) => void>> = {};
+/** Asks Rust again what a part's row shows: the hearing model changed. */
+const voiceEngineRedraw: Partial<Record<VoiceEnginePart, () => void>> = {};
 
 function shortcutsSection(initial: ShortcutsReport | null): HTMLElement {
   let report = initial;

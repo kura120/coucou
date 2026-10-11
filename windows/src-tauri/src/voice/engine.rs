@@ -4,7 +4,8 @@
 // on its own:
 //
 //   hearing   the library, a model that writes down what is said and a small
-//             one that tells a voice from a noise (38 MB)
+//             one that tells a voice from a noise (38 MB with the smallest
+//             model; the user may choose a larger one that hears better)
 //   speaking  the library and a model that says a sentence out loud (129 MB)
 //
 // Archives from the projects' own releases on GitHub, each checked against the
@@ -14,6 +15,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -52,16 +54,105 @@ const RUNTIME: Archive = Archive {
     into: "runtime",
 };
 
-/// Moonshine tiny, English, quantised (MIT). On 54 synthesised commands it got
-/// 12 % of the words wrong; the streaming model tried first got 54 %.
-const HEARING: Archive = Archive {
-    url: "asr-models/sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27.tar.bz2",
-    sha256: "9ec31b342d8fa3240c3b81b8f82e1cf7e3ac467c93ca5a999b741d5887164f8d",
-    size: 29_858_559,
-    folder: "sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27",
-    keep: &["encoder_model.ort", "decoder_model_merged.ort", "tokens.txt", "LICENSE"],
-    into: "moonshine-tiny-en",
-};
+/// How a hearing model is put together, which is how it is loaded (sherpa.rs).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Family {
+    /// An encoder and a merged decoder.
+    Moonshine,
+    /// An encoder, a decoder and a joiner (NVIDIA's Parakeet).
+    Transducer,
+}
+
+/// A model that writes down what is said. English, all of them.
+pub struct Hearing {
+    /// What the settings file says: never renamed.
+    pub id: &'static str,
+    pub name: &'static str,
+    pub family: Family,
+    archive: Archive,
+}
+
+/// The models the user may choose from, the smallest and fastest first: it is
+/// the one used until another is chosen. Measured on 69 synthesised commands
+/// (three voices, 2026-10-10), as words wrong and sentences written whole:
+///
+///   Moonshine tiny    13 %   45   a hundredth of the sentence's length to write
+///   Parakeet 110m      8 %   52   three hundredths
+///   Parakeet 0.6b v2   4 %   57   a tenth: 0.3 s for a 3 s sentence
+///
+/// Tried and left out: Moonshine base (9 %, no better than Parakeet 110m for
+/// its size), Canary 180m (7 %, three times slower than Parakeet 110m) and
+/// Whisper base.en and small.en (8 % and 5 %, three and nine times slower than
+/// the Parakeet next to them).
+pub const HEARING_MODELS: &[Hearing] = &[
+    // MIT.
+    Hearing {
+        id: "moonshine-tiny",
+        name: "Moonshine tiny",
+        family: Family::Moonshine,
+        archive: Archive {
+            url: "asr-models/sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27.tar.bz2",
+            sha256: "9ec31b342d8fa3240c3b81b8f82e1cf7e3ac467c93ca5a999b741d5887164f8d",
+            size: 29_858_559,
+            folder: "sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27",
+            keep: &["encoder_model.ort", "decoder_model_merged.ort", "tokens.txt", "LICENSE"],
+            into: "moonshine-tiny-en",
+        },
+    },
+    // NVIDIA's, CC BY 4.0; quantised.
+    Hearing {
+        id: "parakeet-110m",
+        name: "Parakeet 110m",
+        family: Family::Transducer,
+        archive: Archive {
+            url: "asr-models/sherpa-onnx-nemo-parakeet_tdt_transducer_110m-en-36000-int8.tar.bz2",
+            sha256: "f628312e9fdf8686374cb01a69425c41732529d540860311f16f37cbc32cfe9b",
+            size: 108_035_095,
+            folder: "sherpa-onnx-nemo-parakeet_tdt_transducer_110m-en-36000-int8",
+            keep: &["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"],
+            into: "parakeet-110m-en",
+        },
+    },
+    Hearing {
+        id: "parakeet-0.6b",
+        name: "Parakeet 0.6b",
+        family: Family::Transducer,
+        archive: Archive {
+            url: "asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
+            sha256: "157c157bc51155e03e37d2466522a3a737dd9c72bb25f36eb18912964161e1ad",
+            size: 482_468_385,
+            folder: "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8",
+            keep: &["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"],
+            into: "parakeet-0.6b-v2-en",
+        },
+    },
+];
+
+/// Which of them is the hearing model: its place in the list above.
+static CHOSEN: AtomicUsize = AtomicUsize::new(0);
+
+/// The settings name a hearing model; one they do not know is the first.
+/// Returns its place in the list, for whoever must notice a change.
+pub fn choose(id: &str) -> usize {
+    let at = HEARING_MODELS.iter().position(|model| model.id == id).unwrap_or(0);
+    CHOSEN.store(at, Ordering::Relaxed);
+    at
+}
+
+/// The hearing model in use.
+pub fn hearing() -> &'static Hearing {
+    &HEARING_MODELS[CHOSEN.load(Ordering::Relaxed).min(HEARING_MODELS.len() - 1)]
+}
+
+impl Hearing {
+    pub fn installed(&self) -> bool {
+        present(&self.archive)
+    }
+
+    pub fn download_bytes(&self) -> u64 {
+        self.archive.size
+    }
+}
 
 /// Silero VAD (MIT): says whether a sound is a voice, so that typing is not
 /// cut out as a sentence and written down.
@@ -106,16 +197,16 @@ pub enum Part {
 impl Part {
     fn model(self) -> &'static Archive {
         match self {
-            Part::Hearing => &HEARING,
+            Part::Hearing => &hearing().archive,
             Part::Speaking => &SPEAKING,
         }
     }
 
     /// Everything this part is made of, the library first.
-    fn archives(self) -> &'static [&'static Archive] {
+    fn archives(self) -> Vec<&'static Archive> {
         match self {
-            Part::Hearing => &[&RUNTIME, &HEARING, &DETECTOR],
-            Part::Speaking => &[&RUNTIME, &SPEAKING],
+            Part::Hearing => vec![&RUNTIME, self.model(), &DETECTOR],
+            Part::Speaking => vec![&RUNTIME, self.model()],
         }
     }
 }
@@ -209,7 +300,9 @@ fn unpack(archive: &Path, into: &Path) -> Result<(), String> {
 async fn fetch(app: &AppHandle, part: Part, archive: &Archive, to: &Path, before: u64, total: u64) -> Result<(), String> {
     use tokio::io::AsyncWriteExt;
     let url = reqwest::Url::parse(&format!("{RELEASES}/{}", archive.url)).map_err(|e| e.to_string())?;
-    let mut reply = crate::net::client(&url, Duration::from_secs(900))?.get(url).send().await.map_err(|e| e.to_string())?;
+    // A quarter of an hour for what is small, an hour for the largest model.
+    let patience = Duration::from_secs(if archive.size > 200_000_000 { 3600 } else { 900 });
+    let mut reply = crate::net::client(&url, patience)?.get(url).send().await.map_err(|e| e.to_string())?;
     if !reply.status().is_success() {
         return Err(format!("HTTP {}", reply.status().as_u16()));
     }
@@ -278,7 +371,7 @@ pub async fn install(app: &AppHandle, part: Part) -> Result<(), String> {
     let total = download_bytes(part);
     let result = async {
         let mut before = 0;
-        for archive in part.archives().iter().copied().filter(|archive| !present(archive)) {
+        for archive in part.archives().into_iter().filter(|archive| !present(archive)) {
             install_one(app, part, archive, before, total).await?;
             before += archive.size;
         }
@@ -300,9 +393,14 @@ pub async fn install(app: &AppHandle, part: Part) -> Result<(), String> {
     Err(why)
 }
 
-/// Removes one part's model from the disk, and the library with the last of them.
+/// Removes one part's models from the disk — every hearing model that was
+/// ever chosen, not only today's — and the library with the last of them.
 pub fn remove(part: Part) {
-    for archive in part.archives().iter().filter(|archive| archive.into != RUNTIME.into) {
+    let mut archives = part.archives();
+    if part == Part::Hearing {
+        archives.extend(HEARING_MODELS.iter().map(|model| &model.archive));
+    }
+    for archive in archives.iter().filter(|archive| archive.into != RUNTIME.into) {
         let _ = std::fs::remove_dir_all(dir().join(archive.into));
     }
     let other = if part == Part::Hearing { Part::Speaking } else { Part::Hearing };
@@ -317,7 +415,8 @@ mod tests {
 
     #[test]
     fn what_is_downloaded_is_pinned() {
-        for archive in [&RUNTIME, &HEARING, &DETECTOR, &SPEAKING] {
+        let models = HEARING_MODELS.iter().map(|model| &model.archive);
+        for archive in [&RUNTIME, &DETECTOR, &SPEAKING].into_iter().chain(models) {
             assert_eq!(archive.sha256.len(), 64);
             assert!(archive.sha256.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
             assert!(!archive.keep.is_empty());
@@ -327,7 +426,14 @@ mod tests {
         assert!(detector_file().ends_with("silero_vad.onnx"));
         // The library is the version whose header sherpa.rs was written from.
         assert!(RUNTIME.url.contains(&format!("v{VERSION}")));
-        assert!(RUNTIME.size + HEARING.size + DETECTOR.size < 40 * 1024 * 1024);
+        // The model nobody chose stays the small one.
+        assert!(RUNTIME.size + HEARING_MODELS[0].archive.size + DETECTOR.size < 40 * 1024 * 1024);
+        // Each model has its own name and folder, and the settings' names are plain.
+        for (i, model) in HEARING_MODELS.iter().enumerate() {
+            assert!(model.id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '.'));
+            assert!(HEARING_MODELS[..i].iter().all(|other| other.id != model.id && other.archive.into != model.archive.into));
+            assert!(model.archive.keep.contains(&"tokens.txt"));
+        }
         assert!(dir().ends_with(format!("sherpa-onnx-{VERSION}")));
         assert_ne!(model_dir(Part::Hearing), model_dir(Part::Speaking));
     }
@@ -342,7 +448,9 @@ mod tests {
     fn the_archives_match_their_checksums_and_hold_what_is_kept() {
         let folder = PathBuf::from(std::env::var("COUCOU_VOICE_ARCHIVES").expect("COUCOU_VOICE_ARCHIVES"));
         let work = std::env::temp_dir().join(format!("coucou-voice-test-{}", std::process::id()));
-        for (archive, file) in [(&RUNTIME, "runtime-lib.tar.bz2"), (&HEARING, "moontiny.tar.bz2"), (&SPEAKING, "supertonic.tar.bz2")] {
+        for (archive, file) in
+            [(&RUNTIME, "runtime-lib.tar.bz2"), (&HEARING_MODELS[0].archive, "moontiny.tar.bz2"), (&SPEAKING, "supertonic.tar.bz2")]
+        {
             let path = folder.join(file);
             assert_eq!(std::fs::metadata(&path).unwrap().len(), archive.size, "{file}");
             assert_eq!(sha256(&path).unwrap(), archive.sha256, "{file}");
@@ -354,6 +462,22 @@ mod tests {
             }
         }
         let _ = std::fs::remove_dir_all(&work);
+        // The larger hearing models, when they are there too, under their own names.
+        for model in &HEARING_MODELS[1..] {
+            let path = folder.join(Path::new(model.archive.url).file_name().unwrap());
+            if !path.is_file() {
+                continue;
+            }
+            assert_eq!(std::fs::metadata(&path).unwrap().len(), model.archive.size, "{}", model.id);
+            assert_eq!(sha256(&path).unwrap(), model.archive.sha256, "{}", model.id);
+            let _ = std::fs::remove_dir_all(&work);
+            std::fs::create_dir_all(&work).unwrap();
+            unpack(&path, &work).unwrap();
+            for name in model.archive.keep {
+                assert!(work.join(model.archive.folder).join(name).is_file(), "{}: {name}", model.id);
+            }
+            let _ = std::fs::remove_dir_all(&work);
+        }
         let detector = folder.join(DETECTOR.keep[0]);
         assert_eq!(std::fs::metadata(&detector).unwrap().len(), DETECTOR.size);
         assert_eq!(sha256(&detector).unwrap(), DETECTOR.sha256);
