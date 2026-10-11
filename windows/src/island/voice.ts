@@ -11,7 +11,9 @@ import {
 import { lastTextStep } from "../core/diff";
 import { Sound } from "../core/sound";
 import { language, t } from "../i18n/i18n";
-import { showToast } from "../toast/api";
+import { askToast, showToast } from "../toast/api";
+import { read, written } from "../voice/guard";
+import type { AppView, AppWorld } from "../voice/tools-app";
 import type { VoiceWorld } from "../voice/tools";
 import { VoiceConversation } from "../voice/conversation";
 import { resolveRelative, type VoiceAction } from "../voice/memory";
@@ -47,6 +49,8 @@ export interface VoiceHost {
   voiceAgain(text: string): void;
   /** How loud the microphone hears while Coucou listens, 0…1. */
   voiceLevel(level: number): void;
+  /** Ctrl+Shift+number or Ctrl+Shift+Enter, pressed while a question is on screen: "1"…"9" or "enter". */
+  voiceAskKey(key: string): void;
 }
 
 /** What the tools need of the island itself. */
@@ -55,6 +59,14 @@ export interface VoiceCards {
   showWaitingCard(): void;
   /** Declines the waiting permission, as a click on Deny does. */
   declineWaiting(): void;
+  /** Brings one of the island's views up, or the Settings window. False when it cannot be shown now. */
+  showView(view: AppView): boolean;
+  /** Opens the chat with this in its field, for the user to read and send. */
+  prepareChat(message: string): boolean;
+  /** The settings changed under the island: it follows, as it does for the Settings window. */
+  settingsChanged(): void;
+  /** Pauses Coucou, as the tray's Pause does. */
+  pause(): void;
 }
 
 /**
@@ -192,6 +204,58 @@ function stopTimer(): boolean {
   return true;
 }
 
+/** Where a web search is opened: the browser decides nothing about it, the address does. */
+const WEB_SEARCH = "https://www.google.com/search?q=";
+
+/** The app's views, settings and windows, as voice reaches them (voice/tools-app.ts). */
+function createAppWorld(cards: VoiceCards): AppWorld {
+  const setSetting = async (key: string, value: unknown) => {
+    State.settings = written(State.settings, key, value);
+    await Bridge.saveSettings(State.settings);
+    cards.settingsChanged();
+    State.notify();
+    return read(State.settings, key) === value;
+  };
+  return {
+    setting: (key) => read(State.settings, key),
+    setSetting,
+    // A click on the toast's button, or its key: never a word.
+    confirm: async ({ title, change, action }) =>
+      (await askToast({ kind: "warning", title, text: change, actions: { yes: action, no: t("Cancel") } })) === "yes",
+    notify: (title, text) => void showToast({ kind: "info", title, text: text || undefined }),
+    showView: (view) => cards.showView(view),
+    stopListening() {
+      void setSetting("voice.enabled", false);
+      // Closing the microphone is never made hard; the way back is on screen for a while.
+      void askToast({
+        kind: "info", title: t("Voice is off"), text: t("Coucou no longer listens. Turn it back on here, or in Settings."),
+        actions: { yes: t("Turn back on"), no: t("OK") }, durationMs: 20_000,
+      }).then((answer) => {
+        if (answer === "yes") void setSetting("voice.enabled", true);
+      });
+    },
+    pause: () => cards.pause(),
+    serviceInfo(pillId) {
+      const task = State.tasks.find((x) => x.id === pillId);
+      if (!task) return [];
+      return [task.finalLine, ...task.steps.slice(-5).map((step) => (typeof step === "string" ? step : (step as { text?: string }).text))]
+        .filter((line): line is string => typeof line === "string" && line.trim() !== "")
+        .map((line) => line.slice(0, 160));
+    },
+    openWebSearch: (query) => void Bridge.openUrl(WEB_SEARCH + encodeURIComponent(query)),
+    openMailDraft: async (to, subject, body) => (await Bridge.openMailDraft(to, subject, body)) === true,
+    prepareForAgent: (message) => cards.prepareChat(message),
+    remote() {
+      const { voice, ollamaUrl, lmstudioUrl, customUrl } = State.settings;
+      const url = { ollama: ollamaUrl, lmstudio: lmstudioUrl, custom: customUrl }[voice.brain as "ollama" | "lmstudio" | "custom"] ?? "";
+      return url !== "" && !/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?(\/|$)/i.test(url.trim());
+    },
+  };
+}
+
+/** Whether the app opened last was seen to come to the front. */
+let appSeen = false;
+
 export function createWorld(cards: VoiceCards): VoiceWorld {
   const pillName = (id: string) => pillDefinition(id)?.name ?? id;
   return {
@@ -232,7 +296,13 @@ export function createWorld(cards: VoiceCards): VoiceWorld {
       timer = { label, endsAt: Date.now() + ms, handle };
     },
     cancelTimer: stopTimer,
-    openApp: async (name) => (await Bridge.voiceOpenApp(name)) ?? null,
+    async openApp(name) {
+      const app = await Bridge.voiceOpenApp(name);
+      appSeen = app?.seen ?? false;
+      return app?.name ?? null;
+    },
+    appSeen: () => appSeen,
+    app: createAppWorld(cards),
     appsNear: async (said) => (await Bridge.voiceAppsNear(said)) ?? { names: [], clear: false },
     openFolder: async (name) => (await Bridge.voiceOpenFolder(name)) ?? null,
     openUrl: (url) => void Bridge.openUrl(url),
@@ -266,7 +336,7 @@ export const voiceRunner = new VoiceRunner(liveMusic, livePills, voicePills);
  */
 export function createConversation(world: VoiceWorld): VoiceConversation {
   return new VoiceConversation(voiceRunner, world, voicePills, () =>
-    brainChosen() ? (system, said, tools, history) => Bridge.voiceBrain(system, said, tools, history) : null,
+    brainChosen() ? (system, said, tools, history, steps) => Bridge.voiceBrain(system, said, tools, history, steps) : null,
   );
 }
 
@@ -337,6 +407,7 @@ export function sayResult(result: VoiceResult) {
 export function registerVoiceHandlers(island: VoiceHost) {
   void onEvent<VoiceEvent>("voice", (event) => applyVoice(island, event));
   void onEvent<number>("voice-level", (level) => island.voiceLevel(level));
+  void onEvent<string>("voice-ask-key", (key) => island.voiceAskKey(key));
   void onEvent<{ sampleRate: number; pcm: string }>("voice-speech", playSpeech);
   // What the recogniser can hear: nothing listens until it has this. The
   // installed apps are part of it ("open {app}"), so they are asked for first.

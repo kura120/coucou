@@ -4997,6 +4997,182 @@
    "pt-BR": "Este código também inclui a chave de acesso e a chave de ponta a ponta do relay {host}. «Parear de novo» cria uma chave e uma sala novas.",
    "ru": "Этот код также содержит ключ доступа и сквозной ключ для ретранслятора {host}. «Сопрячь заново» создаёт новый ключ и новую комнату.",
    "id": "Kode ini juga memuat kunci akses dan kunci ujung ke ujung untuk relay {host}. «Sandingkan ulang» membuat kunci dan ruang baru."
+  },
+  "Opening {0}…": {
+   "zh-Hans": "正在打开 {0}…",
+   "hi": "{0} खोला जा रहा है…",
+   "es": "Abriendo {0}…",
+   "ar": "جارٍ فتح {0}…",
+   "fr": "Ouverture de {0}…",
+   "bn": "{0} খোলা হচ্ছে…",
+   "pt-BR": "Abrindo {0}…",
+   "ru": "Открываю {0}…",
+   "id": "Membuka {0}…"
+  },
+  "Asked Windows to open {0}": {
+   "zh-Hans": "已请 Windows 打开 {0}",
+   "hi": "Windows से {0} खोलने को कहा गया",
+   "es": "Se pidió a Windows que abriera {0}",
+   "ar": "طُلب من Windows فتح {0}",
+   "fr": "Windows a été chargé d’ouvrir {0}",
+   "bn": "Windows-কে {0} খুলতে বলা হয়েছে",
+   "pt-BR": "O Windows foi solicitado a abrir {0}",
+   "ru": "Windows получил запрос открыть {0}",
+   "id": "Windows diminta membuka {0}"
+  },
+  "Confirm": {
+   "zh-Hans": "确认",
+   "hi": "पुष्टि करें",
+   "es": "Confirmar",
+   "ar": "تأكيد",
+   "fr": "Confirmer",
+   "bn": "নিশ্চিত করুন",
+   "pt-BR": "Confirmar",
+   "ru": "Подтвердить",
+   "id": "Konfirmasi"
+  },
+  "That cannot be shown right now": {
+   "zh-Hans": "现在无法显示",
+   "hi": "अभी यह नहीं दिखाया जा सकता",
+   "es": "No se puede mostrar ahora",
+   "ar": "لا يمكن عرض ذلك الآن",
+   "fr": "Impossible d’afficher cela maintenant",
+   "bn": "এখন এটি দেখানো যাচ্ছে না",
+   "pt-BR": "Não é possível mostrar isso agora",
+   "ru": "Сейчас это показать нельзя",
+   "id": "Itu tidak dapat ditampilkan sekarang"
+  },
+  "That is changed in Settings, not by voice": {
+   "zh-Hans": "这要在设置中更改，不能用语音",
+   "hi": "यह सेटिंग्स में बदला जाता है, आवाज़ से नहीं",
+   "es": "Eso se cambia en Ajustes, no por voz",
+   "ar": "يُغيَّر ذلك في الإعدادات، لا بالصوت",
+   "fr": "Cela se change dans les Réglages, pas à la voix",
+   "bn": "এটি সেটিংসে বদলানো হয়, কণ্ঠে নয়",
+   "pt-BR": "Isso se altera nos Ajustes, não por voz",
+   "ru": "Это меняется в настройках, а не голосом",
+   "id": "Itu diubah di Pengaturan, bukan dengan suara"
+  },
+  "Change a setting?": {
+   "zh-Hans": "更改设置？",
+   "hi": "सेटिंग बदलें?",
+   "es": "¿Cambiar un ajuste?",
+   "ar": "تغيير إعداد؟",
+   "fr": "Modifier un réglage ?",
+   "bn": "সেটিং বদলাবেন?",
+   "pt-BR": "Alterar um ajuste?",
+   "ru": "Изменить настройку?",
+   "id": "Ubah pengaturan?"
+  },
+  "Change": {
+   "zh-Hans": "更改",
+   "hi": "बदलें",
+   "es": "Cambiar",
+   "ar": "تغيير",
+   "fr": "Modifier",
+   "bn": "বদলান",
+   "pt-BR": "Alterar",
+   "ru": "Изменить",
+   "id": "Ubah"
+  },
+  "That did not change": {
+   "zh-Hans": "没有更改",
+   "hi": "वह नहीं बदला",
+   "es": "Eso no cambió",
+   "ar": "لم يتغير ذلك",
+   "fr": "Cela n’a pas changé",
+   "bn": "সেটি বদলায়নি",
+   "pt-BR": "Isso não mudou",
+   "ru": "Это не изменилось",
+   "id": "Itu tidak berubah"
+  },
+  "Nothing to report": {
+   "zh-Hans": "没有可报告的内容",
+   "hi": "बताने को कुछ नहीं",
+   "es": "Nada que informar",
+   "ar": "لا شيء للإبلاغ عنه",
+   "fr": "Rien à signaler",
+   "bn": "জানানোর কিছু নেই",
+   "pt-BR": "Nada a informar",
+   "ru": "Сообщить нечего",
+   "id": "Tidak ada yang dilaporkan"
+  },
+  "Searching the web for « {0} »": {
+   "zh-Hans": "正在网上搜索“{0}”",
+   "hi": "वेब पर « {0} » खोजा जा रहा है",
+   "es": "Buscando « {0} » en la web",
+   "ar": "جارٍ البحث في الويب عن « {0} »",
+   "fr": "Recherche de « {0} » sur le web",
+   "bn": "ওয়েবে « {0} » খোঁজা হচ্ছে",
+   "pt-BR": "Buscando « {0} » na web",
+   "ru": "Ищу в интернете « {0} »",
+   "id": "Mencari « {0} » di web"
+  },
+  "The draft is open: read it and send it yourself": {
+   "zh-Hans": "草稿已打开：请阅读后自行发送",
+   "hi": "ड्राफ़्ट खुला है: पढ़ें और ख़ुद भेजें",
+   "es": "El borrador está abierto: léelo y envíalo tú",
+   "ar": "المسودة مفتوحة: اقرأها وأرسلها بنفسك",
+   "fr": "Le brouillon est ouvert : relisez-le et envoyez-le vous-même",
+   "bn": "খসড়া খোলা আছে: পড়ে নিজে পাঠান",
+   "pt-BR": "O rascunho está aberto: leia e envie você mesmo",
+   "ru": "Черновик открыт: прочитайте и отправьте сами",
+   "id": "Draf terbuka: baca dan kirim sendiri"
+  },
+  "No mail app opened": {
+   "zh-Hans": "没有打开邮件应用",
+   "hi": "कोई मेल ऐप नहीं खुला",
+   "es": "No se abrió ninguna app de correo",
+   "ar": "لم يُفتح أي تطبيق بريد",
+   "fr": "Aucune application de messagerie ne s’est ouverte",
+   "bn": "কোনো মেইল অ্যাপ খোলেনি",
+   "pt-BR": "Nenhum app de e-mail foi aberto",
+   "ru": "Почтовое приложение не открылось",
+   "id": "Tidak ada aplikasi email yang terbuka"
+  },
+  "It is in the chat: read it and send it yourself": {
+   "zh-Hans": "已放入聊天：请阅读后自行发送",
+   "hi": "यह चैट में है: पढ़ें और ख़ुद भेजें",
+   "es": "Está en el chat: léelo y envíalo tú",
+   "ar": "إنه في المحادثة: اقرأه وأرسله بنفسك",
+   "fr": "C’est dans le chat : relisez-le et envoyez-le vous-même",
+   "bn": "এটি চ্যাটে আছে: পড়ে নিজে পাঠান",
+   "pt-BR": "Está no chat: leia e envie você mesmo",
+   "ru": "Это в чате: прочитайте и отправьте сами",
+   "id": "Ada di obrolan: baca dan kirim sendiri"
+  },
+  "Voice is off": {
+   "zh-Hans": "语音已关闭",
+   "hi": "आवाज़ बंद है",
+   "es": "La voz está desactivada",
+   "ar": "الصوت متوقف",
+   "fr": "La voix est désactivée",
+   "bn": "ভয়েস বন্ধ",
+   "pt-BR": "A voz está desativada",
+   "ru": "Голос выключен",
+   "id": "Suara mati"
+  },
+  "Coucou no longer listens. Turn it back on here, or in Settings.": {
+   "zh-Hans": "Coucou 不再聆听。可在此处或设置中重新开启。",
+   "hi": "Coucou अब नहीं सुन रहा। यहाँ या सेटिंग्स में फिर चालू करें।",
+   "es": "Coucou ya no escucha. Vuelve a activarlo aquí o en Ajustes.",
+   "ar": "لم يعد Coucou يستمع. أعد تشغيله من هنا أو من الإعدادات.",
+   "fr": "Coucou n’écoute plus. Réactivez-le ici ou dans les Réglages.",
+   "bn": "Coucou আর শুনছে না। এখানে বা সেটিংসে আবার চালু করুন।",
+   "pt-BR": "O Coucou não está mais ouvindo. Reative aqui ou nos Ajustes.",
+   "ru": "Coucou больше не слушает. Включите снова здесь или в настройках.",
+   "id": "Coucou tidak lagi mendengarkan. Nyalakan kembali di sini atau di Pengaturan."
+  },
+  "Turn back on": {
+   "zh-Hans": "重新开启",
+   "hi": "फिर चालू करें",
+   "es": "Volver a activar",
+   "ar": "إعادة التشغيل",
+   "fr": "Réactiver",
+   "bn": "আবার চালু করুন",
+   "pt-BR": "Reativar",
+   "ru": "Включить снова",
+   "id": "Nyalakan kembali"
   }
  }
 }

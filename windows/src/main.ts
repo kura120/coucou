@@ -1,5 +1,6 @@
 // Entry point: boot the bridge, wire the island, start the greeting.
 
+import type { Ask } from "./voice/result";
 import "./style.css";
 import { Bridge, IS_TAURI, onEvent } from "./core/bridge";
 import { Sound } from "./core/sound";
@@ -88,6 +89,17 @@ async function main() {
   });
 
   // The settings window writes preferences; apply them here without a restart.
+  // Voice changes a setting or pauses Coucou the way Settings and the tray do.
+  island.onVoiceSettings = () => {
+    applyLanguage();
+    island.applySettings();
+    State.loadIntegrationTasks();
+  };
+  island.onVoicePause = () => {
+    setPaused(true);
+    island.fsm.forceHidden();
+  };
+
   await onEvent<Settings>("settings-changed", (s) => {
     const previousMain = State.mainPillId;
     State.settings = { ...State.settings, ...s };
@@ -128,6 +140,11 @@ async function main() {
     Object.assign(window, {
       coucouVoice: (event: VoiceEvent) => applyVoice(island, event),
       coucouLevel: (level: number) => island.voiceLevel(level),
+      // A question as Mochi would ask it, e.g. coucouAsk({ kind: "choice", question: "Which account?",
+      // options: [{ id: "a", label: "Work" }, { id: "b", label: "Home" }] }), and the gray card: coucouWorking("Opening Spotify…").
+      coucouAsk: (ask: Ask) => island.voicePreviewAsk(ask),
+      coucouAskKey: (key: string) => island.voiceAskKey(key),
+      coucouWorking: (line: string | null) => island.voicePreviewWorking(line),
     });
   }
 }

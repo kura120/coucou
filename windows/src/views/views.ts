@@ -8,6 +8,8 @@ import { Ticker } from "./ticker";
 import { State, type AgentTask } from "../core/state";
 import { washRGBA, type IslandViewName, type Wash } from "../core/layout";
 import { createMiniBot, pruneMiniBots } from "../mochi/minibots";
+import { buildAsk } from "./ask";
+import type { Answer } from "../voice/result";
 import { buildPrompt } from "./chat";
 import { buildChoose, buildUpload, buildUploading } from "./upload";
 import { renderIntegrationCard, type IntegrationCardHooks } from "./integrations";
@@ -30,6 +32,12 @@ import type { ViewCommand } from "../island/shortcuts";
 
 export interface ViewActions {
   setView(v: IslandViewName): void;
+  /** The answer to the question Mochi has on screen: a click on a choice, a button, the field confirmed. */
+  voiceAnswer(answer: Answer): void;
+  /** The question's text field was edited by hand: what it holds now. */
+  voiceDraft(value: string): void;
+  /** The question's text field was clicked: the island takes the keyboard for it. */
+  voiceField(): void;
   /** "Cancel" on a dropped file: forgets it and goes back home. */
   cancelDrop(): void;
   collapse(): void;
@@ -67,6 +75,8 @@ export interface ViewHost {
   sync(): void;
   /** Called when the view becomes active, for views with a text field. */
   focus?(): void;
+  /** Puts this in the view's text field, for the user to read and send (the chat). */
+  prefill?(text: string): void;
   /** Called every frame while the view is on screen. True = needs another frame. */
   tick?(nowMs: number): boolean | void;
   /** Ctrl+O / Ctrl+E while the view is on screen (island/shortcuts.ts). */
@@ -758,7 +768,8 @@ function buildConfused(): ViewHost {
 // ── Note ──────────────────────────────────────────────────────────────────────
 
 /** "OK Coucou": what Mochi hears, as he hears it (VoiceListeningView). */
-function buildListening(): ViewHost {
+function buildListening(actions: ViewActions): ViewHost {
+  const asking = buildAsk((answer) => actions.voiceAnswer(answer), (value) => actions.voiceDraft(value), () => actions.voiceField());
   const micDot = h("span", { class: "mic-dot" });
   const title = h("div", { class: "title" });
   const line = h("div", { class: "sub" });
@@ -767,12 +778,19 @@ function buildListening(): ViewHost {
     { class: "stack", style: "padding:0 18px 0 110px" },
     h("div", { class: "listening-head" }, micDot, title),
     line,
+    asking.el,
   );
+  // Listening is cyan; doing something about what was heard is gray, and says what.
+  const hearing = card("cyan", body);
   return {
-    el: h("div", { class: "view" }, card("cyan", body)),
+    el: h("div", { class: "view" }, hearing),
     sync() {
-      const { text, question, thinking } = State.voice;
-      title.textContent = thinking ? t("Thinking…") : t("Listening…");
+      const { text, question, thinking, working, ask, draft } = State.voice;
+      asking.sync(ask ?? null, draft ?? "");
+      body.classList.toggle("asking", ask != null);
+      hearing.style.setProperty("--wash", washRGBA(thinking ? "soft" : "cyan"));
+      hearing.classList.toggle("working", Boolean(thinking));
+      title.textContent = thinking ? (working || t("Thinking…")) : t("Listening…");
       // A question Mochi asked stays until its answer is being said.
       line.textContent = text || question || t("Say your command");
       line.classList.toggle("heard", text !== "");
@@ -920,7 +938,7 @@ export function buildViews(
   map.set("choose", buildChoose(actions));
   map.set("recap", buildRecap(actions));
   map.set("wardrobe", buildWardrobe(actions));
-  map.set("listening", buildListening());
+  map.set("listening", buildListening(actions));
   map.set("voiceResult", buildVoiceResult());
   // Not in the Windows v1: sending a file by email, window attach + web result.
   map.set("mail", buildPlaceholder(tl("Sending by email isn't in this version."), ""));

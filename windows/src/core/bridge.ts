@@ -463,9 +463,11 @@ export const Bridge = {
     tools: unknown[],
     /** The turns so far, oldest first: each sentence, what was done for it and what came of it. */
     history: { said: string; calls: { name: string; arguments: Record<string, unknown> }[]; result: string }[] = [],
+    /** This turn's rounds so far: the calls the model made and what each gave back. */
+    steps: { calls: { name: string; arguments: Record<string, unknown> }[]; results: string[] }[] = [],
   ) =>
     call<{ calls: { name: string; arguments: Record<string, unknown> }[]; text: string }>(
-      "voice_brain", { system, said, tools, history },
+      "voice_brain", { system, said, tools, history, steps },
     ),
   /** Whether a part of the bundled engine is on this machine, and what getting it costs. */
   voiceEngineStatus: (part: VoiceEnginePart) =>
@@ -475,8 +477,12 @@ export const Bridge = {
   voiceEngineRemove: (part: VoiceEnginePart) => call<void>("voice_engine_remove", { part }),
   /** Mochi says this out loud, when speaking is on and his voice is installed. */
   voiceSay: (text: string) => call<void>("voice_say", { text }),
-  /** Starts the Start-menu app that name means; its name, or null. */
-  voiceOpenApp: (name: string) => call<string | null>("voice_open_app", { name }),
+  /** Opens the mail app on a draft, for the user to read and send. False when the recipient is not one address. */
+  openMailDraft: (to: string, subject: string, body: string) => call<boolean>("open_mail_draft", { to, subject, body }),
+  /** Holds Ctrl+Shift+1…`numbers` and, for a text field, Ctrl+Shift+Enter while a question is on screen; 0 and false lets go. */
+  voiceAskKeys: (numbers: number, enter: boolean) => call<void>("voice_ask_keys", { numbers, enter }),
+  /** Starts the installed app that name means: its name and whether a window of it was seen to come, or null. */
+  voiceOpenApp: (name: string) => call<{ name: string; seen: boolean } | null>("voice_open_app", { name }),
   /** The installed apps nearest to what was heard, for "Open Spotify?": opens nothing. */
   voiceAppsNear: (said: string) => call<{ names: string[]; clear: boolean }>("voice_apps_near", { said }),
   /** Opens one of the user's own folders; its name, or null. */
