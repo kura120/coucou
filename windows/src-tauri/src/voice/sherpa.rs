@@ -176,10 +176,47 @@ struct RecognizerConfig {
     hr: HomophoneReplacer,
 }
 
-/// Only its first field is read.
+/// `SherpaOnnxOfflineRecognizerResult`, as far as it is read: the text, and
+/// for each token how probable the model found it (transducers only; null
+/// for the other models).
 #[repr(C)]
 struct RecognizerResult {
     text: Text,
+    timestamps: *const f32,
+    count: i32,
+    tokens: Text,
+    tokens_arr: *const Text,
+    json: Text,
+    lang: Text,
+    emotion: Text,
+    event: Text,
+    durations: *const f32,
+    ys_log_probs: *const f32,
+}
+
+/// For each word of `text`, the probability of the least sure of its tokens
+/// (0…1). A token that starts a word starts with a space; punctuation is not
+/// part of how sure a word is. Empty when the tokens are not the words of the
+/// text one for one: then nothing is known, which is not the same as unsure.
+pub fn words_sure(text: &str, tokens: &[(String, f32)]) -> Vec<f32> {
+    let mut words: Vec<f32> = Vec::new();
+    let mut open = false;
+    for (token, log_prob) in tokens {
+        let starts = token.starts_with(' ') || token.starts_with('\u{2581}');
+        if !token.chars().any(char::is_alphanumeric) {
+            // "." closes nothing and opens nothing; a space alone opens the next word.
+            open = open && !starts;
+            continue;
+        }
+        let sure = log_prob.exp().clamp(0.0, 1.0);
+        match words.last_mut() {
+            Some(last) if open && !starts => *last = last.min(sure),
+            _ => words.push(sure),
+        }
+        open = true;
+    }
+    let written = text.split_whitespace().filter(|word| word.chars().any(char::is_alphanumeric)).count();
+    if words.len() == written && written == text.split_whitespace().count() { words } else { Vec::new() }
 }
 
 type Create = unsafe extern "C" fn(*const RecognizerConfig) -> *const c_void;
@@ -271,28 +308,49 @@ impl Engine {
     }
 
     /// What was said in these samples (mono, -1…1). Empty when nothing was.
+    #[cfg(test)]
     pub fn transcribe(&self, sample_rate: u32, samples: &[f32]) -> String {
+        self.transcribe_sure(sample_rate, samples).0
+    }
+
+    /// The same, and how sure the model was of each word (0…1, one for each
+    /// word of the text) — empty when the model does not say (`words_sure`).
+    pub fn transcribe_sure(&self, sample_rate: u32, samples: &[f32]) -> (String, Vec<f32>) {
         if samples.is_empty() {
-            return String::new();
+            return (String::new(), Vec::new());
         }
         unsafe {
             let stream = (self.create_stream)(self.recognizer);
             if stream.is_null() {
-                return String::new();
+                return (String::new(), Vec::new());
             }
             (self.accept)(stream, sample_rate as i32, samples.as_ptr(), samples.len() as i32);
             (self.decode)(self.recognizer, stream);
             let result = (self.get_result)(stream);
-            let text = if result.is_null() || (*result).text.is_null() {
-                String::new()
+            let heard = if result.is_null() || (*result).text.is_null() {
+                (String::new(), Vec::new())
             } else {
-                CStr::from_ptr((*result).text).to_string_lossy().trim().to_string()
+                let result = &*result;
+                let text = CStr::from_ptr(result.text).to_string_lossy().trim().to_string();
+                let mut tokens = Vec::new();
+                if !result.ys_log_probs.is_null() && !result.tokens_arr.is_null() && result.count > 0 {
+                    for at in 0..result.count as usize {
+                        let token = *result.tokens_arr.add(at);
+                        if token.is_null() {
+                            tokens.clear();
+                            break;
+                        }
+                        tokens.push((CStr::from_ptr(token).to_string_lossy().into_owned(), *result.ys_log_probs.add(at)));
+                    }
+                }
+                let sure = words_sure(&text, &tokens);
+                (text, sure)
             };
             if !result.is_null() {
                 (self.destroy_result)(result);
             }
             (self.destroy_stream)(stream);
-            text
+            heard
         }
     }
 }
@@ -755,6 +813,22 @@ pub fn test_family() -> Family {
 mod tests {
     use super::*;
 
+    #[test]
+    fn each_word_is_as_sure_as_the_least_sure_of_its_tokens() {
+        let tokens = |list: &[(&str, f32)]| list.iter().map(|(t, p)| (t.to_string(), p.ln())).collect::<Vec<_>>();
+        // "Open this squad." as Parakeet 0.6b wrote the user's "open discord".
+        let heard = tokens(&[(" O", 0.84), ("p", 1.0), ("en", 1.0), (" this", 0.38), (" s", 0.79), ("qu", 1.0), ("ad", 0.99), (".", 0.68)]);
+        let sure = words_sure("Open this squad.", &heard);
+        assert_eq!(sure.len(), 3);
+        assert!((sure[0] - 0.84).abs() < 1e-3 && (sure[1] - 0.38).abs() < 1e-3 && (sure[2] - 0.79).abs() < 1e-3, "{sure:?}");
+        // Punctuation is no part of a word, wherever it stands.
+        assert_eq!(words_sure("No, Discord.", &tokens(&[(" No", 0.9), (",", 0.2), (" D", 0.7), ("iscord", 0.8), (".", 0.1)])), [0.9, 0.7]);
+        // Not the words of the text one for one, or no tokens: nothing is known.
+        assert!(words_sure("open discord", &tokens(&[(" open", 0.9)])).is_empty());
+        assert!(words_sure("open discord", &[]).is_empty());
+        assert!(words_sure("", &[]).is_empty());
+    }
+
     /// The struct sizes c-api.h 1.13.8 gives on a 64-bit target: a field added,
     /// dropped or reordered here would move every pointer after it.
     #[test]
@@ -766,6 +840,8 @@ mod tests {
         assert_eq!(std::mem::size_of::<Qwen3Asr>(), 64);
         assert_eq!(std::mem::size_of::<ModelConfig>(), 504);
         assert_eq!(std::mem::size_of::<RecognizerConfig>(), 608);
+        // Read up to `ys_log_probs`, the eleventh field of the result.
+        assert_eq!(std::mem::offset_of!(RecognizerResult, ys_log_probs), 80);
         assert_eq!(std::mem::size_of::<SileroVad>(), 32);
         assert_eq!(std::mem::size_of::<VadConfig>(), 88);
     }
@@ -827,7 +903,11 @@ mod tests {
         let data = bytes.windows(4).position(|w| w == b"data").expect("data chunk") + 8;
         let samples: Vec<f32> = bytes[data..].chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect();
         let started = std::time::Instant::now();
-        let text = engine.transcribe(rate, &samples);
+        let (text, sure) = engine.transcribe_sure(rate, &samples);
+        // How sure of each word: a transducer says, the other models do not.
+        println!("sure of each word: {:?}", sure.iter().map(|p| (p * 100.0).round() / 100.0).collect::<Vec<_>>());
+        assert!(sure.is_empty() || sure.len() == text.split_whitespace().count());
+        assert!(sure.iter().all(|p| (0.0..=1.0).contains(p)));
         println!("heard: {text:?} in {:?} ({} samples at {rate} Hz)", started.elapsed(), samples.len());
         let expected = std::env::var("COUCOU_VOICE_EXPECT").unwrap_or_default().to_lowercase();
         assert!(!text.is_empty());

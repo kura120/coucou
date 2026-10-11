@@ -778,6 +778,8 @@ export class Island {
 
   /** What was said while a question is on screen: its answer, words for its field, or neither. */
   private voiceAskHeard(ask: Ask, said: string) {
+    // A question about a name takes more for an answer: the name itself, another one, a command (hook: conversation.ts).
+    if (this.conversation.saidWhileAsked(said)) return;
     const heard = readSaid(ask, said, State.voice.draft ?? "");
     if (heard.is === "answer") return this.voiceAnswer(heard.answer);
     if (heard.is === "draft") State.voice = { ...State.voice, draft: heard.value, text: "" };

@@ -376,8 +376,12 @@ fn titled(title: &str, name: &str) -> bool {
 /// ask about ("Open Spotify?"): nothing is opened.
 #[derive(Serialize)]
 pub struct NearApps {
+    /// The app the name means as `voice_open_app` would find it, if it is one.
+    found: Option<String>,
     /// Nearest first, three at most.
     names: Vec<String>,
+    /// How near each of them is, 0…1.
+    scores: Vec<f32>,
     /// The first is the one to ask about by itself; else the first two are as near.
     clear: bool,
 }
@@ -386,7 +390,12 @@ pub struct NearApps {
 pub fn voice_apps_near(said: String) -> NearApps {
     let installed = apps::installed_lately();
     let near = apps::near(&said, &installed);
-    NearApps { names: near.iter().map(|(_, app)| app.name.clone()).collect(), clear: apps::clear(&near) }
+    NearApps {
+        found: apps::find(&said, &installed).map(|app| app.name.clone()),
+        names: near.iter().map(|(_, app)| app.name.clone()).collect(),
+        scores: near.iter().map(|(score, _)| *score).collect(),
+        clear: apps::clear(&near),
+    }
 }
 
 /// The installed apps' names, for a recogniser that only hears what it was
@@ -525,11 +534,29 @@ fn set_status(app: &AppHandle, generation: Option<u64>, status: Status) {
 struct Event {
     phase: &'static str,
     text: String,
+    /// How sure the speech model was of each word of `text`, 0…1, when it
+    /// says: a name it was not sure of is asked about rather than acted on
+    /// (src/voice/resolve.ts). Empty when nothing is known.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    sure: Vec<f32>,
+}
+
+/// The sentence the bundled model wrote down last, and how sure it was of
+/// each word. In memory until the next sentence; never logged.
+static SURE: Mutex<Option<(String, Vec<f32>)>> = Mutex::new(None);
+
+/// How sure the model was of the words of `text`, if `text` is its last sentence.
+fn sure_of(text: &str) -> Vec<f32> {
+    let sure = SURE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    match sure.as_ref() {
+        Some((written, sure)) if written == text => sure.clone(),
+        _ => Vec::new(),
+    }
 }
 
 /// Something for the island that is not something heard.
 fn note(app: &AppHandle, phase: &'static str) {
-    let _ = app.emit_to(WINDOW_LABEL, EVENT, Event { phase, text: String::new() });
+    let _ = app.emit_to(WINDOW_LABEL, EVENT, Event { phase, text: String::new(), sure: Vec::new() });
 }
 
 fn tell(app: &AppHandle, heard: Heard) {
@@ -546,7 +573,8 @@ fn tell(app: &AppHandle, heard: Heard) {
     if !matches!(phase, "partial" | "again") {
         crate::log::line(format!("voice: {phase}"));
     }
-    let _ = app.emit_to(WINDOW_LABEL, EVENT, Event { phase, text });
+    let sure = if matches!(phase, "final" | "again") { sure_of(&text) } else { Vec::new() };
+    let _ = app.emit_to(WINDOW_LABEL, EVENT, Event { phase, text, sure });
 }
 
 /// The bundled engine at work: the microphone, the sentence being said, and
@@ -648,6 +676,14 @@ impl Free {
         Ok(())
     }
 
+    /// A command is listened for: where recordings stand in for the
+    /// microphone (a debug build's `COUCOU_VOICE_WAV`), the next one is said.
+    fn say_next(&mut self) {
+        if let Some(capture) = self.capture.as_mut() {
+            capture.say_next();
+        }
+    }
+
     /// What is being said so far is not part of what comes next.
     fn start_over(&mut self) {
         self.sentences.clear();
@@ -659,11 +695,16 @@ impl Free {
         let samples = vad::fitting(samples);
         // The model server first when it is the speech model; the bundled
         // model for what it did not hear, and nothing when there is neither.
-        let heard = self
-            .by_server(samples)
-            .or_else(|| self.engine.as_ref().map(|engine| engine.transcribe(vad::SAMPLE_RATE, samples)))
-            .unwrap_or_default();
+        // Only the bundled model says how sure it is of each word.
+        let (heard, sure) = match self.by_server(samples) {
+            Some(heard) => (heard, Vec::new()),
+            None => self.engine.as_ref().map(|engine| engine.transcribe_sure(vad::SAMPLE_RATE, samples)).unwrap_or_default(),
+        };
         let text = session::without_wake(&heard);
+        // The wake phrase said again was taken off the front: its words' too.
+        let kept = text.split_whitespace().count();
+        let sure = if sure.len() >= kept { sure[sure.len() - kept..].to_vec() } else { Vec::new() };
+        *SURE.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = (!sure.is_empty()).then(|| (text.clone(), sure));
         if text.chars().any(char::is_alphanumeric) {
             Raw::Phrase { rule: Rule::Command, text, confidence: 1.0 }
         } else {
@@ -750,6 +791,8 @@ impl Free {
 
     fn start_over(&mut self) {}
 
+    fn say_next(&mut self) {}
+
     fn warm(&self) {}
 
     fn same_breath(&mut self, _wake: Duration) -> Option<Raw> {
@@ -829,6 +872,7 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
                 // room is known and a command's first sound is not lost.
                 turned = free.open(want != Listen::Nothing);
                 if want == Listen::Command {
+                    free.say_next();
                     free.warm();
                     if !std::mem::take(&mut same_breath) {
                         free.start_over();

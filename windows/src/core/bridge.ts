@@ -484,7 +484,7 @@ export const Bridge = {
   /** Starts the installed app that name means: its name and whether a window of it was seen to come, or null. */
   voiceOpenApp: (name: string) => call<{ name: string; seen: boolean } | null>("voice_open_app", { name }),
   /** The installed apps nearest to what was heard, for "Open Spotify?": opens nothing. */
-  voiceAppsNear: (said: string) => call<{ names: string[]; clear: boolean }>("voice_apps_near", { said }),
+  voiceAppsNear: (said: string) => call<{ found: string | null; names: string[]; scores: number[]; clear: boolean }>("voice_apps_near", { said }),
   /** Opens one of the user's own folders; its name, or null. */
   voiceOpenFolder: (name: string) => call<string | null>("voice_open_folder", { name }),
 };

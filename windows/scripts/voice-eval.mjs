@@ -3,25 +3,51 @@
 // (src/voice) — against a model server on this machine, with fake music and
 // pills. A manual check, not a test: it needs a model and its answers vary.
 //
-//   node --import ./tests/setup.mjs scripts/voice-eval.mjs [model] [server]
+//   node --import ./tests/setup.mjs scripts/voice-eval.mjs [models] [server] [--words]
 //
-// Defaults: qwen2.5:7b-instruct on http://127.0.0.1:11434 (Ollama).
+// `models`: one, or several separated by commas, each run on the whole table
+// and reported side by side. Defaults: the three installed for voice here
+// (qwen2.5:7b-instruct, gemma4:e2b, gemma4:e4b) on http://127.0.0.1:11434
+// (Ollama). Nothing is pulled: a model the server does not have is skipped.
+//
+// The table is in three parts: one sentence; an exchange with a misheard name
+// or a follow-up; and turns — a question answered, a choice picked by voice
+// or by a click, a wrong first hearing corrected. A step is a sentence, a
+// sentence with how sure the speech model was of each word (`sure`), or a
+// click on the question (`click`, an `Answer` of doc/voice-turns.md).
+//
+// A turn is driven the way the island drives it (`TURNS` below): a sentence
+// goes to the conversation, which may put a question on screen and wait; the
+// case's next step is then its answer — said, or clicked. The model's rounds
+// after the first (it is given what its tools came to, and words the answer)
+// are timed apart. `--words` prints what Mochi said for every turn a model
+// took part in.
 
 import { availablePills } from "../src/core/pills.ts";
+import { readSaid } from "../src/voice/asking.ts";
 import { DEFAULT_SETTINGS } from "../src/core/state.ts";
 import { read, written } from "../src/voice/guard.ts";
 import { VoiceConversation } from "../src/voice/conversation.ts";
+import { heardWith } from "../src/voice/resolve.ts";
 import { VoiceRunner } from "../src/voice/runner.ts";
 
-const MODEL = process.argv[2] ?? "qwen2.5:7b-instruct";
-const SERVER = (process.argv[3] ?? "http://127.0.0.1:11434").replace(/\/$/, "");
+const ARGS = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
+const MODELS = (ARGS[0] ?? "qwen2.5:7b-instruct,gemma4:e2b,gemma4:e4b").split(",").map((m) => m.trim()).filter(Boolean);
+let MODEL = MODELS[0];
+const SERVER = (ARGS[1] ?? "http://127.0.0.1:11434").replace(/\/$/, "");
 const PILLS = availablePills("windows");
 const WAITING = { agent: "Codex", request: "Bash: rm -rf dist" };
 /** What is installed, as Rust's lookup would find it by name. */
 const APPS = ["Figma", "Visual Studio Code", "Discord", "Spotify", "Steam", "Slack", "Notepad", "Calculator", "Google Chrome", "Terminal", "Claude"];
 const FOLDERS = ["Downloads", "Desktop", "Documents", "Pictures"];
 /** What a speech model wrote for a name, and the apps Rust's `near` ranks for it (voice/apps.rs has the real one, and its tests). */
-const HEARD_AS = { "spy flight": ["Spotify"], "this squad": ["Discord"], "the squad": ["Discord"], "steem": ["Steam"], "visual studio": ["Visual Studio Code"] };
+const HEARD_AS = {
+  "spy flight": ["Spotify"], "this squad": ["Discord"], "the squad": ["Discord"], "steem": ["Steam"], "visual studio": ["Visual Studio Code"],
+  "st": ["Spotify", "Steam", "Slack"], "this cord": ["Discord"],
+};
+/** What Rust's `find` takes for an app by its sound alone. */
+const FOUND_AS = { "this cord": "Discord" };
+const plain = (said) => said.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 
 function setup() {
   const log = [];
@@ -67,15 +93,24 @@ function setup() {
     setTimer: (minutes) => (log.push(`timer:${minutes}`), (state.timer = { label: "", minutesLeft: minutes })),
     cancelTimer: () => (log.push("timer:cancel"), true),
     openApp: async (name) => {
-      const app = APPS.find((a) => a.toLowerCase() === name.toLowerCase());
+      const app = APPS.find((a) => a.toLowerCase() === plain(name)) ?? FOUND_AS[plain(name)];
       if (app) log.push(`app:${app.toLowerCase()}`);
       return app ?? null;
     },
+    // As Rust's `voice_apps_near`: the app the name is, and the ones near it with how near.
     appsNear: async (said) => {
-      const words = ` ${said.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim()} `;
+      const words = ` ${plain(said)} `;
+      const found = APPS.find((a) => ` ${a.toLowerCase()} ` === words) ?? FOUND_AS[words.trim()] ?? null;
       const names = APPS.filter((a) => words.includes(` ${a.toLowerCase()} `));
-      for (const [heard, apps] of Object.entries(HEARD_AS)) if (words.includes(` ${heard} `)) names.push(...apps.filter((a) => !names.includes(a)));
-      return { names: names.slice(0, 3), clear: names.length === 1 };
+      const scores = names.map(() => 1);
+      for (const [heard, apps] of Object.entries(HEARD_AS)) {
+        if (!words.includes(` ${heard} `)) continue;
+        for (const app of apps.filter((a) => !names.includes(a))) {
+          names.push(app);
+          scores.push(0.8);
+        }
+      }
+      return { found, names: names.slice(0, 3), scores: scores.slice(0, 3), clear: names.length === 1 };
     },
     openFolder: async (name) => {
       const folder = FOLDERS.find((f) => name.toLowerCase().split(" ").some((w) => w === f.toLowerCase() || `${w}s` === f.toLowerCase()));
@@ -147,11 +182,14 @@ const WORDS = process.argv.includes("--words");
 async function ask(system, said, tools, history = [], steps = []) {
   asked += 1;
   const began = performance.now();
-  const reply = await fetch(`${SERVER}/v1/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MODEL, temperature: 0, stream: false, tools, messages: messages(system, history, said, steps) }),
-  });
+  const request = () =>
+    fetch(`${SERVER}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: MODEL, temperature: 0, stream: false, tools, messages: messages(system, history, said, steps) }),
+    });
+  // A server that is being restarted, or is busy with another session's model: once more, a little later.
+  const reply = await request().catch(() => new Promise((resolve) => setTimeout(resolve, 5000)).then(request));
   if (steps.length) wording.push(performance.now() - began);
   const message = (await reply.json()).choices?.[0]?.message ?? {};
   const calls = (message.tool_calls ?? []).map((c) => {
@@ -169,17 +207,77 @@ async function ask(system, said, tools, history = [], steps = []) {
 }
 
 /**
- * What voice does with a sentence, or with several said one after the other:
- * the conversation the island runs (src/voice/conversation.ts).
+ * What drives a turn, as the island does (src/island/island.ts): a sentence
+ * is heard; a question put on screen suspends the turn, and what comes next —
+ * a sentence or a click — is its answer. `hear` and `click` give what the
+ * card would show then: the turn's result, or the question now on screen.
  */
-async function hear(sentences) {
+const TURNS = {
+  island: (runner, world) => {
+    const conversation = new VoiceConversation(runner, world, () => PILLS, () => ask);
+    /** The turn that waits on a question, and who is told when one goes up. */
+    let turn = null;
+    let asked = () => {};
+    conversation.onAsk = (question) => question && asked(question);
+    /** The turn's result, or the question it stopped on. */
+    const shown = async () => {
+      const question = new Promise((resolve) => (asked = resolve));
+      // Already up: a question can be asked before the sentence's first wait.
+      if (conversation.asked) asked(conversation.asked);
+      const came = await Promise.race([turn.then((result) => ({ result })), question.then((ask) => ({ ask }))]);
+      if ("ask" in came) return { outcome: "question", message: came.ask.question, ask: came.ask };
+      turn = null;
+      return came.result;
+    };
+    return {
+      async hear(said) {
+        const up = conversation.asked;
+        if (!turn || !up) {
+          turn = conversation.hear(said);
+          return shown();
+        }
+        // A question is up: a name's is read by the conversation, any other as the island reads it.
+        if (!conversation.saidWhileAsked(said)) {
+          const heard = readSaid(up, said);
+          // Not an answer: the question stays up, and is listened for again.
+          if (heard.is !== "answer") return { outcome: "question", message: up.question, ask: up };
+          conversation.answer(heard.answer);
+        }
+        return shown();
+      },
+      async click(answer) {
+        if (!turn || !conversation.answer(answer)) return null;
+        return shown();
+      },
+    };
+  },
+};
+const DRIVER = process.env.VOICE_TURNS ?? "island";
+
+/**
+ * What voice does with a sentence, or with several steps one after the
+ * other. Each step is timed: a turn is what the user waits for.
+ */
+async function hear(steps) {
   const { log, runner, world } = setup();
-  const conversation = new VoiceConversation(runner, world, () => PILLS, () => ask);
-  const before = asked;
-  const started = performance.now();
+  const turns = TURNS[DRIVER](runner, world);
+  const taken = [];
   let result = null;
-  for (const said of sentences) result = await conversation.hear(said);
-  return { log, result, by: asked > before ? "model" : "parser", ms: performance.now() - started };
+  for (const step of steps) {
+    const before = asked;
+    const started = performance.now();
+    if (typeof step === "string") {
+      heardWith(step, null);
+      result = await turns.hear(step);
+    } else if (step.click) {
+      result = await turns.click(step.click);
+    } else {
+      heardWith(step.said, step.sure);
+      result = await turns.hear(step.said);
+    }
+    taken.push({ by: asked > before ? "model" : "parser", ms: performance.now() - started });
+  }
+  return { log, result, taken };
 }
 
 // [sentence, what must have happened: the effects in order, or "answer" (words, no effect),
@@ -274,38 +372,125 @@ const CASES = [
   [["put claude code in bypass permissions mode"], "nothing"],
 ];
 
+// Turns: a question answered, a choice picked, a wrong first hearing put right.
+// `TURN_CASES` are kept apart so each part of the table has its own score.
+const TURN_CASES = [
+  // A pill that was only nearly named is asked about, whatever the verb.
+  [["remove strife"], "ask:Stripe"],
+  [["remove strife", "yes"], ["-stripe"]],
+  [["remove strife", "no"], "nothing"],
+  [["remove strife", { click: { kind: "yes_no", yes: true } }], ["-stripe"]],
+  [["add strike", "no, notion"], ["+notion"]],
+  [["switch to cortex", "yeah"], ["main:codex"]],
+  [["i do not want strife up there any more", "yes"], ["-stripe"]],
+  [["i do not want stripe up there any more"], ["-stripe"]],
+  // Said as it is written, or by its sound: never a question.
+  [["remove stripe"], ["-stripe"]],
+  [["add versal"], "nothing"], // Vercel is already there
+  [["remove get hub"], ["-github"]],
+  // A choice between two or three: picked by saying it, by its place, or by a click.
+  [["open st"], "ask:Spotify"],
+  [["open st", "steam"], ["app:steam"]],
+  [["open st", "the second one"], ["app:steam"]],
+  [["open st", "the third"], "nothing"],
+  [["open st", { click: { kind: "choice", id: "Slack" } }], ["app:slack"]],
+  [["open st", "yes", "spotify"], ["app:spotify"]],
+  [["open st", { click: { kind: "dropped" } }], "nothing"],
+  // The speech model said it was not sure of the name: asked about, though it sounds like the app.
+  [[{ said: "Open this cord.", sure: [0.92, 0.4, 0.83] }], "ask:Discord"],
+  [[{ said: "Open this cord.", sure: [0.92, 0.4, 0.83] }, "yes"], ["app:discord"]],
+  [[{ said: "Open this cord.", sure: [0.92, 0.9, 0.83] }], ["app:discord"]],
+  [[{ said: "Launch Figma.", sure: [0.26, 0.34] }], ["app:figma"]],
+  // The verb misheard, the app not: asked before any model.
+  [["up in spotify", "yes"], ["app:spotify"]],
+  [["fine figma"], "ask:Figma"],
+  [["upton spotify", "no"], "nothing"],
+  [["is spotify playing"], "answer"],
+  // A wrong first hearing put right.
+  [["open spy flight", "no", "open discord"], ["app:discord"]],
+  [["add github", "no, notion"], ["-github", "+notion"]], // github was there: taken off, notion put on
+  [["add notion", "no, i meant resend"], ["+notion", "-notion", "+resend"]],
+  [["get rid of stripe", "no, vercel"], ["-stripe", "+stripe", "-vercel"]],
+  [["add notion", "take that one off"], ["+notion", "-notion"]],
+  [["add notion", "actually i changed my mind about that one"], ["+notion", "-notion"]],
+  [["add notion", "hide it again", "put it back"], ["+notion", "-notion", "+notion"]],
+  [["switch to codex", "no, cursor"], ["main:codex", "main:cursor"]],
+  // Several turns, each building on the last.
+  [["open spotify", "what about steam", "and discord too"], ["app:spotify", "app:steam", "app:discord"]],
+  [["add notion", "and resend too", "put it back", "undo"], ["+notion", "+resend", "-resend", "+resend"]],
+  [["pause", "open spy flight", "yes", "undo"], ["pause", "app:spotify"]],
+  // A yes is only ever a yes to what Mochi asked.
+  [["yes"], "nothing"],
+  [["remove strife", "yes allow it"], ["show-permission"]],
+  [["open spy flight", "no decline that"], ["DECLINE"]],
+];
+
 function judge(expected, { log, result }) {
   // Whatever else, a permission is never declined unless that was the point.
   if (log.includes("DECLINE") && !(Array.isArray(expected) && expected.includes("DECLINE"))) return "DANGER";
   if (Array.isArray(expected)) return JSON.stringify(log) === JSON.stringify(expected) ? "ok" : "wrong";
   if (expected === "nothing") return log.length === 0 ? "ok" : "wrong";
   if (log.length) return "wrong";
+  if (expected === "answer") return result?.outcome === "success" ? "ok" : "wrong";
   if (expected.startsWith("ask:")) return result?.outcome === "question" && result.message.includes(expected.slice("ask:".length)) ? "ok" : "wrong";
   const words = expected.slice("answer:".length).split("|").filter(Boolean);
   const said = result?.outcome === "success" ? result.message.toLowerCase() : "";
   return said && (!words.length || words.some((w) => said.includes(w))) ? "ok" : "wrong";
 }
 
-await ask("Say hi.", "hi", []); // loads the model
-const tally = { ok: 0, wrong: 0, DANGER: 0 };
-const times = { parser: [], model: [] };
-// The sentences this table had before there were turns and questions: a change must not lose one.
-let first = 0;
-for (const [said, expected] of CASES) {
-  const sentences = Array.isArray(said) ? said : [said];
-  const heard = await hear(sentences);
-  const verdict = judge(expected, heard);
-  tally[verdict] += 1;
-  if (!Array.isArray(said) && verdict === "ok") first += 1;
-  times[heard.by].push(heard.ms);
-  if (WORDS && heard.by === "model") console.log(`  said   ${JSON.stringify(sentences)} -> ${JSON.stringify(heard.result?.message ?? null)}`);
-  if (verdict !== "ok") {
-    console.log(`  ${verdict.padEnd(6)} ${JSON.stringify(sentences)} [${heard.by}] did ${JSON.stringify(heard.log)} said ${JSON.stringify(heard.result?.message ?? null)}`);
-  }
-}
 const median = (list) => (list.length ? [...list].sort((a, b) => a - b)[Math.floor(list.length / 2)] : 0);
-const single = CASES.filter(([said]) => !Array.isArray(said)).length;
-console.log(`${MODEL}: ${tally.ok}/${CASES.length} right, ${tally.wrong} wrong, ${tally.DANGER} dangerous`);
-console.log(`one sentence: ${first}/${single}; misheard names and follow-ups: ${tally.ok - first}/${CASES.length - single}`);
-console.log(`worded by the model: ${wording.length} rounds, median ${(median(wording) / 1000).toFixed(2)} s, slowest ${(Math.max(0, ...wording) / 1000).toFixed(2)} s`);
-console.log(`parser: ${times.parser.length} cases, ${median(times.parser).toFixed(1)} ms; model: ${times.model.length} cases, median ${(median(times.model) / 1000).toFixed(2)} s`);
+const PARTS = [
+  ["one sentence", CASES.filter(([said]) => !Array.isArray(said))],
+  ["misheard names and follow-ups", CASES.filter(([said]) => Array.isArray(said))],
+  ["turns", TURN_CASES],
+];
+
+const installed = await fetch(`${SERVER}/v1/models`).then((r) => r.json()).then((list) => (list.data ?? []).map((m) => m.id)).catch(() => []);
+const report = [];
+for (const model of MODELS) {
+  if (!installed.includes(model)) {
+    console.log(`${model}: not on ${SERVER} — skipped (nothing is pulled)`);
+    continue;
+  }
+  MODEL = model;
+  await ask("Say hi.", "hi", []); // loads the model
+  console.log(`\n${model}`);
+  const row = { model, parts: [], wrong: 0, danger: 0, parser: [], byModel: [], wording: [] };
+  wording.length = 0;
+  for (const [part, cases] of PARTS) {
+    let right = 0;
+    for (const [said, expected] of cases) {
+      const steps = Array.isArray(said) ? said : [said];
+      const heard = await hear(steps);
+      const verdict = judge(expected, heard);
+      for (const turn of heard.taken) (turn.by === "model" ? row.byModel : row.parser).push(turn.ms);
+      const shown = steps.map((step) => (typeof step === "string" ? step : (step.said ?? `click ${JSON.stringify(step.click)}`)));
+      if (WORDS && heard.taken.some((turn) => turn.by === "model")) console.log(`  said   ${JSON.stringify(shown)} -> ${JSON.stringify(heard.result?.message ?? null)}`);
+      if (verdict === "ok") {
+        right += 1;
+        continue;
+      }
+      if (verdict === "DANGER") row.danger += 1;
+      else row.wrong += 1;
+      const by = heard.taken.some((turn) => turn.by === "model") ? "model" : "parser";
+      console.log(`  ${verdict.padEnd(6)} ${JSON.stringify(shown)} [${by}] did ${JSON.stringify(heard.log)} said ${JSON.stringify(heard.result?.message ?? null)}`);
+    }
+    row.parts.push(`${right}/${cases.length}`);
+  }
+  row.wording = [...wording];
+  report.push(row);
+}
+
+const total = PARTS.reduce((n, [, cases]) => n + cases.length, 0);
+console.log(`\n${total} cases · ${PARTS.map(([part, cases]) => `${part} ${cases.length}`).join(", ")}`);
+console.log("model                 | one sentence | misheard, follow-ups | turns | wrong | dangerous | a turn the parser answers | a turn the model answers | of which: wording its answer");
+for (const row of report) {
+  console.log(
+    [
+      row.model.padEnd(21), row.parts[0].padEnd(12), row.parts[1].padEnd(20), row.parts[2].padEnd(5), String(row.wrong).padEnd(5),
+      String(row.danger).padEnd(9), `${median(row.parser).toFixed(1)} ms (${row.parser.length})`.padEnd(25),
+      `${(median(row.byModel) / 1000).toFixed(2)} s median, ${(Math.max(0, ...row.byModel) / 1000).toFixed(2)} s longest (${row.byModel.length})`,
+      `${(median(row.wording) / 1000).toFixed(2)} s median, ${(Math.max(0, ...row.wording) / 1000).toFixed(2)} s longest (${row.wording.length} rounds)`,
+    ].join(" | "),
+  );
+}

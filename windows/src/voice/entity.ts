@@ -99,6 +99,42 @@ export function spokenForms(def: PillDefinition): readonly string[] {
 }
 
 /**
+ * How a pill was named:
+ * - `said`: its name, one of the ways it is said, or a whole word of it;
+ * - `sound`: other letters for the same sounds — "versal", "get hub", "Kodaks" —
+ *   which is how a speech model spells a name it does not know;
+ * - `near`: a letter or two away and not the same sound — "strife" for Stripe —
+ *   which may be another word altogether: asked about, not acted on.
+ */
+export type NamedHow = "said" | "sound" | "near";
+
+export interface PillMatch {
+  id: string;
+  how: NamedHow;
+  /** What was heard, normalised. */
+  heard: string;
+}
+
+/** Told of every pill a name is taken for, while a sentence is being parsed (`noting`). */
+let note: ((match: PillMatch) => void) | null = null;
+
+/**
+ * Runs `work` and gives back, with its result, every way a pill was named in
+ * it: the parser says which pill a sentence means, this says how sure of it
+ * one can be (voice/resolve.ts decides what to ask about).
+ */
+export function noting<T>(work: () => T): { value: T; matches: PillMatch[] } {
+  const matches: PillMatch[] = [];
+  const before = note;
+  note = (match) => matches.push(match);
+  try {
+    return { value: work(), matches };
+  } finally {
+    note = before;
+  }
+}
+
+/**
  * The pill `query` means among `pills`, or null: nothing close enough, or two
  * pills as close as each other. `category` keeps to one kind of pill (the
  * workspace ones, for the main pill).
@@ -108,19 +144,31 @@ export function resolvePill(
   pills: readonly PillDefinition[],
   category?: PillCategory,
 ): string | null {
+  return matchPill(query, pills, category)?.id ?? null;
+}
+
+/** `resolvePill`, with how the pill was named. */
+export function matchPill(query: string, pills: readonly PillDefinition[], category?: PillCategory): PillMatch | null {
+  const match = match0(query, pills, category);
+  if (match) note?.(match);
+  return match;
+}
+
+function match0(query: string, pills: readonly PillDefinition[], category?: PillCategory): PillMatch | null {
   const q = normalise(query);
   const pool = category ? pills.filter((p) => p.category === category) : pills;
   if (!pool.length || !q) return null;
+  const as = (id: string | null | undefined, how: NamedHow): PillMatch | null => (id ? { id, how, heard: q } : null);
 
   const alias = ALIASES.get(q);
-  if (alias && pool.some((p) => p.id === alias)) return alias;
+  if (alias && pool.some((p) => p.id === alias)) return as(alias, "said");
 
   const exact = pool.find((p) => normalise(p.name) === q);
-  if (exact) return exact.id;
+  if (exact) return as(exact.id, "said");
 
   // "gemini" is a whole word of "gemini cli".
   const byWord = pool.filter((p) => normalise(p.name).split(" ").includes(q));
-  if (byWord.length === 1) return byWord[0].id;
+  if (byWord.length === 1) return as(byWord[0].id, "said");
   if (byWord.length > 1) return null;
 
   let best: { id: string; dist: number } | null = null;
@@ -136,9 +184,12 @@ export function resolvePill(
   }
   if (!best) return null;
   const tolerance = [...q].length <= 4 ? 1 : 2;
-  if (best.dist > tolerance) return heardAs(q, pool);
+  // Two words for one, or the same sound: the name, as a speech model spells it.
+  if (best.dist > tolerance) return as(heardAs(q, pool), "sound");
   if (second && second.dist <= tolerance) return null;
-  return best.id;
+  const name = pool.find((p) => p.id === best.id);
+  const same = name != null && [normalise(name.name), ...spokenForms(name)].some((form) => soundKey(form) === soundKey(q));
+  return as(best.id, same ? "sound" : "near");
 }
 
 /**

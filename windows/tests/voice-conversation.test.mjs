@@ -80,12 +80,15 @@ function setup({ brain = null, after = null, active = ["integration_github"], pe
       if (app) log.push(`app:${app}`);
       return app ?? null;
     },
+    // As Rust's `voice_apps_near`: the app the name is (`found`), and the ones near it.
     appsNear: async (said) => {
-      const text = ` ${said.toLowerCase()} `;
+      const text = ` ${said.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim()} `;
+      const found = APPS.find((a) => ` ${a.toLowerCase()} ` === text) ?? null;
       const named = APPS.filter((a) => text.includes(` ${a.toLowerCase()} `));
-      if (named.length) return { names: named.slice(0, 3), clear: named.length === 1 };
+      if (named.length) return { found, names: named.slice(0, 3), scores: named.slice(0, 3).map(() => 1), clear: named.length === 1 };
       const heard = Object.keys(NEAR).find((key) => text.includes(` ${key} `));
-      return heard ? { names: NEAR[heard][0], clear: NEAR[heard][1] } : { names: [], clear: false };
+      if (!heard) return { found, names: [], scores: [], clear: false };
+      return { found, names: NEAR[heard][0], scores: NEAR[heard][0].map(() => 0.8), clear: NEAR[heard][1] };
     },
     openFolder: async () => null,
     openUrl: (url) => log.push(`url:${url}`),
@@ -106,7 +109,9 @@ function setup({ brain = null, after = null, active = ["integration_github"], pe
       }
     : null;
   const conversation = new VoiceConversation(runner, world, () => PILLS, () => ask, () => state.now);
-  const hear = (said, how) => conversation.hear(said, how);
+  // The card's side of a result: what is asked, as the island's ask component gets it, is looked at apart.
+  const card = (result) => (result ? { outcome: result.outcome, message: result.message } : result);
+  const hear = async (said, how) => card(await conversation.hear(said, how));
   return { log, asked, rounds, hear, conversation, runner, state, pills };
 }
 

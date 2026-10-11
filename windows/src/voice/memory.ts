@@ -135,15 +135,44 @@ const PERMISSION = /\b(allow|approve|accept|grant|authori[sz]e|permit|decline|de
 export const aboutPermission = (said: string) => PERMISSION.test(normalise(said));
 
 /** What a follow-up names, and whether a lead-in said it was one ("and …", "what about …"). */
-function followUpName(words: readonly string[]): { name: string[]; led: boolean; also: boolean } {
+function followUpName(words: readonly string[]): { name: string[]; led: boolean; also: boolean; instead: boolean } {
   // "and vercel too", "vercel as well", "discord instead".
   const last = words[words.length - 1];
   const tail = words.length < 2 ? 0 : last === "too" || last === "also" || last === "instead" ? 1 : words.slice(-2).join(" ") === "as well" ? 2 : 0;
   const body = words.slice(0, words.length - tail);
+  const said = tail > 0 && last === "instead";
   for (const [lead, also] of LEAD_INS) {
-    if (lead.length < body.length && lead.every((w, i) => body[i] === w)) return { name: body.slice(lead.length), led: true, also };
+    if (lead.length < body.length && lead.every((w, i) => body[i] === w)) {
+      return { name: body.slice(lead.length), led: true, also, instead: said || CORRECTING.has(lead.join(" ")) };
+    }
   }
-  return { name: body, led: tail > 0, also: tail > 0 && last !== "instead" };
+  return { name: body, led: tail > 0, also: tail > 0 && !said, instead: said };
+}
+
+/** The lead-ins that say the last name was the wrong one. */
+const CORRECTING = new Set(["no", "not", "no i meant", "no i said", "i meant", "i said"]);
+
+/** "it", "that one": what was named last. Longest first. */
+const PRONOUNS = ["that one", "this one", "those", "them", "that", "this", "it"];
+
+/**
+ * The sentence with its "it" or "that one" said as the pill the last action
+ * was about — "take that one off" after "add GitHub" is "take github off" —
+ * or null when there is no such word, or nothing it can mean. Never for a
+ * sentence about a permission, where "that" is the request.
+ */
+export function withPronoun(said: string, last: VoiceAction | null, pills: readonly PillDefinition[]): string | null {
+  const norm = normalise(said);
+  if (!last || aboutPermission(said) || UNDO.includes(norm)) return null;
+  const ids = last.kind === "add" || last.kind === "remove" ? last.ids : last.kind === "main" ? [last.id] : [];
+  if (ids.length !== 1) return null;
+  const name = pills.find((p) => p.id === ids[0])?.name;
+  if (!name) return null;
+  const text = ` ${norm} `;
+  const pronoun = PRONOUNS.find((p) => text.includes(` ${p} `));
+  if (!pronoun) return null;
+  // "hide it again", "remove that one now": what trails the name is not part of it.
+  return text.replace(` ${pronoun} `, ` ${normalise(name)} `).trim().replace(/( (again|now|please|too|then))+$/, "");
 }
 
 /**
@@ -158,7 +187,7 @@ const LEAD_INS: readonly (readonly [string[], boolean])[] = [
   [["and"], true], [["also"], true], [["no"], false], [["not"], false], [["now"], false], [["try"], false],
 ];
 
-const NAME_FILLERS = new Set(["the", "a", "an", "my", "pill", "app", "please", "one"]);
+const NAME_FILLERS = new Set(["the", "a", "an", "my", "pill", "app", "please", "one", "that", "this"]);
 
 /**
  * A follow-up that only makes sense after the last action, as the intent it
@@ -171,6 +200,11 @@ const NAME_FILLERS = new Set(["the", "a", "an", "my", "pill", "app", "please", "
  * - A bare name ("Vercel"), only when `bare` allows it: after the wake phrase,
  *   not for a sentence that was said to nobody in particular.
  *
+ * - "no, Vercel", "I meant Vercel", "Vercel instead" after "add GitHub": a
+ *   correction, so the two are swapped — GitHub goes, Vercel comes; after
+ *   "remove GitHub", GitHub comes back and Vercel goes (`also` is the second
+ *   of the two intents). After "open Spotify" it only opens the other one.
+ *
  * Nothing about a permission is ever carried over, and a name is a pill for a
  * pill action, anything for "open" (it is looked up among the installed apps).
  */
@@ -179,7 +213,7 @@ export function resolveRelative(
   last: VoiceAction | null,
   pills: readonly PillDefinition[],
   bare = true,
-): { intent: VoiceIntent; led: boolean; undo: boolean } | null {
+): { intent: VoiceIntent; also?: VoiceIntent; led: boolean; undo: boolean } | null {
   const norm = normalise(said);
   const words = norm.split(" ").filter(Boolean);
   if (!words.length || aboutPermission(said)) return null;
@@ -189,7 +223,7 @@ export function resolveRelative(
     return inverse ? { intent: inverse, led: true, undo: true } : null;
   }
 
-  const { name: named, led, also } = followUpName(words);
+  const { name: named, led, also, instead } = followUpName(words);
   if (!led && !bare) return null;
   const name = named.filter((w) => !NAME_FILLERS.has(w));
   if (!name.length || name.length > 4) return null;
@@ -204,8 +238,13 @@ export function resolveRelative(
   if (!id) return null;
   switch (last?.kind) {
     case "add":
+      // A correction of the one pill just added: that one goes, this one comes.
+      if (instead && last.ids.length === 1 && last.ids[0] !== id) return { intent: { kind: "pillReplace", old: last.ids[0], new: id }, led, undo: false };
       return { intent: { kind: "pillAdd", id }, led, undo: false };
     case "remove":
+      if (instead && last.ids.length === 1 && last.ids[0] !== id) {
+        return { intent: { kind: "pillAdd", id: last.ids[0] }, also: { kind: "pillRemove", id }, led, undo: false };
+      }
       return { intent: { kind: "pillRemove", id }, led, undo: false };
     case "main": {
       const workspace = resolvePill(text, pills, "workspace");

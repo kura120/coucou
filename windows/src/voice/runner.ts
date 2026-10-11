@@ -12,14 +12,17 @@
 
 import type { PillDefinition } from "../core/pills";
 import { t } from "../i18n/i18n";
-import { openQuestion } from "./ask";
+import { askWhich, openQuestion } from "./ask";
 import { resolvePill } from "./entity";
 import type { VoiceIntent } from "./intent";
+import type { Ask } from "./result";
 
 export interface VoiceResult {
   /** "question": Mochi asks, and listens again for the answer. */
   outcome: "success" | "failure" | "question";
   message: string;
+  /** With a question: what is asked, as the island's ask component shows it (doc/voice-turns.md). */
+  ask?: Ask;
 }
 
 export interface MusicControls {
@@ -54,10 +57,17 @@ export interface PillControls {
 const ok = (message: string): VoiceResult => ({ outcome: "success", message });
 const fail = (message: string): VoiceResult => ({ outcome: "failure", message });
 
-/** "Open Spotify?" was asked: the apps it was about, and the sentence that led to it. */
-export interface OpenAsked {
-  names: string[];
-  /** The sentence that named no app, as it was heard. */
+/**
+ * A question Mochi asked about a name he was not sure of, waiting for its
+ * answer: what was asked, about which candidates, and what a yes — or the
+ * candidate chosen — leads to.
+ */
+export interface Asked {
+  ask: Ask;
+  candidates: { id: string; label: string }[];
+  /** "app": the candidate is opened. Else the intents to run for the one chosen (by its id). */
+  then: "app" | ((id: string) => VoiceIntent[]);
+  /** The sentence that led to the question, as it was heard. */
   said: string;
   /** How many times in a row Mochi has asked. */
   rounds: number;
@@ -66,7 +76,7 @@ export interface OpenAsked {
 export class VoiceRunner {
   /** The pill waiting for room: "which one do I remove?" was asked. */
   private pendingAdd: string | null = null;
-  private pendingOpen: OpenAsked | null = null;
+  private pendingAsk: Asked | null = null;
 
   private music: MusicControls;
   private pills: PillControls;
@@ -79,25 +89,31 @@ export class VoiceRunner {
   }
 
   get asking(): boolean {
-    return this.pendingAdd != null || this.pendingOpen != null;
+    return this.pendingAdd != null || this.pendingAsk != null;
   }
 
-  /** The apps Mochi asked about and waits to hear of, if he did (voice/ask.ts). */
-  get openAsked(): OpenAsked | null {
-    return this.pendingOpen;
+  /** The question about a name that waits for its answer, if one does (voice/ask.ts). */
+  get asked(): Asked | null {
+    return this.pendingAsk;
+  }
+
+  /** Asks about a name: nothing is done until the answer says so. */
+  ask(asked: Asked): VoiceResult {
+    this.reset();
+    this.pendingAsk = asked;
+    return { outcome: "question", message: asked.ask.question, ask: asked.ask };
   }
 
   /** Asks "Open X?", or "X or Y?": nothing is opened until the answer says so. */
   askOpen(names: readonly string[], said: string, rounds = 1): VoiceResult {
-    this.reset();
-    this.pendingOpen = { names: names.slice(0, 2), said, rounds };
-    return openQuestion(this.pendingOpen.names);
+    const candidates = names.slice(0, 3).map((name) => ({ id: name, label: name }));
+    return this.ask({ ask: askWhich(candidates, openQuestion), candidates, then: "app", said, rounds });
   }
 
   /** The answer came: the question is no longer waiting. */
-  takeOpenAsked(): OpenAsked | null {
-    const asked = this.pendingOpen;
-    this.pendingOpen = null;
+  takeAsked(): Asked | null {
+    const asked = this.pendingAsk;
+    this.pendingAsk = null;
     return asked;
   }
 
@@ -109,7 +125,7 @@ export class VoiceRunner {
   /** Forgets a question nobody answered. */
   reset() {
     this.pendingAdd = null;
-    this.pendingOpen = null;
+    this.pendingAsk = null;
   }
 
   run(intent: VoiceIntent, said = ""): VoiceResult {
