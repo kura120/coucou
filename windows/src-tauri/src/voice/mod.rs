@@ -37,6 +37,8 @@
 // "woke", "partial", "final", "missed" or "cancelled" — and "following" /
 // "rested" around the time another command may follow without the wake phrase,
 // "again" being a sentence said in that time. Settings follows `voice-status`.
+// While the bundled engine listens for a command, `voice-level` says how loud
+// the microphone hears (0…1), for the glow under the island.
 
 use std::collections::BTreeMap;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
@@ -69,6 +71,9 @@ use session::{Heard, Listen, Raw, Rule, Session};
 
 const EVENT: &str = "voice";
 const STATUS_EVENT: &str = "voice-status";
+const LEVEL_EVENT: &str = "voice-level";
+/// How often the island is told the microphone's level: about 15 times a second.
+const LEVEL_EVERY: Duration = Duration::from_millis(66);
 
 /// How long one wait for speech lasts before the thread looks at its messages.
 const POLL: Duration = Duration::from_millis(200);
@@ -387,6 +392,8 @@ struct Free {
     /// The sentence being said started with the wake phrase, which ended this
     /// long into it.
     after_wake: Option<Duration>,
+    /// The loudest the microphone has heard since it was last asked.
+    peak: f32,
 }
 
 /// How long ago a sentence may have ended and still be the one Windows'
@@ -419,6 +426,7 @@ impl Free {
                 buffer: Vec::new(),
                 recent: None,
                 after_wake: None,
+                peak: 0.0,
             }),
             Err(why) => {
                 crate::log::line(format!("voice: bundled engine: {why}"));
@@ -488,6 +496,7 @@ impl Free {
         let Some(capture) = self.capture.as_mut() else { return Ok(None) };
         self.buffer.clear();
         capture.read(wait, &mut self.buffer)?;
+        self.peak = self.peak.max(vad::loudness(&self.buffer));
         let Some(sentence) = self.sentences.feed(&self.buffer) else { return Ok(None) };
         if !wanted {
             self.recent = Some((Instant::now(), sentence));
@@ -502,6 +511,11 @@ impl Free {
 
     fn speaking(&self) -> bool {
         self.sentences.speaking()
+    }
+
+    /// How loud it has been since the last time this was asked, 0…1.
+    fn loudest(&mut self) -> f32 {
+        std::mem::take(&mut self.peak)
     }
 }
 
@@ -539,6 +553,10 @@ impl Free {
     fn speaking(&self) -> bool {
         false
     }
+
+    fn loudest(&mut self) -> f32 {
+        0.0
+    }
 }
 
 fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &Receiver<Control>) {
@@ -559,6 +577,8 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
     let mut hush_until: Option<Instant> = None;
     // The command is the rest of the sentence that woke Coucou: not to be forgotten.
     let mut same_breath = false;
+    let mut level = vad::Level::default();
+    let mut level_told = Instant::now();
 
     loop {
         // Messages first: a wait for speech below never lasts longer than POLL.
@@ -655,6 +675,14 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
                     free.start_over();
                 } else if freely && free.speaking() {
                     session.speaking(Instant::now());
+                }
+                // The glow under the island moves with the voice, not with Mochi's.
+                if freely && level_told.elapsed() >= LEVEL_EVERY {
+                    level_told = Instant::now();
+                    let loudest = free.loudest();
+                    if let Some(level) = level.step(if hushed { 0.0 } else { loudest }) {
+                        let _ = app.emit_to(WINDOW_LABEL, LEVEL_EVENT, level);
+                    }
                 }
             }
             if hushed {

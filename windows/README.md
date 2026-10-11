@@ -195,8 +195,8 @@ SHA-256) and uses it for the command:
   stop speaking, in a few hundredths of a second.
 - **Keep listening after a command**: for a few seconds (8 by default) after a
   command, another can be said without the wake phrase. The view closes as
-  usual; Mochi keeps his listening look and a small orange dot sits beside him
-  for as long as he still listens. Anything said nearby in that time is heard
+  usual; Mochi keeps his listening look and an orange glow stays under the
+  island, moving with your voice, for as long as he still listens. Anything said nearby in that time is heard
   too, but the island opens only when it is a command: a keyboard is not taken
   for a voice, and a word to someone else shows nothing unless the model, when
   one is chosen, finds a command in it.

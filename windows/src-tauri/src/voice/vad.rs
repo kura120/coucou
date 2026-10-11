@@ -138,6 +138,37 @@ pub fn after_wake(sentence_len: usize, wake: std::time::Duration) -> Option<usiz
 /// A sound shorter than this is a click or a cough, not a sentence.
 const SHORTEST: usize = (SAMPLE_RATE as usize) * 3 / 10;
 
+/// How loud these samples are, for the island's glow: 0 for a quiet room,
+/// 1 for a voice close to the microphone (-55 dB to -15 dB).
+pub fn loudness(samples: &[f32]) -> f32 {
+    if samples.is_empty() {
+        return 0.0;
+    }
+    let power = samples.iter().map(|s| f64::from(*s) * f64::from(*s)).sum::<f64>() / samples.len() as f64;
+    let decibels = 10.0 * power.max(1e-12).log10();
+    ((decibels + 55.0) / 40.0).clamp(0.0, 1.0) as f32
+}
+
+/// The level the island is told: it rises at once and falls away gently, and
+/// silence is said once, not fifteen times a second.
+#[derive(Default)]
+pub struct Level {
+    shown: f32,
+}
+
+impl Level {
+    /// `peak`: the loudest since the last time. What to tell the island, if anything.
+    pub fn step(&mut self, peak: f32) -> Option<f32> {
+        let level = peak.max(self.shown * 0.7);
+        let level = if level < 0.03 { 0.0 } else { level };
+        if level == 0.0 && self.shown == 0.0 {
+            return None;
+        }
+        self.shown = level;
+        Some(level)
+    }
+}
+
 /// What says whether someone is speaking.
 enum Hears {
     /// By how loud it is.
@@ -505,6 +536,31 @@ mod tests {
         println!("typed over: {} sentence(s), {:?} s", over.len(), over.iter().map(seconds).collect::<Vec<_>>());
         assert_eq!(over.len(), 1, "one sentence was said over the typing");
         assert!(seconds(&over[0]) < seconds(&by_voice[0]) + 0.6);
+    }
+
+    #[test]
+    fn the_level_follows_the_voice_and_says_silence_once() {
+        assert_eq!(loudness(&[]), 0.0);
+        assert_eq!(loudness(&tone(0.1, 0.0005)), 0.0);
+        assert_eq!(loudness(&tone(0.1, 0.5)), 1.0);
+        let speaking = loudness(&tone(0.1, 0.05));
+        assert!((0.6..0.8).contains(&speaking), "{speaking}");
+        assert!(loudness(&tone(0.1, 0.01)) < speaking);
+
+        let mut level = Level::default();
+        // A quiet room: nothing to tell.
+        assert_eq!(level.step(0.0), None);
+        assert_eq!(level.step(0.01), None);
+        // A voice: at once. Then it falls away, and silence is told one time.
+        assert_eq!(level.step(0.8), Some(0.8));
+        let mut told = Vec::new();
+        for _ in 0..20 {
+            told.extend(level.step(0.0));
+        }
+        assert!(told.windows(2).all(|pair| pair[1] < pair[0]), "{told:?}");
+        assert_eq!(told.last(), Some(&0.0));
+        assert!((5..15).contains(&told.len()), "{told:?}");
+        assert_eq!(level.step(0.0), None);
     }
 
     #[test]

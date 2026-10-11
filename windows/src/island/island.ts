@@ -85,7 +85,7 @@ export class Island {
   /** What is playing, passing through the middle of the compact island. */
   private nowPlaying = createMarquee("now-playing");
   /** The microphone dot beside Mochi while another command may follow. */
-  private followDot!: HTMLElement;
+  private listenGlow!: HTMLElement;
   /** The music card was there at the last sync: the island is wider with it. */
   private hadMusicCard = false;
   private countdown!: HTMLElement;
@@ -324,7 +324,7 @@ export class Island {
     this.greetingCanvas = h("canvas", { id: "greeting-canvas" });
     this.miniGrid = h("div", { id: "mini-grid" });
     this.nowPlaying.el.id = "now-playing";
-    this.followDot = h("i", { class: "mic-dot", id: "follow-dot" });
+    this.listenGlow = h("div", { id: "listen-glow" });
     this.countdown = h("div", { id: "countdown" });
 
     this.header = buildHeader(actions);
@@ -357,10 +357,11 @@ export class Island {
       "div",
       { id: "island" },
       this.clipEl,
+      // Under Mochi, who hangs below the compact island.
+      this.listenGlow,
       this.botGlow,
       this.botCanvas,
       this.nowPlaying.el,
-      this.followDot,
       this.miniGrid,
       this.countdown,
     );
@@ -649,6 +650,12 @@ export class Island {
     if (this.fsm.state !== "listening") return;
     State.voice = { ...State.voice, text: said };
     this.voiceResult(result);
+  }
+
+  /** How loud the microphone hears, 0…1: the glow under the island moves with it. */
+  voiceLevel(level: number) {
+    // Straight to the element: no redraw of the island, no frame of its own.
+    this.listenGlow.style.setProperty("--level", String(Math.max(0, Math.min(1, level || 0))));
   }
 
   /** Nothing was said: back to where the island was. */
@@ -1587,9 +1594,14 @@ export class Island {
     }
 
     this.syncNowPlaying();
-    // Still listening after a command: said beside Mochi, wherever the island is,
-    // except on the listening view, which has its own dot.
-    this.followDot.classList.toggle("on", State.voiceFollowing && State.mode !== "hidden" && State.view !== "listening");
+    // Listening, for a command or for another after it: the glow under the
+    // island says so, wherever the island is.
+    const hears = State.mode !== "hidden" && (State.voiceFollowing || State.view === "listening");
+    if (hears !== this.listenGlow.classList.contains("on")) {
+      this.listenGlow.classList.toggle("on", hears);
+      // Steady until a level comes: Windows' recogniser gives none.
+      this.listenGlow.style.removeProperty("--level");
+    }
 
     syncMiniBotStates(State.tasks);
     this.engine.setState(State.effectiveState);
