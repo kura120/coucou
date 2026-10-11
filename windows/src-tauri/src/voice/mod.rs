@@ -264,14 +264,21 @@ pub fn voice_talk() {
     talk();
 }
 
-/// "Open Figma": starts the Start-menu app that name means, and says which.
+/// "Open Figma": starts the installed app that name means, and says which.
 #[tauri::command]
 pub fn voice_open_app(name: String) -> Option<String> {
     let installed = apps::installed();
     let app = apps::find(&name, &installed)?;
     crate::log::line("voice: open app");
-    crate::platform::reveal_folder(&app.path.to_string_lossy());
+    app.open();
     Some(app.name.clone())
+}
+
+/// The installed apps' names, for a recogniser that only hears what it was
+/// given ("open {app}").
+#[tauri::command]
+pub fn voice_apps() -> Vec<String> {
+    apps::sayable(&apps::installed())
 }
 
 /// "Open my downloads": one of the user's own folders, and which.

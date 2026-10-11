@@ -169,6 +169,8 @@ export class VoiceRunner {
       case "musicVolumeUp":
       case "musicVolumeDown":
       case "musicSetVolume":
+      // Opening looks the name up among the installed apps: voice/tools.ts `openNamed`.
+      case "open":
       case "cancel":
       case "unknown":
         return fail(said ? t("Not recognised: « {0} »", { 0: said }) : t("Command not recognised"));

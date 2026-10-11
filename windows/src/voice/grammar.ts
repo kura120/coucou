@@ -2,7 +2,8 @@
 // matches sentences it was given, so the sentences are written here, next to
 // the parser that must understand every one of them (tests/voice-intent.test.mjs
 // checks that it does). `{pill}` and `{workspace}` stand for any way of saying
-// a pill; Rust builds one grammar rule per slot (src-tauri/src/voice/sapi.rs).
+// a pill, `{app}` for an installed app's name; Rust builds one grammar rule per
+// slot (src-tauri/src/voice/sapi.rs).
 //
 // A recogniser that hears free text needs none of this: it gets the parser alone.
 
@@ -38,13 +39,18 @@ const ANSWER = ["{pill}"];
 
 const CANCEL = ["never mind", "cancel", "forget it"];
 
-export function buildGrammar(pills: readonly PillDefinition[]): VoiceGrammar {
+/** Any installed app, by its name: heard only when Rust has said which there are. */
+const OPEN = ["open {app}", "launch {app}"];
+
+/** `apps`: the installed apps' names as they can be said (Rust's `voice_apps`). */
+export function buildGrammar(pills: readonly PillDefinition[], apps: readonly string[] = []): VoiceGrammar {
   const said = (list: readonly PillDefinition[]) => [...new Set(list.flatMap(spokenForms))];
   return {
-    commands: [...MUSIC, ...PILLS, ...MAIN_PILL, ...ANSWER, ...CANCEL],
+    commands: [...MUSIC, ...PILLS, ...MAIN_PILL, ...ANSWER, ...CANCEL, ...(apps.length ? OPEN : [])],
     slots: {
       pill: said(pills),
       workspace: said(pills.filter((p) => p.category === "workspace")),
+      ...(apps.length ? { app: [...apps] } : {}),
     },
   };
 }
