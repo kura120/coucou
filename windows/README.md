@@ -151,9 +151,14 @@ it is. Spotify takes no slot, as everywhere else.
   recogniser, which needs the English speech pack (Settings → Time & language →
   Speech) and nothing downloaded. Linux has no system recogniser and waits for
   a bundled one; Settings says so there.
-- **On this computer only.** No audio and no text leaves it, and there is no
-  online recogniser to fall back on. Nothing is recorded, and the log says that
-  something was recognised, never what.
+- **On this computer only.** What the microphone hears never leaves it, and
+  there is no online recogniser to fall back on. A sentence is written down by
+  Windows' recogniser, by the downloaded engine or — if you choose it as the
+  speech model, below — by a model server running on this computer; Coucou
+  refuses to send sound to any other address. The words stay here too, unless
+  you pick a model for what Coucou does not know (below): they then go, as
+  text, to that server, wherever you pointed it. Nothing is recorded, and the
+  log says that something was recognised, never what.
 - **The microphone.** While voice is on, Windows shows a microphone in the
   taskbar. Turn off **Listen for « OK Coucou »** to keep the microphone closed
   until you press the **Talk to Coucou** shortcut (`Ctrl+Alt+V`, off by
@@ -215,6 +220,41 @@ SHA-256) and uses it for the command:
   All three write "Vercel" as "versal": names are matched afterwards, by how
   they sound. Tried and left out: Moonshine base, Canary 180m, Whisper base.en
   and small.en — no better than the Parakeet next to them, and slower.
+- **Or the model server hears.** When the server chosen under **Understand
+  free speech with** is on this computer (127.0.0.1, localhost, ::1) and a
+  model is picked, that model is a fourth choice in **Speech model**, with
+  nothing to download: the sentence's sound goes to it, as a WAV file made in
+  memory, and it writes the words. It must be a model that takes audio.
+  It is not the model that hears best. `gemma4:e4b` through Ollama 0.40.2
+  got 5 % of words wrong on the same 69 synthesised commands, in 0.15 s a
+  sentence on a GPU — but on twelve sentences in a real voice (one speaker)
+  it got 34 % wrong, "switch to colgate" for "switch to Codex", where
+  Parakeet 0.6b got 15 %. What it can do that a speech model cannot is be
+  told what to expect: Coucou gives it the pills' and the installed apps'
+  names with each sentence, and on those twelve it then got 15 to 22 % wrong
+  — about Parakeet 0.6b's, with nothing downloaded. Twelve sentences are few:
+  try it on your own voice. What to know:
+  - The names of your pills and installed apps (140 at most) go to that
+    server with the sound. It is on this computer.
+  - Only a server on this computer. For any other address the choice is not
+    in the list, and if the address changes later nothing is sent: the
+    downloaded model hears. The request follows no redirect and uses no proxy.
+  - Coucou waits 2.5 s for the answer. Past that, on an error or on an answer
+    without words, the smallest downloaded model writes the sentence instead;
+    with none downloaded, the command is missed. A model that does not take
+    audio is an error every time (Ollama answers so at once, once the model
+    is loaded).
+  - Ollama lets go of a model after five minutes and takes about 9 s to load
+    this one again, so Coucou asks the server for one word (no sound) when
+    voice starts and each time it is woken. The first command after a long
+    quiet may still be the downloaded model's.
+  - It is the same model that is asked what a sentence means. Choosing Gemma
+    to hear means Gemma decides too, and on Coucou's table it decides a little
+    less well and more slowly than `qwen2.5:7b-instruct` (37 of 39 in 0.8 s
+    against 38 in 0.2 s).
+  - Without a downloaded model there is no voice detector either: a sentence
+    is then cut out by loudness, and a keyboard can be taken for one (Gemma
+    answered nothing to noise, silence and a tone when tried).
 - A command is at most about seven seconds: the model that writes it down
   fails on ten seconds and more, so a longer sentence — or music that never
   pauses — is cut there.
@@ -223,7 +263,9 @@ SHA-256) and uses it for the command:
   after that moment is written down. Said with a pause — "OK Coucou" … "next
   track" — it works as before.
 - It runs on this computer. The sound stays in memory until it is written
-  down, and is kept nowhere. **Remove** deletes the engine and its model.
+  down — by the engine, or by the model server on this computer when that is
+  the speech model — and is kept nowhere. **Remove** deletes the engine and
+  its models.
 - Windows only for now.
 
 Without the engine, the model is only reached by what the parser does not

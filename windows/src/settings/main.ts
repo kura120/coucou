@@ -1092,7 +1092,12 @@ function voiceSection(): HTMLElement {
   });
   model.addEventListener("change", () => change({ brainModel: model.value }));
   fillServers();
-  voiceServersRedraw = fillServers;
+  // Every save comes back here: which server and model are chosen decides
+  // whether the model server may be the speech model.
+  voiceServersRedraw = () => {
+    fillServers();
+    void fillHearing();
+  };
 
   // The bundled engine's two parts, each downloaded when asked for: a row with
   // its switch once it is here, a Download button until then.
@@ -1156,15 +1161,34 @@ function voiceSection(): HTMLElement {
 
   // Which model hears: the row above then shows that one's switch, or its
   // Download button when it is not on this machine yet.
+  // The last choice is not a download: the model chosen below hears, when its
+  // server is on this computer. Rust says whether it may (voice/hear.rs), and
+  // for any other server the choice is not there.
   const hearing = h("select", {}) as HTMLSelectElement;
+  const hearingHint = h("div", { class: "hint", text: t("The sound of each sentence is sent to this model's server, on this computer, and nowhere else. It must be a model that takes audio, such as Gemma 4. When it does not answer in time, a downloaded model hears instead.") });
   const megabytes = (bytes: number) => Math.round(bytes / 1_000_000);
-  void Bridge.voiceHearingModels().then((models) => {
-    for (const m of models ?? []) hearing.append(h("option", { value: m.id, text: `${m.name} · ${megabytes(m.downloadBytes)} MB` }));
+  const fillHearing = async () => {
+    const models = (await Bridge.voiceHearingModels()) ?? [];
+    const serverName = LOCAL[settings.voice.brain as LocalId]?.name;
+    const label = (m: (typeof models)[number]) =>
+      m.server ? `${m.name} · ${serverName ? t(serverName) : ""}` : `${m.name} · ${megabytes(m.downloadBytes)} MB`;
+    const wanted = models.map((m) => `${m.id}|${label(m)}`).join("\n");
+    if (hearing.dataset.shown !== wanted) {
+      hearing.dataset.shown = wanted;
+      clear(hearing);
+      for (const m of models) hearing.append(h("option", { value: m.id, text: label(m) }));
+      // The row above answers for the model server too.
+      voiceEngineRedraw.hearing?.();
+    }
     hearing.value = settings.voice.hearingModel;
     // A model this build does not know is the first one, as Rust takes it.
     if (hearing.selectedIndex < 0) hearing.selectedIndex = 0;
-  });
+    hearingHint.style.display = hearing.value === SERVER_HEARS ? "" : "none";
+  };
+  hearingHint.style.display = "none";
+  void fillHearing();
   hearing.addEventListener("change", () => {
+    hearingHint.style.display = hearing.value === SERVER_HEARS ? "" : "none";
     // Saved first: Rust answers for the model the settings name.
     void Promise.resolve(change({ hearingModel: hearing.value })).then(() => voiceEngineRedraw.hearing?.());
   });
@@ -1208,6 +1232,7 @@ function voiceSection(): HTMLElement {
     free,
     h("div", { class: "hint", text: t("Lets a command be said in your own words, not only the sentences Windows was given. The engine and its English model (sherpa-onnx and Moonshine) are downloaded from GitHub when you ask, checked, and run on this computer. The wake phrase stays Windows' own.") }),
     h("div", { class: "row" }, h("label", { text: t("Speech model") }), hearing),
+    hearingHint,
     h("div", { class: "hint", text: t("A larger model hears names and accents better, and takes a little longer to write a sentence down. Each is downloaded from GitHub when you ask for it. Parakeet is NVIDIA's (CC BY 4.0).") }),
     h("div", { class: "row" }, h("label", { text: t("Keep listening after a command") }), followUp),
     h("div", { class: "hint", text: t("For a few seconds after a command, another can be said without « OK Coucou ». Only with free speech.") }),
@@ -1219,6 +1244,8 @@ function voiceSection(): HTMLElement {
 }
 
 let voiceListener: ((s: VoiceStatus | null) => void) | null = null;
+/** `voice.hearingModel` when the model server hears (src-tauri/src/voice/hear.rs `ID`). */
+const SERVER_HEARS = "server";
 /** Redraws the voice section's list of model servers. */
 let voiceServersRedraw: (() => void) | null = null;
 type EngineProgress = { part: VoiceEnginePart; done: number; installed: boolean; error: string | null };

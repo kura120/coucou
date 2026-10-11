@@ -256,9 +256,13 @@ export const Bridge = {
     call<void>("voice_grammar", { commands, slots }),
   /** What was said without the wake phrase was a command: another may follow it. */
   voiceFollowed: () => call<void>("voice_followed"),
-  /** The models the bundled engine can hear with, and which are on this machine. */
+  /**
+   * The models the bundled engine can hear with, and which are on this machine;
+   * and, last and with `server`, the model of the server chosen for voice when
+   * that server is on this computer (src-tauri/src/voice/hear.rs).
+   */
   voiceHearingModels: () =>
-    call<{ id: string; name: string; downloadBytes: number; installed: boolean }[]>("voice_hearing_models"),
+    call<{ id: string; name: string; downloadBytes: number; installed: boolean; server: boolean }[]>("voice_hearing_models"),
   /** The installed apps' names, as a recogniser can be given them ("open {app}"). */
   voiceApps: () => call<string[]>("voice_apps"),
   /** Listens for a command without the wake phrase: the answer to a question. */

@@ -119,7 +119,7 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
     }
     integrations::settings_saved(&app, &settings.active_integrations);
     spotify::sync(&app, &settings.active_integrations);
-    voice::sync(&app, &settings.voice);
+    voice::sync(&app, &settings);
     if shortcuts_changed {
         shortcuts::apply(&app, &settings.shortcuts);
     }
@@ -941,7 +941,7 @@ pub fn run() {
             pipe::start(handle.clone());
             integrations::start(handle.clone());
             spotify::sync(&handle, &loaded.active_integrations);
-            voice::sync(&handle, &loaded.voice);
+            voice::sync(&handle, &loaded);
             shortcuts::apply(&handle, &loaded.shortcuts);
             // Test toasts at launch, to see how every kind looks. Remove when done.
             if let Some(which) = toast::sample_from_args(&std::env::args().collect::<Vec<_>>()) {

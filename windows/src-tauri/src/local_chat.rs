@@ -257,13 +257,20 @@ fn request_body(model: &str, system: &str, history: &[Value], user: &Value) -> V
 /// The errors are for the log; the island shows its own card.
 pub async fn complete(server: &Server, body: &Value, timeout: Duration) -> Result<Value, String> {
     let base = base_url(server)?;
-    let reply = net::client(&base, timeout)?
-        .post(net::join(&base, "v1/chat/completions"))
+    complete_at(net::client(&base, timeout)?, &base, server, body).await
+}
+
+/// The same, at an address the caller has checked and with a client of its
+/// own making (voice/hear.rs, which lets a sentence's sound go nowhere but
+/// this computer).
+pub async fn complete_at(client: reqwest::Client, base: &Url, server: &Server, body: &Value) -> Result<Value, String> {
+    let reply = client
+        .post(net::join(base, "v1/chat/completions"))
         .header("Authorization", bearer(server.key.as_deref()))
         .json(body)
         .send()
         .await
-        .map_err(|_| unreachable(&base))?;
+        .map_err(|_| unreachable(base))?;
     let status = reply.status();
     let bytes = net::read_capped(reply, net::MAX_BODY).await?;
     if !status.is_success() {

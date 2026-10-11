@@ -4403,6 +4403,17 @@
    "pt-BR": "Um modelo maior ouve melhor nomes e sotaques, e leva um pouco mais de tempo para escrever uma frase. Cada um é baixado do GitHub quando você pede. O Parakeet é da NVIDIA (CC BY 4.0).",
    "ru": "Более крупная модель лучше слышит названия и акценты и чуть дольше записывает фразу. Каждая загружается с GitHub, когда вы об этом просите. Parakeet — модель NVIDIA (CC BY 4.0).",
    "id": "Model yang lebih besar mendengar nama dan aksen dengan lebih baik, dan sedikit lebih lama menuliskan kalimat. Masing-masing diunduh dari GitHub saat Anda memintanya. Parakeet milik NVIDIA (CC BY 4.0)."
+  },
+  "The sound of each sentence is sent to this model's server, on this computer, and nowhere else. It must be a model that takes audio, such as Gemma 4. When it does not answer in time, a downloaded model hears instead.": {
+   "zh-Hans": "每句话的声音会发送到这个模型的服务器，它就在这台电脑上，不会发往别处。它必须是能接收音频的模型，例如 Gemma 4。如果它没有及时回答，就由已下载的模型来听。",
+   "hi": "हर वाक्य की आवाज़ इस मॉडल के सर्वर को भेजी जाती है, जो इसी कंप्यूटर पर है, और कहीं नहीं। यह ऐसा मॉडल होना चाहिए जो ऑडियो लेता हो, जैसे Gemma 4। जब यह समय पर जवाब नहीं देता, तो डाउनलोड किया हुआ मॉडल सुनता है।",
+   "es": "El sonido de cada frase se envía al servidor de este modelo, en este ordenador, y a ningún otro sitio. Debe ser un modelo que acepte audio, como Gemma 4. Si no responde a tiempo, oye en su lugar un modelo descargado.",
+   "ar": "يُرسَل صوت كل جملة إلى خادم هذا النموذج، على هذا الحاسوب، ولا إلى أي مكان آخر. يجب أن يكون نموذجًا يقبل الصوت، مثل Gemma 4. وإذا لم يُجب في الوقت المناسب، يسمع بدلًا منه نموذج منزَّل.",
+   "fr": "Le son de chaque phrase est envoyé au serveur de ce modèle, sur cet ordinateur, et nulle part ailleurs. Il faut un modèle qui accepte l'audio, comme Gemma 4. S'il ne répond pas à temps, un modèle téléchargé écoute à sa place.",
+   "bn": "প্রতিটি বাক্যের শব্দ এই মডেলের সার্ভারে পাঠানো হয়, যা এই কম্পিউটারেই আছে, আর কোথাও নয়। এটি এমন মডেল হতে হবে যা অডিও নেয়, যেমন Gemma 4। এটি সময়মতো উত্তর না দিলে ডাউনলোড করা মডেল শোনে।",
+   "pt-BR": "O som de cada frase é enviado ao servidor deste modelo, neste computador, e a nenhum outro lugar. Precisa ser um modelo que aceite áudio, como o Gemma 4. Quando ele não responde a tempo, um modelo baixado ouve no lugar dele.",
+   "ru": "Звук каждой фразы отправляется на сервер этой модели, на этом компьютере, и больше никуда. Нужна модель, которая принимает аудио, например Gemma 4. Если она не отвечает вовремя, вместо неё слушает загруженная модель.",
+   "id": "Suara setiap kalimat dikirim ke server model ini, di komputer ini, dan tidak ke tempat lain. Modelnya harus menerima audio, seperti Gemma 4. Jika tidak menjawab tepat waktu, model yang diunduh yang mendengarkan."
   }
  }
 }
