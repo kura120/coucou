@@ -169,7 +169,7 @@ async function ask(system, said, tools, history = []) {
 const TURNS = {
   single: (runner, world) => {
     const conversation = new VoiceConversation(runner, world, () => PILLS, () => ask);
-    return { hear: (said) => conversation.hear(said), answer: (answer) => conversation.answer(answer) };
+    return { hear: (said) => conversation.hear(said), answer: (answer) => conversation.answerAsked(answer) };
   },
 };
 const DRIVER = process.env.VOICE_TURNS ?? "single";

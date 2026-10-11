@@ -155,7 +155,7 @@ export class VoiceConversation {
    * The answer to the question that waits, given by a click or a shortcut
    * (the island's ask component) rather than said. Null when nothing waits.
    */
-  async answer(answer: Answer, how: Hearing = {}): Promise<VoiceResult | null> {
+  async answerAsked(answer: Answer, how: Hearing = {}): Promise<VoiceResult | null> {
     provideNames(this.names);
     const asked = this.runner.takeAsked();
     return asked ? this.settle(asked, answer, how) : null;

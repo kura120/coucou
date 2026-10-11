@@ -98,7 +98,7 @@ function setup({ brain = null, active = ["integration_github", "integration_stri
     log, asked, conversation, runner, state, pills,
     hear: async (said, how) => card(await conversation.hear(said, how)),
     full: (said, how) => conversation.hear(said, how),
-    answer: async (given) => card(await conversation.answer(given)),
+    answer: async (given) => card(await conversation.answerAsked(given)),
   };
 }
 

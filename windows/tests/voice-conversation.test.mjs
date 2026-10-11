@@ -105,7 +105,7 @@ function setup({ brain = null, active = ["integration_github"], permission = nul
   // The card's side of a result: what is asked, as the island's ask component gets it, is looked at apart.
   const card = (result) => (result ? { outcome: result.outcome, message: result.message } : result);
   const hear = async (said, how) => card(await conversation.hear(said, how));
-  const answer = async (given) => card(await conversation.answer(given));
+  const answer = async (given) => card(await conversation.answerAsked(given));
   return { log, asked, hear, answer, conversation, runner, state, pills };
 }
 
