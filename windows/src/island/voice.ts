@@ -12,17 +12,19 @@ import { lastTextStep } from "../core/diff";
 import { Sound } from "../core/sound";
 import { language, t } from "../i18n/i18n";
 import { showToast } from "../toast/api";
-import { describeState, runProposal, systemPrompt, toolSchemas, type VoiceWorld } from "../voice/tools";
+import { describeState, runProposal, systemPrompt, toolSchemas, understood, type VoiceWorld } from "../voice/tools";
 import { SPOTIFY_ID, Spotify } from "../core/spotify";
 import { State } from "../core/state";
 import { buildGrammar } from "../voice/grammar";
+import { parseIntent, parseSeveral } from "../voice/intent";
+import type { PillDefinition } from "../core/pills";
 import { VoiceRunner, type MusicControls, type PillControls, type VoiceResult } from "../voice/runner";
 
 /** How long a result stays on screen before the island goes back. */
 export const RESULT_SHOWN_MS = 2000;
 
 export interface VoiceEvent {
-  phase: "woke" | "partial" | "final" | "missed" | "cancelled" | "following" | "rested";
+  phase: "woke" | "partial" | "final" | "missed" | "cancelled" | "following" | "rested" | "again";
   text: string;
 }
 
@@ -33,6 +35,8 @@ export interface VoiceHost {
   voiceCancelled(): void;
   /** Another command may follow without the wake phrase, or that time is over. */
   voiceFollowing(on: boolean): void;
+  /** A sentence said in that time: a command, or nothing meant for Coucou. */
+  voiceAgain(text: string): void;
 }
 
 /** What the tools need of the island itself. */
@@ -92,7 +96,23 @@ export function applyVoice(island: VoiceHost, event: VoiceEvent) {
     case "rested":
       island.voiceFollowing(false);
       break;
+    case "again":
+      island.voiceAgain(event.text);
+      break;
   }
+}
+
+/**
+ * What a sentence said without the wake phrase is, before anything is shown:
+ * a command the parser knows, something only the model could make sense of
+ * (`brain`: one is chosen), or nothing for Coucou — typing taken for words, a
+ * word to someone else, "never mind" with nothing to cancel.
+ */
+export function followUpKind(said: string, pills: readonly PillDefinition[], brain: boolean): "command" | "ask" | "nothing" {
+  const intent = parseIntent(said, pills);
+  if (intent.kind === "cancel") return "nothing";
+  if (intent.kind !== "unknown" || parseSeveral(said, pills)) return "command";
+  return brain ? "ask" : "nothing";
 }
 
 // ── What voice may touch ──────────────────────────────────────────────────────
@@ -215,13 +235,15 @@ export const brainChosen = () => Boolean(State.settings.voice.brain && State.set
 /**
  * What a sentence the parser does not know means, asked of the model, checked
  * and done. Null: nothing to show. A model that cannot be asked, or answers
- * nothing usable, is "not recognised" like before there was one.
+ * nothing usable, is "not recognised" like before there was one — or, when
+ * `quiet` (nobody said the wake phrase), nothing at all.
  */
-export async function askBrain(said: string, world: VoiceWorld): Promise<VoiceResult | null> {
+export async function askBrain(said: string, world: VoiceWorld, quiet = false): Promise<VoiceResult | null> {
   const pills = voicePills();
   const system = systemPrompt(describeState(world, voiceRunner, pills));
   const proposal = await Bridge.voiceBrain(system, said, toolSchemas(pills));
-  return runProposal(proposal ?? { calls: [], text: "" }, said, voiceRunner, world, pills);
+  const result = await runProposal(proposal ?? { calls: [], text: "" }, said, voiceRunner, world, pills);
+  return quiet && result && !understood(result, said) ? null : result;
 }
 
 /** The pills a command may name: the ones this build offers. */

@@ -22,7 +22,9 @@
 // wake phrase is still Windows' — it hears "coucou" where the free engine does
 // not — and the command after it is free speech: the microphone is read here
 // (capture.rs), a sentence is cut out of it (vad.rs) and written down. For a
-// few seconds after a command, another may follow without the wake phrase.
+// few seconds after a command, another may follow without the wake phrase:
+// whatever is said then is handed to the island, which shows something only
+// when it is a command, and says so (`voice_followed`).
 // And the two may be one breath, "OK Coucou, next track": Windows' recogniser
 // says when in the sentence the wake phrase ended, and what the microphone
 // gave after that moment is written down.
@@ -33,8 +35,8 @@
 //
 // The island is told with one event, `voice`: { phase, text }, phase being
 // "woke", "partial", "final", "missed" or "cancelled" — and "following" /
-// "rested" around the time another command may follow without the wake phrase. Settings follows
-// `voice-status`.
+// "rested" around the time another command may follow without the wake phrase,
+// "again" being a sentence said in that time. Settings follows `voice-status`.
 
 use std::collections::BTreeMap;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
@@ -113,6 +115,8 @@ pub enum Status {
 enum Control {
     Talk,
     Cancel,
+    /// What was said without the wake phrase was a command.
+    Followed,
     Paused(bool),
     /// Mochi is speaking until then: nothing heard meanwhile is a command.
     Hush(Instant),
@@ -322,6 +326,13 @@ pub fn voice_cancel() {
     send(&shared(), Control::Cancel);
 }
 
+/// The sentence said without the wake phrase was a command, and is done:
+/// another may follow it in turn.
+#[tauri::command]
+pub fn voice_followed() {
+    send(&shared(), Control::Followed);
+}
+
 /// `generation`: only the listener still in charge may speak; None for `sync`.
 fn set_status(app: &AppHandle, generation: Option<u64>, status: Status) {
     {
@@ -352,14 +363,11 @@ fn tell(app: &AppHandle, heard: Heard) {
         Heard::Final(text) => ("final", text),
         Heard::Missed => ("missed", String::new()),
         Heard::Cancelled => ("cancelled", String::new()),
-        // The island opens on its listening view again, then hears the command.
-        Heard::Again(text) => {
-            tell(app, Heard::Woke);
-            ("final", text)
-        }
+        // The island shows nothing unless it makes a command of it.
+        Heard::Again(text) => ("again", text),
     };
-    // Never the words: docs/VOICE.md.
-    if phase != "partial" {
+    // Never the words: docs/VOICE.md. Nor every sentence said near a microphone.
+    if !matches!(phase, "partial" | "again") {
         crate::log::line(format!("voice: {phase}"));
     }
     let _ = app.emit_to(WINDOW_LABEL, EVENT, Event { phase, text });
@@ -395,11 +403,19 @@ impl Free {
             crate::log::line("voice: the bundled engine is chosen but not installed");
             return None;
         }
+        // A keyboard is as loud as a voice: the detector is what tells them apart.
+        let sentences = match sherpa::Detector::load(&engine::runtime_dir(), &engine::detector_file(), vad::SILENCE_SECONDS) {
+            Ok(detector) => vad::Sentences::of_voices(detector),
+            Err(why) => {
+                crate::log::line(format!("voice: no voice detector, loudness instead: {why}"));
+                vad::Sentences::default()
+            }
+        };
         match sherpa::Engine::load(&engine::runtime_dir(), &engine::model_dir(engine::Part::Hearing)) {
             Ok(engine) => Some(Self {
                 engine,
                 capture: None,
-                sentences: vad::Sentences::default(),
+                sentences,
                 buffer: Vec::new(),
                 recent: None,
                 after_wake: None,
@@ -681,6 +697,10 @@ fn apply(
         Control::Talk => session.talk(Instant::now()),
         Control::Cancel => {
             session.cancel();
+            None
+        }
+        Control::Followed => {
+            session.followed(Instant::now());
             None
         }
         Control::Paused(on) => {

@@ -6,6 +6,8 @@
 //
 // With an engine that hears free speech there is one more step: for a few
 // seconds after a command, another one may be said without the wake phrase.
+// Anything may be said in that time, to someone else too: only what the island
+// found to be a command (`followed`) lets yet another follow.
 //
 // The floors come from one voice on one machine (2026-10-09, Windows' own
 // recogniser): the wake phrase scored 0.90–0.94, "coucou" alone and "ok cool,
@@ -65,8 +67,27 @@ pub enum Heard {
     Missed,
     /// Nothing was said, or listening had to stop.
     Cancelled,
-    /// Another command, said without the wake phrase after the last one.
+    /// A sentence said without the wake phrase after a command: another
+    /// command, or nothing meant for Coucou.
     Again(String),
+}
+
+/// What is written down when nothing was really said: a breath, a noise, a
+/// word to oneself.
+const FILLERS: &[&str] = &[
+    "a", "ah", "and", "bye", "eh", "er", "ha", "hm", "hmm", "huh", "i", "mhm", "mm", "oh", "ok", "okay", "so", "thank", "thanks",
+    "the", "uh", "um", "well", "yeah", "you",
+];
+
+/// One or two words that say nothing ("Uh.", "Thank you."): what a speech
+/// model makes of a noise more often than what someone asks for.
+pub fn says_nothing(text: &str) -> bool {
+    let words: Vec<String> = text
+        .split_whitespace()
+        .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase())
+        .filter(|w| !w.is_empty())
+        .collect();
+    words.len() <= 2 && words.iter().all(|w| FILLERS.contains(&w.as_str()))
 }
 
 /// A sentence as the free-speech engine wrote it, without the wake phrase if
@@ -153,6 +174,13 @@ impl Session {
         self.follow_until = (!self.follow_up.is_zero() && !self.held).then(|| now + RESULT_SHOWN + self.follow_up);
     }
 
+    /// The island made a command of what was said without the wake phrase.
+    pub fn followed(&mut self, now: Instant) {
+        if self.command_until.is_none() {
+            self.ended(now);
+        }
+    }
+
     /// Someone is in the middle of a sentence: whatever is waited for waits on.
     pub fn speaking(&mut self, now: Instant) {
         for until in [&mut self.command_until, &mut self.follow_until].into_iter().flatten() {
@@ -179,8 +207,10 @@ impl Session {
                 Some(Heard::Missed)
             }
             // Noise or a sentence that was not words is not an answer to anything.
-            (Listen::FollowUp, Raw::Phrase { rule: Rule::Command, text, confidence }) if confidence >= COMMAND_FLOOR => {
-                self.ended(now);
+            // Nor does it let another follow: the island says if it was a command.
+            (Listen::FollowUp, Raw::Phrase { rule: Rule::Command, text, confidence })
+                if confidence >= COMMAND_FLOOR && !says_nothing(&text) =>
+            {
                 Some(Heard::Again(text))
             }
             _ => None,
@@ -236,7 +266,8 @@ mod tests {
         // Seven seconds later, still inside the two of the card and the eight after.
         let later = now + Duration::from_secs(7);
         assert_eq!(s.heard(command("and the one after", 1.0), later), Some(Heard::Again("and the one after".into())));
-        // Which opens a new window in turn.
+        // Which, being a command, opens a new window in turn.
+        s.followed(later);
         assert_eq!(s.listen(), Listen::FollowUp);
         assert_eq!(s.tick(later + Duration::from_secs(9)), None);
         assert_eq!(s.listen(), Listen::FollowUp);
@@ -255,6 +286,42 @@ mod tests {
         assert_eq!(s.listen(), Listen::FollowUp);
         assert_eq!(s.tick(now + Duration::from_secs(60)), None);
         assert_eq!(s.listen(), Listen::Wake);
+    }
+
+    #[test]
+    fn what_is_said_to_someone_else_does_not_keep_the_follow_up_open() {
+        let now = Instant::now();
+        let mut s = Session::new(true, Duration::from_secs(8));
+        s.heard(wake(0.95), now);
+        s.heard(command("pause", 1.0), now);
+        // Typing taken for words, a word to a colleague: handed over, and that is all.
+        let later = now + Duration::from_secs(9);
+        assert_eq!(s.heard(command("see you at four then", 1.0), later), Some(Heard::Again("see you at four then".into())));
+        assert_eq!(s.tick(now + Duration::from_secs(10)), None);
+        assert_eq!(s.listen(), Listen::Wake);
+        // The island's word comes while another command is being heard: that
+        // one is not cut short.
+        s.heard(wake(0.95), later);
+        s.followed(later);
+        assert_eq!(s.listen(), Listen::Command);
+    }
+
+    #[test]
+    fn a_noise_written_down_as_a_word_or_two_is_not_handed_over() {
+        let now = Instant::now();
+        let mut s = Session::new(true, Duration::from_secs(8));
+        s.heard(wake(0.95), now);
+        s.heard(command("pause", 1.0), now);
+        for nothing in ["Uh.", "Thank you.", "Hmm, okay.", "you", "..."] {
+            assert!(says_nothing(nothing), "{nothing}");
+            assert_eq!(s.heard(command(nothing, 1.0), now), None, "{nothing}");
+        }
+        for something in ["Pause.", "next", "Okay, next track.", "thank you very much", "play"] {
+            assert!(!says_nothing(something), "{something}");
+        }
+        // After the wake phrase a word is an answer: "okay" to a question Mochi asked.
+        s.talk(now);
+        assert_eq!(s.heard(command("Okay.", 1.0), now), Some(Heard::Final("Okay.".into())));
     }
 
     #[test]

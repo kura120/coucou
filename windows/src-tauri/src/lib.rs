@@ -890,6 +890,7 @@ pub fn run() {
             toast::toast_keys,
             voice::voice_status,
             voice::voice_cancel,
+            voice::voice_followed,
             voice::voice_grammar,
             voice::voice_talk,
             voice::voice_open_app,

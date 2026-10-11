@@ -3,12 +3,14 @@
 // its models, which only those who want them need. Two parts, each asked for
 // on its own:
 //
-//   hearing   the library and a model that writes down what is said (37 MB)
+//   hearing   the library, a model that writes down what is said and a small
+//             one that tells a voice from a noise (38 MB)
 //   speaking  the library and a model that says a sentence out loud (129 MB)
 //
 // Archives from the projects' own releases on GitHub, each checked against the
 // SHA-256 written here before anything in it is used, then unpacked with the
-// system's tar. Only the files that are needed are kept.
+// system's tar. Only the files that are needed are kept. What is already here
+// is not fetched again.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -26,11 +28,18 @@ struct Archive {
     url: &'static str,
     sha256: &'static str,
     size: u64,
-    /// The folder the archive unpacks to, and the files kept from it.
+    /// The folder the archive unpacks to, and the files kept from it. A
+    /// download that is not an archive is the one file kept.
     folder: &'static str,
     keep: &'static [&'static str],
     /// Where they go, under `dir()`.
     into: &'static str,
+}
+
+impl Archive {
+    fn packed(&self) -> bool {
+        self.url.ends_with(".tar.bz2")
+    }
 }
 
 /// The library, with speech recognition and synthesis both.
@@ -52,6 +61,17 @@ const HEARING: Archive = Archive {
     folder: "sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27",
     keep: &["encoder_model.ort", "decoder_model_merged.ort", "tokens.txt", "LICENSE"],
     into: "moonshine-tiny-en",
+};
+
+/// Silero VAD (MIT): says whether a sound is a voice, so that typing is not
+/// cut out as a sentence and written down.
+const DETECTOR: Archive = Archive {
+    url: "asr-models/silero_vad.onnx",
+    sha256: "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+    size: 643_854,
+    folder: "",
+    keep: &["silero_vad.onnx"],
+    into: "silero-vad",
 };
 
 /// Supertonic 3, quantised: the voice that was picked by ear among Kokoro,
@@ -90,6 +110,14 @@ impl Part {
             Part::Speaking => &SPEAKING,
         }
     }
+
+    /// Everything this part is made of, the library first.
+    fn archives(self) -> &'static [&'static Archive] {
+        match self {
+            Part::Hearing => &[&RUNTIME, &HEARING, &DETECTOR],
+            Part::Speaking => &[&RUNTIME, &SPEAKING],
+        }
+    }
 }
 
 /// Everything of the engine lives here; removing the folder removes it.
@@ -105,6 +133,10 @@ pub fn model_dir(part: Part) -> PathBuf {
     dir().join(part.model().into)
 }
 
+pub fn detector_file() -> PathBuf {
+    dir().join(DETECTOR.into).join(DETECTOR.keep[0])
+}
+
 fn kept(archive: &Archive) -> impl Iterator<Item = PathBuf> + '_ {
     let base = dir().join(archive.into);
     archive.keep.iter().map(move |file| base.join(Path::new(file).file_name().unwrap_or_default()))
@@ -115,13 +147,13 @@ fn present(archive: &Archive) -> bool {
 }
 
 pub fn installed(part: Part) -> bool {
-    cfg!(windows) && present(&RUNTIME) && present(part.model())
+    cfg!(windows) && part.archives().iter().all(|archive| present(archive))
 }
 
-/// What asking for this part downloads now: its model, and the library when
-/// the other part has not brought it already.
+/// What asking for this part downloads now: what it is made of and is not
+/// here yet — not the library when the other part has brought it already.
 pub fn download_bytes(part: Part) -> u64 {
-    part.model().size + if present(&RUNTIME) { 0 } else { RUNTIME.size }
+    part.archives().iter().filter(|archive| !present(archive)).map(|archive| archive.size).sum()
 }
 
 #[derive(Clone, Serialize)]
@@ -206,7 +238,7 @@ async fn install_one(app: &AppHandle, part: Part, archive: &'static Archive, bef
     let work = base.join(format!("download-{}", archive.into));
     let _ = std::fs::remove_dir_all(&work);
     std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;
-    let file = work.join("archive.tar.bz2");
+    let file = work.join("download");
     let fetched = fetch(app, part, archive, &file, before, total).await;
 
     let target = base.join(archive.into);
@@ -218,10 +250,12 @@ async fn install_one(app: &AppHandle, part: Part, archive: &'static Archive, bef
                 if sha256(&file)? != archive.sha256 {
                     return Err("the download does not match its checksum".into());
                 }
-                unpack(&file, &work)?;
+                if archive.packed() {
+                    unpack(&file, &work)?;
+                }
                 std::fs::create_dir_all(&target).map_err(|e| e.to_string())?;
                 for name in archive.keep {
-                    let from = work.join(archive.folder).join(name);
+                    let from = if archive.packed() { work.join(archive.folder).join(name) } else { file.clone() };
                     let to = target.join(Path::new(name).file_name().unwrap_or_default());
                     std::fs::copy(&from, &to).map_err(|_| format!("{name} is missing from the download"))?;
                 }
@@ -244,11 +278,10 @@ pub async fn install(app: &AppHandle, part: Part) -> Result<(), String> {
     let total = download_bytes(part);
     let result = async {
         let mut before = 0;
-        if !present(&RUNTIME) {
-            install_one(app, part, &RUNTIME, 0, total).await?;
-            before = RUNTIME.size;
+        for archive in part.archives().iter().copied().filter(|archive| !present(archive)) {
+            install_one(app, part, archive, before, total).await?;
+            before += archive.size;
         }
-        install_one(app, part, part.model(), before, total).await?;
         if installed(part) { Ok(()) } else { Err("the engine is incomplete".to_string()) }
     }
     .await;
@@ -269,7 +302,9 @@ pub async fn install(app: &AppHandle, part: Part) -> Result<(), String> {
 
 /// Removes one part's model from the disk, and the library with the last of them.
 pub fn remove(part: Part) {
-    let _ = std::fs::remove_dir_all(model_dir(part));
+    for archive in part.archives().iter().filter(|archive| archive.into != RUNTIME.into) {
+        let _ = std::fs::remove_dir_all(dir().join(archive.into));
+    }
     let other = if part == Part::Hearing { Part::Speaking } else { Part::Hearing };
     if !present(other.model()) {
         let _ = std::fs::remove_dir_all(dir());
@@ -282,23 +317,25 @@ mod tests {
 
     #[test]
     fn what_is_downloaded_is_pinned() {
-        for archive in [&RUNTIME, &HEARING, &SPEAKING] {
+        for archive in [&RUNTIME, &HEARING, &DETECTOR, &SPEAKING] {
             assert_eq!(archive.sha256.len(), 64);
             assert!(archive.sha256.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
-            assert!(archive.url.ends_with(".tar.bz2"));
             assert!(!archive.keep.is_empty());
+            // A download that is not an archive is one file, kept under its own name.
+            assert!(archive.packed() || (archive.keep.len() == 1 && archive.url.ends_with(archive.keep[0])));
         }
+        assert!(detector_file().ends_with("silero_vad.onnx"));
         // The library is the version whose header sherpa.rs was written from.
         assert!(RUNTIME.url.contains(&format!("v{VERSION}")));
-        assert!(RUNTIME.size + HEARING.size < 40 * 1024 * 1024);
+        assert!(RUNTIME.size + HEARING.size + DETECTOR.size < 40 * 1024 * 1024);
         assert!(dir().ends_with(format!("sherpa-onnx-{VERSION}")));
         assert_ne!(model_dir(Part::Hearing), model_dir(Part::Speaking));
     }
 
     /// The real thing: downloads nothing, but checks and unpacks archives
     /// already on disk the way `install` does. `COUCOU_VOICE_ARCHIVES` is the
-    /// folder holding `runtime-lib.tar.bz2`, `moontiny.tar.bz2` and
-    /// `supertonic.tar.bz2`.
+    /// folder holding `runtime-lib.tar.bz2`, `moontiny.tar.bz2`,
+    /// `supertonic.tar.bz2` and `silero_vad.onnx`.
     #[test]
     #[cfg(windows)]
     #[ignore = "needs the downloaded archives"]
@@ -317,5 +354,8 @@ mod tests {
             }
         }
         let _ = std::fs::remove_dir_all(&work);
+        let detector = folder.join(DETECTOR.keep[0]);
+        assert_eq!(std::fs::metadata(&detector).unwrap().len(), DETECTOR.size);
+        assert_eq!(sha256(&detector).unwrap(), DETECTOR.sha256);
     }
 }

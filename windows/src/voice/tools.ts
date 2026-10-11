@@ -274,6 +274,9 @@ export function intentOf(call: BrainCall, said: string, pills: readonly PillDefi
 const notUnderstood = (said: string) =>
   fail(said ? t("Not recognised: « {0} »", { 0: said }) : t("Command not recognised"));
 
+/** Whether the model made anything of the sentence: false for "not recognised". */
+export const understood = (result: VoiceResult, said: string) => result.message !== notUnderstood(said).message;
+
 /** One call, checked and done. `null`: the user changed their mind — nothing to show. */
 async function runCall(
   call: BrainCall,
