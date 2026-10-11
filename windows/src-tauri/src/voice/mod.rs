@@ -290,11 +290,28 @@ pub fn voice_talk() {
 /// "Open Figma": starts the installed app that name means, and says which.
 #[tauri::command]
 pub fn voice_open_app(name: String) -> Option<String> {
-    let installed = apps::installed();
+    let installed = apps::installed_lately();
     let app = apps::find(&name, &installed)?;
     crate::log::line("voice: open app");
     app.open();
     Some(app.name.clone())
+}
+
+/// The installed apps nearest to a name that is none of them, for Mochi to
+/// ask about ("Open Spotify?"): nothing is opened.
+#[derive(Serialize)]
+pub struct NearApps {
+    /// Nearest first, three at most.
+    names: Vec<String>,
+    /// The first is the one to ask about by itself; else the first two are as near.
+    clear: bool,
+}
+
+#[tauri::command]
+pub fn voice_apps_near(said: String) -> NearApps {
+    let installed = apps::installed_lately();
+    let near = apps::near(&said, &installed);
+    NearApps { names: near.iter().map(|(_, app)| app.name.clone()).collect(), clear: apps::clear(&near) }
 }
 
 /// The installed apps' names, for a recogniser that only hears what it was
@@ -741,6 +758,14 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
                     if !std::mem::take(&mut same_breath) {
                         free.start_over();
                     }
+                }
+            }
+            // A command is coming: the model that may be asked about it gets ready.
+            if want == Listen::Command {
+                use tauri::Manager;
+                let settings = app.try_state::<crate::Shared>().and_then(|shared| shared.settings.lock().ok().map(|s| s.clone()));
+                if let Some(settings) = settings {
+                    brain::warm(&settings);
                 }
             }
             if let Err(why) = turned {

@@ -12,6 +12,7 @@
 
 import type { PillDefinition } from "../core/pills";
 import { t } from "../i18n/i18n";
+import { openQuestion } from "./ask";
 import { resolvePill } from "./entity";
 import type { VoiceIntent } from "./intent";
 
@@ -53,9 +54,19 @@ export interface PillControls {
 const ok = (message: string): VoiceResult => ({ outcome: "success", message });
 const fail = (message: string): VoiceResult => ({ outcome: "failure", message });
 
+/** "Open Spotify?" was asked: the apps it was about, and the sentence that led to it. */
+export interface OpenAsked {
+  names: string[];
+  /** The sentence that named no app, as it was heard. */
+  said: string;
+  /** How many times in a row Mochi has asked. */
+  rounds: number;
+}
+
 export class VoiceRunner {
   /** The pill waiting for room: "which one do I remove?" was asked. */
   private pendingAdd: string | null = null;
+  private pendingOpen: OpenAsked | null = null;
 
   private music: MusicControls;
   private pills: PillControls;
@@ -68,7 +79,26 @@ export class VoiceRunner {
   }
 
   get asking(): boolean {
-    return this.pendingAdd != null;
+    return this.pendingAdd != null || this.pendingOpen != null;
+  }
+
+  /** The apps Mochi asked about and waits to hear of, if he did (voice/ask.ts). */
+  get openAsked(): OpenAsked | null {
+    return this.pendingOpen;
+  }
+
+  /** Asks "Open X?", or "X or Y?": nothing is opened until the answer says so. */
+  askOpen(names: readonly string[], said: string, rounds = 1): VoiceResult {
+    this.reset();
+    this.pendingOpen = { names: names.slice(0, 2), said, rounds };
+    return openQuestion(this.pendingOpen.names);
+  }
+
+  /** The answer came: the question is no longer waiting. */
+  takeOpenAsked(): OpenAsked | null {
+    const asked = this.pendingOpen;
+    this.pendingOpen = null;
+    return asked;
   }
 
   /** The pills as they are now, for what a model is told about the app. */
@@ -79,6 +109,7 @@ export class VoiceRunner {
   /** Forgets a question nobody answered. */
   reset() {
     this.pendingAdd = null;
+    this.pendingOpen = null;
   }
 
   run(intent: VoiceIntent, said = ""): VoiceResult {
@@ -121,6 +152,7 @@ export class VoiceRunner {
       case "pillAdd": {
         if (intent.id === pills.main() || pills.active().includes(intent.id)) return ok(t("Already active"));
         if (!pills.hasRoomFor(intent.id)) {
+          this.reset();
           this.pendingAdd = intent.id;
           return { outcome: "question", message: t("{0} active — remove which?", { 0: pills.limit() }) };
         }

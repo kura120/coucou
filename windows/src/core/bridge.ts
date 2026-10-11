@@ -271,9 +271,15 @@ export const Bridge = {
    * What a sentence means, asked of the model server chosen for voice: the
    * tool calls it proposes, or its answer. Null when it cannot be asked.
    */
-  voiceBrain: (system: string, said: string, tools: unknown[]) =>
+  voiceBrain: (
+    system: string,
+    said: string,
+    tools: unknown[],
+    /** The turns so far, oldest first: each sentence, what was done for it and what came of it. */
+    history: { said: string; calls: { name: string; arguments: Record<string, unknown> }[]; result: string }[] = [],
+  ) =>
     call<{ calls: { name: string; arguments: Record<string, unknown> }[]; text: string }>(
-      "voice_brain", { system, said, tools },
+      "voice_brain", { system, said, tools, history },
     ),
   /** Whether a part of the bundled engine is on this machine, and what getting it costs. */
   voiceEngineStatus: (part: VoiceEnginePart) =>
@@ -285,6 +291,8 @@ export const Bridge = {
   voiceSay: (text: string) => call<void>("voice_say", { text }),
   /** Starts the Start-menu app that name means; its name, or null. */
   voiceOpenApp: (name: string) => call<string | null>("voice_open_app", { name }),
+  /** The installed apps nearest to what was heard, for "Open Spotify?": opens nothing. */
+  voiceAppsNear: (said: string) => call<{ names: string[]; clear: boolean }>("voice_apps_near", { said }),
   /** Opens one of the user's own folders; its name, or null. */
   voiceOpenFolder: (name: string) => call<string | null>("voice_open_folder", { name }),
 };

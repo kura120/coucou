@@ -8,6 +8,8 @@ import { PILL_CATALOG, availablePills } from "../src/core/pills.ts";
 import { SPOKEN, levenshtein, normalise, resolvePill, soundKey, spokenForms } from "../src/voice/entity.ts";
 import { parseIntent, parseSeveral } from "../src/voice/intent.ts";
 import { buildGrammar, sentences } from "../src/voice/grammar.ts";
+import { readAnswer } from "../src/voice/ask.ts";
+import { resolveRelative } from "../src/voice/memory.ts";
 import { VoiceRunner } from "../src/voice/runner.ts";
 
 const PILLS = availablePills("windows");
@@ -265,6 +267,8 @@ test("no two pills are said the same way", () => {
 // ── The grammar ───────────────────────────────────────────────────────────────
 
 const GRAMMAR = buildGrammar(PILLS);
+/** The sentences that follow another: understood by what was done last (src/voice/memory.ts). */
+const FOLLOWING = new Set(["and {pill} too", "also {pill}", "same for {pill}", "what about {pill}", "put it back", "undo"]);
 
 test("the grammar is what Rust accepts: plain words, known slots, within its bounds", () => {
   assert.ok(GRAMMAR.commands.length > 30 && GRAMMAR.commands.length <= 200);
@@ -294,6 +298,9 @@ test("everything the recogniser can hear, the parser understands", () => {
       // A pill's name alone is the answer to a question, not a command.
       if (command === "{pill}") {
         assert.ok(resolvePill(sentence, PILLS), sentence);
+      } else if (FOLLOWING.has(command)) {
+        // A follow-up means something after the command before it, and only then.
+        assert.ok(resolveRelative(sentence, { kind: "add", ids: ["integration_github"] }, PILLS), sentence);
       } else {
         assert.notEqual(parse(sentence).kind, "unknown", sentence);
       }
@@ -313,6 +320,15 @@ test("with the installed apps' names, opening any of them can be heard and is un
       assert.deepEqual(parse(sentence), { kind: "open", name: apps[i] }, sentence);
     }
   }
+  // After an app was opened, its name is enough for the next one; and it is the answer to "Open Discord?".
+  for (const command of ["what about {app}", "and {app}", "{app}"]) {
+    assert.ok(grammar.commands.includes(command), command);
+    for (const [i, sentence] of sentences(command, grammar.slots).entries()) {
+      assert.deepEqual(resolveRelative(sentence, { kind: "open" }, PILLS)?.intent, { kind: "open", name: apps[i] }, sentence);
+      if (command === "{app}") assert.equal(readAnswer(sentence, ["Discord", "Visual Studio Code"]).kind, i < 2 ? "open" : "other", sentence);
+    }
+  }
+  assert.deepEqual(readAnswer("no", ["Discord"]), { kind: "no" });
   // Rust refuses a slot with nothing in it: without apps, nothing about them is sent.
   assert.ok(!GRAMMAR.commands.some((c) => c.includes("{app}")) && !("app" in GRAMMAR.slots));
 });

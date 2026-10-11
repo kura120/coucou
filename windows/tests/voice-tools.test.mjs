@@ -59,6 +59,7 @@ function setup({ active = ["integration_github", "integration_vercel", "integrat
       return had;
     },
     openApp: async (name) => (log.push(`app:${name}`), apps.find((a) => a.toLowerCase() === name.toLowerCase()) ?? null),
+    appsNear: async () => ({ names: [], clear: false }),
     openFolder: async (name) => (log.push(`folder:${name}`), /download/i.test(name) ? "Downloads" : null),
     openUrl: (url) => log.push(`url:${url}`),
     nowPlaying: () => "Get Lucky — Daft Punk",

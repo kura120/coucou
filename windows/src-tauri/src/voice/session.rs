@@ -112,6 +112,25 @@ pub fn without_wake(text: &str) -> String {
     text.to_string()
 }
 
+/// The wake phrase and nothing else, as the free-speech engine writes it:
+/// "Okay, cuckoo.", "Hey Kuku". It spells "coucou" a different way each time,
+/// so the word is known by its sound — it starts with a `k` and has another —
+/// after "ok" or "hey". "Okay, cool." is not it.
+pub fn is_wake_alone(text: &str) -> bool {
+    let words: Vec<String> = text
+        .split_whitespace()
+        .map(|w| w.chars().filter(|c| c.is_alphanumeric()).collect::<String>().to_lowercase())
+        .filter(|w| !w.is_empty())
+        .collect();
+    let [first, name @ ..] = words.as_slice() else { return false };
+    if !matches!(first.as_str(), "ok" | "okay" | "hey") || name.is_empty() || name.len() > 2 {
+        return false;
+    }
+    let name = name.concat();
+    let hard = |c: char| matches!(c, 'c' | 'k' | 'q');
+    name.len() <= 8 && name.starts_with(hard) && name.chars().skip(1).any(hard)
+}
+
 pub struct Session {
     /// Listen for the wake phrase all the time; else only the shortcut wakes.
     wake: bool,
@@ -206,6 +225,16 @@ impl Session {
                 self.ended(now);
                 Some(Heard::Missed)
             }
+            // The wake phrase said again while another command may follow: it
+            // is the wake phrase, not a sentence that was no command. Windows'
+            // recogniser does not listen then, so it is known by how it was written.
+            (Listen::FollowUp, Raw::Phrase { rule: Rule::Command, text, confidence })
+                if self.wake && confidence >= COMMAND_FLOOR && is_wake_alone(&text) =>
+            {
+                self.follow_until = None;
+                self.command_until = Some(now + COMMAND_WAIT);
+                Some(Heard::Woke)
+            }
             // Noise or a sentence that was not words is not an answer to anything.
             // Nor does it let another follow: the island says if it was a command.
             (Listen::FollowUp, Raw::Phrase { rule: Rule::Command, text, confidence })
@@ -273,6 +302,32 @@ mod tests {
         assert_eq!(s.listen(), Listen::FollowUp);
         assert_eq!(s.tick(later + Duration::from_secs(10)), None);
         assert_eq!(s.listen(), Listen::Wake);
+    }
+
+    #[test]
+    fn the_wake_phrase_said_during_the_follow_up_wakes() {
+        for said in ["Okay, cuckoo.", "Hey Kuku", "OK Coco!", "okay kalku", "Okay, cow-coo.", "Hey, coucou."] {
+            assert!(is_wake_alone(said), "{said}");
+            let now = Instant::now();
+            let mut s = Session::new(true, Duration::from_secs(8));
+            s.heard(wake(0.95), now);
+            s.heard(command("open spy flight", 1.0), now);
+            assert_eq!(s.listen(), Listen::FollowUp);
+            // While the island is still working the last sentence out, too.
+            assert_eq!(s.heard(command(said, 1.0), now + Duration::from_secs(3)), Some(Heard::Woke), "{said}");
+            assert_eq!(s.listen(), Listen::Command);
+            assert_eq!(s.heard(command("open spotify", 1.0), now + Duration::from_secs(5)), Some(Heard::Final("open spotify".into())));
+        }
+        // Not the wake phrase: handed over like any other sentence, or nothing at all.
+        for said in ["Okay, cool.", "okay", "hey you", "Okay, next track.", "cuckoo", "okay cuckoo clock strikes", "hey can", "ok kombucha kick"] {
+            assert!(!is_wake_alone(said), "{said}");
+        }
+        // Where only the shortcut wakes, it does not wake here either.
+        let now = Instant::now();
+        let mut s = Session::new(false, Duration::from_secs(8));
+        s.talk(now);
+        s.heard(command("pause", 1.0), now);
+        assert_eq!(s.heard(command("Okay, cuckoo.", 1.0), now), Some(Heard::Again("Okay, cuckoo.".into())));
     }
 
     #[test]

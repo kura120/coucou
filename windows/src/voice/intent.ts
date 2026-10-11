@@ -300,6 +300,19 @@ export function parseIntent(text: string, pills: readonly PillDefinition[]): Voi
 }
 
 /**
+ * What followed the word for opening, as it was heard — "the squad" where the
+ * intent's name is "squad": a name that was misheard is looked for in all of
+ * it. Empty when the sentence does not open anything.
+ */
+export function heardToOpen(text: string): string {
+  let words = normalise(text).split(" ").filter(Boolean);
+  const polite = POLITENESS.find((prefix) => startsWith(words, prefix));
+  if (polite) words = words.slice(polite.length);
+  const opening = OPEN.find((seq) => startsWith(words, seq));
+  return opening ? words.slice(opening.length).join(" ") : "";
+}
+
+/**
  * Two or more commands joined by "and" or "then", or null when the sentence is
  * not that (IntentParser.parseMultiAction). Any part that means nothing makes
  * it one command again: "add gemini and cursor" is one, adding two pills.

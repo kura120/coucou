@@ -32,11 +32,9 @@ import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
 import { interruptedAfter, isPlace } from "./restore";
 import {
-  RESULT_SHOWN_MS, askBrain, brainChosen, createWorld, followUpKind, runOpening, sayResult, stopSpeaking, voicePills,
-  voiceRunner, wakeBlocked,
+  RESULT_SHOWN_MS, VOICE_PATIENCE_MS, brainChosen, createConversation, createWorld, followUpKind, sayResult, stopSpeaking,
+  voicePills, voiceRunner, wakeBlocked,
 } from "./voice";
-import { parseIntent, parseSeveral, type VoiceIntent } from "../voice/intent";
-import { notFound } from "../voice/tools";
 import type { VoiceResult } from "../voice/runner";
 import { installContextMenu, type ContextMenu, type Rect } from "../views/menu";
 
@@ -131,10 +129,14 @@ export class Island {
 
   private confusedRecovery: number | null = null;
   private voiceTimer: number | null = null;
-  private voiceWorld = createWorld({
-    showWaitingCard: () => this.showWaitingCard(),
-    declineWaiting: () => this.declineWaiting(),
-  });
+  private conversation = createConversation(
+    createWorld({
+      showWaitingCard: () => this.showWaitingCard(),
+      declineWaiting: () => this.declineWaiting(),
+    }),
+  );
+  /** Counts the sentences being understood: an answer that comes for an earlier one is dropped. */
+  private voiceTurn = 0;
   private prevViewBeforeConfused: IslandViewName = "overview";
   /** The chat is on screen and the island has taken the keyboard for it. */
   private chatHasKeyboard = false;
@@ -574,6 +576,8 @@ export class Island {
       return;
     }
     this.clearVoiceTimer();
+    // Whatever was still being worked out is no longer waited for.
+    this.voiceTurn += 1;
     // Spoken to: he stops talking and listens.
     stopSpeaking();
     // The wake phrase, or the answer to a question Mochi just asked.
@@ -601,7 +605,9 @@ export class Island {
   /** Something was said and it was no command. */
   voiceMissed() {
     if (this.fsm.state !== "listening" || State.view !== "listening") return;
-    this.voiceResult(voiceRunner.asking ? voiceRunner.answer("") : voiceRunner.run({ kind: "unknown" }));
+    // Not words: no answer to what Mochi asked, and the question is dropped.
+    if (voiceRunner.asking) void this.voiceUnderstand("");
+    else this.voiceResult(voiceRunner.run({ kind: "unknown" }));
   }
 
   /**
@@ -625,7 +631,7 @@ export class Island {
    */
   voiceAgain(said: string) {
     if (wakeBlocked(State.view, State.mode, State.pendingApproval != null, State.paused)) return;
-    switch (followUpKind(said, voicePills(), brainChosen())) {
+    switch (followUpKind(said, voicePills(), brainChosen(), this.conversation.last())) {
       case "command":
         void Bridge.voiceFollowed();
         this.voiceWoke();
@@ -639,13 +645,17 @@ export class Island {
     }
   }
 
-  /** The model is asked without a word on screen; only what it made of the sentence is shown. */
+  /** Looked up, or the model asked, without a word on screen; only what came of the sentence is shown. */
   private async voiceAskQuietly(said: string) {
-    const result = await askBrain(said, this.voiceWorld, true);
+    const result = await this.conversation.hear(said, { spokenTo: false });
     if (!result) return;
     // The wake phrase was said meanwhile: that command is the one being heard.
-    if (this.fsm.state === "listening" && State.view === "listening") return;
-    if (wakeBlocked(State.view, State.mode, State.pendingApproval != null, State.paused)) return;
+    const taken = this.fsm.state === "listening" && State.view === "listening";
+    if (taken || wakeBlocked(State.view, State.mode, State.pendingApproval != null, State.paused)) {
+      // A question nobody will hear is not left waiting for an answer.
+      if (result.outcome === "question" && !taken) voiceRunner.reset();
+      return;
+    }
     void Bridge.voiceFollowed();
     this.voiceWoke();
     if (this.fsm.state !== "listening") return;
@@ -667,52 +677,47 @@ export class Island {
 
   /** Understands what was said and does it; the card says what happened. */
   private voiceCommand(said: string) {
-    const pills = voicePills();
-    if (voiceRunner.asking) {
-      this.voiceResult(voiceRunner.answer(said));
-      return;
-    }
-    const intent = parseIntent(said, pills);
-    if (intent.kind === "cancel") {
-      this.fsm.voiceFinished();
-      return;
-    }
-    // "pause and remove github": each part is done, the last one is shown.
-    // Looked for first, or its first word alone would be taken for the whole.
-    const several = parseSeveral(said, pills);
-    if (intent.kind === "unknown" && !several && brainChosen()) {
-      void this.voiceAsk(said);
-      return;
-    }
-    const intents = several ?? [intent];
-    if (intents.some((one) => one.kind === "open")) {
-      void this.voiceOpen(said, intents);
-      return;
-    }
-    const results = intents.map((one) => voiceRunner.run(one, said));
-    this.voiceResult(results.find((r) => r.outcome !== "success") ?? results[results.length - 1]);
+    void this.voiceUnderstand(said);
   }
 
-  /** "Open Discord": the name is looked up among what is installed, then the card says which. */
-  private async voiceOpen(said: string, intents: readonly VoiceIntent[]) {
-    const result = await runOpening(intents, said, this.voiceWorld);
-    if (this.fsm.state !== "listening" || State.view !== "listening" || State.voice.text !== said) return;
-    if (result) this.voiceResult(result);
-    // Nothing installed by that name: a session or a web address, the model may know.
-    else if (brainChosen()) void this.voiceAsk(said);
-    else this.voiceResult(notFound(intents[0].kind === "open" ? intents[0].name : said));
-  }
-
-  /** Not a sentence the parser knows: the model is asked, and its proposal checked. */
-  private async voiceAsk(said: string) {
-    State.voice = { ...State.voice, thinking: true };
-    State.notify();
-    const result = await askBrain(said, this.voiceWorld);
-    // The island moved on while the model thought: its answer is for nobody.
-    if (this.fsm.state !== "listening" || State.view !== "listening" || State.voice.text !== said) return;
+  /**
+   * One sentence through the conversation (voice/conversation.ts): the parser,
+   * the last turns, the installed apps, a model. Whatever has to be waited for
+   * shows "Thinking…" at once, and is waited for a few seconds at most: then
+   * the card says so, and whatever answer comes later is for nobody.
+   */
+  private async voiceUnderstand(said: string) {
+    const turn = ++this.voiceTurn;
+    const here = () => turn === this.voiceTurn && this.fsm.state === "listening" && State.view === "listening";
+    let late = false;
+    const patience = window.setTimeout(() => {
+      if (!here()) return;
+      late = true;
+      voiceRunner.reset();
+      State.voice = { ...State.voice, thinking: false };
+      this.voiceResult({ outcome: "failure", message: t("That took too long. Say it again.") });
+    }, VOICE_PATIENCE_MS);
+    let result: VoiceResult | null = null;
+    try {
+      result = await this.conversation.hear(said, {
+        waiting: () => {
+          if (!here() || State.voice.thinking) return;
+          State.voice = { ...State.voice, thinking: true };
+          State.notify();
+        },
+        wanted: () => !late && here(),
+      });
+    } finally {
+      window.clearTimeout(patience);
+    }
+    // The island moved on meanwhile: the answer is for nobody.
+    if (late || !here()) {
+      if (result?.outcome === "question" && turn === this.voiceTurn) voiceRunner.reset();
+      return;
+    }
     State.voice = { ...State.voice, thinking: false };
     if (result) this.voiceResult(result);
-    else if (this.fsm.state === "listening") this.fsm.voiceFinished();
+    else this.fsm.voiceFinished();
   }
 
   /** The waiting permission card, up and unanswered (voice: "what is the request?"). */
@@ -1652,6 +1657,8 @@ export class Island {
     Sound.setVolume(State.settings.soundVolume);
     this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
     this.fsm.openOnHover = State.settings.openOnHover;
+    // Voice turned off: what was said is not kept for when it comes back on.
+    if (!State.settings.voice.enabled) this.conversation.forget();
     State.notify();
   }
 
