@@ -110,7 +110,7 @@ export function toolSchemas(pills: readonly PillDefinition[], near: readonly str
       : []),
     // The app's own tools, when the sentence speaks of what they do (voice/tools-app.ts).
     ...appToolsFor(said, names),
-    // Sample data only (voice/tools-preview.ts): web_search, check_email, read_email, draft_email.
+    // Sample data only (voice/tools-preview.ts): web_search, check_inbox, read_message, write_draft.
     ...previewToolsFor(said),
     fn("nothing", "The user changed their mind, or what was heard is not a request."),
   ];

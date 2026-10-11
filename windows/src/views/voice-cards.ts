@@ -133,11 +133,11 @@ export function registerVoiceCards(views: Map<IslandViewName, ViewHost>, actions
         driver.say(result.ask.question);
       } else if (result.status !== "done") {
         MailCard.show({ step: "failed", line: result.line, detail: result.detail && result.detail !== result.line ? result.detail : "", retry: call });
-      } else if (call.name === "check_email") {
+      } else if (call.name === "check_inbox") {
         lastList = data as unknown as MailListData;
         MailCard.show({ step: "list", data: lastList });
         driver.say(result.line);
-      } else if (call.name === "read_email") {
+      } else if (call.name === "read_message") {
         MailCard.show({ step: "message", message: data.message as MailMessage, back: lastList });
       } else {
         MailCard.show({ step: "compose", draft: data.draft as MailDraft });
@@ -189,7 +189,7 @@ const sampleDraft = (extra: Partial<MailDraft> = {}): MailDraft => ({
  * nothing is fetched: these put a card in a state, or run the sample tools.
  *
  *   coucouPreview.say("check my emails")          a fixed sentence, as if heard
- *   coucouPreview.tool("draft_email", { to: "tana" })   a call, as a model makes one
+ *   coucouPreview.tool("write_draft", { to: "tana" })   a call, as a model makes one
  *   coucouPreview.web("done")       one of coucouPreview.states.web
  *   coucouPreview.email("list")     one of coucouPreview.states.email
  *   coucouPreview.language("ar")    the interface language (Arabic reads right to left)
@@ -256,18 +256,18 @@ function previewConsole(open: (view: IslandViewName) => void) {
       const message = (id: string) => SAMPLE_MESSAGES.find((m) => m.id === id) as MailMessage;
       if (MAIL_SHOWN.has(state)) open("email");
       switch (state) {
-        case "accounts": void runPreview({ name: "check_email", arguments: {} }); return;
-        case "narrow": void runPreview({ name: "check_email", arguments: { account: "work" } }); return;
-        case "who": void runPreview({ name: "check_email", arguments: { account: "work", scope: "person" } }); return;
-        case "which": void runPreview({ name: "draft_email", arguments: { to: "tana" } }); return;
-        case "error": void runPreview({ name: "check_email", arguments: { account: "work", scope: "recent", fail: true } }); return;
+        case "accounts": void runPreview({ name: "check_inbox", arguments: {} }); return;
+        case "narrow": void runPreview({ name: "check_inbox", arguments: { account: "work" } }); return;
+        case "who": void runPreview({ name: "check_inbox", arguments: { account: "work", scope: "person" } }); return;
+        case "which": void runPreview({ name: "write_draft", arguments: { to: "tana" } }); return;
+        case "error": void runPreview({ name: "check_inbox", arguments: { account: "work", scope: "recent", fail: true } }); return;
         case "many-accounts":
           MailCard.show({
             step: "asking",
             ask: choice(t("Which email account do you want to use?"), Array.from({ length: 9 }, (_, i) => ({ id: `a${i}`, label: `Account ${i + 1}`, hint: `account.number.${i + 1}@example.com` }))),
           });
           break;
-        case "loading": MailCard.show({ step: "working", line: workingLine({ name: "check_email", arguments: { account: "work" } }) }); break;
+        case "loading": MailCard.show({ step: "working", line: workingLine({ name: "check_inbox", arguments: { account: "work" } }) }); break;
         case "list": MailCard.show({ step: "list", data: sampleList() }); break;
         case "many": {
           const base = sampleList();

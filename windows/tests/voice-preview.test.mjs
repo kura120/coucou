@@ -63,7 +63,7 @@ const WORLD = {
 // ── What they must never do ───────────────────────────────────────────────────
 
 test("no sample tool sends, and the file that holds them reaches nothing", () => {
-  for (const name of PREVIEW_TOOL_NAMES) assert.doesNotMatch(name, /send|allow|approve|run|exec/, name);
+  for (const name of PREVIEW_TOOL_NAMES) assert.doesNotMatch(name, /allow|approve|accept|grant|send|mail|run|exec|shell|command/, name);
   const source = readFileSync(join(SRC, "voice/tools-preview.ts"), "utf8");
   // No network, no Rust, no storage: fixed data and a timer.
   for (const word of ["fetch(", "XMLHttpRequest", "WebSocket", "Bridge", "invoke(", "localStorage", "@tauri-apps"]) {
@@ -74,9 +74,9 @@ test("no sample tool sends, and the file that holds them reaches nothing", () =>
 test("every result tells a model it is sample data", async () => {
   const results = [
     await run("web_search", { query: "how tall is everest" }),
-    await run("check_email", { account: "work", scope: "recent" }),
-    await run("read_email", { id: "m01" }),
-    await run("draft_email", { to: "louis", about: "see you friday" }),
+    await run("check_inbox", { account: "work", scope: "recent" }),
+    await run("read_message", { id: "m01" }),
+    await run("write_draft", { to: "louis", about: "see you friday" }),
   ];
   for (const result of results) {
     assert.equal(result.status, "done");
@@ -98,7 +98,7 @@ test("the sample: two accounts, a dozen emails, three search results", () => {
 test("the model is offered the tools a sentence speaks of, and no other sentence sees them", () => {
   const offered = (said) => toolSchemas(PILLS, [], said).map((tool) => tool.function.name).filter((name) => PREVIEW_TOOL_NAMES.includes(name));
   assert.deepEqual(offered("search the web for the weather"), ["web_search"]);
-  assert.deepEqual(offered("do I have any new emails"), ["check_email", "read_email", "draft_email"]);
+  assert.deepEqual(offered("do I have any new emails"), ["check_inbox", "read_message", "write_draft"]);
   assert.deepEqual(offered("add github and vercel"), []);
   assert.deepEqual(offered("what is claude doing"), []);
   assert.deepEqual(previewToolsFor("look up my inbox online").length, 4);
@@ -114,17 +114,17 @@ test("the fixed sentences, and what is not one", () => {
     ["Search the internet for the weather in Lyon.", "web_search", { query: "the weather in lyon" }],
     ["look up espresso machines on the web", "web_search", { query: "espresso machines" }],
     ["search the web", "web_search", { query: "" }],
-    ["check my emails", "check_email", {}],
-    ["Check my email.", "check_email", {}],
-    ["do I have any new emails", "check_email", { scope: "recent" }],
-    ["check my recent emails", "check_email", { scope: "recent" }],
-    ["check my emails from Tana", "check_email", { scope: "person", who: "tana" }],
-    ["read my emails about the invoice", "check_email", { scope: "topic", topic: "the invoice" }],
-    ["write an email to Tana", "draft_email", { to: "tana" }],
-    ["write an email", "draft_email", {}],
-    ["send an email to Louis saying the build is ready", "draft_email", { to: "louis", about: "the build is ready" }],
-    ["draft an e-mail to tana at example dot com about lunch", "draft_email", { to: "tana at example dot com", about: "lunch" }],
-    ["write an email to Priya about the notes with the file notes dot pdf", "draft_email", { to: "priya", about: "the notes", attachment: "notes.pdf" }],
+    ["check my emails", "check_inbox", {}],
+    ["Check my email.", "check_inbox", {}],
+    ["do I have any new emails", "check_inbox", { scope: "recent" }],
+    ["check my recent emails", "check_inbox", { scope: "recent" }],
+    ["check my emails from Tana", "check_inbox", { scope: "person", who: "tana" }],
+    ["read my emails about the invoice", "check_inbox", { scope: "topic", topic: "the invoice" }],
+    ["write an email to Tana", "write_draft", { to: "tana" }],
+    ["write an email", "write_draft", {}],
+    ["send an email to Louis saying the build is ready", "write_draft", { to: "louis", about: "the build is ready" }],
+    ["draft an e-mail to tana at example dot com about lunch", "write_draft", { to: "tana at example dot com", about: "lunch" }],
+    ["write an email to Priya about the notes with the file notes dot pdf", "write_draft", { to: "priya", about: "the notes", attachment: "notes.pdf" }],
   ];
   for (const [said, name, args] of cases) assert.deepEqual(previewSentence(said), call(name, args), said);
   for (const said of ["next track", "open mail", "open my inbox", "add github", "what is claude doing", "never mind", "", "email"]) {
@@ -132,7 +132,7 @@ test("the fixed sentences, and what is not one", () => {
   }
 });
 
-// ── check_email: the questions it asks ────────────────────────────────────────
+// ── check_inbox: the questions it asks ────────────────────────────────────────
 
 test("check my emails: which account, then what to look for, then the list", async () => {
   let c = previewSentence("check my emails");
@@ -160,37 +160,37 @@ test("check my emails: which account, then what to look for, then the list", asy
   assert.ok(result.data.messages.every((m) => !("body" in m)));
 });
 
-test("check_email: what was already said is not asked again, and nothing found is an empty list", async () => {
-  const recent = await run("check_email", { account: "personal", scope: "recent" });
+test("check_inbox: what was already said is not asked again, and nothing found is an empty list", async () => {
+  const recent = await run("check_inbox", { account: "personal", scope: "recent" });
   assert.equal(recent.data.messages.length, 7);
-  const about = await run("check_email", { account: "Work", topic: "invoice" });
+  const about = await run("check_inbox", { account: "Work", topic: "invoice" });
   assert.deepEqual(about.data.messages.map((m) => m.id), ["m05"]);
-  const none = await run("check_email", { account: "work", who: "nobody" });
+  const none = await run("check_inbox", { account: "work", who: "nobody" });
   assert.deepEqual([none.status, none.data.messages.length, none.line], ["done", 0, "No emails match."]);
-  const failed = await run("check_email", { account: "work", scope: "recent", fail: true });
+  const failed = await run("check_inbox", { account: "work", scope: "recent", fail: true });
   assert.deepEqual([failed.status, failed.line], ["failed", "Couldn't reach Work."]);
   // An account that is not one of the user's is asked about, not guessed.
-  assert.equal((await run("check_email", { account: "school" })).status, "ask");
+  assert.equal((await run("check_inbox", { account: "school" })).status, "ask");
 });
 
 test("a dropped question, or an empty answer, goes nowhere", async () => {
-  const c = call("check_email");
+  const c = call("check_inbox");
   const result = await runPreviewTool(c);
   assert.equal(withAnswer(c, result, { kind: "dropped" }), null);
-  const who = await run("check_email", { account: "work", scope: "person" });
-  assert.equal(withAnswer(call("check_email", { account: "work", scope: "person" }), who, { kind: "text", value: "   " }), null);
+  const who = await run("check_inbox", { account: "work", scope: "person" });
+  assert.equal(withAnswer(call("check_inbox", { account: "work", scope: "person" }), who, { kind: "text", value: "   " }), null);
   // Only a question can be answered.
-  assert.equal(withAnswer(c, await run("read_email", { id: "m01" }), { kind: "choice", id: "x" }), null);
+  assert.equal(withAnswer(c, await run("read_message", { id: "m01" }), { kind: "choice", id: "x" }), null);
 });
 
-test("read_email opens one email, or says it is not there", async () => {
-  const found = await run("read_email", { id: "m04" });
+test("read_message opens one email, or says it is not there", async () => {
+  const found = await run("read_message", { id: "m04" });
   assert.equal(found.data.message.from.name, "Louis Bernard");
   assert.ok(found.data.message.body.length > 200);
-  assert.equal((await run("read_email", { id: "nope" })).status, "not_found");
+  assert.equal((await run("read_message", { id: "nope" })).status, "not_found");
 });
 
-// ── draft_email ───────────────────────────────────────────────────────────────
+// ── write_draft ───────────────────────────────────────────────────────────────
 
 test("a spoken name becomes an address only when one contact has it", async () => {
   assert.deepEqual(contactsNamed("Louis").map((c) => c.address), ["louis@example.com"]);
@@ -202,11 +202,11 @@ test("a spoken name becomes an address only when one contact has it", async () =
   assert.equal(spokenAddress("tana"), null);
 
   // Two Tanas: asked, with the addresses to tell them apart.
-  const which = await run("draft_email", { to: "tana", about: "lunch" });
+  const which = await run("write_draft", { to: "tana", about: "lunch" });
   assert.deepEqual([which.status, which.ask.kind, which.ask.question], ["ask", "choice", "Which Tana?"]);
   assert.deepEqual(which.ask.options.map((o) => o.id), ["tana.rao@example.com", "tana.meyer@example.org"]);
   // Nobody by that name: the address is asked for, never made up.
-  const unknown = await run("draft_email", { to: "zoe", about: "lunch" });
+  const unknown = await run("write_draft", { to: "zoe", about: "lunch" });
   assert.deepEqual([unknown.status, unknown.ask.kind], ["ask", "text"]);
   assert.match(unknown.ask.question, /can't find zoe/);
 });
@@ -229,9 +229,9 @@ test("write an email to Tana: which Tana, what to say, then the card — and not
   });
   assert.equal(result.line, "Here's your email. Check it and click Send.");
 
-  const first = await run("draft_email", {});
+  const first = await run("write_draft", {});
   assert.deepEqual([first.status, first.ask.question], ["ask", "Who is the email for?"]);
-  const attached = await run("draft_email", { to: "louis", about: "here it is", attachment: "notes.pdf", account: "work" });
+  const attached = await run("write_draft", { to: "louis", about: "here it is", attachment: "notes.pdf", account: "work" });
   assert.deepEqual([attached.data.draft.attachment, attached.data.draft.from.id], ["notes.pdf", "work"]);
 });
 
@@ -259,11 +259,11 @@ test("a search is made of the user's words, and an email goes only to someone th
   assert.equal(previewChecked(call("web_search", { query: "alex martin home address" }), said).arguments.query, "the weather in lyon");
   assert.equal(previewChecked(call("web_search", { query: "" }), "who won yesterday").arguments.query, "who won yesterday");
 
-  assert.equal(previewChecked(call("draft_email", { to: "Tana Rao", about: "hi" }), "write an email to tana").arguments.to, "Tana Rao");
-  assert.equal(previewChecked(call("draft_email", { to: "boss@example.com", about: "hi" }), "write an email to tana").arguments.to, undefined);
-  assert.equal(previewChecked(call("draft_email", { to: "Louis", about: "hi" }), "write an email to tana").arguments.to, undefined);
+  assert.equal(previewChecked(call("write_draft", { to: "Tana Rao", about: "hi" }), "write an email to tana").arguments.to, "Tana Rao");
+  assert.equal(previewChecked(call("write_draft", { to: "boss@example.com", about: "hi" }), "write an email to tana").arguments.to, undefined);
+  assert.equal(previewChecked(call("write_draft", { to: "Louis", about: "hi" }), "write an email to tana").arguments.to, undefined);
   assert.equal(
-    previewChecked(call("draft_email", { to: "tana@example.com" }), "write an email to tana at example dot com").arguments.to,
+    previewChecked(call("write_draft", { to: "tana@example.com" }), "write an email to tana at example dot com").arguments.to,
     "tana@example.com",
   );
 });
@@ -272,11 +272,11 @@ test("a search is made of the user's words, and an email goes only to someone th
 
 test("from a model: the tool's card opens and the voice card has nothing to say", async () => {
   const seen = recordingHost();
-  const result = await runProposal({ calls: [call("check_email", { account: "work" })], text: "" }, "check my work emails", fakeRunner(), WORLD, PILLS);
+  const result = await runProposal({ calls: [call("check_inbox", { account: "work" })], text: "" }, "check my work emails", fakeRunner(), WORLD, PILLS);
   assert.equal(result, null);
   await tick();
   // No way to ask in the listening card yet (a model's first round): the card asks.
-  assert.deepEqual(seen.map(([what, name]) => [what, name]), [["working", "check_email"], ["ask", "check_email"]]);
+  assert.deepEqual(seen.map(([what, name]) => [what, name]), [["working", "check_inbox"], ["ask", "check_inbox"]]);
 
   // Once the turn can ask, the questions go through it and the card opens on the list.
   seen.length = 0;
@@ -285,9 +285,9 @@ test("from a model: the tool's card opens and the voice card has nothing to say"
     asked.push(question.question);
     return question.kind === "choice" ? { kind: "choice", id: question.options[0].id } : { kind: "dropped" };
   };
-  assert.equal(await runProposal({ calls: [call("check_email", { account: "work" })], text: "" }, "check my work emails", fakeRunner(), WORLD, PILLS, { ask }), null);
+  assert.equal(await runProposal({ calls: [call("check_inbox", { account: "work" })], text: "" }, "check my work emails", fakeRunner(), WORLD, PILLS, { ask }), null);
   assert.deepEqual(asked, ["Recent emails, or a person or a topic in particular?"]);
-  assert.deepEqual(seen.map(([what, name]) => [what, name]), [["done", "check_email"]]);
+  assert.deepEqual(seen.map(([what, name]) => [what, name]), [["done", "check_inbox"]]);
   setPreviewHost(null);
 });
 
@@ -315,7 +315,7 @@ test("by voice: check my emails asks in the listening card, twice, then opens th
 
   conversation.onAsk = (ask) => ask && queueMicrotask(() => conversation.answer({ kind: "choice", id: ask.options[0].id }));
   assert.equal(await conversation.hear("check my emails"), null);
-  assert.deepEqual(seen.map(([what, name, result]) => [what, name, result.data.account.id, result.data.scope.kind]), [["done", "check_email", "personal", "recent"]]);
+  assert.deepEqual(seen.map(([what, name, result]) => [what, name, result.data.account.id, result.data.scope.kind]), [["done", "check_inbox", "personal", "recent"]]);
   conversation.onAsk = null;
   setPreviewHost(null);
 });
@@ -344,9 +344,9 @@ test("a newer call makes an older one's answer nobody's", async () => {
   previewTiming.delayMs = 20;
   const first = runPreview(call("web_search", { query: "one" }));
   previewTiming.delayMs = 0;
-  await runPreview(call("check_email", { account: "work", scope: "recent" }));
+  await runPreview(call("check_inbox", { account: "work", scope: "recent" }));
   await first;
-  assert.deepEqual(seen.map(([what, name]) => [what, name]), [["working", "web_search"], ["working", "check_email"], ["done", "check_email"]]);
+  assert.deepEqual(seen.map(([what, name]) => [what, name]), [["working", "web_search"], ["working", "check_inbox"], ["done", "check_inbox"]]);
   setPreviewHost(null);
 });
 
@@ -462,7 +462,7 @@ test("the list of emails: sender, subject, a line, when — and a click opens on
   const { actions } = fakeActions();
   const { driver, log } = fakeDriver();
   const view = buildEmail(actions, driver);
-  const { data } = await run("check_email", { account: "work", scope: "recent" });
+  const { data } = await run("check_inbox", { account: "work", scope: "recent" });
   MailCard.show({ step: "list", data });
   view.sync();
   assert.equal(view.el.find(".vc-title")[0].textContent, "Work · Recent emails");
@@ -474,14 +474,14 @@ test("the list of emails: sender, subject, a line, when — and a click opens on
   assert.ok(rows[0].find(".mail-when")[0].textContent.length > 0);
   assert.ok(rows[0].classList.contains("unread") && !rows[4].classList.contains("unread"));
   rows[1].fire("click");
-  assert.deepEqual(log.pop(), ["run", call("read_email", { id: "m03" })]);
+  assert.deepEqual(log.pop(), ["run", call("read_message", { id: "m03" })]);
 
   // Nothing found: said, with a way back to the question.
   MailCard.show({ step: "list", data: { ...data, scope: { kind: "person", who: "nobody" }, messages: [] } });
   view.sync();
   assert.match(view.el.textContent, /Work · From nobody.*No emails match\./);
   view.el.find(".btn")[0].fire("click");
-  assert.deepEqual(log.pop(), ["run", call("check_email", { account: "work" })]);
+  assert.deepEqual(log.pop(), ["run", call("check_inbox", { account: "work" })]);
   assert.equal(scopeLabel({ kind: "topic", topic: "invoices" }), "About invoices");
 });
 
@@ -489,13 +489,13 @@ test("an opened email: its text, back to the list, and Reply prepares an answer"
   const { actions } = fakeActions();
   const { driver, log } = fakeDriver();
   const view = buildEmail(actions, driver);
-  const list = (await run("check_email", { account: "work", scope: "recent" })).data;
-  const { message } = (await run("read_email", { id: "m05" })).data;
+  const list = (await run("check_inbox", { account: "work", scope: "recent" })).data;
+  const { message } = (await run("read_message", { id: "m05" })).data;
   MailCard.show({ step: "message", message, back: list });
   view.sync();
   assert.match(view.el.textContent, /Invoice 2026-104.*Tana Meyer.*tana\.meyer@example\.org.*Payment is due.*invoice-2026-104\.pdf/s);
   view.el.find(".btn")[0].fire("click");
-  assert.deepEqual(log.pop(), ["run", call("draft_email", { to: "tana.meyer@example.org", subject: "Re: Invoice 2026-104", account: "work" })]);
+  assert.deepEqual(log.pop(), ["run", call("write_draft", { to: "tana.meyer@example.org", subject: "Re: Invoice 2026-104", account: "work" })]);
   view.el.find(".mail-back")[0].fire("click");
   assert.equal(MailCard.state.step, "list");
 });
@@ -504,7 +504,7 @@ test("the compose card: Send is a click, and here it sends nothing and says so",
   const { actions } = fakeActions();
   const { driver, log } = fakeDriver();
   const view = buildEmail(actions, driver);
-  const { draft } = (await run("draft_email", { to: "louis", about: "the build is ready", attachment: "notes.pdf" })).data;
+  const { draft } = (await run("write_draft", { to: "louis", about: "the build is ready", attachment: "notes.pdf" })).data;
   MailCard.show({ step: "compose", draft });
   view.sync();
   const [to, subject] = view.el.find("input");

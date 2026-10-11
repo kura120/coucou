@@ -190,7 +190,7 @@ export interface MailDraft {
 
 // ── The tools ─────────────────────────────────────────────────────────────────
 
-export const PREVIEW_TOOL_NAMES = ["web_search", "check_email", "read_email", "draft_email"] as const;
+export const PREVIEW_TOOL_NAMES = ["web_search", "check_inbox", "read_message", "write_draft"] as const;
 export type PreviewToolName = (typeof PREVIEW_TOOL_NAMES)[number];
 
 export const isPreviewTool = (name: string): name is PreviewToolName => (PREVIEW_TOOL_NAMES as readonly string[]).includes(name);
@@ -222,7 +222,7 @@ export function previewToolsFor(said: string): unknown[] {
   const spoken = normalise(said);
   const wanted = new Set<string>();
   if (has(spoken, ["web", "internet", "online", "search", "look up", "google"])) wanted.add("web_search");
-  if (has(spoken, ["email", "emails", "e mail", "e mails", "mail", "mails", "inbox"])) wanted.add("check_email").add("read_email").add("draft_email");
+  if (has(spoken, ["email", "emails", "e mail", "e mails", "mail", "mails", "inbox"])) wanted.add("check_inbox").add("read_message").add("write_draft");
   return (previewToolSchemas() as { function: { name: string } }[]).filter((tool) => wanted.has(tool.function.name));
 }
 
@@ -232,14 +232,14 @@ export function previewToolSchemas(): unknown[] {
     fn("web_search", "Look something up on the web and show a short answer with its sources. For questions about the world, not about this app.", {
       query: { type: "string", description: "What to look up, in the user's words." },
     }, ["query"]),
-    fn("check_email", "Show the user's emails. Leave out what the user did not say: the tool asks which account, and whether recent emails, a person or a topic.", {
+    fn("check_inbox", "Show the user's emails. Leave out what the user did not say: the tool asks which account, and whether recent emails, a person or a topic.", {
       account: { type: "string", enum: SAMPLE_ACCOUNTS.map((a) => a.id) },
       scope: { type: "string", enum: ["recent", "person", "topic"] },
       who: { type: "string", description: "The sender to look for, for scope 'person'." },
       topic: { type: "string", description: "The words to look for, for scope 'topic'." },
     }),
-    fn("read_email", "Open one email from the list that check_email returned.", { id: { type: "string" } }, ["id"]),
-    fn("draft_email", "Prepare an email on a card for the user to check. It is never sent by you: only a click on the card sends. Leave out what the user did not say.", {
+    fn("read_message", "Open one email from the list that check_inbox returned.", { id: { type: "string" } }, ["id"]),
+    fn("write_draft", "Prepare an email on a card for the user to check. It is never sent by you: only a click on the card sends. Leave out what the user did not say.", {
       to: { type: "string", description: "A contact's name or an email address, as the user said it." },
       about: { type: "string", description: "What the email should say, in the user's words." },
       subject: { type: "string" },
@@ -394,9 +394,9 @@ export async function runPreviewTool(call: BrainCall): Promise<ToolResult> {
   await wait();
   switch (call.name) {
     case "web_search": return webSearch(a);
-    case "check_email": return checkEmail(a);
-    case "read_email": return readEmail(a);
-    case "draft_email": return draftEmail(a);
+    case "check_inbox": return checkEmail(a);
+    case "read_message": return readEmail(a);
+    case "write_draft": return draftEmail(a);
     default: return failed(t("Command not recognised"), `unknown tool ${call.name}`);
   }
 }
@@ -405,11 +405,11 @@ export async function runPreviewTool(call: BrainCall): Promise<ToolResult> {
 export function workingLine(call: BrainCall): string {
   switch (call.name) {
     case "web_search": return t("Searching the web…");
-    case "check_email": {
+    case "check_inbox": {
       const account = accountOf(str(call.arguments?.account));
       return account ? t("Checking {account}…", { account: account.name }) : t("Loading…");
     }
-    case "draft_email": return t("Writing the email…");
+    case "write_draft": return t("Writing the email…");
     default: return t("Loading…");
   }
 }
@@ -454,7 +454,7 @@ export function previewSentence(said: string): BrainCall | null {
     const [, how, what] = check;
     const recent = /\b(recent|latest|new)\b/.test(s);
     return {
-      name: "check_email",
+      name: "check_inbox",
       arguments: how === "from" ? { scope: "person", who: what } : how === "about" ? { scope: "topic", topic: what } : recent ? { scope: "recent" } : {},
     };
   }
@@ -463,7 +463,7 @@ export function previewSentence(said: string): BrainCall | null {
   const draft = DRAFT.exec(s);
   if (draft) {
     return {
-      name: "draft_email",
+      name: "write_draft",
       arguments: {
         ...(draft[1] ? { to: draft[1] } : {}),
         ...(draft[2] ? { about: draft[2] } : {}),
@@ -495,7 +495,7 @@ export function previewChecked(call: BrainCall, said: string): BrainCall {
     const own = query.filter((w) => words.has(w)).length;
     if (!query.length || own * 2 < query.length) a.query = previewSentence(said)?.arguments.query || said.trim();
   }
-  if (call.name === "draft_email" && str(a.to)) {
+  if (call.name === "write_draft" && str(a.to)) {
     const to = str(a.to);
     const address = spokenAddress(to);
     // An address counts when the sentence holds it, written or said as "… at … dot …".

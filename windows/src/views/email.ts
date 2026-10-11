@@ -74,7 +74,7 @@ export function buildEmail(actions: ViewActions, driver: CardDriver): ViewHost {
       {
         class: message.unread ? "mail-row unread" : "mail-row",
         title: message.subject,
-        onclick: () => driver.run({ name: "read_email", arguments: { id: message.id } }),
+        onclick: () => driver.run({ name: "read_message", arguments: { id: message.id } }),
       },
       h("span", { class: "mail-dot" }),
       h(
@@ -107,7 +107,7 @@ export function buildEmail(actions: ViewActions, driver: CardDriver): ViewHost {
           "div",
           { class: "actions" },
           // Asks again what to look for, in the same account.
-          button(tl("Back"), "primary", () => driver.run({ name: "check_email", arguments: { account: data.account.id } })),
+          button(tl("Back"), "primary", () => driver.run({ name: "check_inbox", arguments: { account: data.account.id } })),
           close(),
         ),
       );
@@ -149,7 +149,7 @@ export function buildEmail(actions: ViewActions, driver: CardDriver): ViewHost {
         { class: "actions" },
         button(tl("Reply"), "primary", () =>
           driver.run({
-            name: "draft_email",
+            name: "write_draft",
             arguments: { to: message.from.address, subject: /^re:/i.test(message.subject) ? message.subject : `Re: ${message.subject}`, account: message.account },
           })),
         close(),
