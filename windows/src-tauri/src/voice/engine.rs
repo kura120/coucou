@@ -132,9 +132,15 @@ pub const HEARING_MODELS: &[Hearing] = &[
 static CHOSEN: AtomicUsize = AtomicUsize::new(0);
 
 /// The settings name a hearing model; one they do not know is the first.
+/// When they name the model server instead (hear.rs), this is the model that
+/// hears a sentence the server did not: the smallest that is installed.
 /// Returns its place in the list, for whoever must notice a change.
 pub fn choose(id: &str) -> usize {
-    let at = HEARING_MODELS.iter().position(|model| model.id == id).unwrap_or(0);
+    let at = if id == super::hear::ID {
+        HEARING_MODELS.iter().position(Hearing::installed).unwrap_or(0)
+    } else {
+        HEARING_MODELS.iter().position(|model| model.id == id).unwrap_or(0)
+    };
     CHOSEN.store(at, Ordering::Relaxed);
     at
 }
@@ -433,6 +439,8 @@ mod tests {
             assert!(model.id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '.'));
             assert!(HEARING_MODELS[..i].iter().all(|other| other.id != model.id && other.archive.into != model.archive.into));
             assert!(model.archive.keep.contains(&"tokens.txt"));
+            // "server" is the model server's name in the settings (hear.rs).
+            assert_ne!(model.id, super::super::hear::ID);
         }
         assert!(dir().ends_with(format!("sherpa-onnx-{VERSION}")));
         assert_ne!(model_dir(Part::Hearing), model_dir(Part::Speaking));

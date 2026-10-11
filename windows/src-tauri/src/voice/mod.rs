@@ -4,9 +4,16 @@
 // side only listens: it owns the microphone and the recogniser.
 //
 // The rules, the Mac's (docs/VOICE.md):
-// - On this machine only. No audio and no text leaves it, there is no cloud
-//   recogniser to fall back on: where there is no local one, Settings says so
-//   and nothing listens.
+// - On this machine only. What the microphone hears never leaves it: a
+//   sentence is written down by Windows' recogniser, by the bundled engine,
+//   or — when the user chose that as the speech model — by the model server
+//   they connected, and then only when that server is on this computer
+//   (hear.rs refuses any other address, and the bundled model hears instead).
+//   There is no cloud recogniser to fall back on: where there is no local
+//   one, Settings says so and nothing listens.
+// - The words, once written down, stay here too, with one exception the user
+//   sets up: a sentence the parser does not know is put, as text, to the model
+//   server chosen for voice (brain.rs), wherever the user pointed it.
 // - Nothing is recorded. The log says that something was recognised, never what.
 // - Off by default. Off means no thread and a closed microphone.
 // - Voice never approves a permission and never sends anything.
@@ -25,6 +32,9 @@
 // few seconds after a command, another may follow without the wake phrase:
 // whatever is said then is handed to the island, which shows something only
 // when it is a command, and says so (`voice_followed`).
+// The model that writes the sentence down is one of the bundled ones, or the
+// model server's own (hear.rs) with a bundled one behind it for the sentences
+// the server does not answer for in time.
 // And the two may be one breath, "OK Coucou, next track": Windows' recogniser
 // says when in the sentence the wake phrase ended, and what the microphone
 // gave after that moment is written down.
@@ -46,10 +56,10 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, State};
 
 use crate::island::WINDOW_LABEL;
-use crate::settings::VoicePref;
+use crate::settings::{Settings, VoicePref};
 
 mod apps;
 pub mod brain;
@@ -57,6 +67,7 @@ pub mod brain;
 mod capture;
 pub mod engine;
 mod grammar;
+mod hear;
 #[cfg(windows)]
 mod sapi;
 mod sherpa;
@@ -136,6 +147,10 @@ struct Plan {
     free: bool,
     /// Which hearing model it does so with (engine.rs): a new one is a new listener.
     hearing: usize,
+    /// The model server is asked to write the command down (hear.rs), and
+    /// whether it may be: it is on this computer and has a model.
+    server: bool,
+    server_here: bool,
     follow_up: u32,
 }
 
@@ -162,15 +177,19 @@ fn shared() -> MutexGuard<'static, Shared> {
 
 /// Starts, stops or restarts the listener to match the settings. Called at
 /// launch and on every save.
-pub fn sync(app: &AppHandle, pref: &VoicePref) {
+pub fn sync(app: &AppHandle, settings: &Settings) {
+    let pref = &settings.voice;
     if !(pref.enabled && pref.speak) {
         speak::unload();
     }
     let hearing = engine::choose(&pref.hearing_model);
+    let server = pref.hearing_model == hear::ID;
     let want = pref.enabled.then(|| Plan {
         wake: pref.wake,
         free: pref.engine == "bundled",
         hearing,
+        server,
+        server_here: server && hear::ear(settings).is_ok(),
         follow_up: pref.follow_up.min(MAX_FOLLOW_UP),
     });
     let mut s = shared();
@@ -306,8 +325,17 @@ pub struct EngineStatus {
 }
 
 #[tauri::command]
-pub fn voice_engine_status(part: engine::Part) -> EngineStatus {
+pub fn voice_engine_status(shared: State<crate::Shared>, part: engine::Part) -> EngineStatus {
+    // With the model server as the speech model, nothing has to be downloaded to hear.
+    if part == engine::Part::Hearing && cfg!(windows) && server_hears(&shared.settings.lock().unwrap()) {
+        return EngineStatus { installed: true, download_bytes: 0, available: true };
+    }
     EngineStatus { installed: engine::installed(part), download_bytes: engine::download_bytes(part), available: cfg!(windows) }
+}
+
+/// The settings name the model server as the speech model, and it may hear.
+fn server_hears(settings: &Settings) -> bool {
+    settings.voice.hearing_model == hear::ID && hear::ear(settings).is_ok()
 }
 
 /// A hearing model the user may choose, for Settings → Voice.
@@ -315,17 +343,32 @@ pub fn voice_engine_status(part: engine::Part) -> EngineStatus {
 #[serde(rename_all = "camelCase")]
 pub struct HearingChoice {
     id: &'static str,
-    name: &'static str,
+    name: String,
     download_bytes: u64,
     installed: bool,
+    /// Not a download: the model of the server chosen for voice, by its name.
+    server: bool,
 }
 
+/// The bundled models, and after them the model server chosen for voice when
+/// it may hear: one on this computer, with a model (hear.rs). For any other
+/// server the choice is not there to make.
 #[tauri::command]
-pub fn voice_hearing_models() -> Vec<HearingChoice> {
-    engine::HEARING_MODELS
+pub fn voice_hearing_models(shared: State<crate::Shared>) -> Vec<HearingChoice> {
+    let mut choices: Vec<HearingChoice> = engine::HEARING_MODELS
         .iter()
-        .map(|model| HearingChoice { id: model.id, name: model.name, download_bytes: model.download_bytes(), installed: model.installed() })
-        .collect()
+        .map(|model| HearingChoice {
+            id: model.id,
+            name: model.name.to_string(),
+            download_bytes: model.download_bytes(),
+            installed: model.installed(),
+            server: false,
+        })
+        .collect();
+    if let Ok(ear) = hear::ear(&shared.settings.lock().unwrap()) {
+        choices.push(HearingChoice { id: hear::ID, name: ear.model().to_string(), download_bytes: 0, installed: true, server: true });
+    }
+    choices
 }
 
 /// Settings → Voice → Download: fetches that part of the engine. The listener
@@ -411,7 +454,11 @@ fn tell(app: &AppHandle, heard: Heard) {
 /// what writes it down.
 #[cfg(windows)]
 struct Free {
-    engine: sherpa::Engine,
+    /// The bundled model; None when only the model server hears.
+    engine: Option<sherpa::Engine>,
+    /// Set when the model server is asked first (hear.rs): where the settings
+    /// are, which say at every sentence whether it still may be.
+    server: Option<AppHandle>,
     capture: Option<capture::Capture>,
     sentences: vad::Sentences,
     buffer: Vec<f32>,
@@ -432,10 +479,16 @@ const SAME_BREATH: Duration = Duration::from_millis(1500);
 
 #[cfg(windows)]
 impl Free {
-    /// None when the engine is not installed or will not load: the grammar
-    /// recogniser then hears commands as before.
-    fn load() -> Option<Self> {
-        if !engine::installed(engine::Part::Hearing) {
+    /// None when the engine is not installed or will not load, and the model
+    /// server is not there to hear instead: the grammar recogniser then hears
+    /// commands as before.
+    fn load(app: &AppHandle, plan: Plan) -> Option<Self> {
+        if plan.server && !plan.server_here {
+            crate::log::line("voice: the model server may not hear (not on this computer, or no model): the bundled model does");
+        }
+        let server = plan.server_here.then(|| app.clone());
+        let bundled = engine::installed(engine::Part::Hearing);
+        if !bundled && server.is_none() {
             crate::log::line("voice: the bundled engine is chosen but not installed");
             return None;
         }
@@ -447,21 +500,38 @@ impl Free {
                 vad::Sentences::default()
             }
         };
-        match sherpa::Engine::load(&engine::runtime_dir(), &engine::model_dir(engine::Part::Hearing), engine::hearing().family) {
-            Ok(engine) => Some(Self {
-                engine,
-                capture: None,
-                sentences,
-                buffer: Vec::new(),
-                recent: None,
-                after_wake: None,
-                peak: 0.0,
-            }),
-            Err(why) => {
-                crate::log::line(format!("voice: bundled engine: {why}"));
-                None
-            }
+        let engine = bundled
+            .then(|| sherpa::Engine::load(&engine::runtime_dir(), &engine::model_dir(engine::Part::Hearing), engine::hearing().family))
+            .and_then(|loaded| loaded.map_err(|why| crate::log::line(format!("voice: bundled engine: {why}"))).ok());
+        if engine.is_none() && server.is_none() {
+            return None;
         }
+        let free = Self { engine, server, capture: None, sentences, buffer: Vec::new(), recent: None, after_wake: None, peak: 0.0 };
+        free.warm();
+        Some(free)
+    }
+
+    /// The settings as they are now, when the model server is asked to hear.
+    fn asked(&self) -> Option<Settings> {
+        use tauri::Manager;
+        Some(self.server.as_ref()?.try_state::<crate::Shared>()?.settings.lock().ok()?.clone())
+    }
+
+    /// A command is coming: the model server gets its model ready (hear.rs).
+    fn warm(&self) {
+        if let Some(Ok(ear)) = self.asked().map(|settings| hear::ear(&settings)) {
+            hear::warm(ear);
+        }
+    }
+
+    /// The sentence as the model server wrote it down, when it is asked and
+    /// answers in time (hear.rs). The settings are read again each time: a
+    /// server that is no longer on this computer is not sent anything.
+    fn by_server(&self, samples: &[f32]) -> Option<String> {
+        let settings = self.asked()?;
+        let heard = hear::ear(&settings).map_err(str::to_string).and_then(|ear| hear::write_down(&ear, samples));
+        // Why not, never the words.
+        heard.map_err(|why| crate::log::line(format!("voice: the model server did not hear: {}", why.chars().take(160).collect::<String>()))).ok()
     }
 
     /// Opens or closes the microphone.
@@ -484,7 +554,14 @@ impl Free {
     }
 
     fn written(&self, samples: &[f32]) -> Raw {
-        let text = session::without_wake(&self.engine.transcribe(vad::SAMPLE_RATE, vad::fitting(samples)));
+        let samples = vad::fitting(samples);
+        // The model server first when it is the speech model; the bundled
+        // model for what it did not hear, and nothing when there is neither.
+        let heard = self
+            .by_server(samples)
+            .or_else(|| self.engine.as_ref().map(|engine| engine.transcribe(vad::SAMPLE_RATE, samples)))
+            .unwrap_or_default();
+        let text = session::without_wake(&heard);
         if text.chars().any(char::is_alphanumeric) {
             Raw::Phrase { rule: Rule::Command, text, confidence: 1.0 }
         } else {
@@ -561,7 +638,7 @@ struct Free;
 
 #[cfg(not(windows))]
 impl Free {
-    fn load() -> Option<Self> {
+    fn load(_app: &AppHandle, _plan: Plan) -> Option<Self> {
         None
     }
 
@@ -570,6 +647,8 @@ impl Free {
     }
 
     fn start_over(&mut self) {}
+
+    fn warm(&self) {}
 
     fn same_breath(&mut self, _wake: Duration) -> Option<Raw> {
         None
@@ -590,7 +669,7 @@ impl Free {
 
 fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &Receiver<Control>) {
     let wake = plan.wake;
-    let mut free = if plan.free { Free::load() } else { None };
+    let mut free = if plan.free { Free::load(app, plan) } else { None };
     // One breath only where the rest of the sentence can be written down.
     let mut recogniser = match Recogniser::open(grammar, free.is_some()) {
         Ok(recogniser) => recogniser,
@@ -647,8 +726,11 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
                 // The microphone stays open through the wake phrase too, so the
                 // room is known and a command's first sound is not lost.
                 turned = free.open(want != Listen::Nothing);
-                if want == Listen::Command && !std::mem::take(&mut same_breath) {
-                    free.start_over();
+                if want == Listen::Command {
+                    free.warm();
+                    if !std::mem::take(&mut same_breath) {
+                        free.start_over();
+                    }
                 }
             }
             if let Err(why) = turned {
