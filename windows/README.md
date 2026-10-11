@@ -225,9 +225,17 @@ SHA-256) and uses it for the command:
   model is picked, that model is a fourth choice in **Speech model**, with
   nothing to download: the sentence's sound goes to it, as a WAV file made in
   memory, and it writes the words. It must be a model that takes audio.
-  `gemma4:e4b` through Ollama 0.40.2, on the same 69 commands: 5 % of words
-  wrong, 56 written whole, 0.15 s a sentence on a GPU — and it writes "Figma"
-  and "Codex", which the two smaller models above do not. What to know:
+  It is not the model that hears best. `gemma4:e4b` through Ollama 0.40.2
+  got 5 % of words wrong on the same 69 synthesised commands, in 0.15 s a
+  sentence on a GPU — but on twelve sentences in a real voice (one speaker)
+  it got 34 % wrong, "switch to colgate" for "switch to Codex", where
+  Parakeet 0.6b got 15 %. What it can do that a speech model cannot is be
+  told what to expect: Coucou gives it the pills' and the installed apps'
+  names with each sentence, and on those twelve it then got 15 to 22 % wrong
+  — about Parakeet 0.6b's, with nothing downloaded. Twelve sentences are few:
+  try it on your own voice. What to know:
+  - The names of your pills and installed apps (140 at most) go to that
+    server with the sound. It is on this computer.
   - Only a server on this computer. For any other address the choice is not
     in the list, and if the address changes later nothing is sent: the
     downloaded model hears. The request follows no redirect and uses no proxy.

@@ -459,6 +459,8 @@ struct Free {
     /// Set when the model server is asked first (hear.rs): where the settings
     /// are, which say at every sentence whether it still may be.
     server: Option<AppHandle>,
+    /// The names it is told may be said: the pills and the installed apps.
+    names: Vec<String>,
     capture: Option<capture::Capture>,
     sentences: vad::Sentences,
     buffer: Vec<f32>,
@@ -482,7 +484,7 @@ impl Free {
     /// None when the engine is not installed or will not load, and the model
     /// server is not there to hear instead: the grammar recogniser then hears
     /// commands as before.
-    fn load(app: &AppHandle, plan: Plan) -> Option<Self> {
+    fn load(app: &AppHandle, plan: Plan, grammar: &Grammar) -> Option<Self> {
         if plan.server && !plan.server_here {
             crate::log::line("voice: the model server may not hear (not on this computer, or no model): the bundled model does");
         }
@@ -506,7 +508,8 @@ impl Free {
         if engine.is_none() && server.is_none() {
             return None;
         }
-        let free = Self { engine, server, capture: None, sentences, buffer: Vec::new(), recent: None, after_wake: None, peak: 0.0 };
+        let names = if server.is_some() { hear::names(&grammar.slots) } else { Vec::new() };
+        let free = Self { engine, server, names, capture: None, sentences, buffer: Vec::new(), recent: None, after_wake: None, peak: 0.0 };
         free.warm();
         Some(free)
     }
@@ -529,7 +532,7 @@ impl Free {
     /// server that is no longer on this computer is not sent anything.
     fn by_server(&self, samples: &[f32]) -> Option<String> {
         let settings = self.asked()?;
-        let heard = hear::ear(&settings).map_err(str::to_string).and_then(|ear| hear::write_down(&ear, samples));
+        let heard = hear::ear(&settings).map_err(str::to_string).and_then(|ear| hear::write_down(&ear, samples, &self.names));
         // Why not, never the words.
         heard.map_err(|why| crate::log::line(format!("voice: the model server did not hear: {}", why.chars().take(160).collect::<String>()))).ok()
     }
@@ -638,7 +641,7 @@ struct Free;
 
 #[cfg(not(windows))]
 impl Free {
-    fn load(_app: &AppHandle, _plan: Plan) -> Option<Self> {
+    fn load(_app: &AppHandle, _plan: Plan, _grammar: &Grammar) -> Option<Self> {
         None
     }
 
@@ -669,7 +672,7 @@ impl Free {
 
 fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &Receiver<Control>) {
     let wake = plan.wake;
-    let mut free = if plan.free { Free::load(app, plan) } else { None };
+    let mut free = if plan.free { Free::load(app, plan, grammar) } else { None };
     // One breath only where the rest of the sentence can be written down.
     let mut recogniser = match Recogniser::open(grammar, free.is_some()) {
         Ok(recogniser) => recogniser,

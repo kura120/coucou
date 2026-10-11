@@ -13,6 +13,7 @@
 // Only Windows has a listener to call this yet (mod.rs).
 #![cfg_attr(not(windows), allow(dead_code))]
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -40,7 +41,8 @@ const WARM_UP: Duration = Duration::from_secs(60);
 
 /// The wording that did best of three on 69 synthesised commands with
 /// gemma4:e4b (56 written whole, 5 % of words wrong), and that gets an empty
-/// answer for silence, noise and a tone.
+/// answer for silence, noise and a tone. On a real voice it is not enough:
+/// see `asked`.
 const PROMPT: &str =
     "Write down exactly what is said in this audio. Only the words, nothing else. If nothing is said, reply with nothing.";
 
@@ -102,11 +104,45 @@ fn wav(samples: &[f32]) -> Vec<u8> {
     file
 }
 
-fn request(model: &str, samples: &[f32]) -> Value {
+/// The most names the model is told may be said, and the most they may weigh.
+const MAX_NAMES: usize = 140;
+const MAX_NAMES_LENGTH: usize = 4000;
+
+/// The names a sentence may hold, from what the island said can be heard
+/// (the grammar's slots: pills, installed apps): the pills first, each name
+/// once, and no more than the model is given.
+pub fn names(slots: &BTreeMap<String, Vec<String>>) -> Vec<String> {
+    let pills = slots.get("pill").into_iter().flatten();
+    let others = slots.iter().filter(|(slot, _)| slot.as_str() != "pill").flat_map(|(_, values)| values);
+    let mut seen = BTreeSet::new();
+    let mut length = 0;
+    pills
+        .chain(others)
+        .filter(|name| seen.insert(name.as_str()))
+        .take(MAX_NAMES)
+        .take_while(|name| {
+            length += name.len() + 2;
+            length <= MAX_NAMES_LENGTH
+        })
+        .cloned()
+        .collect()
+}
+
+/// What the model is asked. A speech model cannot be told what to expect; a
+/// language model can, and it is what makes this one worth choosing: on
+/// twelve sentences in the user's own voice gemma4:e4b got 34 % of the words
+/// wrong without the names ("switch to colgate") and 15 to 22 % with them,
+/// where the largest bundled model gets 15 %. Silence and noise still get an
+/// empty answer.
+fn asked(names: &[String]) -> String {
+    if names.is_empty() { PROMPT.to_string() } else { format!("{PROMPT} Names that may be said: {}.", names.join(", ")) }
+}
+
+fn request(model: &str, samples: &[f32], names: &[String]) -> Value {
     json!({
         "model": model,
         "messages": [{ "role": "user", "content": [
-            { "type": "text", "text": PROMPT },
+            { "type": "text", "text": asked(names) },
             { "type": "input_audio", "input_audio": { "data": crate::claude::base64_for(&wav(samples)), "format": "wav" } },
         ] }],
         "temperature": 0,
@@ -122,12 +158,13 @@ fn words(answer: &Value) -> String {
 }
 
 /// What was said in `samples` (16 kHz mono, a sentence as `vad::fitting`
-/// leaves it), written down by the server's model. Holds the calling thread
+/// leaves it), written down by the server's model, which is told the `names`
+/// that may be in it. Holds the calling thread
 /// until the answer or `TIMEOUT`. An answer without words is an error too:
 /// the caller then has the bundled model, or a command that was missed.
-pub fn write_down(ear: &Ear, samples: &[f32]) -> Result<String, String> {
+pub fn write_down(ear: &Ear, samples: &[f32], names: &[String]) -> Result<String, String> {
     let client = client(TIMEOUT)?;
-    let body = request(&ear.model, samples);
+    let body = request(&ear.model, samples, names);
     let answer = tauri::async_runtime::block_on(async {
         // The client's own time limit, and this one over everything.
         tokio::time::timeout(TIMEOUT, local_chat::complete_at(client, &ear.base, &ear.server, &body)).await
@@ -259,7 +296,7 @@ mod tests {
 
     #[test]
     fn the_request_carries_the_sound_and_asks_for_no_thinking() {
-        let body = request("gemma4:e4b", &[0.0; 160]);
+        let body = request("gemma4:e4b", &[0.0; 160], &[]);
         assert_eq!(body["model"], "gemma4:e4b");
         assert_eq!(body["reasoning_effort"], "none");
         assert_eq!(body["temperature"], 0);
@@ -270,6 +307,26 @@ mod tests {
         assert_eq!(parts[1]["input_audio"]["format"], "wav");
         // "RIFF" in base64.
         assert!(parts[1]["input_audio"]["data"].as_str().unwrap().starts_with("UklGR"));
+        assert_eq!(parts[0]["text"], PROMPT);
+        let told = request("gemma4:e4b", &[0.0; 160], &["github".to_string(), "discord".to_string()]);
+        assert!(told["messages"][0]["content"][0]["text"].as_str().unwrap().ends_with("Names that may be said: github, discord."));
+    }
+
+    #[test]
+    fn the_names_told_are_the_pills_then_the_rest_once_each_and_not_without_end() {
+        let list = |values: &[&str]| values.iter().map(|v| v.to_string()).collect::<Vec<_>>();
+        let mut slots = BTreeMap::new();
+        slots.insert("app".to_string(), list(&["discord", "figma", "spotify"]));
+        slots.insert("pill".to_string(), list(&["github", "figma"]));
+        assert_eq!(names(&slots), ["github", "figma", "discord", "spotify"]);
+        assert!(names(&BTreeMap::new()).is_empty());
+        slots.insert("app".to_string(), (0..500).map(|i| format!("an app with a long name {i}")).collect());
+        let told = names(&slots);
+        assert_eq!(told[0], "github");
+        assert_eq!(told.len(), MAX_NAMES);
+        assert!(asked(&told).len() < PROMPT.len() + MAX_NAMES_LENGTH + 40);
+        slots.insert("app".to_string(), vec!["x".repeat(300); 1].into_iter().chain((0..100).map(|i| format!("{i}{}", "y".repeat(300)))).collect());
+        assert!(names(&slots).iter().map(String::len).sum::<usize>() <= MAX_NAMES_LENGTH);
     }
 
     #[test]
@@ -281,23 +338,37 @@ mod tests {
         assert_eq!(words(&json!({})), "");
     }
 
-    /// The real thing: a recorded sentence, written down by a model server on
-    /// this computer. `COUCOU_VOICE_WAV` is the sentence (16-bit mono); `COUCOU_VOICE_SERVER` the server's address (Ollama's usual one
-    /// when not set) and `COUCOU_VOICE_SERVER_MODEL` its model (gemma4:e4b).
-    /// `COUCOU_VOICE_EXPECT` may hold words the text must have.
+    /// The real thing: recorded sentences, written down by a model server on
+    /// this computer. `COUCOU_VOICE_WAV` is one sentence (16-bit mono), or a
+    /// folder of them with a `sentences.txt` (a line for each: the file, a
+    /// tab, what is said in it — doc\record-voice.ps1 makes one).
+    /// `COUCOU_VOICE_SERVER` is the server's address (Ollama's usual one when
+    /// not set) and `COUCOU_VOICE_SERVER_MODEL` its model (gemma4:e4b).
+    /// `COUCOU_VOICE_NAMES`, separated by commas, are the names it is told may
+    /// be said. For one sentence, `COUCOU_VOICE_EXPECT` may hold words the
+    /// text must have.
     /// `cargo test -p coucou voice::hear -- --ignored --nocapture`
     #[test]
-    #[ignore = "needs a model server that takes audio, and a recorded sentence"]
-    fn a_recorded_sentence_is_written_down_by_the_model_server() {
-        let path = std::env::var("COUCOU_VOICE_WAV").expect("COUCOU_VOICE_WAV is not set");
-        let bytes = std::fs::read(&path).expect("wav");
-        let rate = f64::from(u32::from_le_bytes(bytes[24..28].try_into().unwrap()));
-        let data = bytes.windows(4).position(|w| w == b"data").expect("data chunk") + 8;
-        let recorded: Vec<f32> = bytes[data..].chunks_exact(2).map(|b| f32::from(i16::from_le_bytes([b[0], b[1]])) / 32768.0).collect();
-        // To the microphone's rate, the plain way: this is a test, not the capture.
-        let step = rate / f64::from(vad::SAMPLE_RATE);
-        let samples: Vec<f32> = (0..(recorded.len() as f64 / step) as usize).map(|i| recorded[(i as f64 * step) as usize]).collect();
-        let samples = vad::fitting(&samples);
+    #[ignore = "needs a model server that takes audio, and recorded sentences"]
+    fn recorded_sentences_are_written_down_by_the_model_server() {
+        let path = std::path::PathBuf::from(std::env::var("COUCOU_VOICE_WAV").expect("COUCOU_VOICE_WAV is not set"));
+        // The file, and what is said in it when that is known.
+        let clips: Vec<(std::path::PathBuf, Option<String>)> = if path.is_dir() {
+            let list = std::fs::read_to_string(path.join("sentences.txt")).expect("sentences.txt");
+            list.trim_start_matches('\u{feff}')
+                .lines()
+                .filter_map(|line| line.split_once('\t'))
+                .map(|(file, said)| (path.join(file.trim()), Some(said.trim().to_string())))
+                .collect()
+        } else {
+            vec![(path, None)]
+        };
+        let names: Vec<String> = std::env::var("COUCOU_VOICE_NAMES")
+            .unwrap_or_default()
+            .split(',')
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty())
+            .collect();
 
         let mut settings = Settings::default();
         settings.voice.brain = "ollama".into();
@@ -305,23 +376,52 @@ mod tests {
         settings.voice.brain_model = std::env::var("COUCOU_VOICE_SERVER_MODEL").unwrap_or_else(|_| "gemma4:e4b".into());
         let heard_by = ear(&settings).expect("a server on this computer");
 
-        let seconds = samples.len() as f64 / f64::from(vad::SAMPLE_RATE);
         // As the listener does when Coucou is woken, but waited for here.
         let started = std::time::Instant::now();
         tauri::async_runtime::block_on(one_word(&heard_by)).expect("the model server answers");
-        println!("{} · in memory after {:.2} s", heard_by.model(), started.elapsed().as_secs_f64());
-        let mut last = String::new();
-        for turn in 1..=4 {
+        println!("{} · in memory after {:.2} s · {} names told", heard_by.model(), started.elapsed().as_secs_f64(), names.len());
+
+        let plain = |text: &str| -> Vec<String> {
+            let kept: String = text.to_lowercase().chars().filter(|c| c.is_alphanumeric() || c.is_whitespace()).collect();
+            kept.split_whitespace().map(str::to_string).collect()
+        };
+        let (mut whole, mut known, mut last) = (0, 0, String::new());
+        for (file, said) in &clips {
+            let bytes = std::fs::read(file).expect("wav");
+            let rate = f64::from(u32::from_le_bytes(bytes[24..28].try_into().unwrap()));
+            let data = bytes.windows(4).position(|w| w == b"data").expect("data chunk") + 8;
+            let recorded: Vec<f32> = bytes[data..].chunks_exact(2).map(|b| f32::from(i16::from_le_bytes([b[0], b[1]])) / 32768.0).collect();
+            // To the microphone's rate, the plain way: this is a test, not the capture.
+            let step = rate / f64::from(vad::SAMPLE_RATE);
+            let samples: Vec<f32> = (0..(recorded.len() as f64 / step) as usize).map(|i| recorded[(i as f64 * step) as usize]).collect();
+            let samples = vad::fitting(&samples);
+            let seconds = samples.len() as f64 / f64::from(vad::SAMPLE_RATE);
+
             let started = std::time::Instant::now();
-            let written = write_down(&heard_by, samples);
-            println!("{} · {seconds:.1} s of sound · try {turn}: {:.2} s · {written:?}", heard_by.model(), started.elapsed().as_secs_f64());
+            let written = write_down(&heard_by, samples, &names);
+            let took = started.elapsed().as_secs_f64();
+            let name = file.file_name().unwrap_or_default().to_string_lossy();
+            match said {
+                Some(said) => {
+                    known += 1;
+                    let right = written.as_ref().is_ok_and(|text| plain(text) == plain(said));
+                    whole += usize::from(right);
+                    println!("{name} · {seconds:.1} s of sound · {took:.2} s · {} {said:?} -> {written:?}", if right { "ok  " } else { "MISS" });
+                }
+                None => println!("{name} · {seconds:.1} s of sound · {took:.2} s · {written:?}"),
+            }
             if let Ok(text) = written {
                 last = text;
             }
         }
+        if known > 0 {
+            println!("{whole} of {known} written whole");
+        }
         assert!(!last.is_empty(), "nothing was written down");
-        for word in std::env::var("COUCOU_VOICE_EXPECT").unwrap_or_default().to_lowercase().split_whitespace() {
-            assert!(last.to_lowercase().contains(word), "{word:?} not in {last:?}");
+        if clips.len() == 1 {
+            for word in std::env::var("COUCOU_VOICE_EXPECT").unwrap_or_default().to_lowercase().split_whitespace() {
+                assert!(last.to_lowercase().contains(word), "{word:?} not in {last:?}");
+            }
         }
     }
 }
