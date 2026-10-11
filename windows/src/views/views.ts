@@ -805,7 +805,8 @@ function buildListening(actions: ViewActions): ViewHost {
 /** What a voice command did (VoiceResultView): green and a tick, or red and a cross. */
 function buildVoiceResult(): ViewHost {
   const side = (wash: Wash, icon: string, opts: { stroke?: number }, color: string) => {
-    const title = h("div", { class: "title one-line" });
+    // Shown whole, on as many lines as it takes: the island grows for it (resultRoom).
+    const title = h("div", { class: "title voice-line" });
     const mark = svg(icon, 14, opts);
     mark.style.color = color;
     mark.style.flex = "none";

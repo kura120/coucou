@@ -359,7 +359,13 @@ const CASES = [
   [["open coucou settings"], ["view:settings"]],
   [["stop talking"], "nothing"], // already off in the defaults: said, nothing written
   [["set the sound effects to thirty percent"], ["set:soundVolume=0.06"]],
-  [["stop listening"], ["voice-off"]],
+  [["turn voice off"], ["voice-off"]],
+  // From the first run with a microphone: being done, a false start, an app that is not installed.
+  [["stop listening"], "nothing"],
+  [["ok done"], "nothing"],
+  [["alright that is everything thanks"], "nothing"],
+  [["spo open spy flight"], "ask:Spotify"],
+  [["can you open blender"], "nothing"],
   [["set the language to french"], ["confirm:language: System → Français"]], // guarded: a click, which the script refuses
   [["could you put the sound effects at about thirty percent for me"], ["set:soundVolume=0.06"]],
   [["i would rather you did not answer out loud any more"], "nothing"], // already off in the defaults

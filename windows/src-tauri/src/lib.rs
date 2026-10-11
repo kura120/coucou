@@ -967,6 +967,7 @@ pub fn run() {
             voice::voice_status,
             voice::voice_cancel,
             voice::voice_followed,
+            voice::voice_rest,
             open_mail_draft,
             voice::ask_keys::voice_ask_keys,
             voice::voice_grammar,
@@ -1023,6 +1024,14 @@ pub fn run() {
             integrations::start(handle.clone());
             spotify::sync(&handle, &loaded.active_integrations);
             voice::sync(&handle, &loaded);
+            // A debug build started with COUCOU_DEVTOOLS=1 opens the island's developer console: its own
+            // right-click menu stands in for the browser's, so there is no other way in. Never in a release.
+            #[cfg(debug_assertions)]
+            if std::env::var_os("COUCOU_DEVTOOLS").is_some() {
+                if let Some(window) = island::window(&handle) {
+                    window.open_devtools();
+                }
+            }
             shortcuts::apply(&handle, &loaded.shortcuts);
             // Test toasts at launch, to see how every kind looks. Remove when done.
             if let Some(which) = toast::sample_from_args(&std::env::args().collect::<Vec<_>>()) {

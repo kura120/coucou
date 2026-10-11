@@ -22,7 +22,7 @@ import { certain, provideNames, resolveName, type NameSources } from "./resolve"
 import { forModel, fromVoiceResult, spoken, type Answer, type Ask } from "./result";
 import type { Asked, VoiceResult, VoiceRunner } from "./runner";
 import {
-  AFTER_TOOLS, ASK_USER, describeState, misheardApps, notAnApp, notFound, opened, openedName, runProposal, systemPrompt, toolSchemas, understood,
+  AFTER_TOOLS, ASK_USER, callsWritten, looksLikeCall, toolNames, describeState, misheardApps, notAnApp, notFound, opened, openedName, runProposal, systemPrompt, toolSchemas, understood,
   type BrainCall, type VoiceWorld,
 } from "./tools";
 import { heardPreview } from "./tools-preview";
@@ -213,6 +213,11 @@ export class VoiceConversation {
     provideNames(this.names);
     const spokenTo = how.spokenTo ?? true;
     const pills = this.pills();
+
+    // "Spo— open spy flight": a false start before "open" is not part of the sentence —
+    // unless the sentence means something as it stands ("add open code", a pill).
+    const opening = fromOpening(said);
+    if (opening !== said && parseIntent(said, pills).kind === "unknown" && !parseSeveral(said, pills)) said = opening;
 
     // The answer to a question Mochi asked.
     const asked = this.runner.takeAsked();
@@ -517,6 +522,12 @@ export class VoiceConversation {
       const next = await within(brain(`${system}\n${AFTER_TOOLS}`, said, [...tools, ASK_USER], history, steps), WORDING_MS);
       if (how.wanted && !how.wanted()) return null;
       if (!next) break;
+      // Calls written out as text are calls; what is left of them is never Mochi's words.
+      if (!next.calls.length) {
+        const written = callsWritten(next.text, toolNames([...tools, ASK_USER]));
+        if (written.length) next.calls = written;
+        else if (looksLikeCall(next.text)) next.text = "";
+      }
       // A model that calls again what it just called has nothing more to do:
       // nothing is done twice for one sentence.
       const fresh = next.calls.filter((call) => !steps.some((s) => s.calls.some((made) => sameCall(made, call))));
@@ -535,7 +546,10 @@ export class VoiceConversation {
     // Mochi's words are the model's when its tools ran and it said something —
     // but only for what worked. A model told a call was refused has still said
     // "Spotify is now playing": what did not happen is said in the tool's own words.
-    const result = steps.length && last_.outcome === "success" ? { ...last_, message: spoken(words, last_.message) } : last_;
+    // What failed for a reason ("Stripe is not one of your pills") may be said in its words too:
+    // the card is red either way. What was refused keeps the tool's line.
+    const worded = last_.outcome === "success" || understood(last_, said);
+    const result = steps.length && worded ? { ...last_, message: spoken(words, last_.message) } : last_;
     return this.remembered(said, calls, result, action);
   }
 
@@ -546,6 +560,21 @@ export class VoiceConversation {
 }
 
 const sameCall = (a: BrainCall, b: BrainCall) => a.name === b.name && JSON.stringify(a.arguments ?? {}) === JSON.stringify(b.arguments ?? {});
+
+/**
+ * A sentence from its "open" on, when a word or two came before it that are
+ * not a way of asking ("spo open spy flight", "uh launch figma"). Anything
+ * else is left as it was said.
+ */
+export function fromOpening(said: string): string {
+  const words = said.trim().split(/\s+/);
+  const at = words.findIndex((w) => /^(open|launch)[.,!?]?$/i.test(w));
+  if (at < 1 || at > 2 || at === words.length - 1) return said;
+  const before = words.slice(0, at).map((w) => w.toLowerCase().replace(/[^a-z']/g, ""));
+  // "Can you open…", "please open…", "don't open…" are sentences as they stand.
+  const asking = new Set(["can", "could", "would", "will", "you", "please", "to", "and", "then", "not", "don't", "dont", "never", "i", "we", "just", "go", "now", "hey", "ok", "okay", "coucou", "mochi", "it", "that", "how", "do", "does", "did", "should", "why", "when", "who", "what", "if"]);
+  return before.every((w) => !asking.has(w)) ? words.slice(at).join(" ") : said;
+}
 
 /** What a promise comes to, or null when it has not by then. */
 function within<T>(promise: Promise<T>, ms: number): Promise<T | null> {

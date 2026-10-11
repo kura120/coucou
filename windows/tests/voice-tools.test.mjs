@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { availablePills } from "../src/core/pills.ts";
 import { VoiceRunner } from "../src/voice/runner.ts";
 import {
-  asksToApprove, describeState, intentOf, minutesSaid, names, openNamed, runProposal, systemPrompt, toolSchemas, webAddress,
+  asksToApprove, callsWritten, describeState, looksLikeCall, intentOf, minutesSaid, names, openNamed, runProposal, systemPrompt, toolSchemas, webAddress,
 } from "../src/voice/tools.ts";
 
 const PILLS = availablePills("windows");
@@ -282,11 +282,39 @@ test("an agent's session is opened when the sentence names it and it has one", a
 
 // ── Answers, several things, nothing ──────────────────────────────────────────
 
-test("an answer in words is shown, cut to a sentence", async () => {
+test("an answer in words is shown whole, a page is not", async () => {
   const s = setup();
   assert.deepEqual(await s.propose("is the ci green", [], "  Yes, main is\npassing. "), { outcome: "success", message: "Yes, main is passing." });
-  const long = await s.propose("tell me everything", [], "word ".repeat(100));
-  assert.ok(long.message.length <= 160 && long.message.endsWith("…"));
+  const few = "Claude is running the tests in coucou, Codex is waiting for you to answer its request, and nothing else is going on right now. ".repeat(2).trim();
+  assert.equal((await s.propose("tell me everything", [], few)).message, few);
+  const page = await s.propose("tell me everything", [], "word ".repeat(400));
+  assert.ok(page.message.length <= 600 && page.message.endsWith("…"));
+});
+
+test("tool calls a model wrote out as text are calls, and are never shown as its answer", async () => {
+  const known = new Set(["remove_pills", "add_pills", "open_app", "music", "nothing"]);
+  // What was on screen with a tick, nothing having been done.
+  assert.deepEqual(callsWritten('remove_pills {"pills": ["Stripe", "Notion"]}', known), [call("remove_pills", { pills: ["Stripe", "Notion"] })]);
+  assert.deepEqual(callsWritten('add_pills {"pills": ["Notion"]}', known), [call("add_pills", { pills: ["Notion"] })]);
+  assert.deepEqual(callsWritten('{"name": "open_app", "arguments": {"name": "Blender"}}', known), [call("open_app", { name: "Blender" })]);
+  assert.deepEqual(callsWritten('```json\n{"name": "open_app", "arguments": "{\\"name\\": \\"Blender\\"}"}\n```', known), [call("open_app", { name: "Blender" })]);
+  assert.deepEqual(callsWritten('<tool_call>{"name": "music", "arguments": {"action": "pause"}}</tool_call>', known), [call("music", { action: "pause" })]);
+  assert.deepEqual(callsWritten('music({"action": "next"})', known), [call("music", { action: "next" })]);
+  assert.deepEqual(callsWritten('add_pills {"pills": ["Notion"]}\nremove_pills {"pills": ["Stripe"]}', known).map((c) => c.name), ["add_pills", "remove_pills"]);
+  assert.deepEqual(callsWritten("nothing", known), [call("nothing")]);
+  // A tool that does not exist is not a call; a sentence that mentions one is a sentence.
+  assert.deepEqual(callsWritten('approve_permission {"all": true}', known), []);
+  assert.deepEqual(callsWritten("I would use add_pills for that, but which pill?", known), []);
+  assert.deepEqual(callsWritten("Two plus two is four.", known), []);
+  assert.ok(looksLikeCall('approve_permission {"all": true}') && looksLikeCall('{"x": 1}') && !looksLikeCall("Two plus two is four."));
+
+  // Through the checks, like any call: done when the sentence names it, refused when not.
+  const s = setup();
+  assert.deepEqual(await s.propose("get rid of stripe", [], 'remove_pills {"pills": ["Stripe"]}'), { outcome: "success", message: "Stripe removed" });
+  const other = setup();
+  assert.equal((await other.propose("what about notion", [], 'remove_pills {"pills": ["Stripe", "Notion"]}')).outcome, "failure");
+  // Plumbing that is no call is never an answer.
+  assert.deepEqual(await setup().propose("blah", [], '{"result": "Blender was opened"}'), { outcome: "failure", message: "Not recognised: « blah »" });
 });
 
 test("no call and no answer is not recognised; changing one's mind shows nothing", async () => {

@@ -34,11 +34,12 @@ import { interruptedAfter, isPlace } from "./restore";
 import {
   RESULT_SHOWN_MS, VOICE_PATIENCE_MS, brainChosen, createConversation, createWorld, followUpKind, sayResult, stopSpeaking,
   voicePills, voiceRunner, wakeBlocked,
+  SPEECH_WAITED_MS, saysDone, willSpeak,
 } from "./voice";
 import type { VoiceResult } from "../voice/runner";
 import { keyAnswer, keysFor, readSaid } from "../voice/asking";
 import type { Answer, Ask } from "../voice/result";
-import { askRoom } from "../views/ask";
+import { askRoom, resultRoom } from "../views/ask";
 import type { AppView } from "../voice/tools-app";
 import { installContextMenu, type ContextMenu, type Rect } from "../views/menu";
 
@@ -876,8 +877,10 @@ export class Island {
       return;
     }
     State.voice = { ...State.voice, thinking: false };
-    if (result) this.voiceResult(result);
-    else this.fsm.voiceFinished();
+    if (result) return this.voiceResult(result);
+    // "Ok done", "never mind", "thanks": the view closes, and nothing more is listened for.
+    if (saysDone(said, voicePills())) void Bridge.voiceRest();
+    this.fsm.voiceFinished();
   }
 
   /** The waiting permission card, up and unanswered (voice: "what is the request?"). */
@@ -913,7 +916,16 @@ export class Island {
     if (!State.voiceFollowing) this.engine.exitListening();
     this.engine.triggerEmote(result.outcome === "success" ? "happy" : "surprised");
     this.setView("voiceResult");
-    this.voiceEndsIn(RESULT_SHOWN_MS);
+    // Read at about fifteen characters a second, and never under two seconds. When Mochi says it out
+    // loud the card stays until he has finished (`voiceSpoken`): what is on screen is what is being said.
+    const reading = Math.max(RESULT_SHOWN_MS, Math.min(12_000, result.message.length * 65));
+    this.voiceEndsIn(willSpeak(result) ? Math.max(reading, SPEECH_WAITED_MS) : reading);
+  }
+
+  /** Mochi started saying the answer (`ms` long), or finished: the card stays for it, then a moment more. */
+  voiceSpoken(ms: number | null) {
+    if (this.fsm.state !== "listening" || State.view !== "voiceResult") return;
+    this.voiceEndsIn(ms == null ? 600 : ms + 600);
   }
 
   private voiceEndsIn(ms: number) {
@@ -1121,6 +1133,8 @@ export class Island {
     }
     // A question Mochi asks brings its choices, its buttons or its field.
     if (State.mode === "expanded" && State.view === "listening") h += askRoom(State.voice.ask ?? null);
+    // An answer is shown whole: the result card grows by its lines.
+    if (State.mode === "expanded" && State.view === "voiceResult") h += resultRoom(State.voiceResult?.message);
     const r = State.mode === "expanded" ? EXPANDED_CORNER : ROUNDED_CORNER;
     return { w, h, r };
   }

@@ -5591,6 +5591,50 @@
    "pt-BR": "Remover o anexo",
    "ru": "Убрать вложение",
    "id": "Hapus lampiran"
+  },
+  "{0} is already there": {
+   "zh-Hans": "{0} 已经在了",
+   "hi": "{0} पहले से मौजूद है",
+   "es": "{0} ya está ahí",
+   "ar": "{0} موجود بالفعل",
+   "fr": "{0} est déjà là",
+   "bn": "{0} আগে থেকেই আছে",
+   "pt-BR": "{0} já está aí",
+   "ru": "{0} уже на месте",
+   "id": "{0} sudah ada"
+  },
+  "{0} is not one of your pills": {
+   "zh-Hans": "{0} 不在你的药丸中",
+   "hi": "{0} आपके पिल्स में नहीं है",
+   "es": "{0} no está entre tus píldoras",
+   "ar": "{0} ليس من بين حبوبك",
+   "fr": "{0} ne fait pas partie de vos pastilles",
+   "bn": "{0} আপনার পিলগুলোর মধ্যে নেই",
+   "pt-BR": "{0} não está entre suas pílulas",
+   "ru": "{0} нет среди ваших пилюль",
+   "id": "{0} tidak ada di antara pil Anda"
+  },
+  "Nothing to add: they are already there, or there is no room": {
+   "zh-Hans": "没有可添加的：它们已经在了，或者没有位置",
+   "hi": "जोड़ने को कुछ नहीं: वे पहले से हैं, या जगह नहीं है",
+   "es": "Nada que añadir: ya están ahí, o no hay sitio",
+   "ar": "لا شيء للإضافة: هي موجودة بالفعل، أو لا يوجد مكان",
+   "fr": "Rien à ajouter : elles sont déjà là, ou il n’y a plus de place",
+   "bn": "যোগ করার কিছু নেই: সেগুলো আগে থেকেই আছে, অথবা জায়গা নেই",
+   "pt-BR": "Nada a adicionar: já estão aí, ou não há espaço",
+   "ru": "Добавлять нечего: они уже на месте или нет места",
+   "id": "Tidak ada yang ditambahkan: sudah ada, atau tidak ada tempat"
+  },
+  "None of those are in your pills": {
+   "zh-Hans": "这些都不在你的药丸中",
+   "hi": "इनमें से कोई आपके पिल्स में नहीं है",
+   "es": "Ninguna de esas está entre tus píldoras",
+   "ar": "لا شيء من هذه ضمن حبوبك",
+   "fr": "Aucune de celles-ci ne fait partie de vos pastilles",
+   "bn": "এগুলোর কোনোটিই আপনার পিলে নেই",
+   "pt-BR": "Nenhuma dessas está entre suas pílulas",
+   "ru": "Ничего из этого нет среди ваших пилюль",
+   "id": "Tidak satu pun ada di antara pil Anda"
   }
  }
 }

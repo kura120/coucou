@@ -166,7 +166,7 @@ export class VoiceRunner {
       }
 
       case "pillAdd": {
-        if (intent.id === pills.main() || pills.active().includes(intent.id)) return ok(t("Already active"));
+        if (intent.id === pills.main() || pills.active().includes(intent.id)) return ok(t("{0} is already there", { 0: this.name(intent.id) }));
         if (!pills.hasRoomFor(intent.id)) {
           this.reset();
           this.pendingAdd = intent.id;
@@ -182,10 +182,10 @@ export class VoiceRunner {
           pills.toggle(id);
           added.push(this.name(id));
         }
-        return added.length ? ok(t("{0} added", { 0: added.join(", ") })) : fail(t("Command not recognised"));
+        return added.length ? ok(t("{0} added", { 0: added.join(", ") })) : fail(t("Nothing to add: they are already there, or there is no room"));
       }
       case "pillRemove":
-        if (!pills.active().includes(intent.id)) return fail(t("Not active"));
+        if (!pills.active().includes(intent.id)) return fail(t("{0} is not one of your pills", { 0: this.name(intent.id) }));
         pills.toggle(intent.id);
         return ok(t("{0} removed", { 0: this.name(intent.id) }));
       case "pillRemoveMultiple": {
@@ -195,7 +195,7 @@ export class VoiceRunner {
           pills.toggle(id);
           removed.push(this.name(id));
         }
-        return removed.length ? ok(t("{0} removed", { 0: removed.join(", ") })) : fail(t("Command not recognised"));
+        return removed.length ? ok(t("{0} removed", { 0: removed.join(", ") })) : fail(t("None of those are in your pills"));
       }
       case "pillSetMain":
         pills.setMain(intent.id);

@@ -47,7 +47,13 @@ const UNKNOWN: VoiceIntent = { kind: "unknown" };
 /** Stripped from the start, longest first. */
 const POLITENESS = [["could", "you"], ["can", "you"], ["please"]];
 /** The whole command, nothing else. */
-const CANCEL = [["never", "mind"], ["cancel"], ["forget", "it"]];
+const CANCEL = [
+  ["never", "mind"], ["nevermind"], ["cancel"], ["forget", "it"],
+  // Done talking: the listening view closes, and nothing more is listened for.
+  ["done"], ["ok", "done"], ["okay", "done"], ["i", "m", "done"], ["im", "done"], ["all", "done"], ["that", "s", "all"], ["that", "s", "it"],
+  ["that", "is", "all"], ["nothing", "else"], ["thanks"], ["thank", "you"], ["ok", "thanks"], ["okay", "thanks"], ["ok", "thank", "you"],
+  ["okay", "thank", "you"], ["goodbye"], ["bye"], ["stop", "listening"], ["you", "can", "stop"], ["you", "can", "stop", "listening"], ["close"],
+];
 const PAUSE = [["pause"], ["stop"]];
 const NEXT = [["next", "track"], ["next", "song"], ["next"], ["skip"]];
 const PREVIOUS = [["previous", "track"], ["previous", "song"], ["previous"], ["back"]];

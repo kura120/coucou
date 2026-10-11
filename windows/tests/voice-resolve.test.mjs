@@ -247,7 +247,7 @@ test("a common command said as it is written is never questioned", async () => {
   assert.ok(checked > 300, `${checked} sentences`);
   // And what a speech model writes for a name by its sound, when it says nothing of how sure it was.
   for (const [said, did] of [
-    ["add versal", "Vercel added"], ["add get hub", "Already active"], ["switch to kodaks", "Main: Codex"], ["remove git hub", "GitHub removed"],
+    ["add versal", "Vercel added"], ["add get hub", "GitHub is already there"], ["switch to kodaks", "Main: Codex"], ["remove git hub", "GitHub removed"],
     ["add co pilot", "Copilot CLI added"], ["open spotify", "Spotify opened"], ["open my downloads", "Downloads opened"],
   ]) {
     heardWith("", null);

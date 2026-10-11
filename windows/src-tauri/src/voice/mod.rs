@@ -134,6 +134,8 @@ enum Control {
     Cancel,
     /// What was said without the wake phrase was a command.
     Followed,
+    /// The user is done talking: nothing more is listened for until the wake phrase.
+    Rest,
     Paused(bool),
     /// Mochi is speaking until then: nothing heard meanwhile is a command.
     Hush(Instant),
@@ -518,6 +520,13 @@ pub fn voice_followed() {
     send(&shared(), Control::Followed);
 }
 
+/// "Ok done", "never mind", "thanks": the listening view has closed, and no
+/// follow-up is listened for.
+#[tauri::command]
+pub fn voice_rest() {
+    send(&shared(), Control::Rest);
+}
+
 /// `generation`: only the listener still in charge may speak; None for `sync`.
 fn set_status(app: &AppHandle, generation: Option<u64>, status: Status) {
     {
@@ -621,6 +630,8 @@ impl Free {
             crate::log::line("voice: the bundled engine is chosen but not installed");
             return None;
         }
+        // Moonshine fails from ten seconds of sound; a Parakeet or a model server takes a long sentence.
+        vad::takes_long_sentences(server.is_some() || engine::hearing().family != engine::Family::Moonshine);
         // A keyboard is as loud as a voice: the detector is what tells them apart.
         let sentences = match sherpa::Detector::load(&engine::runtime_dir(), &engine::detector_file(), vad::SILENCE_SECONDS) {
             Ok(detector) => vad::Sentences::of_voices(detector),
@@ -994,6 +1005,10 @@ fn apply(
         }
         Control::Followed => {
             session.followed(Instant::now());
+            None
+        }
+        Control::Rest => {
+            session.rest();
             None
         }
         Control::Paused(on) => {

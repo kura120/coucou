@@ -32,6 +32,19 @@ export function askRoom(ask: Ask | null): number {
   return ask.kind === "choice" ? ask.options.length * ASK_ROW + 6 : ASK_BAR;
 }
 
+/** One line of an answer on the result card, and about how many characters fit on it. */
+export const RESULT_LINE = 18;
+const RESULT_LINE_CHARS = 54;
+/** A result card shows this many lines at most; an answer is not a page. */
+const RESULT_MOST_LINES = 9;
+
+/** How much taller than one line the result card must be to show a message whole. */
+export function resultRoom(message: string | null | undefined): number {
+  const length = (message ?? "").length;
+  const lines = Math.min(RESULT_MOST_LINES, Math.max(1, Math.ceil(length / RESULT_LINE_CHARS)));
+  return (lines - 1) * RESULT_LINE;
+}
+
 const key = (label: string) => h("kbd", { class: "ask-key", text: label });
 
 export function buildAsk(onAnswer: (answer: Answer) => void, onDraft: (value: string) => void, onFocus: () => void): AskView {

@@ -204,7 +204,9 @@ test("views, a note, a service's report, a search, a draft, the chat: each only 
 
 test("stop listening and pause act at once, and only on their own words", async () => {
   const s = setup();
-  assert.equal(await s.run("stop listening", "stop_listening"), null);
+  assert.equal(await s.run("turn voice off", "stop_listening"), null);
+  // "Stop listening" is being done with a request, not turning voice off: the parser's, and it closes the view.
+  assert.equal((await s.run("stop listening", "stop_listening")).outcome, "failure");
   assert.equal(await s.run("pause coucou", "pause_coucou"), null);
   assert.equal((await s.run("pause", "pause_coucou")).outcome, "failure");
   assert.equal((await s.run("stop the music", "stop_listening")).outcome, "failure");
@@ -212,7 +214,8 @@ test("stop listening and pause act at once, and only on their own words", async 
 });
 
 test("said plainly, the app's own need no model", () => {
-  assert.deepEqual(appCall("Stop listening."), call("stop_listening"));
+  assert.deepEqual(appCall("Turn off the microphone."), call("stop_listening"));
+  assert.equal(appCall("stop listening"), null);
   assert.deepEqual(appCall("mute"), call("set_setting", { setting: "soundEnabled", value: "off" }));
   assert.deepEqual(appCall("unmute the sounds"), call("set_setting", { setting: "soundEnabled", value: "on" }));
   assert.deepEqual(appCall("turn the sound off"), call("set_setting", { setting: "soundEnabled", value: "off" }));

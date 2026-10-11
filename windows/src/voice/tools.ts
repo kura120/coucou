@@ -114,7 +114,7 @@ export function toolSchemas(pills: readonly PillDefinition[], near: readonly str
     ...appToolsFor(said, names),
     // Sample data only (voice/tools-preview.ts): web_search, check_inbox, read_message, write_draft.
     ...previewToolsFor(said),
-    fn("nothing", "The user changed their mind, or what was heard is not a request."),
+    fn("nothing", "The user changed their mind, is done ('ok done', 'that's all', 'thanks'), or what was heard is not a request."),
   ];
 }
 
@@ -366,10 +366,68 @@ export async function didYouMean(
   world: VoiceWorld,
   rounds = 1,
 ): Promise<VoiceResult | null> {
-  const near = await world.appsNear(heard.slice(0, 80));
-  if (!near.names.length) return null;
-  return runner.askOpen(near.clear ? near.names.slice(0, 1) : near.names, said, rounds);
+  // The name, then the name without what trails it: "spy flight for me" is asked about as "spy flight".
+  const words = heard.slice(0, 80).split(/\s+/).filter(Boolean);
+  for (let length = Math.min(words.length, 5); length >= 1; length--) {
+    if (length < words.length && length > 3) continue;
+    const near = await world.appsNear(words.slice(0, length).join(" "));
+    if (near.names.length) return runner.askOpen(near.clear ? near.names.slice(0, 1) : near.names, said, rounds);
+    if (words.length === 1) break;
+  }
+  return null;
 }
+
+/**
+ * The tool calls a model wrote out as text instead of making them — `remove_pills
+ * {"pills": ["Stripe"]}`, `{"name": "open_app", "arguments": {…}}`, with or
+ * without a code fence. A small model does this now and then, and what it wrote
+ * was shown as its answer, with a tick, while nothing had been done. Only the
+ * names of tools that exist are taken; anything else is not a call.
+ */
+export function callsWritten(text: string, known: ReadonlySet<string>): BrainCall[] {
+  const body = text.replace(/```[a-z]*\n?|```|<\/?tool_call>/gi, " ").trim();
+  if (!body) return [];
+  const calls: BrainCall[] = [];
+  const take = (name: unknown, args: unknown) => {
+    if (typeof name !== "string" || !known.has(name.trim())) return;
+    const parsed = typeof args === "string" ? safeJson(args) : args;
+    calls.push({ name: name.trim(), arguments: parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {} });
+  };
+  // JSON: one call or a list of them.
+  const whole = safeJson(body);
+  for (const item of Array.isArray(whole) ? whole : whole ? [whole] : []) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const fn = (o.function && typeof o.function === "object" ? o.function : o) as Record<string, unknown>;
+    take(fn.name ?? o.tool, fn.arguments ?? fn.parameters ?? o.args ?? {});
+  }
+  if (calls.length) return calls;
+  // name {json} or name({json}), one or several.
+  for (const m of body.matchAll(/([a-z_]{3,40})\s*\(?\s*(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})?\s*\)?/g)) {
+    if (known.has(m[1])) take(m[1], m[2] ?? {});
+  }
+  // Only when the text is nothing but calls: a sentence that mentions a tool's name is a sentence.
+  const rest = body.replace(/([a-z_]{3,40})\s*\(?\s*(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})?\s*\)?/g, (all, name) => (known.has(name) ? "" : all)).replace(/[\s,;.]+/g, "");
+  return rest ? [] : calls;
+}
+
+function safeJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+/** Text that is a model's plumbing showing through, not a sentence for a person: never shown, never said. */
+export function looksLikeCall(text: string): boolean {
+  const body = text.trim();
+  return /^[\[{]/.test(body) || /^```/.test(body) || /<tool_call>/.test(body) || /^[a-z_]{3,40}\s*[({]/.test(body);
+}
+
+/** The names of the tools a list offers. */
+export const toolNames = (tools: readonly unknown[]): Set<string> =>
+  new Set(tools.map((tool) => (tool as { function?: { name?: string } }).function?.name).filter((name): name is string => typeof name === "string"));
 
 /**
  * Of the apps near a sentence, the ones it does not already name outright: a
@@ -576,8 +634,8 @@ async function runCall(
 
 /** At most this many things are done for one sentence. */
 const MAX_ACTIONS = 3;
-/** A spoken answer is a sentence, not a page. */
-const MAX_ANSWER = 160;
+/** An answer is a few sentences at most; it is shown whole, the card grows for it. */
+const MAX_ANSWER = 600;
 
 /**
  * Does what the model proposed, after the checks, and says what happened.
@@ -598,8 +656,12 @@ export async function runProposal(
     world.showPermission();
     return null;
   }
-  const calls = proposal.calls.slice(0, MAX_ACTIONS);
+  // A model that wrote its calls out instead of making them: they are calls all the same.
+  const made = proposal.calls.length ? proposal.calls : callsWritten(proposal.text, toolNames(toolSchemas(pills, heard.near ?? [], said)));
+  const calls = made.slice(0, MAX_ACTIONS);
   if (!calls.length) {
+    // What is left of its plumbing is not an answer.
+    if (looksLikeCall(proposal.text)) return notUnderstood(said);
     const answer = proposal.text.replace(/\s+/g, " ").trim();
     return answer ? ok(answer.length > MAX_ANSWER ? `${answer.slice(0, MAX_ANSWER - 1)}…` : answer) : notUnderstood(said);
   }
