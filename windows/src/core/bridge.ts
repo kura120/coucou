@@ -463,9 +463,11 @@ export const Bridge = {
     tools: unknown[],
     /** The turns so far, oldest first: each sentence, what was done for it and what came of it. */
     history: { said: string; calls: { name: string; arguments: Record<string, unknown> }[]; result: string }[] = [],
+    /** This turn's rounds so far: the calls the model made and what each gave back. */
+    steps: { calls: { name: string; arguments: Record<string, unknown> }[]; results: string[] }[] = [],
   ) =>
     call<{ calls: { name: string; arguments: Record<string, unknown> }[]; text: string }>(
-      "voice_brain", { system, said, tools, history },
+      "voice_brain", { system, said, tools, history, steps },
     ),
   /** Whether a part of the bundled engine is on this machine, and what getting it costs. */
   voiceEngineStatus: (part: VoiceEnginePart) =>

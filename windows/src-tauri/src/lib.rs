@@ -547,9 +547,11 @@ async fn voice_brain(
     said: String,
     tools: serde_json::Value,
     history: Option<Vec<voice::brain::Turn>>,
+    steps: Option<Vec<voice::brain::Step>>,
 ) -> Result<voice::brain::Reply, String> {
     let settings = shared.settings.lock().unwrap().clone();
-    let reply = voice::brain::ask(&app, &settings, &system, &said, &tools, &history.unwrap_or_default()).await;
+    let reply =
+        voice::brain::ask(&app, &settings, &system, &said, &tools, &history.unwrap_or_default(), &steps.unwrap_or_default()).await;
     if let Err(why) = &reply {
         log::line(format!("voice: model: {why}"));
     }

@@ -144,6 +144,19 @@ export function systemPrompt(state: unknown, near: readonly string[] = []): stri
   ].join("\n");
 }
 
+/**
+ * What the model is told once its tools have run, on top of what it was told
+ * first: to go on if something is still to do, else to say what happened. The
+ * first round's prompt is left exactly as it was — it is what the checks and
+ * the evaluation were tuned on.
+ */
+export const AFTER_TOOLS = [
+  "The tools you called have run. Their results follow: status 'done' with verified true was seen to work; verified false was asked for but not seen;",
+  "'failed', 'not_found' and 'refused' did not happen.",
+  "If what the user asked still needs another tool, call it. Otherwise call no tool and say what happened in one short sentence, as Mochi, in plain words:",
+  "only what the results show — never say something worked when its result says otherwise, and say so when it did not.",
+].join(" ");
+
 // ── Checking what the model proposes ──────────────────────────────────────────
 
 const DECLINE_WORDS = /\b(decline|declined|deny|denied|refuse|reject|block|don t allow|do not allow|dont allow)\b/;
@@ -371,6 +384,8 @@ export interface Heard {
   near?: readonly string[];
   /** Told of each call that was done, and as which intent when it was one. */
   ran?: (call: BrainCall, intent: VoiceIntent | null) => void;
+  /** Told of every call and what came of it, done or not: what a model is given back. */
+  each?: (call: BrainCall, result: VoiceResult | null) => void;
 }
 
 /** One call, checked and done. `null`: the user changed their mind — nothing to show. */
@@ -511,6 +526,7 @@ export async function runProposal(
   const results: VoiceResult[] = [];
   for (const call of calls) {
     const result = await runCall(call, said, runner, world, pills, heard);
+    heard.each?.(call, result);
     if (result) results.push(result);
     // A question from Mochi ("which one do I remove?") stops the rest.
     if (result?.outcome === "question") return result;

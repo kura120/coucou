@@ -88,7 +88,7 @@ function setup() {
 }
 
 /** The earlier turns as messages: what src-tauri/src/voice/brain.rs `messages` builds. */
-function messages(system, history, said) {
+function messages(system, history, said, steps = []) {
   const list = [{ role: "system", content: system }];
   history.slice(-6).forEach((turn, t) => {
     list.push({ role: "user", content: turn.said });
@@ -104,18 +104,34 @@ function messages(system, history, said) {
     calls.forEach((_, i) => list.push({ role: "tool", tool_call_id: `call_${t}_${i}`, content: turn.result || "Done." }));
   });
   list.push({ role: "user", content: said });
+  // This turn's own rounds: `with_steps` in brain.rs.
+  steps.slice(0, 5).forEach((step, s) => {
+    if (!step.calls.length) return;
+    list.push({
+      role: "assistant", content: "",
+      tool_calls: step.calls.map((c, i) => ({ id: `step_${s}_${i}`, type: "function", function: { name: c.name, arguments: JSON.stringify(c.arguments ?? {}) } })),
+    });
+    step.calls.forEach((_, i) => list.push({ role: "tool", tool_call_id: `step_${s}_${i}`, content: step.results[i] || "No result." }));
+  });
   return list;
 }
 
 let asked = 0;
 
-async function ask(system, said, tools, history = []) {
+/** Rounds after the first, and how long each took: the model wording what its tools came to. */
+const wording = [];
+/** `--words`: print what Mochi said for every sentence, not only the wrong ones. */
+const WORDS = process.argv.includes("--words");
+
+async function ask(system, said, tools, history = [], steps = []) {
   asked += 1;
+  const began = performance.now();
   const reply = await fetch(`${SERVER}/v1/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MODEL, temperature: 0, stream: false, tools, messages: messages(system, history, said) }),
+    body: JSON.stringify({ model: MODEL, temperature: 0, stream: false, tools, messages: messages(system, history, said, steps) }),
   });
+  if (steps.length) wording.push(performance.now() - began);
   const message = (await reply.json()).choices?.[0]?.message ?? {};
   const calls = (message.tool_calls ?? []).map((c) => {
     let args = c.function?.arguments ?? {};
@@ -245,6 +261,7 @@ for (const [said, expected] of CASES) {
   tally[verdict] += 1;
   if (!Array.isArray(said) && verdict === "ok") first += 1;
   times[heard.by].push(heard.ms);
+  if (WORDS && heard.by === "model") console.log(`  said   ${JSON.stringify(sentences)} -> ${JSON.stringify(heard.result?.message ?? null)}`);
   if (verdict !== "ok") {
     console.log(`  ${verdict.padEnd(6)} ${JSON.stringify(sentences)} [${heard.by}] did ${JSON.stringify(heard.log)} said ${JSON.stringify(heard.result?.message ?? null)}`);
   }
@@ -253,4 +270,5 @@ const median = (list) => (list.length ? [...list].sort((a, b) => a - b)[Math.flo
 const single = CASES.filter(([said]) => !Array.isArray(said)).length;
 console.log(`${MODEL}: ${tally.ok}/${CASES.length} right, ${tally.wrong} wrong, ${tally.DANGER} dangerous`);
 console.log(`one sentence: ${first}/${single}; misheard names and follow-ups: ${tally.ok - first}/${CASES.length - single}`);
+console.log(`worded by the model: ${wording.length} rounds, median ${(median(wording) / 1000).toFixed(2)} s, slowest ${(Math.max(0, ...wording) / 1000).toFixed(2)} s`);
 console.log(`parser: ${times.parser.length} cases, ${median(times.parser).toFixed(1)} ms; model: ${times.model.length} cases, median ${(median(times.model) / 1000).toFixed(2)} s`);

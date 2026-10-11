@@ -4,11 +4,11 @@
 // tests), and what a model is given of them. The apps "near" a name come from
 // Rust (src-tauri/src/voice/apps.rs, tested there); here they are a table.
 
-import { test } from "node:test";
+import { mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { availablePills } from "../src/core/pills.ts";
 import { readAnswer } from "../src/voice/ask.ts";
-import { VoiceConversation } from "../src/voice/conversation.ts";
+import { MOST_MODEL_ROUNDS, VoiceConversation, WORDING_MS } from "../src/voice/conversation.ts";
 import { FORGOTTEN_AFTER_MS, MOST_TURNS, VoiceMemory, resolveRelative } from "../src/voice/memory.ts";
 import { VoiceRunner } from "../src/voice/runner.ts";
 import { misheardApps, systemPrompt, toolSchemas } from "../src/voice/tools.ts";
@@ -30,7 +30,7 @@ const NEAR = {
  * A conversation over fakes. `brain`: what the model proposes for a sentence
  * (a function of the sentence), or null for no model chosen.
  */
-function setup({ brain = null, active = ["integration_github"], permission = null } = {}) {
+function setup({ brain = null, after = null, active = ["integration_github"], permission = null } = {}) {
   const log = [];
   const asked = [];
   const pills = { active: [...active], main: "integration_claude" };
@@ -92,15 +92,22 @@ function setup({ brain = null, active = ["integration_github"], permission = nul
     nowPlaying: () => null,
     reports: () => ({}),
   };
+  // `after`: what the model does once its tools have run (the rounds after
+  // the first); without one it has nothing to add.
+  const rounds = [];
   const ask = brain
-    ? async (system, said, tools, history) => {
+    ? async (system, said, tools, history, steps = []) => {
+        if (steps.length) {
+          rounds.push({ system, steps: structuredClone(steps) });
+          return after ? after(steps, said) : { calls: [], text: "" };
+        }
         asked.push({ system, said, tools, history });
         return brain(said, history);
       }
     : null;
   const conversation = new VoiceConversation(runner, world, () => PILLS, () => ask, () => state.now);
   const hear = (said, how) => conversation.hear(said, how);
-  return { log, asked, hear, conversation, runner, state, pills };
+  return { log, asked, rounds, hear, conversation, runner, state, pills };
 }
 
 const call = (name, args = {}) => ({ name, arguments: args });
@@ -444,4 +451,95 @@ test("an answer that comes after it was given up on does nothing", async () => {
   assert.equal(waited, 1, "the island is told at once that there is a wait");
   assert.deepEqual(s.log, []);
   assert.deepEqual(await s.hear("vercel would be nice up there", { wanted: () => true }), done("Vercel added"));
+});
+
+// ── The rounds of a turn (the model sees what its tools came to) ──────────────
+
+test("once its tools have run, the model is given what came of them and words the answer", async () => {
+  const s = setup({
+    brain: () => ({ calls: [call("add_pills", { pills: ["Stripe"] })], text: "" }),
+    after: () => ({ calls: [], text: "  Stripe is up\nthere now. " }),
+  });
+  assert.deepEqual(await s.hear("could you put stripe up there for me"), done("Stripe is up there now."));
+  assert.equal(s.rounds.length, 1);
+  // The first round's prompt is untouched; the next one says the tools have run.
+  assert.ok(!s.asked[0].system.includes("have run"));
+  assert.ok(s.rounds[0].system.startsWith(s.asked[0].system) && s.rounds[0].system.includes("have run"));
+  const [step] = s.rounds[0].steps;
+  assert.deepEqual(step.calls, [call("add_pills", { pills: ["Stripe"] })]);
+  // The status first, and whether it was seen to work: not only the card's line.
+  assert.deepEqual(JSON.parse(step.results[0]), { status: "done", verified: false, result: "Stripe added" });
+  // What is remembered is what Mochi said.
+  assert.equal(s.conversation.memory.recent(s.state.now).at(-1).result, "Stripe is up there now.");
+});
+
+test("a model with nothing to add, or too slow to say it, leaves the tool's own line", async () => {
+  const silent = setup({ brain: () => ({ calls: [call("add_pills", { pills: ["Stripe"] })], text: "" }) });
+  assert.deepEqual(await silent.hear("could you put stripe up there for me"), done("Stripe added"));
+  const never = setup({
+    brain: () => ({ calls: [call("add_pills", { pills: ["Stripe"] })], text: "" }),
+    after: () => new Promise(() => {}),
+  });
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const heard = never.hear("could you put stripe up there for me");
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    mock.timers.tick(WORDING_MS);
+    assert.deepEqual(await heard, done("Stripe added"));
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test("the model may go on with another tool, and nothing is done twice for one sentence", async () => {
+  const s = setup({
+    brain: () => ({ calls: [call("add_pills", { pills: ["Stripe"] })], text: "" }),
+    after: (steps) =>
+      steps.length === 1
+        ? { calls: [call("add_pills", { pills: ["Stripe"] }), call("add_pills", { pills: ["Vercel"] })], text: "" }
+        : { calls: [], text: "Stripe and Vercel are both there." },
+  });
+  assert.deepEqual(await s.hear("could you put stripe and vercel up there"), done("Stripe and Vercel are both there."));
+  assert.deepEqual(s.log.filter((l) => l.startsWith("+")), ["+integration_stripe", "+integration_vercel"]);
+  assert.equal(s.rounds.length, 2);
+  assert.equal(s.rounds[1].steps.length, 2);
+
+  // A model that only repeats itself is not asked again, and nothing runs again.
+  const stuck = setup({
+    brain: () => ({ calls: [call("add_pills", { pills: ["Stripe"] })], text: "" }),
+    after: () => ({ calls: [call("add_pills", { pills: ["Stripe"] })], text: "" }),
+  });
+  assert.deepEqual(await stuck.hear("could you put stripe up there for me"), done("Stripe added"));
+  assert.deepEqual(stuck.log.filter((l) => l.startsWith("+")), ["+integration_stripe"]);
+  assert.equal(stuck.rounds.length, 1);
+});
+
+test("a turn is a few rounds at most, and what failed is what the card shows, in the tool's own words", async () => {
+  let n = 0;
+  const names = ["Vercel", "Notion", "Resend", "Linear", "Sentry", "Supabase", "Cloudflare"].filter((name) => PILLS.some((p) => p.name === name));
+  const endless = setup({
+    brain: () => ({ calls: [call("add_pills", { pills: ["Stripe"] })], text: "" }),
+    after: () => ({ calls: [call("add_pills", { pills: [names[n++ % names.length]] })], text: "" }),
+    active: [],
+  });
+  await endless.hear(`could you put stripe ${names.join(" ")} up there`);
+  assert.ok(endless.rounds.length < MOST_MODEL_ROUNDS + 1, `${endless.rounds.length} rounds`);
+
+  const failing = setup({
+    brain: () => ({ calls: [call("cancel_timer")], text: "" }),
+    after: () => ({ calls: [], text: "The timer is cancelled." }),
+  });
+  // Whatever the model makes of a failure, the card says what did not happen.
+  assert.deepEqual(await failing.hear("get rid of that timer"), { outcome: "failure", message: "No timer is running" });
+  assert.equal(JSON.parse(failing.rounds[0].steps[0].results[0]).status, "failed");
+});
+
+test("an answer with no tool is one round, and so is a sentence said to nobody", async () => {
+  const s = setup({ brain: () => ({ calls: [], text: "Two plus two is four." }), after: () => assert.fail("nothing ran: nothing to word") });
+  assert.deepEqual(await s.hear("what is two plus two"), done("Two plus two is four."));
+  const quiet = setup({
+    brain: () => ({ calls: [call("add_pills", { pills: ["Stripe"] })], text: "" }),
+    after: () => assert.fail("nobody is waiting for words"),
+  });
+  assert.deepEqual(await quiet.hear("put stripe up there", { spokenTo: false }), done("Stripe added"));
 });

@@ -266,7 +266,7 @@ export const voiceRunner = new VoiceRunner(liveMusic, livePills, voicePills);
  */
 export function createConversation(world: VoiceWorld): VoiceConversation {
   return new VoiceConversation(voiceRunner, world, voicePills, () =>
-    brainChosen() ? (system, said, tools, history) => Bridge.voiceBrain(system, said, tools, history) : null,
+    brainChosen() ? (system, said, tools, history, steps) => Bridge.voiceBrain(system, said, tools, history, steps) : null,
   );
 }
 
