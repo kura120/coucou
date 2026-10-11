@@ -543,3 +543,75 @@ test("an answer with no tool is one round, and so is a sentence said to nobody",
   });
   assert.deepEqual(await quiet.hear("put stripe up there", { spokenTo: false }), done("Stripe added"));
 });
+
+// ── A question on screen (voice/result.ts `Ask`) ──────────────────────────────
+
+test("a question goes up, waits, and comes down with its answer; one at a time", async () => {
+  const s = setup();
+  const ups = [];
+  s.conversation.onAsk = (ask) => ups.push(ask ? ask.question : null);
+  const first = s.conversation.askUser({ kind: "yes_no", question: "Open Spotify?" });
+  assert.equal(s.conversation.asked.question, "Open Spotify?");
+  // Asked over another: the first is dropped.
+  const second = s.conversation.askUser({ kind: "text", question: "  What then?  " });
+  assert.deepEqual(await first, { kind: "dropped" });
+  assert.equal(s.conversation.asked.question, "What then?");
+  assert.equal(s.conversation.answer({ kind: "text", value: "nothing" }), true);
+  assert.deepEqual(await second, { kind: "text", value: "nothing" });
+  assert.equal(s.conversation.asked, null);
+  assert.equal(s.conversation.answer({ kind: "dropped" }), false, "nothing was waiting");
+  assert.deepEqual(ups, ["Open Spotify?", null, "What then?", null]);
+  // A question that cannot be shown is dropped at once, and forgetting drops one that waits.
+  assert.deepEqual(await s.conversation.askUser({ kind: "choice", question: "Which?", options: [] }), { kind: "dropped" });
+  const waiting = s.conversation.askUser({ kind: "yes_no", question: "Sure?" });
+  s.conversation.forget();
+  assert.deepEqual(await waiting, { kind: "dropped" });
+});
+
+test("the model may ask once a tool has run, and goes on from the answer", async () => {
+  const s = setup({
+    brain: () => ({ calls: [call("add_pills", { pills: ["Stripe"] })], text: "" }),
+    after: (steps) => {
+      if (steps.length === 1) return { calls: [call("ask_user", { question: "Vercel as well?", kind: "yes_no" })], text: "" };
+      const answered = JSON.parse(steps[1].results[0]);
+      return answered.result === "yes"
+        ? steps.length === 2
+          ? { calls: [call("add_pills", { pills: ["Vercel"] })], text: "" }
+          : { calls: [], text: "Stripe and Vercel are there now." }
+        : { calls: [], text: "Stripe is there." };
+    },
+  });
+  s.conversation.onAsk = (ask) => {
+    if (ask) queueMicrotask(() => s.conversation.answer({ kind: "yes_no", yes: true }));
+  };
+  assert.deepEqual(await s.hear("put stripe up there and maybe vercel"), done("Stripe and Vercel are there now."));
+  assert.deepEqual(s.log.filter((l) => l.startsWith("+")), ["+integration_stripe", "+integration_vercel"]);
+  // The tool to ask with is offered only once a tool has run.
+  const offered = (tools) => tools.some((tool) => tool.function.name === "ask_user");
+  assert.ok(!offered(s.asked[0].tools));
+
+  // Dropped: the model is told, and what was done stays said.
+  const dropped = setup({
+    brain: () => ({ calls: [call("add_pills", { pills: ["Stripe"] })], text: "" }),
+    after: (steps) => (steps.length === 1 ? { calls: [call("ask_user", { question: "Vercel as well?", kind: "yes_no" })], text: "" } : { calls: [], text: "Stripe is there." }),
+  });
+  dropped.conversation.onAsk = (ask) => {
+    if (ask) queueMicrotask(() => dropped.conversation.answer({ kind: "dropped" }));
+  };
+  const result = await dropped.hear("put stripe up there and maybe vercel");
+  assert.deepEqual(dropped.log.filter((l) => l.startsWith("+")), ["+integration_stripe"]);
+  assert.equal(result.outcome, "failure");
+});
+
+test("a model that asks before any tool has run, or of nobody, asks nothing", async () => {
+  const early = setup({ brain: () => ({ calls: [call("ask_user", { question: "What do you mean?" })], text: "" }) });
+  early.conversation.onAsk = () => assert.fail("nothing is asked in the first round");
+  assert.equal((await early.hear("do the thing with the stuff")).outcome, "failure");
+  const quiet = setup({
+    brain: () => ({ calls: [call("add_pills", { pills: ["Stripe"] })], text: "" }),
+    after: () => ({ calls: [call("ask_user", { question: "Vercel as well?" })], text: "" }),
+  });
+  quiet.conversation.onAsk = () => assert.fail("nobody was spoken to");
+  await quiet.hear("put stripe up there", { spokenTo: false });
+});
+

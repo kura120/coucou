@@ -932,6 +932,7 @@ pub fn run() {
             voice::voice_status,
             voice::voice_cancel,
             voice::voice_followed,
+            voice::ask_keys::voice_ask_keys,
             voice::voice_grammar,
             voice::voice_talk,
             voice::voice_open_app,

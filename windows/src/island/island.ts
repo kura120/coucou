@@ -36,6 +36,9 @@ import {
   voicePills, voiceRunner, wakeBlocked,
 } from "./voice";
 import type { VoiceResult } from "../voice/runner";
+import { keyAnswer, keysFor, readSaid } from "../voice/asking";
+import type { Answer, Ask } from "../voice/result";
+import { askRoom } from "../views/ask";
 import { installContextMenu, type ContextMenu, type Rect } from "../views/menu";
 
 const BOT_OVERHANG = 40;
@@ -222,8 +225,15 @@ export class Island {
   // ── DOM ─────────────────────────────────────────────────────────────────────
 
   private build() {
+    // A question from the conversation goes up in the listening view, and comes down when answered.
+    this.conversation.onAsk = (ask) => this.voiceAsked(ask);
     const actions: ViewActions = {
       setView: (v) => this.setView(v),
+      voiceAnswer: (answer) => this.voiceAnswer(answer),
+      voiceDraft: (value) => {
+        State.voice = { ...State.voice, draft: value };
+      },
+      voiceField: () => void Bridge.focusWindow(true),
       cancelDrop: () => this.discardDrop(),
       collapse: () => this.collapse(),
       dismissCard: (otherwise) =>
@@ -576,6 +586,14 @@ export class Island {
       return;
     }
     this.clearVoiceTimer();
+    // A question is on screen and Mochi listens for its answer: the turn that asked goes on.
+    if (State.voice.ask && this.fsm.state === "listening" && State.view === "listening") {
+      stopSpeaking();
+      State.voice = { ...State.voice, text: "" };
+      this.engine.enterListening();
+      State.notify();
+      return;
+    }
     // Whatever was still being worked out is no longer waited for.
     this.voiceTurn += 1;
     // Spoken to: he stops talking and listens.
@@ -605,6 +623,8 @@ export class Island {
   /** Something was said and it was no command. */
   voiceMissed() {
     if (this.fsm.state !== "listening" || State.view !== "listening") return;
+    // Not words: the question on screen is still there, and still listened for.
+    if (State.voice.ask) return void Bridge.voiceTalk();
     // Not words: no answer to what Mochi asked, and the question is dropped.
     if (voiceRunner.asking) void this.voiceUnderstand("");
     else this.voiceResult(voiceRunner.run({ kind: "unknown" }));
@@ -669,14 +689,99 @@ export class Island {
     this.listenGlow.style.setProperty("--level", String(Math.max(0, Math.min(1, level || 0))));
   }
 
+  // ── A question on screen (voice/result.ts `Ask`, views/ask.ts) ───────────────
+
+  /** How long a question waits for its answer before it is dropped. */
+  private static readonly ASK_WAITS_MS = 45_000;
+  private voiceAskTimer: number | null = null;
+  /** Arms or stops the wait for the turn's answer (`voiceUnderstand`). */
+  private voicePatience: { pause(): void; resume(): void } | null = null;
+
+  /** The conversation put a question up (`ask`), or it was answered or dropped (null). */
+  private voiceAsked(ask: Ask | null) {
+    if (this.voiceAskTimer != null) window.clearTimeout(this.voiceAskTimer);
+    this.voiceAskTimer = null;
+    const keys = keysFor(ask);
+    void Bridge.voiceAskKeys(keys.numbers, keys.enter);
+    if (!ask) {
+      // Answered: the turn goes on, and is waited for again.
+      const asked = State.voice.ask != null;
+      State.voice = { ...State.voice, ask: null, draft: "", question: "", text: "", thinking: asked };
+      this.voicePatience?.resume();
+      this.animateGeometry(true);
+      State.notify();
+      return;
+    }
+    if (this.fsm.state !== "listening" || State.view !== "listening") {
+      // Nobody is looking at a listening island: the question is for nobody.
+      this.conversation.answer({ kind: "dropped" });
+      return;
+    }
+    this.voicePatience?.pause();
+    State.voice = { text: "", question: ask.question, thinking: false, ask, draft: ask.kind === "text" ? (ask.value ?? "") : "" };
+    this.engine.listeningHasWords = false;
+    sayResult({ outcome: "question", message: ask.question });
+    // Listened for without the wake phrase; a click or its key answers as well.
+    void Bridge.voiceTalk();
+    this.voiceAskTimer = window.setTimeout(() => this.voiceAnswer({ kind: "dropped" }), Island.ASK_WAITS_MS);
+    this.animateGeometry(false);
+    State.notify();
+    this.ensureRunning();
+  }
+
+  /** The answer to the question on screen, however it was given. */
+  voiceAnswer(answer: Answer) {
+    this.conversation.answer(answer);
+  }
+
+  /** Ctrl+Shift+number, or Ctrl+Shift+Enter for the text field. */
+  voiceAskKey(key: string) {
+    const ask = State.voice.ask;
+    if (!ask) return;
+    const answer = keyAnswer(ask, key, State.voice.draft ?? "");
+    if (answer) this.voiceAnswer(answer);
+  }
+
+  /** What was said while a question is on screen: its answer, words for its field, or neither. */
+  private voiceAskHeard(ask: Ask, said: string) {
+    const heard = readSaid(ask, said, State.voice.draft ?? "");
+    if (heard.is === "answer") return this.voiceAnswer(heard.answer);
+    if (heard.is === "draft") State.voice = { ...State.voice, draft: heard.value, text: "" };
+    else State.voice = { ...State.voice, text: "" };
+    State.notify();
+    // Still asked: still listened for.
+    void Bridge.voiceTalk();
+  }
+
+  /** For the browser preview (main.ts `coucouAsk`): a question with no turn behind it. */
+  voicePreviewAsk(ask: Ask) {
+    this.voiceWoke();
+    void this.conversation.askUser(ask).then((answer) => {
+      console.log("[coucou] answered", answer);
+      if (this.fsm.state === "listening") this.fsm.voiceFinished();
+    });
+  }
+
+  /** For the browser preview (main.ts `coucouWorking`): the gray card with a line, or back to listening. */
+  voicePreviewWorking(line: string | null) {
+    if (this.fsm.state !== "listening") this.voiceWoke();
+    State.voice = { ...State.voice, thinking: line != null, working: line ?? undefined };
+    State.notify();
+  }
+
   /** Nothing was said: back to where the island was. */
   voiceCancelled() {
+    // A question on screen waits on: it is answered by a click or a key as well, and listened for again.
+    if (State.voice.ask && this.fsm.state === "listening" && State.view === "listening") return void Bridge.voiceTalk();
     voiceRunner.reset();
     this.fsm.voiceFinished();
   }
 
   /** Understands what was said and does it; the card says what happened. */
   private voiceCommand(said: string) {
+    // The answer to a question on screen is not a new turn: the one that asked goes on.
+    const ask = State.voice.ask;
+    if (ask) return this.voiceAskHeard(ask, said);
     void this.voiceUnderstand(said);
   }
 
@@ -690,13 +795,26 @@ export class Island {
     const turn = ++this.voiceTurn;
     const here = () => turn === this.voiceTurn && this.fsm.state === "listening" && State.view === "listening";
     let late = false;
-    const patience = window.setTimeout(() => {
-      if (!here()) return;
-      late = true;
-      voiceRunner.reset();
-      State.voice = { ...State.voice, thinking: false };
-      this.voiceResult({ outcome: "failure", message: t("That took too long. Say it again.") });
-    }, VOICE_PATIENCE_MS);
+    let patience: number | null = null;
+    // Waited for a few seconds — but not while a question is on screen: that wait is the user's.
+    const wait = {
+      pause: () => {
+        if (patience != null) window.clearTimeout(patience);
+        patience = null;
+      },
+      resume: () => {
+        wait.pause();
+        patience = window.setTimeout(() => {
+          if (!here()) return;
+          late = true;
+          voiceRunner.reset();
+          State.voice = { ...State.voice, thinking: false };
+          this.voiceResult({ outcome: "failure", message: t("That took too long. Say it again.") });
+        }, VOICE_PATIENCE_MS);
+      },
+    };
+    wait.resume();
+    this.voicePatience = wait;
     let result: VoiceResult | null = null;
     try {
       result = await this.conversation.hear(said, {
@@ -713,7 +831,8 @@ export class Island {
         wanted: () => !late && here(),
       });
     } finally {
-      window.clearTimeout(patience);
+      wait.pause();
+      if (this.voicePatience === wait) this.voicePatience = null;
     }
     // The island moved on meanwhile: the answer is for nobody.
     if (late || !here()) {
@@ -777,6 +896,8 @@ export class Island {
   /** The island is no longer on the listening view, however that happened. */
   private leftListening() {
     this.clearVoiceTimer();
+    // A question nobody can see any more is dropped, and its keys let go of.
+    this.conversation.answer({ kind: "dropped" });
     voiceRunner.reset();
     if (!State.voiceFollowing) this.engine.exitListening();
     // Rust stops waiting for a command; it has nothing to stop when it ended this itself.
@@ -962,6 +1083,8 @@ export class Island {
     if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
       h = QUESTION_PICKER_H;
     }
+    // A question Mochi asks brings its choices, its buttons or its field.
+    if (State.mode === "expanded" && State.view === "listening") h += askRoom(State.voice.ask ?? null);
     const r = State.mode === "expanded" ? EXPANDED_CORNER : ROUNDED_CORNER;
     return { w, h, r };
   }

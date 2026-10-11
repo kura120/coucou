@@ -317,6 +317,10 @@ pub fn plugin<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
             if crate::toast::on_shortcut(app, shortcut) {
                 return;
             }
+            // The answer to a question Mochi has on screen (voice/ask_keys.rs).
+            if crate::voice::ask_keys::on_shortcut(app, shortcut) {
+                return;
+            }
             let Some(registry) = app.try_state::<Registry>() else { return };
             let action = registry.by_id.lock().unwrap().get(&shortcut.id()).copied();
             if let Some(action) = action {
@@ -403,6 +407,7 @@ pub fn apply<R: Runtime>(app: &AppHandle<R>, stored: &Bindings) {
     }
     // `release` above let go of a toast's decision keys too.
     crate::toast::reclaim_keys(app);
+    crate::voice::ask_keys::reclaim(app);
     let _ = app.emit("shortcuts-status", status(app));
 }
 

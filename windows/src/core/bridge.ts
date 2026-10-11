@@ -477,6 +477,8 @@ export const Bridge = {
   voiceEngineRemove: (part: VoiceEnginePart) => call<void>("voice_engine_remove", { part }),
   /** Mochi says this out loud, when speaking is on and his voice is installed. */
   voiceSay: (text: string) => call<void>("voice_say", { text }),
+  /** Holds Ctrl+Shift+1…`numbers` and, for a text field, Ctrl+Shift+Enter while a question is on screen; 0 and false lets go. */
+  voiceAskKeys: (numbers: number, enter: boolean) => call<void>("voice_ask_keys", { numbers, enter }),
   /** Starts the installed app that name means: its name and whether a window of it was seen to come, or null. */
   voiceOpenApp: (name: string) => call<{ name: string; seen: boolean } | null>("voice_open_app", { name }),
   /** The installed apps nearest to what was heard, for "Open Spotify?": opens nothing. */

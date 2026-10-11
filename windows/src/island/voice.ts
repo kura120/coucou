@@ -47,6 +47,8 @@ export interface VoiceHost {
   voiceAgain(text: string): void;
   /** How loud the microphone hears while Coucou listens, 0…1. */
   voiceLevel(level: number): void;
+  /** Ctrl+Shift+number or Ctrl+Shift+Enter, pressed while a question is on screen: "1"…"9" or "enter". */
+  voiceAskKey(key: string): void;
 }
 
 /** What the tools need of the island itself. */
@@ -345,6 +347,7 @@ export function sayResult(result: VoiceResult) {
 export function registerVoiceHandlers(island: VoiceHost) {
   void onEvent<VoiceEvent>("voice", (event) => applyVoice(island, event));
   void onEvent<number>("voice-level", (level) => island.voiceLevel(level));
+  void onEvent<string>("voice-ask-key", (key) => island.voiceAskKey(key));
   void onEvent<{ sampleRate: number; pcm: string }>("voice-speech", playSpeech);
   // What the recogniser can hear: nothing listens until it has this. The
   // installed apps are part of it ("open {app}"), so they are asked for first.

@@ -1,5 +1,6 @@
 // App state — mirror of AppState.swift (the parts the island needs).
 
+import type { Ask } from "../voice/result";
 import type { BotEmoteName, BotStateName, IslandMode, IslandViewName } from "./layout";
 import type { EyeShape } from "../mochi/engine";
 import {
@@ -263,7 +264,8 @@ class AppState {
    * asked when he is listening for its answer.
    */
   /** `working`: what is being done while the answer is waited for ("Opening Spotify…"), when known. */
-  voice: { text: string; question: string; thinking?: boolean; working?: string } = { text: "", question: "" };
+  /** `ask`: a question on screen with its choices, buttons or field; `draft`: what that field holds. */
+  voice: { text: string; question: string; thinking?: boolean; working?: string; ask?: Ask | null; draft?: string } = { text: "", question: "" };
   /** Another command may be said without the wake phrase: Mochi still listens. */
   voiceFollowing = false;
   /** What the last voice command did, for its card. */

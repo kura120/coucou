@@ -5019,6 +5019,17 @@
    "pt-BR": "O Windows foi solicitado a abrir {0}",
    "ru": "Windows получил запрос открыть {0}",
    "id": "Windows diminta membuka {0}"
+  },
+  "Confirm": {
+   "zh-Hans": "确认",
+   "hi": "पुष्टि करें",
+   "es": "Confirmar",
+   "ar": "تأكيد",
+   "fr": "Confirmer",
+   "bn": "নিশ্চিত করুন",
+   "pt-BR": "Confirmar",
+   "ru": "Подтвердить",
+   "id": "Konfirmasi"
   }
  }
 }

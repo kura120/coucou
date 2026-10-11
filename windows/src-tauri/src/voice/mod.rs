@@ -62,6 +62,7 @@ use crate::island::WINDOW_LABEL;
 use crate::settings::{Settings, VoicePref};
 
 mod apps;
+pub mod ask_keys;
 pub mod brain;
 #[cfg(windows)]
 mod capture;

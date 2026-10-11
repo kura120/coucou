@@ -12,10 +12,11 @@ import { t } from "../i18n/i18n";
 import { readAnswer } from "./ask";
 import { heardToOpen, parseIntent, parseSeveral, type VoiceIntent } from "./intent";
 import { VoiceMemory, aboutPermission, actionOf, recordOf, resolveRelative, type VoiceAction, type VoiceTurn } from "./memory";
-import { forModel, fromVoiceResult, spoken } from "./result";
+import { usable } from "./asking";
+import { forModel, fromVoiceResult, spoken, type Answer, type Ask } from "./result";
 import type { VoiceResult, VoiceRunner } from "./runner";
 import {
-  AFTER_TOOLS, describeState, didYouMean, misheardApps, notAnApp, notFound, opened, openedName, runProposal, systemPrompt, toolSchemas, understood,
+  AFTER_TOOLS, ASK_USER, describeState, didYouMean, misheardApps, notAnApp, notFound, opened, openedName, runProposal, systemPrompt, toolSchemas, understood,
   type BrainCall, type VoiceWorld,
 } from "./tools";
 
@@ -90,6 +91,45 @@ export class VoiceConversation {
   forget() {
     this.memory.clear();
     this.runner.reset();
+    this.answer({ kind: "dropped" });
+  }
+
+  // ── A question on screen (voice/result.ts `Ask`) ────────────────────────────
+
+  /** Told when a question goes up, and with null when it is answered or dropped. */
+  onAsk: ((ask: Ask | null) => void) | null = null;
+
+  private waitingFor: { ask: Ask; resolve: (answer: Answer) => void } | null = null;
+
+  /** The question waiting for its answer, if one is. */
+  get asked(): Ask | null {
+    return this.waitingFor?.ask ?? null;
+  }
+
+  /**
+   * Puts a question on screen and waits for the answer: a click, a key, or
+   * what is said next (island.ts passes them to `answer`). One at a time: a
+   * question asked over another drops the first. A question that cannot be
+   * shown is dropped at once.
+   */
+  askUser(ask: Ask): Promise<Answer> {
+    const shown = usable(ask);
+    if (!shown) return Promise.resolve({ kind: "dropped" });
+    this.answer({ kind: "dropped" });
+    return new Promise((resolve) => {
+      this.waitingFor = { ask: shown, resolve };
+      this.onAsk?.(shown);
+    });
+  }
+
+  /** The answer to the question on screen. False when none was waiting. */
+  answer(answer: Answer): boolean {
+    const waiting = this.waitingFor;
+    if (!waiting) return false;
+    this.waitingFor = null;
+    this.onAsk?.(null);
+    waiting.resolve(answer);
+    return true;
   }
 
   /** What was done last that a follow-up can build on. */
@@ -241,7 +281,14 @@ export class VoiceConversation {
     const hint = misheardApps(said, near);
     const system = systemPrompt(describeState(this.world, this.runner, pills), hint);
     const tools = toolSchemas(pills, hint);
-    const started = this.now();
+    let started = this.now();
+    // Asking is for after a tool has run; the time someone takes to answer is not the turn's.
+    let mayAsk = false;
+    const ask = async (question: Ask): Promise<Answer> => {
+      const answer = await this.askUser(question);
+      started = this.now();
+      return answer;
+    };
     let proposal = await brain(system, said, tools, history);
     // Given up on meanwhile: what it proposes is done for nobody.
     if (how.wanted && !how.wanted()) return null;
@@ -264,6 +311,7 @@ export class VoiceConversation {
           calls.push(call);
           action = actionOf(call, intent, pills, mainBefore) ?? action;
         },
+        ask: mayAsk ? ask : undefined,
         each: (call, came) => {
           step.calls.push(call);
           step.results.push(JSON.stringify(came ? forModel(fromVoiceResult(came)) : { status: "done", result: "Nothing to do." }));
@@ -280,7 +328,8 @@ export class VoiceConversation {
       steps.push(step);
       if (round >= MOST_MODEL_ROUNDS || this.now() - started >= TURN_BUDGET_MS) break;
       how.working?.(result.message);
-      const next = await within(brain(`${system}\n${AFTER_TOOLS}`, said, tools, history, steps), WORDING_MS);
+      mayAsk = true;
+      const next = await within(brain(`${system}\n${AFTER_TOOLS}`, said, [...tools, ASK_USER], history, steps), WORDING_MS);
       if (how.wanted && !how.wanted()) return null;
       if (!next) break;
       // A model that calls again what it just called has nothing more to do:

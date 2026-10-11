@@ -16,7 +16,9 @@ import { t } from "../i18n/i18n";
 import { normalise, resolvePill, spokenForms } from "./entity";
 import type { VoiceIntent } from "./intent";
 import type { VoiceAction } from "./memory";
+import type { Answer, Ask } from "./result";
 import type { VoiceResult, VoiceRunner } from "./runner";
+import { answerLine, usable } from "./asking";
 
 export interface BrainCall {
   name: string;
@@ -396,6 +398,37 @@ export interface Heard {
   ran?: (call: BrainCall, intent: VoiceIntent | null) => void;
   /** Told of every call and what came of it, done or not: what a model is given back. */
   each?: (call: BrainCall, result: VoiceResult | null) => void;
+  /**
+   * Puts a question on screen and waits for its answer. Given only once the
+   * model has seen a tool's result: a model that may ask from the start asks
+   * instead of doing (measured — doc/voice.md D19).
+   */
+  ask?: (ask: Ask) => Promise<Answer>;
+}
+
+/**
+ * The tool a model asks the user with, once its tools have run: a list to
+ * pick from, yes or no, or something to say or type. Offered only then.
+ */
+export const ASK_USER = fn(
+  "ask_user",
+  "Ask the user one short question when a tool's result leaves a choice only they can make (which account, which one of several, what exactly). "
+    + "Give 'options' (2 to 9 short labels) for a choice; kind 'yes_no' for a yes or no; kind 'text' for something they must say or type. "
+    + "Never ask what a tool can find out, and never to confirm what they already said.",
+  {
+    question: { type: "string" },
+    kind: { type: "string", enum: ["choice", "yes_no", "text"] },
+    options: { type: "array", items: { type: "string" } },
+  },
+  ["question"],
+);
+
+/** The question a model's `ask_user` call means, or null when it is none. */
+export function askOf(a: Record<string, unknown>): Ask | null {
+  const question = str(a.question);
+  const options = Array.isArray(a.options) ? a.options.filter((o): o is string => typeof o === "string" && o.trim() !== "") : [];
+  if (options.length >= 2) return usable({ kind: "choice", question, options: options.map((label, i) => ({ id: String(i + 1), label })) });
+  return usable(a.kind === "yes_no" ? { kind: "yes_no", question } : { kind: "text", question });
 }
 
 /** One call, checked and done. `null`: the user changed their mind — nothing to show. */
@@ -488,6 +521,15 @@ async function runCall(
       if (!url) return notUnderstood(said);
       world.openUrl(url);
       return done(opened(new URL(url).hostname));
+    }
+    case "ask_user": {
+      // Nothing is asked of someone who was not talking to Mochi, or before a tool has run.
+      const ask = heard.ask && !heard.quiet ? askOf(a) : null;
+      if (!ask || !heard.ask) return notUnderstood(said);
+      const answer = await heard.ask(ask);
+      heard.ran?.(call, null);
+      // For the model, which goes on from the answer; a card shows it only if the model then says nothing.
+      return answer.kind === "dropped" ? fail(t("OK, leaving it as is")) : ok(answerLine(ask, answer));
     }
     case "ask_which_app": {
       // Nothing is asked of someone who was not talking to Mochi.
