@@ -4,8 +4,8 @@
 // on its own:
 //
 //   hearing   the library, a model that writes down what is said and a small
-//             one that tells a voice from a noise (38 MB with the smallest
-//             model; the user may choose a larger one that hears better)
+//             one that tells a voice from a noise (468 MB with the model
+//             used until another is chosen; 38 MB with the smallest)
 //   speaking  the library and a model that says a sentence out loud (129 MB)
 //
 // Archives from the projects' own releases on GitHub, each checked against the
@@ -72,13 +72,14 @@ pub struct Hearing {
     archive: Archive,
 }
 
-/// The models the user may choose from, the smallest and fastest first: it is
-/// the one used until another is chosen. Measured on 69 synthesised commands
-/// (three voices, 2026-10-10), as words wrong and sentences written whole:
+/// The models the user may choose from, the smallest and fastest first.
+/// Measured on 69 synthesised commands (three voices, 2026-10-10), as words
+/// wrong and sentences written whole — and on twelve sentences of a real voice
+/// with an accent, which is what decided the default (`DEFAULT_HEARING`):
 ///
-///   Moonshine tiny    13 %   45   a hundredth of the sentence's length to write
-///   Parakeet 110m      8 %   52   three hundredths
-///   Parakeet 0.6b v2   4 %   57   a tenth: 0.3 s for a 3 s sentence
+///   Moonshine tiny    13 %   45   real voice: 76 %   a hundredth of the sentence's length to write
+///   Parakeet 110m      8 %   52               44 %   three hundredths
+///   Parakeet 0.6b v2   4 %   57               15 %   a tenth: 0.3 s for a 3 s sentence
 ///
 /// Tried and left out: Moonshine base (9 %, no better than Parakeet 110m for
 /// its size), Canary 180m (7 %, three times slower than Parakeet 110m) and
@@ -128,10 +129,19 @@ pub const HEARING_MODELS: &[Hearing] = &[
     },
 ];
 
-/// Which of them is the hearing model: its place in the list above.
+/// The model used until another is chosen: the only one that wrote a real
+/// voice down well enough to act on, at the price of the largest download.
+pub const DEFAULT_HEARING: &str = "parakeet-0.6b";
+
+fn default_at() -> usize {
+    HEARING_MODELS.iter().position(|model| model.id == DEFAULT_HEARING).unwrap_or(0)
+}
+
+/// Which of them is the hearing model: its place in the list above. Set from
+/// the settings before anything listens.
 static CHOSEN: AtomicUsize = AtomicUsize::new(0);
 
-/// The settings name a hearing model; one they do not know is the first.
+/// The settings name a hearing model; one they do not know is the default.
 /// When they name the model server instead (hear.rs), this is the model that
 /// hears a sentence the server did not: the smallest that is installed.
 /// Returns its place in the list, for whoever must notice a change.
@@ -139,7 +149,7 @@ pub fn choose(id: &str) -> usize {
     let at = if id == super::hear::ID {
         HEARING_MODELS.iter().position(Hearing::installed).unwrap_or(0)
     } else {
-        HEARING_MODELS.iter().position(|model| model.id == id).unwrap_or(0)
+        HEARING_MODELS.iter().position(|model| model.id == id).unwrap_or_else(default_at)
     };
     CHOSEN.store(at, Ordering::Relaxed);
     at
@@ -484,8 +494,13 @@ mod tests {
         assert!(detector_file().ends_with("silero_vad.onnx"));
         // The library is the version whose header sherpa.rs was written from.
         assert!(RUNTIME.url.contains(&format!("v{VERSION}")));
-        // The model nobody chose stays the small one.
+        // The smallest stays small, for whoever would rather have that.
         assert!(RUNTIME.size + HEARING_MODELS[0].archive.size + DETECTOR.size < 40 * 1024 * 1024);
+        // The model nobody chose is one of the list, and the settings start with it.
+        assert_eq!(HEARING_MODELS[default_at()].id, DEFAULT_HEARING);
+        assert_eq!(crate::settings::VoicePref::default().hearing_model, DEFAULT_HEARING);
+        assert_eq!(HEARING_MODELS[choose("a-model-of-another-build")].id, DEFAULT_HEARING);
+        choose(DEFAULT_HEARING);
         // Each model has its own name and folder, and the settings' names are plain.
         for (i, model) in HEARING_MODELS.iter().enumerate() {
             assert!(model.id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '.'));

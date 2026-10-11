@@ -213,7 +213,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mochiOutfit: DEFAULT_OUTFIT,
   pillColors: {},
   language: "",
-  voice: { enabled: false, wake: true, brain: "", brainModel: "", engine: "system", hearingModel: "moonshine-tiny", followUp: 8, speak: false, speaker: "female" },
+  voice: { enabled: false, wake: true, brain: "", brainModel: "", engine: "system", hearingModel: "parakeet-0.6b", followUp: 8, speak: false, speaker: "female" },
 };
 
 type Listener = () => void;

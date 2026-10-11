@@ -208,14 +208,15 @@ SHA-256) and uses it for the command:
   for a voice, and a word to someone else shows nothing unless the model, when
   one is chosen, finds a command in it.
 - **Speech model**: three to choose from in Settings → Voice, each downloaded
-  when you ask for it and pinned like the rest. Measured on 69 synthesised
-  commands in three voices — not on real ones, which is what counts:
+  when you ask for it and pinned like the rest. Words wrong on 69 synthesised
+  commands in three voices, and on twelve sentences of one real voice with an
+  accent — few, but the only real ones, and they decided the default:
 
-  | Model | Download | Words wrong | Sentences whole | To write 3 s of speech |
+  | Model | Download | Synthesised | Real voice | To write 3 s of speech |
   |---|---|---|---|---|
-  | Moonshine tiny (MIT), the one used until you choose | 30 MB | 13 % | 45 | 0.03 s |
-  | Parakeet 110m (NVIDIA, CC BY 4.0) | 103 MB | 8 % | 52 | 0.1 s |
-  | Parakeet 0.6b v2 (NVIDIA, CC BY 4.0) | 460 MB | 4 % | 57 | 0.3 s |
+  | Moonshine tiny (MIT) | 30 MB | 13 % | 76 % | 0.03 s |
+  | Parakeet 110m (NVIDIA, CC BY 4.0) | 103 MB | 8 % | 44 % | 0.1 s |
+  | Parakeet 0.6b v2 (NVIDIA, CC BY 4.0), the one used until you choose | 460 MB | 4 % | 15 % | 0.3 s |
 
   All three write "Vercel" as "versal": names are matched afterwards, by how
   they sound. Tried and left out: Moonshine base, Canary 180m, Whisper base.en
