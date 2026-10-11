@@ -14,6 +14,7 @@
 import type { PillDefinition } from "../core/pills";
 import { t } from "../i18n/i18n";
 import { normalise, resolvePill, spokenForms } from "./entity";
+import { askNearlyNamed, nearlyNamed } from "./ask";
 import type { VoiceIntent } from "./intent";
 import type { VoiceAction } from "./memory";
 import type { VoiceResult, VoiceRunner } from "./runner";
@@ -43,7 +44,7 @@ export interface VoiceWorld {
    * The installed apps nearest to what was heard, nearest first, for a
    * question: nothing is opened. `clear`: the first is the one to ask about.
    */
-  appsNear(said: string): Promise<{ names: string[]; clear: boolean }>;
+  appsNear(said: string): Promise<{ found?: string | null; names: string[]; scores?: number[]; clear: boolean }>;
   openFolder(name: string): Promise<string | null>;
   openUrl(url: string): void;
   /** What is playing, for questions about it. */
@@ -365,6 +366,11 @@ export interface Heard {
    * strength of an earlier sentence.
    */
   last?: VoiceAction | null;
+  /**
+   * The sentence with its "that one" said as the pill the last command was
+   * about (voice/memory.ts `withPronoun`): what a name is checked against.
+   */
+  meant?: string;
   /** Nobody said the wake phrase: Mochi asks nothing back. */
   quiet?: boolean;
   /** The apps the model was told sound like the sentence. */
@@ -384,8 +390,13 @@ async function runCall(
 ): Promise<VoiceResult | null> {
   const a = call.arguments ?? {};
   const spoken = normalise(said);
-  const intent = intentOf(call, said, pills);
+  // What names are read from: the user's words, a pronoun resolved (hook: memory.ts).
+  const named = heard.meant ?? said;
+  const intent = intentOf(call, named, pills);
   if (intent) {
+    // A pill the sentence only nearly names is asked about first (hook: ask.ts).
+    const unsure = askNearlyNamed(intent, named, runner, pills);
+    if (unsure) return heard.quiet ? notUnderstood(said) : unsure();
     const result = runner.run(intent, said);
     if (result.outcome === "success") heard.ran?.(call, intent);
     return result;
@@ -403,9 +414,11 @@ async function runCall(
     case "nothing":
       return null;
     case "open_session": {
-      const ids = pillIds(strs(a.agent), said, pills);
+      const ids = pillIds(strs(a.agent), named, pills);
       if (!ids) return notUnderstood(said);
       const name = pills.find((p) => p.id === ids[0])?.name ?? ids[0];
+      // An agent the sentence only nearly names: nothing is brought forward on a guess.
+      if (nearlyNamed(named, ids, pills).length) return notUnderstood(said);
       return world.openSession(ids[0]) ? done(ok(name)) : fail(t("Nothing running right now."));
     }
     case "show_permission_request":

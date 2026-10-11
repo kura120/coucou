@@ -1,16 +1,151 @@
-// "Open spy flight": no app by that name, so Mochi asks — "Open Spotify?", or
-// "Spotify or Steam?" when two are as near — and listens again. A guess is
-// never opened without the yes. The nearest apps come from Rust
-// (src-tauri/src/voice/apps.rs `near`); what the answer means is read here.
+// A name Mochi is not sure of is asked about, whatever it names (voice/resolve.ts):
+// "Open Spotify?", "Remove Stripe?", or "Spotify or Steam?" when two or three
+// are as near — and he listens again. A guess is never acted on without the
+// yes. The questions are the contract's (`Ask`, doc/voice-turns.md): one
+// candidate is a yes or no, several are a choice; what a spoken answer means
+// is read here, and a click or Ctrl+Shift+number gives the same `Answer`.
 
+import type { PillDefinition } from "../core/pills";
 import { t } from "../i18n/i18n";
 import { normalise } from "./entity";
-import type { VoiceResult } from "./runner";
+import type { VoiceIntent } from "./intent";
+import { certain, howNamed } from "./resolve";
+import type { Answer, Ask } from "./result";
+import type { VoiceResult, VoiceRunner } from "./runner";
 
-/** The question Mochi asks about one app, or about two. */
-export function openQuestion(names: readonly string[]): VoiceResult {
-  const message = names.length > 1 ? t("{0} or {1}?", { 0: names[0], 1: names[1] }) : t("Open {0}?", { 0: names[0] });
-  return { outcome: "question", message };
+/**
+ * The question about what a name may be: yes or no for one candidate, a
+ * choice between two or three. `one`: how the question about one is worded.
+ */
+export function askWhich(candidates: readonly { id: string; label: string }[], one: (label: string) => string): Ask {
+  const [a, b, c] = candidates.map((candidate) => candidate.label);
+  if (candidates.length < 2) return { kind: "yes_no", question: one(a) };
+  const question = c ? t("{0}, {1} or {2}?", { 0: a, 1: b, 2: c }) : t("{0} or {1}?", { 0: a, 1: b });
+  return { kind: "choice", question, options: candidates.slice(0, 3).map(({ id, label }) => ({ id, label })) };
+}
+
+export const openQuestion = (label: string) => t("Open {0}?", { 0: label });
+
+/**
+ * The question about a pill command whose pill was only nearly named:
+ * "Remove Stripe?". `ids`: the pills in doubt; null when the intent is not
+ * about pills.
+ */
+export function intentQuestion(intent: VoiceIntent, pills: readonly PillDefinition[]): string | null {
+  const name = (id: string) => pills.find((p) => p.id === id)?.name ?? id;
+  const names = (ids: readonly string[]) => ids.map(name).join(", ");
+  switch (intent.kind) {
+    case "pillAdd":
+      return t("Add {0}?", { 0: name(intent.id) });
+    case "pillAddMultiple":
+      return t("Add {0}?", { 0: names(intent.ids) });
+    case "pillRemove":
+      return t("Remove {0}?", { 0: name(intent.id) });
+    case "pillRemoveMultiple":
+      return t("Remove {0}?", { 0: names(intent.ids) });
+    case "pillSetMain":
+      return t("Switch to {0}?", { 0: name(intent.id) });
+    case "pillReplace":
+      return t("Replace {0} with {1}?", { 0: name(intent.old), 1: name(intent.new) });
+    case "pillOnly":
+      return t("Keep only {0}?", { 0: names(intent.ids) });
+    default:
+      return null;
+  }
+}
+
+/** The intent with one pill in place of another. */
+export function renamed(intent: VoiceIntent, from: string, to: string): VoiceIntent {
+  const swap = (id: string) => (id === from ? to : id);
+  switch (intent.kind) {
+    case "pillAdd":
+    case "pillRemove":
+    case "pillSetMain":
+      return { ...intent, id: swap(intent.id) };
+    case "pillAddMultiple":
+    case "pillRemoveMultiple":
+    case "pillOnly":
+      return { ...intent, ids: intent.ids.map(swap) };
+    case "pillReplace":
+      return { ...intent, old: swap(intent.old), new: swap(intent.new) };
+    default:
+      return intent;
+  }
+}
+
+/**
+ * Of these pills, the ones a sentence said freely names only nearly: a letter
+ * or two away and not the same sound, or by a word the speech model was not
+ * sure of. A pill the sentence does not name at all is not in doubt here —
+ * the checks refuse it elsewhere.
+ */
+export function nearlyNamed(said: string, ids: readonly string[], pills: readonly PillDefinition[]): string[] {
+  return ids.filter((id) => {
+    const how = howNamed(said, id, pills);
+    return how != null && !certain(how);
+  });
+}
+
+/**
+ * For a pill command a model proposed: the question to ask when the sentence
+ * only nearly names its pill ("get rid of strife" → "Remove Stripe?"), as a
+ * function that asks it — or null when every pill is surely named.
+ */
+export function askNearlyNamed(
+  intent: VoiceIntent,
+  said: string,
+  runner: VoiceRunner,
+  pills: readonly PillDefinition[],
+): (() => VoiceResult) | null {
+  const doubtful = nearlyNamed(said, [...new Set(pillsOf(intent))], pills);
+  const question = doubtful.length ? intentQuestion(intent, pills) : null;
+  if (!question) return null;
+  const label = (id: string) => pills.find((p) => p.id === id)?.name ?? id;
+  const one = doubtful.length === 1 ? doubtful[0] : null;
+  const candidates = one ? [{ id: one, label: label(one) }] : [{ id: "", label: doubtful.map(label).join(", ") }];
+  const then = (id: string) => [one && id && id !== one ? renamed(intent, one, id) : intent];
+  return () => runner.ask({ ask: { kind: "yes_no", question }, candidates, then, said, rounds: 1 });
+}
+
+/** The pills an intent names. */
+export function pillsOf(intent: VoiceIntent): string[] {
+  switch (intent.kind) {
+    case "pillAdd":
+    case "pillRemove":
+    case "pillSetMain":
+      return [intent.id];
+    case "pillAddMultiple":
+    case "pillRemoveMultiple":
+    case "pillOnly":
+      return intent.ids;
+    case "pillReplace":
+      return [intent.old, intent.new];
+    default:
+      return [];
+  }
+}
+
+/**
+ * What a spoken answer to a question means, as the contract's `Answer` — or
+ * `unclear` ("yes" to a choice: which one is still not known), or `other`
+ * (something else was said: another name, or another command).
+ * `labels`: the candidate a yes-or-no question was about, by its name.
+ */
+export function answerOf(said: string, ask: Ask, labels: readonly string[] = []): Answer | { kind: "unclear" } | { kind: "other"; said: string } {
+  if (ask.kind === "text") return said.trim() ? { kind: "text", value: said.trim() } : { kind: "dropped" };
+  const names = ask.kind === "choice" ? ask.options.map((option) => option.label) : labels.slice(0, 1);
+  const answer = readAnswer(said, names.length ? names : ["\u0000"]);
+  switch (answer.kind) {
+    case "no":
+      return normalise(said) ? (ask.kind === "yes_no" ? { kind: "yes_no", yes: false } : { kind: "dropped" }) : { kind: "dropped" };
+    case "unclear":
+      return { kind: "unclear" };
+    case "other":
+      return answer;
+    case "open":
+      if (ask.kind === "yes_no") return { kind: "yes_no", yes: true };
+      return { kind: "choice", id: ask.options[names.indexOf(answer.name)].id };
+  }
 }
 
 export type OpenAnswer =

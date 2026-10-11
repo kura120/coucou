@@ -59,7 +59,9 @@ const MAIN = [["switch", "to"], ["set", "main", "to"], ["change", "to"], ["use"]
 /** A pill first, then music. */
 const MUSIC_OR_PILL = [["play"], ["start"], ["resume"]];
 const ADD = [["add"], ["enable"], ["show"], ["activate"]];
-const REMOVE = [["remove"], ["disable"], ["hide"], ["delete"]];
+const REMOVE = [["remove"], ["disable"], ["hide"], ["delete"], ["get", "rid", "of"], ["take", "away"]];
+/** A verb in two parts with the name between them, and the one word it means. */
+const AROUND = [["take", "off", "remove"], ["take", "away", "remove"], ["take", "out", "remove"], ["put", "back", "add"], ["bring", "back", "add"]] as const;
 /** What follows is the name of something to open, whatever it is. */
 const OPEN = [["open", "up"], ["open"], ["launch"], ["bring", "up"], ["fire", "up"]];
 /** Words around a name that are not part of it. */
@@ -176,6 +178,13 @@ export function parseIntent(text: string, pills: readonly PillDefinition[]): Voi
   if (!words.length) return UNKNOWN;
 
   if (CANCEL.some((seq) => seq.length === words.length && startsWith(words, seq))) return { kind: "cancel" };
+
+  // "take github off", "put vercel back": the verb is around the name.
+  const around = words.length > 2 && AROUND.find(([first, last]) => words[0] === first && words[words.length - 1] === last);
+  if (around) {
+    words = [around[2], ...words.slice(1, -1)];
+    raw = [...words];
+  }
 
   // "open Discord": the name is whatever follows, as it was heard.
   const opening = OPEN.find((seq) => startsWith(words, seq));

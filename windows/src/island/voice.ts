@@ -15,6 +15,7 @@ import { showToast } from "../toast/api";
 import type { VoiceWorld } from "../voice/tools";
 import { VoiceConversation } from "../voice/conversation";
 import { resolveRelative, type VoiceAction } from "../voice/memory";
+import { heardWith } from "../voice/resolve";
 import { SPOTIFY_ID, Spotify } from "../core/spotify";
 import { State } from "../core/state";
 import { buildGrammar } from "../voice/grammar";
@@ -34,6 +35,8 @@ export const VOICE_PATIENCE_MS = 6000;
 export interface VoiceEvent {
   phase: "woke" | "partial" | "final" | "missed" | "cancelled" | "following" | "rested" | "again";
   text: string;
+  /** How sure the speech model was of each word of `text`, 0…1, when it says (voice/resolve.ts). */
+  sure?: number[];
 }
 
 export interface VoiceHost {
@@ -84,6 +87,8 @@ export function wakeBlocked(
 }
 
 export function applyVoice(island: VoiceHost, event: VoiceEvent) {
+  // A name the speech model was not sure of is asked about, not acted on.
+  if (event.phase === "final" || event.phase === "again") heardWith(event.text, event.sure);
   switch (event.phase) {
     case "woke":
       island.voiceWoke();

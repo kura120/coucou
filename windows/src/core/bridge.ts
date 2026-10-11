@@ -478,7 +478,7 @@ export const Bridge = {
   /** Starts the Start-menu app that name means; its name, or null. */
   voiceOpenApp: (name: string) => call<string | null>("voice_open_app", { name }),
   /** The installed apps nearest to what was heard, for "Open Spotify?": opens nothing. */
-  voiceAppsNear: (said: string) => call<{ names: string[]; clear: boolean }>("voice_apps_near", { said }),
+  voiceAppsNear: (said: string) => call<{ found: string | null; names: string[]; scores: number[]; clear: boolean }>("voice_apps_near", { said }),
   /** Opens one of the user's own folders; its name, or null. */
   voiceOpenFolder: (name: string) => call<string | null>("voice_open_folder", { name }),
 };
