@@ -62,6 +62,7 @@ use crate::island::WINDOW_LABEL;
 use crate::settings::{Settings, VoicePref};
 
 mod apps;
+pub mod ask_keys;
 pub mod brain;
 #[cfg(windows)]
 mod capture;
@@ -287,14 +288,88 @@ pub fn voice_talk() {
     talk();
 }
 
-/// "Open Figma": starts the installed app that name means, and says which.
+/// An app voice started: its name, and whether it was seen to come.
+#[derive(Serialize)]
+pub struct Opened {
+    name: String,
+    /// A window of it came to the front within a couple of seconds. False is
+    /// not a failure: Windows was asked, and nothing was seen yet.
+    seen: bool,
+}
+
+/// How long an app is watched for after it is started.
+const SEEN_WITHIN: Duration = Duration::from_millis(2000);
+
+/// "Open Figma": starts the installed app that name means, says which, and
+/// whether it was seen to come — so the island says "opened" for what did.
 #[tauri::command]
-pub fn voice_open_app(name: String) -> Option<String> {
+pub async fn voice_open_app(name: String) -> Option<Opened> {
     let installed = apps::installed_lately();
-    let app = apps::find(&name, &installed)?;
+    let app = apps::find(&name, &installed)?.clone();
     crate::log::line("voice: open app");
+    let before = front::window();
     app.open();
-    Some(app.name.clone())
+    let started = Instant::now();
+    let mut seen = false;
+    while !seen && started.elapsed() < SEEN_WITHIN {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        seen = front::came(before, &app.name);
+    }
+    Some(Opened { name: app.name, seen })
+}
+
+/// The window in front, to tell whether an app that was started has come.
+#[cfg(windows)]
+mod front {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowTextW, GetWindowThreadProcessId};
+
+    /// The window in front now, as a number that can be kept across a wait.
+    pub fn window() -> isize {
+        unsafe { GetForegroundWindow().0 as isize }
+    }
+
+    /// Another program's window has come to the front since `before`, or the
+    /// one in front is that app's by its title (it was in front already).
+    pub fn came(before: isize, name: &str) -> bool {
+        unsafe {
+            let now = GetForegroundWindow();
+            if now.0.is_null() {
+                return false;
+            }
+            let mut owner = 0u32;
+            GetWindowThreadProcessId(now, Some(&mut owner));
+            if owner == std::process::id() {
+                return false;
+            }
+            if now.0 as isize != before {
+                return true;
+            }
+            let mut title = [0u16; 256];
+            let length = GetWindowTextW(HWND(now.0), &mut title).max(0) as usize;
+            super::titled(&String::from_utf16_lossy(&title[..length]), name)
+        }
+    }
+}
+
+#[cfg(not(windows))]
+mod front {
+    pub fn window() -> isize {
+        0
+    }
+
+    pub fn came(_before: isize, _name: &str) -> bool {
+        false
+    }
+}
+
+/// A window's title is that app's: it holds the app's name, or its first word
+/// when the name is several ("Visual Studio Code" in "main.rs — Visual Studio Code").
+#[cfg_attr(not(windows), allow(dead_code))]
+fn titled(title: &str, name: &str) -> bool {
+    let (title, name) = (title.to_lowercase(), name.to_lowercase());
+    let first = name.split_whitespace().next().unwrap_or_default();
+    !name.trim().is_empty() && (title.contains(name.trim()) || (first.len() >= 4 && title.split(|c: char| !c.is_alphanumeric()).any(|w| w == first)))
 }
 
 /// The installed apps nearest to a name that is none of them, for Mochi to
@@ -990,6 +1065,24 @@ impl Recogniser {
     fn next(&mut self, wait: Duration) -> Option<session::Raw> {
         std::thread::sleep(wait);
         None
+    }
+}
+
+#[cfg(test)]
+mod seen_tests {
+    use super::titled;
+
+    #[test]
+    fn a_window_is_an_apps_by_its_title() {
+        assert!(titled("Spotify Premium", "Spotify"));
+        assert!(titled("main.rs — coucou — Visual Studio Code", "Visual Studio Code"));
+        assert!(titled("#general | Discord", "Discord"));
+        // Its first word alone, when it is a word of the title and long enough to mean it.
+        assert!(titled("Figma — Untitled", "Figma Desktop"));
+        assert!(!titled("Notes on the figmatic method", "Figma Desktop"));
+        assert!(!titled("Inbox — Mail", "Spotify"));
+        assert!(!titled("An app", "An Application"));
+        assert!(!titled("anything", "  "));
     }
 }
 

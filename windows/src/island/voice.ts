@@ -50,6 +50,8 @@ export interface VoiceHost {
   voiceAgain(text: string): void;
   /** How loud the microphone hears while Coucou listens, 0…1. */
   voiceLevel(level: number): void;
+  /** Ctrl+Shift+number or Ctrl+Shift+Enter, pressed while a question is on screen: "1"…"9" or "enter". */
+  voiceAskKey(key: string): void;
 }
 
 /** What the tools need of the island itself. */
@@ -197,6 +199,9 @@ function stopTimer(): boolean {
   return true;
 }
 
+/** Whether the app opened last was seen to come to the front. */
+let appSeen = false;
+
 export function createWorld(cards: VoiceCards): VoiceWorld {
   const pillName = (id: string) => pillDefinition(id)?.name ?? id;
   return {
@@ -237,7 +242,12 @@ export function createWorld(cards: VoiceCards): VoiceWorld {
       timer = { label, endsAt: Date.now() + ms, handle };
     },
     cancelTimer: stopTimer,
-    openApp: async (name) => (await Bridge.voiceOpenApp(name)) ?? null,
+    async openApp(name) {
+      const app = await Bridge.voiceOpenApp(name);
+      appSeen = app?.seen ?? false;
+      return app?.name ?? null;
+    },
+    appSeen: () => appSeen,
     appsNear: async (said) => (await Bridge.voiceAppsNear(said)) ?? { names: [], clear: false },
     openFolder: async (name) => (await Bridge.voiceOpenFolder(name)) ?? null,
     openUrl: (url) => void Bridge.openUrl(url),
@@ -271,7 +281,7 @@ export const voiceRunner = new VoiceRunner(liveMusic, livePills, voicePills);
  */
 export function createConversation(world: VoiceWorld): VoiceConversation {
   return new VoiceConversation(voiceRunner, world, voicePills, () =>
-    brainChosen() ? (system, said, tools, history) => Bridge.voiceBrain(system, said, tools, history) : null,
+    brainChosen() ? (system, said, tools, history, steps) => Bridge.voiceBrain(system, said, tools, history, steps) : null,
   );
 }
 
@@ -342,6 +352,7 @@ export function sayResult(result: VoiceResult) {
 export function registerVoiceHandlers(island: VoiceHost) {
   void onEvent<VoiceEvent>("voice", (event) => applyVoice(island, event));
   void onEvent<number>("voice-level", (level) => island.voiceLevel(level));
+  void onEvent<string>("voice-ask-key", (key) => island.voiceAskKey(key));
   void onEvent<{ sampleRate: number; pcm: string }>("voice-speech", playSpeech);
   // What the recogniser can hear: nothing listens until it has this. The
   // installed apps are part of it ("open {app}"), so they are asked for first.

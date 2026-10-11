@@ -307,7 +307,7 @@ test("one candidate is a yes or no, several are a choice; an answer said or clic
   await waiting.hear("open spy flight");
   assert.equal((await waiting.hear("no decline that")).outcome, "failure", "nothing waits to be declined here");
   assert.ok(!waiting.runner.asking);
-  assert.equal(waiting.asked.length, 1, "the model was asked about that sentence, alone");
+  assert.ok(waiting.asked.length >= 1, "the model was asked about that sentence");
   assert.deepEqual(waiting.asked[0].history, []);
   assert.deepEqual(waiting.log, []);
 
@@ -410,4 +410,93 @@ test("no, Vercel after add GitHub: a correction swaps, and also still adds", asy
   assert.deepEqual(await unsure.hear("no, strife"), question("Replace GitHub with Stripe?"));
   assert.deepEqual(await unsure.hear("yes"), done("GitHub → Stripe"));
   assert.equal(intentQuestion({ kind: "pillOnly", ids: ["integration_github"] }, PILLS), "Keep only GitHub?");
+});
+
+// ── On screen: the island's question component (conversation.askUser) ─────────
+
+test("with a screen, a question about a name goes up, and the turn ends in what the answer led to", async () => {
+  /** A conversation with something to show questions on, as the island gives it. */
+  const screen = (options) => {
+    const s = setup(options);
+    const shown = [];
+    s.conversation.onAsk = (ask) => shown.push(ask);
+    return { ...s, shown, asked: () => s.conversation.asked };
+  };
+  const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  // A click or its key: the answer the component gives.
+  const s = screen();
+  const turn = s.hear("open spy flight");
+  await settled();
+  assert.deepEqual(s.asked(), { kind: "yes_no", question: "Open Spotify?" });
+  assert.ok(!s.runner.asking, "one place waits for the answer, not two");
+  assert.deepEqual(s.log, []);
+  assert.equal(s.conversation.answer({ kind: "yes_no", yes: true }), true);
+  assert.deepEqual(await turn, done("Spotify opened"));
+  assert.equal(s.asked(), null);
+  assert.deepEqual(s.shown.map((ask) => ask?.kind ?? null), ["yes_no", null]);
+
+  // A choice, by its option.
+  const choice = s.hear("open st");
+  await settled();
+  assert.equal(s.asked().kind, "choice");
+  s.conversation.answer({ kind: "choice", id: "Steam" });
+  assert.deepEqual(await choice, done("Steam opened"));
+
+  // Closed, timed out, "never mind": nothing is done.
+  const dropped = s.hear("remove strife");
+  await settled();
+  assert.deepEqual(s.asked(), { kind: "yes_no", question: "Remove Stripe?" });
+  s.conversation.answer({ kind: "dropped" });
+  assert.deepEqual(await dropped, done("OK, leaving it as is"));
+  assert.deepEqual(s.log, ["app:Spotify", "app:Steam"]);
+
+  // Said: what answers such a question, which is more than yes and no.
+  for (const [said, result] of [["yeah do it", "Stripe removed"], ["Stripe.", "Stripe removed"], ["no", "OK, leaving it as is"], ["no, github", "GitHub removed"], ["next track", "Next track"]]) {
+    const again = screen();
+    const pending = again.hear("remove strife");
+    await settled();
+    assert.equal(again.conversation.saidWhileAsked(said), true, said);
+    assert.deepEqual(await pending, done(result), said);
+    assert.equal(again.asked(), null);
+  }
+  // Another name for an app is tried; one that is only near is asked about in turn.
+  const other = screen();
+  const first = other.hear("open spy flight");
+  await settled();
+  assert.equal(other.conversation.saidWhileAsked("no, this squad"), true);
+  await settled();
+  assert.deepEqual(other.asked(), { kind: "yes_no", question: "Open Discord?" });
+  assert.equal(other.conversation.saidWhileAsked("yes"), true);
+  assert.deepEqual(await first, done("Discord opened"));
+  // "Yes" to a choice says nothing: the question stays, for the island to read as it reads any.
+  const stays = screen();
+  const waiting = stays.hear("open st");
+  await settled();
+  assert.equal(stays.conversation.saidWhileAsked("yes"), false);
+  assert.equal(stays.asked().kind, "choice");
+  stays.conversation.answer({ kind: "dropped" });
+  await waiting;
+  // Not a question about a name: not this one's to read.
+  assert.equal(stays.conversation.saidWhileAsked("yes"), false);
+  const text = stays.conversation.askUser({ kind: "text", question: "Subject?" });
+  assert.equal(stays.conversation.saidWhileAsked("hello there"), false);
+  stays.conversation.answer({ kind: "dropped" });
+  await text;
+
+  // A sentence about a permission ends the question and is heard alone.
+  const permission = screen({ brain: () => ({ calls: [], text: "It takes a click." }) });
+  const open = permission.hear("open spy flight");
+  await settled();
+  assert.equal(permission.conversation.saidWhileAsked("yeah allow it"), true);
+  assert.deepEqual(await open, done("It takes a click."));
+  assert.deepEqual(permission.log, []);
+
+  // A pill a model proposed for a sentence that only nearly names it: on screen too.
+  const model = screen({ brain: (said) => (said.includes("strife") ? { calls: [call("remove_pills", { pills: ["Stripe"] })], text: "" } : { calls: [], text: "" }) });
+  const proposed = model.hear("i do not want strife up there any more");
+  await settled();
+  assert.deepEqual(model.asked(), { kind: "yes_no", question: "Remove Stripe?" });
+  model.conversation.answer({ kind: "yes_no", yes: true });
+  assert.deepEqual(await proposed, done("Stripe removed"));
 });

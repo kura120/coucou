@@ -34,6 +34,10 @@ const MAX_CALLS: usize = 6;
 const MAX_TURNS: usize = 6;
 const MAX_TURN_CALLS: usize = 3;
 const MAX_RESULT: usize = 240;
+/// This turn's own rounds: the tools the model called and what each gave back,
+/// so it can go on from there or say what happened (src/voice/conversation.ts).
+const MAX_STEPS: usize = 5;
+const MAX_STEP_RESULT: usize = 1200;
 
 /// A turn that came before: what was said, what was done for it (as the tool
 /// calls a model would have made) and what came of it.
@@ -51,6 +55,16 @@ pub struct Called {
     pub name: String,
     #[serde(default)]
     pub arguments: Value,
+}
+
+/// One round of this turn: the calls the model made, and each one's result as
+/// the island checked and ran it — its status first, never only "done".
+#[derive(Debug, Deserialize)]
+pub struct Step {
+    #[serde(default)]
+    pub calls: Vec<Called>,
+    #[serde(default)]
+    pub results: Vec<String>,
 }
 
 #[derive(Debug, Serialize, PartialEq)]
@@ -103,6 +117,7 @@ pub async fn ask(
     said: &str,
     tools: &Value,
     history: &[Turn],
+    steps: &[Step],
 ) -> Result<Reply, String> {
     let server = local_chat::server(settings, &settings.voice.brain).ok_or("no model server is chosen for voice")?;
     let model = settings.voice.brain_model.trim();
@@ -127,7 +142,7 @@ pub async fn ask(
     }
     let body = json!({
         "model": model,
-        "messages": messages(system, history, said),
+        "messages": with_steps(messages(system, history, said), steps),
         "tools": tools,
         "temperature": 0,
         "stream": false,
@@ -174,6 +189,35 @@ pub fn messages(system: &str, history: &[Turn], said: &str) -> Vec<Value> {
         }
     }
     messages.push(json!({ "role": "user", "content": said }));
+    messages
+}
+
+/// The same conversation, with what this turn has done so far after the
+/// sentence: each round's calls and, right after them, their results. A call
+/// with no result recorded is answered "No result." rather than left open.
+pub fn with_steps(mut messages: Vec<Value>, steps: &[Step]) -> Vec<Value> {
+    for (step_at, step) in steps.iter().take(MAX_STEPS).enumerate() {
+        let calls: Vec<&Called> =
+            step.calls.iter().filter(|call| !call.name.trim().is_empty() && call.name.len() <= 64).take(MAX_CALLS).collect();
+        if calls.is_empty() {
+            continue;
+        }
+        let id = |call_at: usize| format!("step_{step_at}_{call_at}");
+        let called: Vec<Value> = calls
+            .iter()
+            .enumerate()
+            .map(|(call_at, call)| {
+                let arguments = if call.arguments.is_object() { call.arguments.to_string() } else { "{}".to_string() };
+                json!({ "id": id(call_at), "type": "function", "function": { "name": call.name.trim(), "arguments": arguments } })
+            })
+            .collect();
+        messages.push(json!({ "role": "assistant", "content": "", "tool_calls": called }));
+        for call_at in 0..calls.len() {
+            let result: String = step.results.get(call_at).map(|r| r.chars().take(MAX_STEP_RESULT).collect()).unwrap_or_default();
+            let content = if result.trim().is_empty() { "No result.".to_string() } else { result };
+            messages.push(json!({ "role": "tool", "tool_call_id": id(call_at), "content": content }));
+        }
+    }
     messages
 }
 
@@ -248,6 +292,27 @@ mod tests {
         }
         // No history is the two messages it always was.
         assert_eq!(super::messages("s", &[], "hi").len(), 2);
+
+        // This turn's rounds follow the sentence: the calls, then each one's result.
+        let steps: Vec<Step> = serde_json::from_value(json!([
+            { "calls": [{ "name": "open_app", "arguments": { "name": "Spotify" } }, { "name": "music", "arguments": { "action": "play" } }],
+              "results": ["{\"status\":\"done\",\"verified\":true}"] },
+            { "calls": [], "results": [] },
+            { "calls": [{ "name": "set_timer", "arguments": "not an object" }], "results": ["{\"status\":\"failed\"}"] },
+        ]))
+        .unwrap();
+        let stepped = with_steps(super::messages("s", &[], "open spotify and play"), &steps);
+        assert_eq!(stepped.len(), 2 + 3 + 2);
+        assert_eq!(stepped[1]["content"], "open spotify and play");
+        assert_eq!(stepped[2]["tool_calls"][1]["id"], "step_0_1");
+        assert_eq!(stepped[3]["tool_call_id"], "step_0_0");
+        assert_eq!(stepped[3]["content"], "{\"status\":\"done\",\"verified\":true}");
+        // A call whose result was not recorded is not left without one.
+        assert_eq!(stepped[4]["content"], "No result.");
+        assert_eq!(stepped[5]["tool_calls"][0]["function"]["arguments"], "{}");
+        assert_eq!(stepped[6]["tool_call_id"], "step_2_0");
+        let many: Vec<Step> = (0..9).map(|_| Step { calls: vec![Called { name: "music".into(), arguments: json!({}) }], results: vec![] }).collect();
+        assert_eq!(with_steps(Vec::new(), &many).len(), MAX_STEPS * 2);
         // Only the last few turns, and long ones cut.
         let many: Vec<Turn> = (0..20).map(|i| turn(&format!("turn {i}"), json!([]), &"x".repeat(1000))).collect();
         let messages = super::messages("s", &many, "now");

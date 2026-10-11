@@ -16,16 +16,23 @@ import { heardToOpen, parseIntent, parseSeveral, type VoiceIntent } from "./inte
 import {
   VoiceMemory, aboutPermission, actionOf, recordOf, resolveRelative, withPronoun, type VoiceAction, type VoiceTurn,
 } from "./memory";
+import { usable } from "./asking";
 import { certain, provideNames, resolveName, type NameSources } from "./resolve";
-import type { Answer } from "./result";
+import { forModel, fromVoiceResult, spoken, type Answer, type Ask } from "./result";
 import type { Asked, VoiceResult, VoiceRunner } from "./runner";
 import {
-  describeState, misheardApps, notAnApp, notFound, opened, openedName, runProposal, systemPrompt, toolSchemas, understood,
+  AFTER_TOOLS, ASK_USER, describeState, misheardApps, notAnApp, notFound, opened, openedName, runProposal, systemPrompt, toolSchemas, understood,
   type BrainCall, type VoiceWorld,
 } from "./tools";
 
 /** An earlier turn, as a model is given it: the sentence, what was done, what came of it. */
 export type BrainTurn = Pick<VoiceTurn, "said" | "calls" | "result">;
+
+/** One round of this turn, as a model is given it back: its calls and what each came to. */
+export interface BrainStep {
+  calls: BrainCall[];
+  results: string[];
+}
 
 /** Asks the model server; null when it cannot be asked or does not answer. */
 export type Brain = (
@@ -33,7 +40,15 @@ export type Brain = (
   said: string,
   tools: unknown[],
   history: BrainTurn[],
+  steps?: BrainStep[],
 ) => Promise<{ calls: BrainCall[]; text: string } | null | undefined>;
+
+/** A turn is at most this many rounds of the model calling tools. */
+export const MOST_MODEL_ROUNDS = 5;
+/** Past this, a turn that has done something says so with the tool's own line. */
+export const TURN_BUDGET_MS = 8000;
+/** How long the model is waited for once its tools have run: its words are a nicety. */
+export const WORDING_MS = 2500;
 
 export interface Hearing {
   /**
@@ -42,8 +57,10 @@ export interface Hearing {
    * what he does not understand is nothing at all.
    */
   spokenTo?: boolean;
-  /** Called when the answer has to be waited for: a lookup, a model. */
-  waiting?: () => void;
+  /** Called when the answer has to be waited for: a lookup, a model. `line`: what is being done, when known. */
+  waiting?: (line?: string) => void;
+  /** Something was done and there is more to come: the line to show meanwhile. */
+  working?: (line: string) => void;
   /** Asked before anything is done after a wait: false when nobody waits for it any more. */
   wanted?: () => boolean;
 }
@@ -93,6 +110,92 @@ export class VoiceConversation {
   forget() {
     this.memory.clear();
     this.runner.reset();
+    this.answer({ kind: "dropped" });
+  }
+
+  // ── A question on screen (voice/result.ts `Ask`) ────────────────────────────
+
+  /** Told when a question goes up, and with null when it is answered or dropped. */
+  onAsk: ((ask: Ask | null) => void) | null = null;
+
+  private waitingFor: { ask: Ask; resolve: (answer: Answer) => void } | null = null;
+
+  /** The question waiting for its answer, if one is. */
+  get asked(): Ask | null {
+    return this.waitingFor?.ask ?? null;
+  }
+
+  /**
+   * Puts a question on screen and waits for the answer: a click, a key, or
+   * what is said next (island.ts passes them to `answer`). One at a time: a
+   * question asked over another drops the first. A question that cannot be
+   * shown is dropped at once.
+   */
+  askUser(ask: Ask): Promise<Answer> {
+    const shown = usable(ask);
+    if (!shown) return Promise.resolve({ kind: "dropped" });
+    this.answer({ kind: "dropped" });
+    return new Promise((resolve) => {
+      this.waitingFor = { ask: shown, resolve };
+      this.onAsk?.(shown);
+    });
+  }
+
+  /** The answer to the question on screen. False when none was waiting. */
+  answer(answer: Answer): boolean {
+    const waiting = this.waitingFor;
+    if (!waiting) return false;
+    this.waitingFor = null;
+    this.onAsk?.(null);
+    waiting.resolve(answer);
+    return true;
+  }
+
+  // ── A question about a name (voice/resolve.ts) ──────────────────────────────
+
+  /** The question about a name that is on screen: what it was about, and what was said in place of an answer. */
+  private naming: { asked: Asked; instead: string | null } | null = null;
+
+  /**
+   * A question about a name, which the runner now waits on, goes on screen
+   * when there is one to put it on (`onAsk`): the turn then waits for the
+   * click, the key or the word, and ends in what the answer led to. With no
+   * screen — a test, the evaluation — the question is the turn's result and
+   * the next sentence answers it, as it always did. Any other result is
+   * given back as it is.
+   */
+  private async onScreen(result: VoiceResult, how: Hearing): Promise<VoiceResult | null> {
+    const asked = result.outcome === "question" ? this.runner.asked : null;
+    if (!asked || !this.onAsk) return result;
+    this.runner.takeAsked();
+    this.naming = { asked, instead: null };
+    const answer = await this.askUser(asked.ask);
+    const instead = this.naming?.asked === asked ? this.naming.instead : null;
+    if (this.naming?.asked === asked) this.naming = null;
+    // Something else was said: another name, another command, a word about a permission.
+    if (instead != null) return this.answered(asked, instead, how);
+    return this.settle(asked, answer, how);
+  }
+
+  /**
+   * What was said while a question about a name is on screen, read the way
+   * such a question is answered: "yeah do it", the name itself, "the second
+   * one" — and "no, Discord" or a command, which are no answer but end the
+   * question and are acted on. True when the sentence was taken; false when
+   * it is not that kind of question, or the sentence says nothing about it
+   * (the island then reads it as for any question).
+   */
+  saidWhileAsked(said: string): boolean {
+    const naming = this.naming;
+    if (!naming || this.waitingFor == null) return false;
+    const { asked } = naming;
+    const answer = aboutPermission(said) ? { kind: "other" as const } : answerOf(said, asked.ask, asked.candidates.map((c) => c.label));
+    if (answer.kind === "unclear") return false;
+    if (answer.kind === "other") {
+      naming.instead = said;
+      return this.answer({ kind: "dropped" });
+    }
+    return this.answer(answer);
   }
 
   /** What was done last that a follow-up can build on. */
@@ -140,7 +243,7 @@ export class VoiceConversation {
     if (intents) {
       // A pill that was only nearly named is asked about, not acted on.
       const unsure = this.unsure(intents, matches, said);
-      if (unsure) return spokenTo ? unsure() : null;
+      if (unsure) return spokenTo ? this.onScreen(unsure(), how) : null;
       const done = await this.run(intents, said, how, follows ? follows.led : true, follows != null && !spokenTo);
       if (done !== undefined) return done;
     } else if (spokenTo) {
@@ -215,8 +318,8 @@ export class VoiceConversation {
         action = record.action ?? action;
         continue;
       }
-      // The name is looked up among what is installed, which takes a moment.
-      how.waiting?.();
+      // The name is looked up among what is installed, started, and watched for.
+      how.waiting?.(t("Opening {0}…", { 0: intent.name }));
       const app = await resolveName("app", intent.name);
       // Surely an app, or one of the user's folders: opened. An app the speech
       // model was not sure it heard is asked about below.
@@ -225,7 +328,7 @@ export class VoiceConversation {
         const record = recordOf(intent, pills, null, name);
         calls.push(...record.calls);
         action = record.action;
-        results.push(opened(name));
+        results.push(opened(name, this.world));
         continue;
       }
       if (intents.length > 1) {
@@ -239,7 +342,7 @@ export class VoiceConversation {
       // No app by that name: the nearest is asked about, at once. Looked for
       // in all that followed "open": "the squad", where the name is "squad".
       const near = app.is === "unsure" ? app : await resolveName("app", heardToOpen(said) || intent.name);
-      if (near.is === "unsure") return this.runner.askOpen(near.candidates.map((c) => c.label), said);
+      if (near.is === "unsure") return this.onScreen(this.runner.askOpen(near.candidates.map((c) => c.label), said), how);
       if (brain) return undefined;
       if (silent) return null;
       return this.remembered(said, [], notFound(intent.name), null);
@@ -265,7 +368,7 @@ export class VoiceConversation {
       const before = words.length - label.split(" ").length;
       return (near.scores?.[i] ?? 1) >= 0.99 && text.endsWith(` ${label}`) && before >= 1 && before <= 2;
     });
-    return app ? this.runner.askOpen([app], said) : null;
+    return app ? this.onScreen(this.runner.askOpen([app], said), how) : null;
   }
 
   /** What was said in answer to a question about a name. */
@@ -275,7 +378,7 @@ export class VoiceConversation {
     // is dropped and the sentence heard for what it is ("no, decline that").
     if (aboutPermission(said)) return this.hear(said, how);
     const answer = answerOf(said, asked.ask, asked.candidates.map((c) => c.label));
-    if (answer.kind === "unclear") return asked.rounds < MOST_ROUNDS ? this.runner.ask({ ...asked, rounds: asked.rounds + 1 }) : leftAsIs();
+    if (answer.kind === "unclear") return asked.rounds < MOST_ROUNDS ? this.onScreen(this.runner.ask({ ...asked, rounds: asked.rounds + 1 }), how) : leftAsIs();
     if (answer.kind !== "other") return this.settle(asked, answer, how);
 
     const intent = parseIntent(said, pills);
@@ -289,7 +392,7 @@ export class VoiceConversation {
       how.waiting?.();
       const app = await resolveName("app", name);
       if (app.is === "sure") return (await this.open(app.label, asked.said)) ?? notFound(name);
-      if (app.is === "unsure" && again) return this.runner.askOpen(app.candidates.map((c) => c.label), asked.said, asked.rounds + 1);
+      if (app.is === "unsure" && again) return this.onScreen(this.runner.askOpen(app.candidates.map((c) => c.label), asked.said, asked.rounds + 1), how);
       return notFound(name);
     }
     const one = asked.candidates.length === 1 && asked.candidates[0].id ? asked.candidates[0] : null;
@@ -301,7 +404,8 @@ export class VoiceConversation {
     if (!again || !question) return this.runner.run({ kind: "unknown" }, said);
     const label = pills.find((p) => p.id === match.id)?.name ?? match.id;
     const then = (id: string) => (id && id !== match.id ? intents.map((i) => renamed(i, match.id, id)) : intents);
-    return this.runner.ask({ ask: { kind: "yes_no", question }, candidates: [{ id: match.id, label }], then, said: asked.said, rounds: asked.rounds + 1 });
+    const next = this.runner.ask({ ask: { kind: "yes_no", question }, candidates: [{ id: match.id, label }], then, said: asked.said, rounds: asked.rounds + 1 });
+    return this.onScreen(next, how);
   }
 
   /** The answer, whichever way it was given: the candidate is acted on, or it is left. */
@@ -321,7 +425,7 @@ export class VoiceConversation {
   /** Opens the app by that name and remembers it as what `said` led to. Null: no such app. */
   private async open(name: string, said: string): Promise<VoiceResult | null> {
     const app = await openedName(name, this.world);
-    return app ? this.remembered(said, [{ name: "open_app", arguments: { name: app } }], opened(app), { kind: "open" }) : null;
+    return app ? this.remembered(said, [{ name: "open_app", arguments: { name: app } }], opened(app, this.world), { kind: "open" }) : null;
   }
 
   /**
@@ -345,25 +449,79 @@ export class VoiceConversation {
     const near = (await this.world.appsNear(said)).names;
     const hint = misheardApps(said, near);
     const system = systemPrompt(describeState(this.world, this.runner, pills), hint);
-    const proposal = await brain(system, said, toolSchemas(pills, hint), history);
+    const tools = toolSchemas(pills, hint);
+    let started = this.now();
+    // Asking is for after a tool has run; the time someone takes to answer is not the turn's.
+    let mayAsk = false;
+    const ask = async (question: Ask): Promise<Answer> => {
+      const answer = await this.askUser(question);
+      started = this.now();
+      return answer;
+    };
+    let proposal = await brain(system, said, tools, history);
     // Given up on meanwhile: what it proposes is done for nobody.
     if (how.wanted && !how.wanted()) return null;
 
     const calls: BrainCall[] = [];
     let action: VoiceAction | null = null;
     const mainBefore = this.runner.pillState().main;
-    const result = await runProposal(proposal ?? { calls: [], text: "" }, said, this.runner, this.world, pills, {
-      last,
-      quiet,
-      near,
-      meant: alone ? undefined : (meant ?? undefined),
-      ran: (call, intent) => {
-        calls.push(call);
-        action = actionOf(call, intent, pills, mainBefore) ?? action;
-      },
-    });
-    if (!result || result.outcome === "question") return result;
-    if (quiet && !understood(result, said)) return null;
+    // The model calls tools, is given what came of them, and goes on from
+    // there — or says what happened, in its own words.
+    const steps: BrainStep[] = [];
+    const shown: VoiceResult[] = [];
+    let words = "";
+    for (let round = 1; ; round++) {
+      const step: BrainStep = { calls: [], results: [] };
+      const result = await runProposal(proposal ?? { calls: [], text: "" }, said, this.runner, this.world, pills, {
+        last,
+        quiet,
+        near,
+        meant: alone ? undefined : (meant ?? undefined),
+        ran: (call, intent) => {
+          calls.push(call);
+          action = actionOf(call, intent, pills, mainBefore) ?? action;
+        },
+        ask: mayAsk ? ask : undefined,
+        each: (call, came) => {
+          step.calls.push(call);
+          step.results.push(JSON.stringify(came ? forModel(fromVoiceResult(came)) : { status: "done", result: "Nothing to do." }));
+        },
+      });
+      // A question, or a card that opened: the turn waits on the user.
+      if (!result || result.outcome === "question") {
+        if (shown.length && !result) break;
+        // A name a tool was not sure of: asked on screen like any other.
+        return result ? this.onScreen(result, how) : result;
+      }
+      shown.push(result);
+      // An answer and no tool, or nothing more to ask the model with.
+      if (!step.calls.length || quiet) break;
+      steps.push(step);
+      if (round >= MOST_MODEL_ROUNDS || this.now() - started >= TURN_BUDGET_MS) break;
+      how.working?.(result.message);
+      mayAsk = true;
+      const next = await within(brain(`${system}\n${AFTER_TOOLS}`, said, [...tools, ASK_USER], history, steps), WORDING_MS);
+      if (how.wanted && !how.wanted()) return null;
+      if (!next) break;
+      // A model that calls again what it just called has nothing more to do:
+      // nothing is done twice for one sentence.
+      const fresh = next.calls.filter((call) => !steps.some((s) => s.calls.some((made) => sameCall(made, call))));
+      if (fresh.length) {
+        proposal = { calls: fresh, text: "" };
+        continue;
+      }
+      if (next.calls.length) break;
+      words = next.text;
+      break;
+    }
+    if (!shown.length) return null;
+    // What went wrong is what is shown; else the last thing done.
+    const last_ = shown.find((r) => r.outcome === "failure") ?? shown[shown.length - 1];
+    if (quiet && !understood(last_, said)) return null;
+    // Mochi's words are the model's when its tools ran and it said something —
+    // but only for what worked. A model told a call was refused has still said
+    // "Spotify is now playing": what did not happen is said in the tool's own words.
+    const result = steps.length && last_.outcome === "success" ? { ...last_, message: spoken(words, last_.message) } : last_;
     return this.remembered(said, calls, result, action);
   }
 
@@ -371,6 +529,25 @@ export class VoiceConversation {
     this.memory.remember({ said, calls, result: result.message, action: result.outcome === "success" ? action : null }, this.now());
     return result;
   }
+}
+
+const sameCall = (a: BrainCall, b: BrainCall) => a.name === b.name && JSON.stringify(a.arguments ?? {}) === JSON.stringify(b.arguments ?? {});
+
+/** What a promise comes to, or null when it has not by then. */
+function within<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(null);
+      },
+    );
+  });
 }
 
 /** "No" to a question: nothing is done, and Mochi says so. */

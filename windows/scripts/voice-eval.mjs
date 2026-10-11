@@ -3,7 +3,7 @@
 // (src/voice) — against a model server on this machine, with fake music and
 // pills. A manual check, not a test: it needs a model and its answers vary.
 //
-//   node --import ./tests/setup.mjs scripts/voice-eval.mjs [models] [server]
+//   node --import ./tests/setup.mjs scripts/voice-eval.mjs [models] [server] [--words]
 //
 // `models`: one, or several separated by commas, each run on the whole table
 // and reported side by side. Defaults: the three installed for voice here
@@ -16,18 +16,23 @@
 // sentence with how sure the speech model was of each word (`sure`), or a
 // click on the question (`click`, an `Answer` of doc/voice-turns.md).
 //
-// What drives a turn is `TURNS` below: today the single round of
-// src/voice/conversation.ts. When the loop (src/voice/loop.ts) lands, give it
-// the same two functions — `hear` and `answer` — and name it with VOICE_TURNS.
+// A turn is driven the way the island drives it (`TURNS` below): a sentence
+// goes to the conversation, which may put a question on screen and wait; the
+// case's next step is then its answer — said, or clicked. The model's rounds
+// after the first (it is given what its tools came to, and words the answer)
+// are timed apart. `--words` prints what Mochi said for every turn a model
+// took part in.
 
 import { availablePills } from "../src/core/pills.ts";
+import { readSaid } from "../src/voice/asking.ts";
 import { VoiceConversation } from "../src/voice/conversation.ts";
 import { heardWith } from "../src/voice/resolve.ts";
 import { VoiceRunner } from "../src/voice/runner.ts";
 
-const MODELS = (process.argv[2] ?? "qwen2.5:7b-instruct,gemma4:e2b,gemma4:e4b").split(",").map((m) => m.trim()).filter(Boolean);
+const ARGS = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
+const MODELS = (ARGS[0] ?? "qwen2.5:7b-instruct,gemma4:e2b,gemma4:e4b").split(",").map((m) => m.trim()).filter(Boolean);
 let MODEL = MODELS[0];
-const SERVER = (process.argv[3] ?? "http://127.0.0.1:11434").replace(/\/$/, "");
+const SERVER = (ARGS[1] ?? "http://127.0.0.1:11434").replace(/\/$/, "");
 const PILLS = availablePills("windows");
 const WAITING = { agent: "Codex", request: "Bash: rm -rf dist" };
 /** What is installed, as Rust's lookup would find it by name. */
@@ -118,7 +123,7 @@ function setup() {
 }
 
 /** The earlier turns as messages: what src-tauri/src/voice/brain.rs `messages` builds. */
-function messages(system, history, said) {
+function messages(system, history, said, steps = []) {
   const list = [{ role: "system", content: system }];
   history.slice(-6).forEach((turn, t) => {
     list.push({ role: "user", content: turn.said });
@@ -134,18 +139,34 @@ function messages(system, history, said) {
     calls.forEach((_, i) => list.push({ role: "tool", tool_call_id: `call_${t}_${i}`, content: turn.result || "Done." }));
   });
   list.push({ role: "user", content: said });
+  // This turn's own rounds: `with_steps` in brain.rs.
+  steps.slice(0, 5).forEach((step, s) => {
+    if (!step.calls.length) return;
+    list.push({
+      role: "assistant", content: "",
+      tool_calls: step.calls.map((c, i) => ({ id: `step_${s}_${i}`, type: "function", function: { name: c.name, arguments: JSON.stringify(c.arguments ?? {}) } })),
+    });
+    step.calls.forEach((_, i) => list.push({ role: "tool", tool_call_id: `step_${s}_${i}`, content: step.results[i] || "No result." }));
+  });
   return list;
 }
 
 let asked = 0;
 
-async function ask(system, said, tools, history = []) {
+/** Rounds after the first, and how long each took: the model wording what its tools came to. */
+const wording = [];
+/** `--words`: print what Mochi said for every sentence, not only the wrong ones. */
+const WORDS = process.argv.includes("--words");
+
+async function ask(system, said, tools, history = [], steps = []) {
   asked += 1;
+  const began = performance.now();
   const reply = await fetch(`${SERVER}/v1/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MODEL, temperature: 0, stream: false, tools, messages: messages(system, history, said) }),
+    body: JSON.stringify({ model: MODEL, temperature: 0, stream: false, tools, messages: messages(system, history, said, steps) }),
   });
+  if (steps.length) wording.push(performance.now() - began);
   const message = (await reply.json()).choices?.[0]?.message ?? {};
   const calls = (message.tool_calls ?? []).map((c) => {
     let args = c.function?.arguments ?? {};
@@ -162,17 +183,52 @@ async function ask(system, said, tools, history = []) {
 }
 
 /**
- * What drives a turn: a sentence in, a result out, and an answer given by a
- * click. `single`: one round — the parser, a follow-up, a question, or one
- * request to the model (src/voice/conversation.ts). The loop goes here.
+ * What drives a turn, as the island does (src/island/island.ts): a sentence
+ * is heard; a question put on screen suspends the turn, and what comes next —
+ * a sentence or a click — is its answer. `hear` and `click` give what the
+ * card would show then: the turn's result, or the question now on screen.
  */
 const TURNS = {
-  single: (runner, world) => {
+  island: (runner, world) => {
     const conversation = new VoiceConversation(runner, world, () => PILLS, () => ask);
-    return { hear: (said) => conversation.hear(said), answer: (answer) => conversation.answerAsked(answer) };
+    /** The turn that waits on a question, and who is told when one goes up. */
+    let turn = null;
+    let asked = () => {};
+    conversation.onAsk = (question) => question && asked(question);
+    /** The turn's result, or the question it stopped on. */
+    const shown = async () => {
+      const question = new Promise((resolve) => (asked = resolve));
+      // Already up: a question can be asked before the sentence's first wait.
+      if (conversation.asked) asked(conversation.asked);
+      const came = await Promise.race([turn.then((result) => ({ result })), question.then((ask) => ({ ask }))]);
+      if ("ask" in came) return { outcome: "question", message: came.ask.question, ask: came.ask };
+      turn = null;
+      return came.result;
+    };
+    return {
+      async hear(said) {
+        const up = conversation.asked;
+        if (!turn || !up) {
+          turn = conversation.hear(said);
+          return shown();
+        }
+        // A question is up: a name's is read by the conversation, any other as the island reads it.
+        if (!conversation.saidWhileAsked(said)) {
+          const heard = readSaid(up, said);
+          // Not an answer: the question stays up, and is listened for again.
+          if (heard.is !== "answer") return { outcome: "question", message: up.question, ask: up };
+          conversation.answer(heard.answer);
+        }
+        return shown();
+      },
+      async click(answer) {
+        if (!turn || !conversation.answer(answer)) return null;
+        return shown();
+      },
+    };
   },
 };
-const DRIVER = process.env.VOICE_TURNS ?? "single";
+const DRIVER = process.env.VOICE_TURNS ?? "island";
 
 /**
  * What voice does with a sentence, or with several steps one after the
@@ -190,7 +246,7 @@ async function hear(steps) {
       heardWith(step, null);
       result = await turns.hear(step);
     } else if (step.click) {
-      result = await turns.answer(step.click);
+      result = await turns.click(step.click);
     } else {
       heardWith(step.said, step.sure);
       result = await turns.hear(step.said);
@@ -359,7 +415,8 @@ for (const model of MODELS) {
   MODEL = model;
   await ask("Say hi.", "hi", []); // loads the model
   console.log(`\n${model}`);
-  const row = { model, parts: [], wrong: 0, danger: 0, parser: [], byModel: [] };
+  const row = { model, parts: [], wrong: 0, danger: 0, parser: [], byModel: [], wording: [] };
+  wording.length = 0;
   for (const [part, cases] of PARTS) {
     let right = 0;
     for (const [said, expected] of cases) {
@@ -367,6 +424,8 @@ for (const model of MODELS) {
       const heard = await hear(steps);
       const verdict = judge(expected, heard);
       for (const turn of heard.taken) (turn.by === "model" ? row.byModel : row.parser).push(turn.ms);
+      const shown = steps.map((step) => (typeof step === "string" ? step : (step.said ?? `click ${JSON.stringify(step.click)}`)));
+      if (WORDS && heard.taken.some((turn) => turn.by === "model")) console.log(`  said   ${JSON.stringify(shown)} -> ${JSON.stringify(heard.result?.message ?? null)}`);
       if (verdict === "ok") {
         right += 1;
         continue;
@@ -374,23 +433,24 @@ for (const model of MODELS) {
       if (verdict === "DANGER") row.danger += 1;
       else row.wrong += 1;
       const by = heard.taken.some((turn) => turn.by === "model") ? "model" : "parser";
-      const shown = steps.map((step) => (typeof step === "string" ? step : (step.said ?? `click ${JSON.stringify(step.click)}`)));
       console.log(`  ${verdict.padEnd(6)} ${JSON.stringify(shown)} [${by}] did ${JSON.stringify(heard.log)} said ${JSON.stringify(heard.result?.message ?? null)}`);
     }
     row.parts.push(`${right}/${cases.length}`);
   }
+  row.wording = [...wording];
   report.push(row);
 }
 
 const total = PARTS.reduce((n, [, cases]) => n + cases.length, 0);
-console.log(`\n${DRIVER} round · ${total} cases · ${PARTS.map(([part, cases]) => `${part} ${cases.length}`).join(", ")}`);
-console.log("model                 | one sentence | misheard, follow-ups | turns | wrong | dangerous | a turn the parser answers | a turn the model answers");
+console.log(`\n${total} cases · ${PARTS.map(([part, cases]) => `${part} ${cases.length}`).join(", ")}`);
+console.log("model                 | one sentence | misheard, follow-ups | turns | wrong | dangerous | a turn the parser answers | a turn the model answers | of which: wording its answer");
 for (const row of report) {
   console.log(
     [
       row.model.padEnd(21), row.parts[0].padEnd(12), row.parts[1].padEnd(20), row.parts[2].padEnd(5), String(row.wrong).padEnd(5),
       String(row.danger).padEnd(9), `${median(row.parser).toFixed(1)} ms (${row.parser.length})`.padEnd(25),
       `${(median(row.byModel) / 1000).toFixed(2)} s median, ${(Math.max(0, ...row.byModel) / 1000).toFixed(2)} s longest (${row.byModel.length})`,
+      `${(median(row.wording) / 1000).toFixed(2)} s median, ${(Math.max(0, ...row.wording) / 1000).toFixed(2)} s longest (${row.wording.length} rounds)`,
     ].join(" | "),
   );
 }

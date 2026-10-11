@@ -1,5 +1,6 @@
 // Entry point: boot the bridge, wire the island, start the greeting.
 
+import type { Ask } from "./voice/result";
 import "./style.css";
 import { Bridge, IS_TAURI, onEvent } from "./core/bridge";
 import { Sound } from "./core/sound";
@@ -128,6 +129,11 @@ async function main() {
     Object.assign(window, {
       coucouVoice: (event: VoiceEvent) => applyVoice(island, event),
       coucouLevel: (level: number) => island.voiceLevel(level),
+      // A question as Mochi would ask it, e.g. coucouAsk({ kind: "choice", question: "Which account?",
+      // options: [{ id: "a", label: "Work" }, { id: "b", label: "Home" }] }), and the gray card: coucouWorking("Opening Spotify…").
+      coucouAsk: (ask: Ask) => island.voicePreviewAsk(ask),
+      coucouAskKey: (key: string) => island.voiceAskKey(key),
+      coucouWorking: (line: string | null) => island.voicePreviewWorking(line),
     });
   }
 }

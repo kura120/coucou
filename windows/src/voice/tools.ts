@@ -17,7 +17,9 @@ import { normalise, resolvePill, spokenForms } from "./entity";
 import { askNearlyNamed, nearlyNamed } from "./ask";
 import type { VoiceIntent } from "./intent";
 import type { VoiceAction } from "./memory";
+import type { Answer, Ask } from "./result";
 import type { VoiceResult, VoiceRunner } from "./runner";
+import { answerLine, usable } from "./asking";
 
 export interface BrainCall {
   name: string;
@@ -40,6 +42,11 @@ export interface VoiceWorld {
   cancelTimer(): boolean;
   /** The name of what was opened, or null when nothing by that name exists. */
   openApp(name: string): Promise<string | null>;
+  /**
+   * Whether the app `openApp` just started was seen to come to the front.
+   * Without it, what was started is taken to have come.
+   */
+  appSeen?(): boolean;
   /**
    * The installed apps nearest to what was heard, nearest first, for a
    * question: nothing is opened. `clear`: the first is the one to ask about.
@@ -144,6 +151,19 @@ export function systemPrompt(state: unknown, near: readonly string[] = []): stri
     `State: ${JSON.stringify(state)}`,
   ].join("\n");
 }
+
+/**
+ * What the model is told once its tools have run, on top of what it was told
+ * first: to go on if something is still to do, else to say what happened. The
+ * first round's prompt is left exactly as it was — it is what the checks and
+ * the evaluation were tuned on.
+ */
+export const AFTER_TOOLS = [
+  "The tools you called have run. Their results follow: status 'done' with verified true was seen to work; verified false was asked for but not seen;",
+  "'failed', 'not_found' and 'refused' did not happen.",
+  "If what the user asked still needs another tool, call it. Otherwise call no tool and say what happened in one short sentence, as Mochi, in plain words:",
+  "only what the results show — never say something worked when its result says otherwise, and say so when it did not.",
+].join(" ");
 
 // ── Checking what the model proposes ──────────────────────────────────────────
 
@@ -309,8 +329,8 @@ const FOLDER = /^(downloads?|desktop|documents?|pictures?|videos?|\w+ folder)$/;
  * that name. The one way in for "open …", from the parser and from a model.
  */
 export async function openNamed(name: string, world: VoiceWorld): Promise<VoiceResult | null> {
-  const opened = await openedName(name, world);
-  return opened ? ok(t("{0} opened", { 0: opened })) : null;
+  const app = await openedName(name, world);
+  return app ? opened(app, world) : null;
 }
 
 /** The same, as the name of what was opened. */
@@ -320,7 +340,12 @@ export async function openedName(name: string, world: VoiceWorld): Promise<strin
   return (FOLDER.test(wanted) ? await world.openFolder(wanted) : null) ?? (await world.openApp(wanted));
 }
 
-export const opened = (name: string) => ok(t("{0} opened", { 0: name }));
+/**
+ * What opening came to. "Opened" is for what was seen to come; an app that
+ * was started and not seen yet is said to have been asked for, no more.
+ */
+export const opened = (name: string, world?: Pick<VoiceWorld, "appSeen">) =>
+  ok(world?.appSeen?.() ?? true ? t("{0} opened", { 0: name }) : t("Asked Windows to open {0}", { 0: name }));
 
 export const notFound = (name: string) => fail(t("Not found: {0}", { 0: name.slice(0, 40) }));
 
@@ -377,6 +402,39 @@ export interface Heard {
   near?: readonly string[];
   /** Told of each call that was done, and as which intent when it was one. */
   ran?: (call: BrainCall, intent: VoiceIntent | null) => void;
+  /** Told of every call and what came of it, done or not: what a model is given back. */
+  each?: (call: BrainCall, result: VoiceResult | null) => void;
+  /**
+   * Puts a question on screen and waits for its answer. Given only once the
+   * model has seen a tool's result: a model that may ask from the start asks
+   * instead of doing (measured — doc/voice.md D19).
+   */
+  ask?: (ask: Ask) => Promise<Answer>;
+}
+
+/**
+ * The tool a model asks the user with, once its tools have run: a list to
+ * pick from, yes or no, or something to say or type. Offered only then.
+ */
+export const ASK_USER = fn(
+  "ask_user",
+  "Ask the user one short question when a tool's result leaves a choice only they can make (which account, which one of several, what exactly). "
+    + "Give 'options' (2 to 9 short labels) for a choice; kind 'yes_no' for a yes or no; kind 'text' for something they must say or type. "
+    + "Never ask what a tool can find out, and never to confirm what they already said.",
+  {
+    question: { type: "string" },
+    kind: { type: "string", enum: ["choice", "yes_no", "text"] },
+    options: { type: "array", items: { type: "string" } },
+  },
+  ["question"],
+);
+
+/** The question a model's `ask_user` call means, or null when it is none. */
+export function askOf(a: Record<string, unknown>): Ask | null {
+  const question = str(a.question);
+  const options = Array.isArray(a.options) ? a.options.filter((o): o is string => typeof o === "string" && o.trim() !== "") : [];
+  if (options.length >= 2) return usable({ kind: "choice", question, options: options.map((label, i) => ({ id: String(i + 1), label })) });
+  return usable(a.kind === "yes_no" ? { kind: "yes_no", question } : { kind: "text", question });
 }
 
 /** One call, checked and done. `null`: the user changed their mind — nothing to show. */
@@ -477,6 +535,15 @@ async function runCall(
       world.openUrl(url);
       return done(opened(new URL(url).hostname));
     }
+    case "ask_user": {
+      // Nothing is asked of someone who was not talking to Mochi, or before a tool has run.
+      const ask = heard.ask && !heard.quiet ? askOf(a) : null;
+      if (!ask || !heard.ask) return notUnderstood(said);
+      const answer = await heard.ask(ask);
+      heard.ran?.(call, null);
+      // For the model, which goes on from the answer; a card shows it only if the model then says nothing.
+      return answer.kind === "dropped" ? fail(t("OK, leaving it as is")) : ok(answerLine(ask, answer));
+    }
     case "ask_which_app": {
       // Nothing is asked of someone who was not talking to Mochi.
       if (heard.quiet) return notUnderstood(said);
@@ -524,6 +591,7 @@ export async function runProposal(
   const results: VoiceResult[] = [];
   for (const call of calls) {
     const result = await runCall(call, said, runner, world, pills, heard);
+    heard.each?.(call, result);
     if (result) results.push(result);
     // A question from Mochi ("which one do I remove?") stops the rest.
     if (result?.outcome === "question") return result;
