@@ -39,6 +39,7 @@ import type { VoiceResult } from "../voice/runner";
 import { keyAnswer, keysFor, readSaid } from "../voice/asking";
 import type { Answer, Ask } from "../voice/result";
 import { askRoom } from "../views/ask";
+import type { AppView } from "../voice/tools-app";
 import { installContextMenu, type ContextMenu, type Rect } from "../views/menu";
 
 const BOT_OVERHANG = 40;
@@ -136,6 +137,10 @@ export class Island {
     createWorld({
       showWaitingCard: () => this.showWaitingCard(),
       declineWaiting: () => this.declineWaiting(),
+      showView: (view) => this.voiceShowView(view),
+      prepareChat: (message) => this.voicePrepareChat(message),
+      settingsChanged: () => this.onVoiceSettings?.(),
+      pause: () => this.onVoicePause?.(),
     }),
   );
   /** Counts the sentences being understood: an answer that comes for an earlier one is dropped. */
@@ -687,6 +692,35 @@ export class Island {
   voiceLevel(level: number) {
     // Straight to the element: no redraw of the island, no frame of its own.
     this.listenGlow.style.setProperty("--level", String(Math.max(0, Math.min(1, level || 0))));
+  }
+
+  // ── The app's own tools (voice/tools-app.ts) ─────────────────────────────────
+
+  /** Set by main.ts: applies a settings change the way one from the Settings window is applied. */
+  onVoiceSettings: (() => void) | null = null;
+  /** Set by main.ts: the tray's Pause. */
+  onVoicePause: (() => void) | null = null;
+
+  /** "Show the chat", "open settings": the view comes up as its own button or shortcut brings it. */
+  private voiceShowView(view: AppView): boolean {
+    if (State.paused || State.pendingApproval) return false;
+    // After the result card has had its turn: the listening view closes first.
+    window.setTimeout(() => {
+      if (view === "settings") return void Bridge.openSettingsWindow();
+      if (view === "wardrobe") return this.wardrobeAnywhere();
+      this.alert(view === "chat" ? "prompt" : view === "recap" ? "recap" : State.defaultView());
+    }, 0);
+    return true;
+  }
+
+  /** "Tell the agent …": the chat opens with the words in its field; sending them is the user's. */
+  private voicePrepareChat(message: string): boolean {
+    if (State.paused || State.pendingApproval) return false;
+    window.setTimeout(() => {
+      this.alert("prompt");
+      this.views.get("prompt")?.prefill?.(message);
+    }, 0);
+    return true;
   }
 
   // ── A question on screen (voice/result.ts `Ask`, views/ask.ts) ───────────────

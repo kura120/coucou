@@ -213,6 +213,41 @@ fn open_url(url: String) {
     platform::open_url(&url);
 }
 
+/// Voice's "write an email to …": the mail app, on a draft for the user to
+/// read and send themselves. Nothing is sent from here, and what is handed to
+/// the system is a `mailto:` address built here, never one that came whole
+/// from a page: one recipient at most, everything else percent-encoded.
+#[tauri::command]
+fn open_mail_draft(to: String, subject: String, body: String) -> bool {
+    match mail_draft(&to, &subject, &body) {
+        Some(url) => {
+            platform::open_url(&url);
+            true
+        }
+        None => false,
+    }
+}
+
+/// The `mailto:` address for a draft, or None when the recipient is not one address.
+fn mail_draft(to: &str, subject: &str, body: &str) -> Option<String> {
+    let to = to.trim();
+    let address = |c: char| c.is_ascii_alphanumeric() || "._%+-@".contains(c);
+    if !to.is_empty() && !(to.len() <= 254 && to.matches('@').count() == 1 && to.chars().all(address)) {
+        return None;
+    }
+    let encode = |text: &str, most: usize| -> String {
+        text.chars()
+            .take(most)
+            .flat_map(|c| {
+                let mut bytes = [0u8; 4];
+                c.encode_utf8(&mut bytes).bytes().collect::<Vec<u8>>()
+            })
+            .map(|b| if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") })
+            .collect()
+    };
+    Some(format!("mailto:{to}?subject={}&body={}", encode(subject, 120), encode(body, 1500)))
+}
+
 /// "Open terminal" opens the working folder in VS Code when `code` is on PATH,
 /// and falls back to the file manager otherwise.
 #[tauri::command]
@@ -932,6 +967,7 @@ pub fn run() {
             voice::voice_status,
             voice::voice_cancel,
             voice::voice_followed,
+            open_mail_draft,
             voice::ask_keys::voice_ask_keys,
             voice::voice_grammar,
             voice::voice_talk,
@@ -1024,5 +1060,30 @@ mod tests {
         assert!(diff_file("").is_none());
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod mail_draft_tests {
+    use super::mail_draft;
+
+    #[test]
+    fn a_draft_is_one_recipient_at_most_and_everything_else_is_encoded() {
+        assert_eq!(mail_draft("ana@example.com", "Late", "I am late.").as_deref(), Some("mailto:ana@example.com?subject=Late&body=I%20am%20late."));
+        // No recipient: a draft to fill in.
+        assert_eq!(mail_draft("", "", "hi").as_deref(), Some("mailto:?subject=&body=hi"));
+        // What could add a recipient, a header or another address is not an address.
+        for to in ["ana@example.com,eve@example.com", "ana@example.com?bcc=eve@example.com", "ana@example.com&cc=eve@example.com", "Ana", "a@b@c", "ana @example.com"] {
+            assert_eq!(mail_draft(to, "s", "b"), None, "{to}");
+        }
+        // Nor can the subject or the text: every character that means something in an address is encoded.
+        let url = mail_draft("ana@example.com", "x&bcc=eve@example.com", "line one
+line two & more? yes #1 é").unwrap();
+        assert!(!url["mailto:ana@example.com?subject=".len()..].contains('@'));
+        assert_eq!(url.matches('&').count(), 1);
+        assert_eq!(url.matches('?').count(), 1);
+        assert!(url.contains("%0A") && url.contains("%C3%A9") && !url.contains('#'));
+        // Long text is cut, not refused.
+        assert!(mail_draft("", "", &"x".repeat(5000)).unwrap().len() < 1600);
     }
 }
