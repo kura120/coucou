@@ -121,8 +121,12 @@ async function main() {
   if (!IS_TAURI) {
     document.addEventListener("click", () => Sound.resume(), { once: true });
     // And no Rust to hear anything: what it would report can be typed in the
-    // console, e.g. coucouVoice({ phase: "woke", text: "" }).
-    Object.assign(window, { coucouVoice: (event: VoiceEvent) => applyVoice(island, event) });
+    // console, e.g. coucouVoice({ phase: "woke", text: "" }), and the
+    // microphone's level with coucouLevel(0.6).
+    Object.assign(window, {
+      coucouVoice: (event: VoiceEvent) => applyVoice(island, event),
+      coucouLevel: (level: number) => island.voiceLevel(level),
+    });
   }
 }
 

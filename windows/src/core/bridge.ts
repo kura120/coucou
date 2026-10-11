@@ -254,6 +254,8 @@ export const Bridge = {
   /** What the recogniser can hear after the wake phrase (voice/grammar.ts). */
   voiceGrammar: (commands: string[], slots: Record<string, string[]>) =>
     call<void>("voice_grammar", { commands, slots }),
+  /** What was said without the wake phrase was a command: another may follow it. */
+  voiceFollowed: () => call<void>("voice_followed"),
   /** Listens for a command without the wake phrase: the answer to a question. */
   voiceTalk: () => call<void>("voice_talk"),
   /**

@@ -185,8 +185,9 @@ that server and nowhere else; a toast says so once if it is not this computer.
 
 **Free speech.** Windows' recogniser only hears the sentences it was given.
 **Hear free speech** in Settings → Voice downloads an engine that hears anything
-(sherpa-onnx with the Moonshine tiny English model, 37 MB, from the project's
-GitHub releases, checked against a pinned SHA-256) and uses it for the command:
+(sherpa-onnx with the Moonshine tiny English model and the Silero voice
+detector, 38 MB, from the project's GitHub releases, checked against a pinned
+SHA-256) and uses it for the command:
 
 - "OK Coucou" is still heard by Windows' recogniser — the free engine writes
   "coucou" a different way every time — and then the command is yours to word:
@@ -194,9 +195,11 @@ GitHub releases, checked against a pinned SHA-256) and uses it for the command:
   stop speaking, in a few hundredths of a second.
 - **Keep listening after a command**: for a few seconds (8 by default) after a
   command, another can be said without the wake phrase. The view closes as
-  usual; Mochi keeps his listening look and a small orange dot sits beside him
-  for as long as he still listens. Anything said nearby in that time is heard
-  as a command too, so turn it off in a noisy room.
+  usual; Mochi keeps his listening look and an orange glow stays under the
+  island, moving with your voice, for as long as he still listens. Anything said nearby in that time is heard
+  too, but the island opens only when it is a command: a keyboard is not taken
+  for a voice, and a word to someone else shows nothing unless the model, when
+  one is chosen, finds a command in it.
 - A command is at most about seven seconds: the model that writes it down
   fails on ten seconds and more, so a longer sentence — or music that never
   pauses — is cut there.

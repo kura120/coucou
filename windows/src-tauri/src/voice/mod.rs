@@ -22,7 +22,9 @@
 // wake phrase is still Windows' — it hears "coucou" where the free engine does
 // not — and the command after it is free speech: the microphone is read here
 // (capture.rs), a sentence is cut out of it (vad.rs) and written down. For a
-// few seconds after a command, another may follow without the wake phrase.
+// few seconds after a command, another may follow without the wake phrase:
+// whatever is said then is handed to the island, which shows something only
+// when it is a command, and says so (`voice_followed`).
 // And the two may be one breath, "OK Coucou, next track": Windows' recogniser
 // says when in the sentence the wake phrase ended, and what the microphone
 // gave after that moment is written down.
@@ -33,8 +35,10 @@
 //
 // The island is told with one event, `voice`: { phase, text }, phase being
 // "woke", "partial", "final", "missed" or "cancelled" — and "following" /
-// "rested" around the time another command may follow without the wake phrase. Settings follows
-// `voice-status`.
+// "rested" around the time another command may follow without the wake phrase,
+// "again" being a sentence said in that time. Settings follows `voice-status`.
+// While the bundled engine listens for a command, `voice-level` says how loud
+// the microphone hears (0…1), for the glow under the island.
 
 use std::collections::BTreeMap;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
@@ -67,6 +71,9 @@ use session::{Heard, Listen, Raw, Rule, Session};
 
 const EVENT: &str = "voice";
 const STATUS_EVENT: &str = "voice-status";
+const LEVEL_EVENT: &str = "voice-level";
+/// How often the island is told the microphone's level: about 15 times a second.
+const LEVEL_EVERY: Duration = Duration::from_millis(66);
 
 /// How long one wait for speech lasts before the thread looks at its messages.
 const POLL: Duration = Duration::from_millis(200);
@@ -113,6 +120,8 @@ pub enum Status {
 enum Control {
     Talk,
     Cancel,
+    /// What was said without the wake phrase was a command.
+    Followed,
     Paused(bool),
     /// Mochi is speaking until then: nothing heard meanwhile is a command.
     Hush(Instant),
@@ -322,6 +331,13 @@ pub fn voice_cancel() {
     send(&shared(), Control::Cancel);
 }
 
+/// The sentence said without the wake phrase was a command, and is done:
+/// another may follow it in turn.
+#[tauri::command]
+pub fn voice_followed() {
+    send(&shared(), Control::Followed);
+}
+
 /// `generation`: only the listener still in charge may speak; None for `sync`.
 fn set_status(app: &AppHandle, generation: Option<u64>, status: Status) {
     {
@@ -352,14 +368,11 @@ fn tell(app: &AppHandle, heard: Heard) {
         Heard::Final(text) => ("final", text),
         Heard::Missed => ("missed", String::new()),
         Heard::Cancelled => ("cancelled", String::new()),
-        // The island opens on its listening view again, then hears the command.
-        Heard::Again(text) => {
-            tell(app, Heard::Woke);
-            ("final", text)
-        }
+        // The island shows nothing unless it makes a command of it.
+        Heard::Again(text) => ("again", text),
     };
-    // Never the words: docs/VOICE.md.
-    if phase != "partial" {
+    // Never the words: docs/VOICE.md. Nor every sentence said near a microphone.
+    if !matches!(phase, "partial" | "again") {
         crate::log::line(format!("voice: {phase}"));
     }
     let _ = app.emit_to(WINDOW_LABEL, EVENT, Event { phase, text });
@@ -379,6 +392,8 @@ struct Free {
     /// The sentence being said started with the wake phrase, which ended this
     /// long into it.
     after_wake: Option<Duration>,
+    /// The loudest the microphone has heard since it was last asked.
+    peak: f32,
 }
 
 /// How long ago a sentence may have ended and still be the one Windows'
@@ -395,14 +410,23 @@ impl Free {
             crate::log::line("voice: the bundled engine is chosen but not installed");
             return None;
         }
+        // A keyboard is as loud as a voice: the detector is what tells them apart.
+        let sentences = match sherpa::Detector::load(&engine::runtime_dir(), &engine::detector_file(), vad::SILENCE_SECONDS) {
+            Ok(detector) => vad::Sentences::of_voices(detector),
+            Err(why) => {
+                crate::log::line(format!("voice: no voice detector, loudness instead: {why}"));
+                vad::Sentences::default()
+            }
+        };
         match sherpa::Engine::load(&engine::runtime_dir(), &engine::model_dir(engine::Part::Hearing)) {
             Ok(engine) => Some(Self {
                 engine,
                 capture: None,
-                sentences: vad::Sentences::default(),
+                sentences,
                 buffer: Vec::new(),
                 recent: None,
                 after_wake: None,
+                peak: 0.0,
             }),
             Err(why) => {
                 crate::log::line(format!("voice: bundled engine: {why}"));
@@ -472,6 +496,7 @@ impl Free {
         let Some(capture) = self.capture.as_mut() else { return Ok(None) };
         self.buffer.clear();
         capture.read(wait, &mut self.buffer)?;
+        self.peak = self.peak.max(vad::loudness(&self.buffer));
         let Some(sentence) = self.sentences.feed(&self.buffer) else { return Ok(None) };
         if !wanted {
             self.recent = Some((Instant::now(), sentence));
@@ -486,6 +511,11 @@ impl Free {
 
     fn speaking(&self) -> bool {
         self.sentences.speaking()
+    }
+
+    /// How loud it has been since the last time this was asked, 0…1.
+    fn loudest(&mut self) -> f32 {
+        std::mem::take(&mut self.peak)
     }
 }
 
@@ -523,6 +553,10 @@ impl Free {
     fn speaking(&self) -> bool {
         false
     }
+
+    fn loudest(&mut self) -> f32 {
+        0.0
+    }
 }
 
 fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &Receiver<Control>) {
@@ -543,6 +577,8 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
     let mut hush_until: Option<Instant> = None;
     // The command is the rest of the sentence that woke Coucou: not to be forgotten.
     let mut same_breath = false;
+    let mut level = vad::Level::default();
+    let mut level_told = Instant::now();
 
     loop {
         // Messages first: a wait for speech below never lasts longer than POLL.
@@ -640,6 +676,14 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
                 } else if freely && free.speaking() {
                     session.speaking(Instant::now());
                 }
+                // The glow under the island moves with the voice, not with Mochi's.
+                if freely && level_told.elapsed() >= LEVEL_EVERY {
+                    level_told = Instant::now();
+                    let loudest = free.loudest();
+                    if let Some(level) = level.step(if hushed { 0.0 } else { loudest }) {
+                        let _ = app.emit_to(WINDOW_LABEL, LEVEL_EVENT, level);
+                    }
+                }
             }
             if hushed {
                 raw = None;
@@ -681,6 +725,10 @@ fn apply(
         Control::Talk => session.talk(Instant::now()),
         Control::Cancel => {
             session.cancel();
+            None
+        }
+        Control::Followed => {
+            session.followed(Instant::now());
             None
         }
         Control::Paused(on) => {

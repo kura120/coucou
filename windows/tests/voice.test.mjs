@@ -5,7 +5,8 @@
 import { afterEach, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { IslandStateMachine } from "../src/island/fsm.ts";
-import { applyVoice, decodeSpeech, speechGain, wakeBlocked } from "../src/island/voice.ts";
+import { applyVoice, decodeSpeech, followUpKind, speechGain, wakeBlocked } from "../src/island/voice.ts";
+import { availablePills } from "../src/core/pills.ts";
 import { VIEW_LAYOUTS, islandSize } from "../src/core/layout.ts";
 import { isCard, isPlace } from "../src/island/restore.ts";
 import { SHORTCUTS, activeKeys } from "../src/core/shortcuts.ts";
@@ -144,6 +145,8 @@ test("each report reaches the island as what it is", () => {
     voiceMissed: () => calls.push("missed"),
     voiceCancelled: () => calls.push("cancelled"),
     voiceFollowing: (on) => calls.push(on ? "following" : "rested"),
+    voiceAgain: (text) => calls.push(`again:${text}`),
+    voiceLevel: () => calls.push("level"),
   };
   for (const [phase, text] of [["woke", ""], ["partial", "next"], ["final", "next track"], ["missed", ""], ["cancelled", ""]]) {
     applyVoice(island, { phase, text });
@@ -153,9 +156,26 @@ test("each report reaches the island as what it is", () => {
   applyVoice(island, { phase: "following", text: "" });
   applyVoice(island, { phase: "rested", text: "" });
   assert.deepEqual(calls.slice(5), ["following", "rested"]);
+  // A sentence said in that time is not a command yet.
+  applyVoice(island, { phase: "again", text: "pause" });
+  assert.deepEqual(calls.slice(7), ["again:pause"]);
   // A phase a later build might add is ignored, not an error.
   applyVoice(island, { phase: "something-new", text: "" });
-  assert.equal(calls.length, 7);
+  assert.equal(calls.length, 8);
+});
+
+test("what is said without the wake phrase shows something only when it is a command", () => {
+  const pills = availablePills("windows");
+  assert.equal(followUpKind("next track", pills, false), "command");
+  assert.equal(followUpKind("Pause, and then add GitHub.", pills, false), "command");
+  // Typing taken for words, or a word to someone else: nothing, where before
+  // the island opened to say "not recognised".
+  assert.equal(followUpKind("see you at four then", pills, false), "nothing");
+  assert.equal(followUpKind("the cat sat on it", pills, false), "nothing");
+  // A model may make something of it: asked without a word on screen.
+  assert.equal(followUpKind("see you at four then", pills, true), "ask");
+  // "Never mind" has nothing to cancel.
+  assert.equal(followUpKind("never mind", pills, true), "nothing");
 });
 
 // ── Mochi's voice ─────────────────────────────────────────────────────────────
