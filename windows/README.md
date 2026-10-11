@@ -140,12 +140,33 @@ command. A card says what was done, and the island goes back to where it was.
 | "remove Notion", "hide Stripe and Notion" | Undeclares them. |
 | "replace n8n with GitHub", "keep only GitHub and Vercel" | Both at once. |
 | "switch to Cursor", "use Codex" | Changes the main pill (workspace tools only). |
-| "open Discord", "launch Visual Studio Code", "open my downloads" | Starts that app, or opens that folder of yours. Any app Windows lists under All apps, Microsoft Store apps included, by its name — and by what the name was heard as: "this cord" is Discord. Two apps as close as each other, and nothing is opened. |
+| "open Discord", "launch Visual Studio Code", "open my downloads" | Starts that app, or opens that folder of yours. Any app Windows lists under All apps, Microsoft Store apps included, by its name — and by what the name was heard as: "this cord" is Discord. A name that is no app is asked about (below); nothing is opened on a guess. |
+| "what about Steam?", "and Vercel too", "same for Stripe", "no, Discord", "put it back" | The last thing done, again with that name — or undone. See below. |
 | "never mind" | Closes without doing anything. |
 
 With six pills already there, "add Gemini" makes Mochi ask **which one to
 remove**: say its name and the two are swapped, say nothing and it is left as
 it is. Spotify takes no slot, as everywhere else.
+
+**Did you mean.** When "open …" names no installed app — the speech model
+wrote "spy flight" for Spotify — Mochi asks instead of giving up: **"Open
+Spotify?"**, or **"Spotify or Steam?"** when two are as near. "Yes", "yeah" or
+"do it" opens it; "no", "never mind" or saying nothing leaves it; another
+name said instead is tried. The nearest apps are found on this computer, by
+letters and by sound, without waiting for a model, and a guess is never opened
+without the yes. Nothing near is said at once. Windows' own recogniser is
+given no "yes" (it would hear one in too much): there, the app's name is the
+answer.
+
+**A short memory.** For a minute and a half after a command, a sentence with
+no verb builds on it: after "open Spotify", "what about Steam?" opens Steam;
+after "add GitHub", "and Vercel too" adds Vercel; "put it back" or "undo"
+takes the last change back (a pill, the main pill, pause and play — not an app
+that was opened). After the wake phrase a bare name is enough ("Steam");
+without it, only a sentence that says it follows ("and …", "what about …").
+The last few turns are kept in memory only — never on disk, never in the log —
+and are forgotten when voice is turned off. Nothing about a permission is ever
+carried over from the sentence before.
 
 - **Windows only, English only, for now.** It uses Windows' own speech
   recogniser, which needs the English speech pack (Settings → Time & language →
@@ -183,11 +204,19 @@ of your folders or a web address — or it answers a question
 about what Coucou shows. The model only proposes: every call is checked against
 what was actually said before anything happens. A pill is touched only if the
 sentence names it, a permission is declined only if the sentence says decline,
-deny, refuse or reject, and asking to allow one just brings its card up. On a
-table of 38 sentences said freely, `qwen2.5:7b-instruct` got 36 right in about
-0.2 s each, none of them dangerous (`node --import ./tests/setup.mjs
-scripts/voice-eval.mjs`); the checks were tuned on that same table, so expect
-less on sentences it has not seen. What you say and what Coucou shows go to
+deny, refuse or reject, and asking to allow one just brings its card up. The
+model is also given the last few turns, so a follow-up arrives with what it
+follows, and — only when a name in the sentence may be a misheard app — the
+two or three installed apps it sounds like, which it may ask about; what it
+makes of a name is asked ("Open Discord?"), never opened. A word for opening
+may come from the turn before, and only after something was opened. On a table
+of 39 sentences said freely, `qwen2.5:7b-instruct` got 39 right in about 0.2 s
+each, and 27 of 28 exchanges with a misheard name or a follow-up, none of them
+dangerous (`node --import ./tests/setup.mjs scripts/voice-eval.mjs`); the
+checks were tuned on that same table, so expect less on sentences it has not
+seen. A model the server has to load first takes about five seconds: it is
+asked for as soon as Coucou is woken, and an answer that takes more than six
+seconds is given up on, with a card that says so. What you say and what Coucou shows go to
 that server and nowhere else; a toast says so once if it is not this computer.
 
 **Free speech.** Windows' recogniser only hears the sentences it was given.

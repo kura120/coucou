@@ -1,6 +1,8 @@
 // What a sentence means when the parser does not know: the question is put to
 // the model server the user connected (Ollama, LM Studio or their own), with
-// the tools Coucou offers. The model proposes — tool calls, or a short answer —
+// the tools Coucou offers and the last few turns, so "what about Steam?" comes
+// with what it follows. Those turns are the island's, kept in memory there for
+// a minute and a half: nothing of them is kept here, written or logged. The model proposes — tool calls, or a short answer —
 // and the island decides what is done with them (src/voice/tools.ts). Nothing
 // here acts.
 //
@@ -9,10 +11,11 @@
 // the user; a toast says so the first time, once per address.
 
 use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::AppHandle;
 
@@ -27,6 +30,28 @@ const MAX_SYSTEM: usize = 16 * 1024;
 const MAX_SAID: usize = 600;
 const MAX_TOOLS: usize = 48 * 1024;
 const MAX_CALLS: usize = 6;
+/// The turns before this one: a few exchanges, each a sentence and a line.
+const MAX_TURNS: usize = 6;
+const MAX_TURN_CALLS: usize = 3;
+const MAX_RESULT: usize = 240;
+
+/// A turn that came before: what was said, what was done for it (as the tool
+/// calls a model would have made) and what came of it.
+#[derive(Debug, Deserialize)]
+pub struct Turn {
+    pub said: String,
+    #[serde(default)]
+    pub calls: Vec<Called>,
+    #[serde(default)]
+    pub result: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Called {
+    pub name: String,
+    #[serde(default)]
+    pub arguments: Value,
+}
 
 #[derive(Debug, Serialize, PartialEq)]
 pub struct Call {
@@ -40,10 +65,45 @@ pub struct Reply {
     pub text: String,
 }
 
+/// Loading a model that the server let go of takes about five seconds here.
+const WARM_UP: Duration = Duration::from_secs(30);
+
+/// A warm-up is on its way: one at a time.
+static WARMING: AtomicBool = AtomicBool::new(false);
+
+/// Coucou was just woken: the model that may be asked about the sentence is
+/// got into the server's memory while the sentence is still being said. A
+/// server lets go of a model nobody asked for a few minutes (Ollama: five),
+/// and the island does not wait long for an answer. One word is asked for —
+/// nothing of the user's — and only of a server on this computer: one
+/// somewhere else is sent nothing before there is a sentence for it.
+pub fn warm(settings: &Settings) {
+    let Some(server) = local_chat::server(settings, &settings.voice.brain) else { return };
+    let model = settings.voice.brain_model.trim().to_string();
+    let here = net::normalise_server_url(&server.url).is_ok_and(|url| net::is_loopback_url(&url));
+    if model.is_empty() || !here || WARMING.swap(true, Ordering::Relaxed) {
+        return;
+    }
+    tauri::async_runtime::spawn(async move {
+        let body = json!({ "model": model, "messages": [{ "role": "user", "content": "ok" }], "max_tokens": 1, "stream": false });
+        if let Err(why) = local_chat::complete(&server, &body, WARM_UP).await {
+            crate::log::line(format!("voice: the model is not ready: {}", why.chars().take(160).collect::<String>()));
+        }
+        WARMING.store(false, Ordering::Relaxed);
+    });
+}
+
 /// Addresses the "not on this machine" toast was shown for, this run.
 static WARNED: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
 
-pub async fn ask(app: &AppHandle, settings: &Settings, system: &str, said: &str, tools: &Value) -> Result<Reply, String> {
+pub async fn ask(
+    app: &AppHandle,
+    settings: &Settings,
+    system: &str,
+    said: &str,
+    tools: &Value,
+    history: &[Turn],
+) -> Result<Reply, String> {
     let server = local_chat::server(settings, &settings.voice.brain).ok_or("no model server is chosen for voice")?;
     let model = settings.voice.brain_model.trim();
     if model.is_empty() {
@@ -67,16 +127,54 @@ pub async fn ask(app: &AppHandle, settings: &Settings, system: &str, said: &str,
     }
     let body = json!({
         "model": model,
-        "messages": [
-            { "role": "system", "content": system },
-            { "role": "user", "content": said },
-        ],
+        "messages": messages(system, history, said),
         "tools": tools,
         "temperature": 0,
         "stream": false,
     });
     let answer = local_chat::complete(&server, &body, TIMEOUT).await?;
     Ok(read(&answer))
+}
+
+/// The conversation as the server is given it: what the app is, the turns so
+/// far, the sentence. A turn that called tools is the call and, right after it,
+/// its result — a server refuses a call left without one — and one that only
+/// answered is its answer. The oldest turns go first when there are too many.
+pub fn messages(system: &str, history: &[Turn], said: &str) -> Vec<Value> {
+    let cut = |text: &str, most: usize| text.chars().take(most).collect::<String>();
+    let mut messages = vec![json!({ "role": "system", "content": system })];
+    let turns = &history[history.len().saturating_sub(MAX_TURNS)..];
+    for (turn_at, turn) in turns.iter().enumerate() {
+        if turn.said.trim().is_empty() {
+            continue;
+        }
+        messages.push(json!({ "role": "user", "content": cut(&turn.said, MAX_SAID) }));
+        let result = cut(&turn.result, MAX_RESULT);
+        let calls: Vec<&Called> =
+            turn.calls.iter().filter(|call| !call.name.trim().is_empty() && call.name.len() <= 64).take(MAX_TURN_CALLS).collect();
+        if calls.is_empty() {
+            if !result.is_empty() {
+                messages.push(json!({ "role": "assistant", "content": result }));
+            }
+            continue;
+        }
+        let id = |call_at: usize| format!("call_{turn_at}_{call_at}");
+        let called: Vec<Value> = calls
+            .iter()
+            .enumerate()
+            .map(|(call_at, call)| {
+                let arguments = if call.arguments.is_object() { call.arguments.to_string() } else { "{}".to_string() };
+                json!({ "id": id(call_at), "type": "function", "function": { "name": call.name.trim(), "arguments": arguments } })
+            })
+            .collect();
+        messages.push(json!({ "role": "assistant", "content": "", "tool_calls": called }));
+        for call_at in 0..calls.len() {
+            let content = if result.is_empty() { "Done." } else { result.as_str() };
+            messages.push(json!({ "role": "tool", "tool_call_id": id(call_at), "content": content }));
+        }
+    }
+    messages.push(json!({ "role": "user", "content": said }));
+    messages
 }
 
 /// The tool calls and the text of an OpenAI-style answer. Arguments arrive as
@@ -118,6 +216,45 @@ pub fn read(answer: &Value) -> Reply {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn earlier_turns_go_before_the_sentence_and_no_call_is_left_without_its_result() {
+        let turn = |said: &str, calls: Value, result: &str| -> Turn {
+            serde_json::from_value(json!({ "said": said, "calls": calls, "result": result })).unwrap()
+        };
+        let history = vec![
+            turn("open spotify", json!([{ "name": "open_app", "arguments": { "name": "Spotify" } }]), "Spotify opened"),
+            turn("what's playing", json!([]), "Get Lucky"),
+            turn("add github and pause", json!([{ "name": "add_pills", "arguments": { "pills": ["GitHub"] } }, { "name": "music" }]), ""),
+            turn("  ", json!([{ "name": "music" }]), "x"),
+            turn("mumble", json!([{ "name": "" }]), ""),
+        ];
+        let messages = messages("system", &history, "what about steam");
+        let roles: Vec<&str> = messages.iter().map(|m| m["role"].as_str().unwrap()).collect();
+        assert_eq!(roles, ["system", "user", "assistant", "tool", "user", "assistant", "user", "assistant", "tool", "tool", "user", "user"]);
+        assert_eq!(messages[2]["tool_calls"][0]["function"]["arguments"], "{\"name\":\"Spotify\"}");
+        assert_eq!(messages[3]["content"], "Spotify opened");
+        assert_eq!(messages[5]["content"], "Get Lucky");
+        assert_eq!(messages[7]["tool_calls"][1]["function"]["arguments"], "{}");
+        assert_eq!(messages[9]["content"], "Done.");
+        assert_eq!(messages.last().unwrap(), &json!({ "role": "user", "content": "what about steam" }));
+        // Every call has its result, by the same id, right after it.
+        for (at, message) in messages.iter().enumerate() {
+            for (n, call) in message["tool_calls"].as_array().into_iter().flatten().enumerate() {
+                let result = &messages[at + 1 + n];
+                assert_eq!(result["role"], "tool");
+                assert_eq!(result["tool_call_id"], call["id"]);
+            }
+        }
+        // No history is the two messages it always was.
+        assert_eq!(super::messages("s", &[], "hi").len(), 2);
+        // Only the last few turns, and long ones cut.
+        let many: Vec<Turn> = (0..20).map(|i| turn(&format!("turn {i}"), json!([]), &"x".repeat(1000))).collect();
+        let messages = super::messages("s", &many, "now");
+        assert_eq!(messages.len(), 2 + 2 * MAX_TURNS);
+        assert_eq!(messages[1]["content"], "turn 14");
+        assert_eq!(messages[2]["content"].as_str().unwrap().len(), MAX_RESULT);
+    }
 
     #[test]
     fn tool_calls_are_read_whether_arguments_come_as_text_or_as_an_object() {

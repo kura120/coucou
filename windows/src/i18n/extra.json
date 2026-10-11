@@ -4414,6 +4414,39 @@
    "pt-BR": "O som de cada frase é enviado ao servidor deste modelo, neste computador, e a nenhum outro lugar. Precisa ser um modelo que aceite áudio, como o Gemma 4. Quando ele não responde a tempo, um modelo baixado ouve no lugar dele.",
    "ru": "Звук каждой фразы отправляется на сервер этой модели, на этом компьютере, и больше никуда. Нужна модель, которая принимает аудио, например Gemma 4. Если она не отвечает вовремя, вместо неё слушает загруженная модель.",
    "id": "Suara setiap kalimat dikirim ke server model ini, di komputer ini, dan tidak ke tempat lain. Modelnya harus menerima audio, seperti Gemma 4. Jika tidak menjawab tepat waktu, model yang diunduh yang mendengarkan."
+  },
+  "Open {0}?": {
+   "zh-Hans": "打开 {0}？",
+   "hi": "{0} खोलूँ?",
+   "es": "¿Abrir {0}?",
+   "ar": "أفتح {0}؟",
+   "fr": "Ouvrir {0} ?",
+   "bn": "{0} খুলব?",
+   "pt-BR": "Abrir {0}?",
+   "ru": "Открыть {0}?",
+   "id": "Buka {0}?"
+  },
+  "{0} or {1}?": {
+   "zh-Hans": "{0} 还是 {1}？",
+   "hi": "{0} या {1}?",
+   "es": "¿{0} o {1}?",
+   "ar": "{0} أم {1}؟",
+   "fr": "{0} ou {1} ?",
+   "bn": "{0} না {1}?",
+   "pt-BR": "{0} ou {1}?",
+   "ru": "{0} или {1}?",
+   "id": "{0} atau {1}?"
+  },
+  "That took too long. Say it again.": {
+   "zh-Hans": "等得太久了。请再说一遍。",
+   "hi": "इसमें बहुत देर लग गई। फिर से कहिए।",
+   "es": "Ha tardado demasiado. Dilo otra vez.",
+   "ar": "استغرق ذلك وقتًا طويلًا. قلها مرة أخرى.",
+   "fr": "C'était trop long. Redis-le.",
+   "bn": "অনেক বেশি সময় লাগল। আবার বলুন।",
+   "pt-BR": "Demorou demais. Diga de novo.",
+   "ru": "Слишком долго. Скажите ещё раз.",
+   "id": "Terlalu lama. Ucapkan lagi."
   }
  }
 }

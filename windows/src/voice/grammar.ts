@@ -39,14 +39,25 @@ const ANSWER = ["{pill}"];
 
 const CANCEL = ["never mind", "cancel", "forget it"];
 
-/** Any installed app, by its name: heard only when Rust has said which there are. */
-const OPEN = ["open {app}", "launch {app}"];
+/**
+ * What only means something after the command before it (voice/memory.ts):
+ * the same again with another name, or the last change taken back.
+ */
+const FOLLOW_UP = ["and {pill} too", "also {pill}", "same for {pill}", "what about {pill}", "put it back", "undo"];
+
+/**
+ * Any installed app, by its name: heard only when Rust has said which there
+ * are. Its name alone is the answer to "Open Spotify?" — this recogniser is
+ * given no "yes", which it would hear in too much — and the app to open next
+ * after one was opened; "no" leaves the question be.
+ */
+const OPEN = ["open {app}", "launch {app}", "what about {app}", "and {app}", "{app}", "no"];
 
 /** `apps`: the installed apps' names as they can be said (Rust's `voice_apps`). */
 export function buildGrammar(pills: readonly PillDefinition[], apps: readonly string[] = []): VoiceGrammar {
   const said = (list: readonly PillDefinition[]) => [...new Set(list.flatMap(spokenForms))];
   return {
-    commands: [...MUSIC, ...PILLS, ...MAIN_PILL, ...ANSWER, ...CANCEL, ...(apps.length ? OPEN : [])],
+    commands: [...MUSIC, ...PILLS, ...MAIN_PILL, ...ANSWER, ...CANCEL, ...FOLLOW_UP, ...(apps.length ? OPEN : [])],
     slots: {
       pill: said(pills),
       workspace: said(pills.filter((p) => p.category === "workspace")),

@@ -12,8 +12,9 @@ import { lastTextStep } from "../core/diff";
 import { Sound } from "../core/sound";
 import { language, t } from "../i18n/i18n";
 import { showToast } from "../toast/api";
-import { describeState, notFound, openNamed, runProposal, systemPrompt, toolSchemas, understood, type VoiceWorld } from "../voice/tools";
-import type { VoiceIntent } from "../voice/intent";
+import type { VoiceWorld } from "../voice/tools";
+import { VoiceConversation } from "../voice/conversation";
+import { resolveRelative, type VoiceAction } from "../voice/memory";
 import { SPOTIFY_ID, Spotify } from "../core/spotify";
 import { State } from "../core/state";
 import { buildGrammar } from "../voice/grammar";
@@ -23,6 +24,12 @@ import { VoiceRunner, type MusicControls, type PillControls, type VoiceResult } 
 
 /** How long a result stays on screen before the island goes back. */
 export const RESULT_SHOWN_MS = 2000;
+/**
+ * How long an answer is waited for — a lookup, a model — before the card says
+ * it took too long. A model already in memory answers in a fifth of a second;
+ * one that has to be loaded first takes about five.
+ */
+export const VOICE_PATIENCE_MS = 6000;
 
 export interface VoiceEvent {
   phase: "woke" | "partial" | "final" | "missed" | "cancelled" | "following" | "rested" | "again";
@@ -109,12 +116,23 @@ export function applyVoice(island: VoiceHost, event: VoiceEvent) {
  * What a sentence said without the wake phrase is, before anything is shown:
  * a command the parser knows, something only the model could make sense of
  * (`brain`: one is chosen), or nothing for Coucou — typing taken for words, a
- * word to someone else, "never mind" with nothing to cancel.
+ * word to someone else, "never mind" with nothing to cancel. `last`: what was
+ * done last, which a follow-up that says it is one builds on — "and Vercel
+ * too" is a command, "what about Steam?" one only if Steam turns out to be an
+ * app, so it is looked up before anything shows (`ask`). A bare name is
+ * nothing here: it was not said to Coucou.
  */
-export function followUpKind(said: string, pills: readonly PillDefinition[], brain: boolean): "command" | "ask" | "nothing" {
+export function followUpKind(
+  said: string,
+  pills: readonly PillDefinition[],
+  brain: boolean,
+  last: VoiceAction | null = null,
+): "command" | "ask" | "nothing" {
   const intent = parseIntent(said, pills);
   if (intent.kind === "cancel") return "nothing";
   if (intent.kind !== "unknown" || parseSeveral(said, pills)) return "command";
+  const relative = resolveRelative(said, last, pills, false);
+  if (relative) return relative.intent.kind === "open" ? "ask" : "command";
   return brain ? "ask" : "nothing";
 }
 
@@ -215,6 +233,7 @@ export function createWorld(cards: VoiceCards): VoiceWorld {
     },
     cancelTimer: stopTimer,
     openApp: async (name) => (await Bridge.voiceOpenApp(name)) ?? null,
+    appsNear: async (said) => (await Bridge.voiceAppsNear(said)) ?? { names: [], clear: false },
     openFolder: async (name) => (await Bridge.voiceOpenFolder(name)) ?? null,
     openUrl: (url) => void Bridge.openUrl(url),
     nowPlaying() {
@@ -232,47 +251,24 @@ export function createWorld(cards: VoiceCards): VoiceWorld {
   };
 }
 
-/**
- * Does what the parser understood, when opening something is part of it: the
- * name is looked up among what is installed, which takes a moment. Null: the
- * one thing asked for is nothing that is installed — a model may know better
- * (a session, a web address).
- */
-export async function runOpening(intents: readonly VoiceIntent[], said: string, world: VoiceWorld): Promise<VoiceResult | null> {
-  const results: VoiceResult[] = [];
-  for (const intent of intents) {
-    if (intent.kind !== "open") {
-      results.push(voiceRunner.run(intent, said));
-      continue;
-    }
-    const opened = await openNamed(intent.name, world);
-    if (!opened && intents.length === 1) return null;
-    results.push(opened ?? notFound(intent.name));
-  }
-  return results.find((r) => r.outcome !== "success") ?? results[results.length - 1];
-}
-
 /** A model server and a model are chosen for voice in Settings. */
 export const brainChosen = () => Boolean(State.settings.voice.brain && State.settings.voice.brainModel);
-
-/**
- * What a sentence the parser does not know means, asked of the model, checked
- * and done. Null: nothing to show. A model that cannot be asked, or answers
- * nothing usable, is "not recognised" like before there was one — or, when
- * `quiet` (nobody said the wake phrase), nothing at all.
- */
-export async function askBrain(said: string, world: VoiceWorld, quiet = false): Promise<VoiceResult | null> {
-  const pills = voicePills();
-  const system = systemPrompt(describeState(world, voiceRunner, pills));
-  const proposal = await Bridge.voiceBrain(system, said, toolSchemas(pills));
-  const result = await runProposal(proposal ?? { calls: [], text: "" }, said, voiceRunner, world, pills);
-  return quiet && result && !understood(result, said) ? null : result;
-}
 
 /** The pills a command may name: the ones this build offers. */
 export const voicePills = () => availablePills(State.os);
 
 export const voiceRunner = new VoiceRunner(liveMusic, livePills, voicePills);
+
+/**
+ * What a sentence means and what is done for it, with the last turns in mind
+ * (voice/conversation.ts). The model is the server chosen in Settings; one
+ * that cannot be asked answers nothing, which is "not recognised".
+ */
+export function createConversation(world: VoiceWorld): VoiceConversation {
+  return new VoiceConversation(voiceRunner, world, voicePills, () =>
+    brainChosen() ? (system, said, tools, history) => Bridge.voiceBrain(system, said, tools, history) : null,
+  );
+}
 
 // ── Mochi's voice (src-tauri/src/voice/speak.rs) ──────────────────────────────
 

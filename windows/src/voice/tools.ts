@@ -15,6 +15,7 @@ import type { PillDefinition } from "../core/pills";
 import { t } from "../i18n/i18n";
 import { normalise, resolvePill, spokenForms } from "./entity";
 import type { VoiceIntent } from "./intent";
+import type { VoiceAction } from "./memory";
 import type { VoiceResult, VoiceRunner } from "./runner";
 
 export interface BrainCall {
@@ -38,6 +39,11 @@ export interface VoiceWorld {
   cancelTimer(): boolean;
   /** The name of what was opened, or null when nothing by that name exists. */
   openApp(name: string): Promise<string | null>;
+  /**
+   * The installed apps nearest to what was heard, nearest first, for a
+   * question: nothing is opened. `clear`: the first is the one to ask about.
+   */
+  appsNear(said: string): Promise<{ names: string[]; clear: boolean }>;
   openFolder(name: string): Promise<string | null>;
   openUrl(url: string): void;
   /** What is playing, for questions about it. */
@@ -57,8 +63,12 @@ function fn(name: string, description: string, properties: Record<string, unknow
   return { type: "function", function: { name, description, parameters: { type: "object", properties, required } } };
 }
 
-/** The tools, in the OpenAI format every local server speaks. Pill names are the catalog's. */
-export function toolSchemas(pills: readonly PillDefinition[]): unknown[] {
+/**
+ * The tools, in the OpenAI format every local server speaks. Pill names are
+ * the catalog's. `near`: the installed apps a misheard name in the sentence
+ * may be (`misheardApps`), which the model may ask about.
+ */
+export function toolSchemas(pills: readonly PillDefinition[], near: readonly string[] = []): unknown[] {
   const names = pills.map((p) => p.name);
   const workspace = pills.filter((p) => p.category === "workspace").map((p) => p.name);
   const pill = { type: "string", enum: names };
@@ -81,6 +91,12 @@ export function toolSchemas(pills: readonly PillDefinition[]): unknown[] {
     fn("open_app", "Open an application installed on this computer.", { name: { type: "string" } }, ["name"]),
     fn("open_url", "Open a web address in the browser.", { url: { type: "string" } }, ["url"]),
     fn("open_folder", "Open one of the user's folders: Downloads, Desktop, Documents, Pictures.", { name: { type: "string" } }, ["name"]),
+    // Offered only with a sentence that may hold a misheard app name: for any other, the list is what it was.
+    ...(near.length
+      ? [fn("ask_which_app", "Ask the user whether they meant one of these applications, when the sentence seems to name an application but no installed one has that name.", {
+          apps: { type: "array", items: { type: "string", enum: [...near] } },
+        }, ["apps"])]
+      : []),
     fn("nothing", "The user changed their mind, or what was heard is not a request."),
   ];
 }
@@ -101,7 +117,12 @@ export function describeState(world: VoiceWorld, runner: Pick<VoiceRunner, "pill
   };
 }
 
-export function systemPrompt(state: unknown): string {
+/**
+ * `near`: the installed apps a misheard name in the sentence may be
+ * (`misheardApps`), so it can be asked about. Never the whole list of what is
+ * installed.
+ */
+export function systemPrompt(state: unknown, near: readonly string[] = []): string {
   return [
     "You are Mochi, the voice of Coucou, a small desktop app that shows AI coding agents and a few services as pills.",
     "The user spoke one sentence. A speech recogniser wrote it down and may have misheard words: 'get hub' is GitHub.",
@@ -115,6 +136,10 @@ export function systemPrompt(state: unknown): string {
     "6. decline_permission only when they clearly say decline, deny, refuse or reject. You cannot approve or allow a request: say it takes a click.",
     "7. Opening or launching an application is open_app, even when a pill has the same name.",
     "8. Changed their mind, or not a request: call nothing.",
+    "9. Earlier messages are the conversation so far. A follow-up with no verb ('what about X', 'and X', 'no, X') means the last action again, with X.",
+    ...(near.length
+      ? [`10. Part of the sentence may be the misheard name of an application. Installed applications that sound like it: ${JSON.stringify(near)}. When they ask to open, launch, pull up or show something that is not a pill, call ask_which_app with these.`]
+      : []),
     `State: ${JSON.stringify(state)}`,
   ].join("\n");
 }
@@ -283,16 +308,70 @@ const FOLDER = /^(downloads?|desktop|documents?|pictures?|videos?|\w+ folder)$/;
  * that name. The one way in for "open …", from the parser and from a model.
  */
 export async function openNamed(name: string, world: VoiceWorld): Promise<VoiceResult | null> {
-  const wanted = name.slice(0, 80);
-  if (!wanted) return null;
-  const opened = (FOLDER.test(wanted) ? await world.openFolder(wanted) : null) ?? (await world.openApp(wanted));
+  const opened = await openedName(name, world);
   return opened ? ok(t("{0} opened", { 0: opened })) : null;
 }
 
+/** The same, as the name of what was opened. */
+export async function openedName(name: string, world: VoiceWorld): Promise<string | null> {
+  const wanted = name.slice(0, 80);
+  if (!wanted) return null;
+  return (FOLDER.test(wanted) ? await world.openFolder(wanted) : null) ?? (await world.openApp(wanted));
+}
+
+export const opened = (name: string) => ok(t("{0} opened", { 0: name }));
+
 export const notFound = (name: string) => fail(t("Not found: {0}", { 0: name.slice(0, 40) }));
+
+/**
+ * No app by that name: Mochi asks about the nearest — "Open Spotify?", or
+ * "Spotify or Steam?" — and the answer decides (voice/ask.ts). Null when
+ * nothing is near. Nothing is opened here.
+ */
+export async function didYouMean(
+  heard: string,
+  said: string,
+  runner: VoiceRunner,
+  world: VoiceWorld,
+  rounds = 1,
+): Promise<VoiceResult | null> {
+  const near = await world.appsNear(heard.slice(0, 80));
+  if (!near.names.length) return null;
+  return runner.askOpen(near.clear ? near.names.slice(0, 1) : near.names, said, rounds);
+}
+
+/**
+ * Of the apps near a sentence, the ones it does not already name outright: a
+ * name that is in the sentence as it is written needs no hint, and a hint
+ * changes what a small model makes of the rest ("what is Claude doing?").
+ */
+export function misheardApps(said: string, near: readonly string[]): string[] {
+  const spoken = ` ${normalise(said)} `;
+  return near.filter((name) => !spoken.includes(` ${normalise(name)} `));
+}
+
+/** Said as something other than an app: a session, a web address. A model may know. */
+export const notAnApp = (name: string) => /\b(session|terminal|website|site|page|dot (com|org|net|io|dev|app|ai))\b/.test(normalise(name));
 
 /** Whether the model made anything of the sentence: false for "not recognised". */
 export const understood = (result: VoiceResult, said: string) => result.message !== notUnderstood(said).message;
+
+/** What a proposal is checked against, besides the sentence itself. */
+export interface Heard {
+  /**
+   * What was done last, if still remembered: a sentence with no word for
+   * opening may open again after it ("what about Steam?"). Only that — a
+   * permission is never declined, and pills are never kept "only", on the
+   * strength of an earlier sentence.
+   */
+  last?: VoiceAction | null;
+  /** Nobody said the wake phrase: Mochi asks nothing back. */
+  quiet?: boolean;
+  /** The apps the model was told sound like the sentence. */
+  near?: readonly string[];
+  /** Told of each call that was done, and as which intent when it was one. */
+  ran?: (call: BrainCall, intent: VoiceIntent | null) => void;
+}
 
 /** One call, checked and done. `null`: the user changed their mind — nothing to show. */
 async function runCall(
@@ -301,10 +380,24 @@ async function runCall(
   runner: VoiceRunner,
   world: VoiceWorld,
   pills: readonly PillDefinition[],
+  heard: Heard,
 ): Promise<VoiceResult | null> {
   const a = call.arguments ?? {};
+  const spoken = normalise(said);
   const intent = intentOf(call, said, pills);
-  if (intent) return runner.run(intent, said);
+  if (intent) {
+    const result = runner.run(intent, said);
+    if (result.outcome === "success") heard.ran?.(call, intent);
+    return result;
+  }
+  const done = (result: VoiceResult) => {
+    heard.ran?.(call, null);
+    return result;
+  };
+  // A word for opening in the sentence — or an app was just opened, and this
+  // sentence is not about a permission.
+  const opening = OPEN_WORDS.test(spoken);
+  const again = !opening && heard.last?.kind === "open" && !DECLINE_WORDS.test(spoken) && !APPROVE_WORDS.test(spoken);
 
   switch (call.name) {
     case "nothing":
@@ -313,14 +406,14 @@ async function runCall(
       const ids = pillIds(strs(a.agent), said, pills);
       if (!ids) return notUnderstood(said);
       const name = pills.find((p) => p.id === ids[0])?.name ?? ids[0];
-      return world.openSession(ids[0]) ? ok(name) : fail(t("Nothing running right now."));
+      return world.openSession(ids[0]) ? done(ok(name)) : fail(t("Nothing running right now."));
     }
     case "show_permission_request":
       if (!world.permission()) return fail(t("No request is waiting"));
       world.showPermission();
       return null;
     case "decline_permission":
-      // The sentence must say so itself: models have declined on "yeah allow it".
+      // This sentence must say so itself: models have declined on "yeah allow it".
       if (!DECLINE_WORDS.test(normalise(said))) return notUnderstood(said);
       if (!world.permission()) return fail(t("No request is waiting"));
       world.declinePermission();
@@ -329,31 +422,57 @@ async function runCall(
       const minutes = minutesSaid(said) ?? (typeof a.minutes === "number" ? a.minutes : Number(str(a.minutes)));
       if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 24 * 60) return notUnderstood(said);
       world.setTimer(minutes, str(a.label).slice(0, 80));
-      return ok(t("Timer set: {0} min", { 0: Math.round(minutes * 10) / 10 }));
+      return done(ok(t("Timer set: {0} min", { 0: Math.round(minutes * 10) / 10 })));
     }
     case "cancel_timer":
-      return world.cancelTimer() ? ok(t("Timer cancelled")) : fail(t("No timer is running"));
+      return world.cancelTimer() ? done(ok(t("Timer cancelled"))) : fail(t("No timer is running"));
     case "open_app": {
-      if (!OPEN_WORDS.test(normalise(said))) return notUnderstood(said);
-      // The app as the user named it first: a model turns "visual studio code" into a pill's name.
-      const wanted = [openedThing(said), str(a.name)].filter(Boolean);
-      for (const name of wanted) {
-        const opened = await openNamed(name, world);
-        if (opened) return opened;
+      const named = str(a.name);
+      if (opening) {
+        // The app as the user named it first: a model turns "visual studio code" into a pill's name.
+        const wanted = [openedThing(said), named].filter(Boolean);
+        for (const name of wanted) {
+          const result = await openNamed(name, world);
+          if (result) return done(result);
+        }
+        // Nothing by that name: the nearest is asked about, never opened as a guess.
+        const asked = heard.quiet ? null : await didYouMean(wanted[0] ?? "", said, runner, world);
+        return asked ?? notFound(wanted[0] ?? "");
       }
-      return notFound(wanted[0] ?? "");
+      if (!named) return notUnderstood(said);
+      // "What about Steam?" after an app was opened: the name is in the sentence.
+      if (again && ` ${spoken} `.includes(` ${normalise(named)} `)) {
+        const result = await openNamed(named, world);
+        if (result) return done(result);
+      }
+      // No word for opening: what the model made of it is a guess. It is asked
+      // about when it is an app near what was said, and opened only on a yes.
+      if (heard.quiet) return notUnderstood(said);
+      const near = heard.near ?? (await world.appsNear(said)).names;
+      const app = near.find((name) => normalise(name) === normalise(named));
+      return app ? runner.askOpen([app], said) : notUnderstood(said);
     }
     case "open_folder": {
-      if (!OPEN_WORDS.test(normalise(said))) return notUnderstood(said);
-      const opened = await world.openFolder(str(a.name).slice(0, 80));
-      return opened ? ok(t("{0} opened", { 0: opened })) : fail(t("Not found: {0}", { 0: str(a.name).slice(0, 40) }));
+      if (!opening && !again) return notUnderstood(said);
+      const name = await world.openFolder(str(a.name).slice(0, 80));
+      return name ? done(opened(name)) : fail(t("Not found: {0}", { 0: str(a.name).slice(0, 40) }));
     }
     case "open_url": {
-      if (!OPEN_WORDS.test(normalise(said))) return notUnderstood(said);
+      if (!opening && !again) return notUnderstood(said);
       const url = webAddress(str(a.url));
       if (!url) return notUnderstood(said);
       world.openUrl(url);
-      return ok(t("{0} opened", { 0: new URL(url).hostname }));
+      return done(opened(new URL(url).hostname));
+    }
+    case "ask_which_app": {
+      // Nothing is asked of someone who was not talking to Mochi.
+      if (heard.quiet) return notUnderstood(said);
+      // Only apps near what was said, and in Mochi's own words.
+      const near = heard.near ?? [];
+      const apps = strs(a.apps)
+        .map((name) => near.find((known) => normalise(known) === normalise(name)))
+        .filter((name): name is string => name != null);
+      return apps.length ? runner.askOpen([...new Set(apps)], said) : notUnderstood(said);
     }
     default:
       return notUnderstood(said);
@@ -377,6 +496,7 @@ export async function runProposal(
   runner: VoiceRunner,
   world: VoiceWorld,
   pills: readonly PillDefinition[],
+  heard: Heard = {},
 ): Promise<VoiceResult | null> {
   // Asked to approve: whatever the model made of it, a click decides.
   if (asksToApprove(said) && world.permission()) {
@@ -390,7 +510,7 @@ export async function runProposal(
   }
   const results: VoiceResult[] = [];
   for (const call of calls) {
-    const result = await runCall(call, said, runner, world, pills);
+    const result = await runCall(call, said, runner, world, pills, heard);
     if (result) results.push(result);
     // A question from Mochi ("which one do I remove?") stops the rest.
     if (result?.outcome === "question") return result;

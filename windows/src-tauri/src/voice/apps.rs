@@ -41,8 +41,16 @@ fn compact(text: &str) -> String {
 /// How a name sounds, roughly: its consonants, those a recogniser takes for
 /// one another made the same. "this cord" and "Discord" are both `tskrt`.
 fn sound(text: &str) -> String {
-    let letters: Vec<char> =
-        compact(text).replace("th", "t").replace("ph", "f").replace("ck", "k").replace("qu", "k").replace('x', "ks").chars().collect();
+    // "flight": the "gh" is not said.
+    let letters: Vec<char> = compact(text)
+        .replace("ght", "t")
+        .replace("th", "t")
+        .replace("ph", "f")
+        .replace("ck", "k")
+        .replace("qu", "k")
+        .replace('x', "ks")
+        .chars()
+        .collect();
     let mut out = String::new();
     for (i, c) in letters.iter().enumerate() {
         let soft = matches!(letters.get(i + 1), Some('e' | 'i' | 'y'));
@@ -142,6 +150,123 @@ pub fn find<'a>(said: &str, apps: &'a [App]) -> Option<&'a App> {
     }
 }
 
+//// By letters alone three in ten may be wrong, no more: "photoshop" is not Photos.
+const BY_LETTERS: f32 = 0.7;
+/// By sound one in four: "this squad" (`tskt`) is near Discord (`tskrt`).
+const BY_SOUND: f32 = 0.75;
+/// A few words inside a longer sentence must be nearly the name itself.
+const NEAR_INSIDE: f32 = 0.9;
+/// The nearest app is "clearly" the one when the next is this much further.
+const AHEAD: f32 = 0.15;
+/// The most apps `near` gives.
+const MOST_NEAR: usize = 3;
+/// Under this many sounds a sound key says too little to compare.
+const SHORTEST_KEY: usize = 4;
+
+/// How alike two names without spaces are by their letters, 0…1; nothing
+/// under `BY_LETTERS`.
+fn spelt_alike(heard: &str, name: &str) -> f32 {
+    let (a, b) = (heard.chars().count(), name.chars().count());
+    if a.min(b) == 0 {
+        return 0.0;
+    }
+    let alike = 1.0 - edits(heard, name) as f32 / a.max(b) as f32;
+    if alike >= BY_LETTERS { alike } else { 0.0 }
+}
+
+/// How alike two names without spaces are, 0…1, or nothing when they are not:
+/// by their letters, by how they sound, or — a recogniser also puts sounds in
+/// another order, "spy flight" for Spotify — by having the same few sounds
+/// after the same start.
+fn alike(heard: &str, name: &str) -> f32 {
+    let mut best = spelt_alike(heard, name);
+    let (heard, name) = (sound(heard), sound(name));
+    let (short, long) = (heard.len().min(name.len()), heard.len().max(name.len()));
+    if short < SHORTEST_KEY {
+        return best;
+    }
+    let by_sound = 1.0 - edits(&heard, &name) as f32 / long as f32;
+    if by_sound >= BY_SOUND {
+        best = best.max(by_sound);
+    }
+    // Short names only: six sounds are found in any order in too many sentences.
+    if long <= 5 && long - short <= 1 && heard.as_bytes()[..2] == name.as_bytes()[..2] {
+        let mut left: Vec<char> = name.chars().collect();
+        let shared = heard.chars().filter(|c| left.iter().position(|l| l == c).map(|at| left.swap_remove(at)).is_some()).count();
+        if shared == short {
+            best = best.max(0.85 * shared as f32 / long as f32);
+        }
+    }
+    best
+}
+
+/// The installed apps nearest to what was heard, nearest first, at most three,
+/// each with how near it is (0…1) — for a question, never to be opened as
+/// they are. Wider than `find`: "spy flight" is near Spotify, "this squad" near
+/// Discord. In a longer sentence ("up in spotify") a few words in a row that
+/// are all but a name count too. Nothing near is an empty list.
+pub fn near<'a>(said: &str, apps: &'a [App]) -> Vec<(f32, &'a App)> {
+    let wanted = normalise(said);
+    let words: Vec<&str> = wanted.split(' ').filter(|w| !w.is_empty()).collect();
+    if words.is_empty() || words.len() > 12 {
+        return Vec::new();
+    }
+    let whole = words.concat();
+    // Every run of one to four words inside it.
+    let mut inside: Vec<String> = Vec::new();
+    for size in 1..=4.min(words.len() - 1) {
+        inside.extend(words.windows(size).map(|run| run.concat()).filter(|run| run.chars().count() >= SHORTEST_GUESS));
+    }
+
+    let mut found: Vec<(f32, &App)> = Vec::new();
+    let mut seen: Vec<String> = Vec::new();
+    for app in apps {
+        let name = normalise(&app.name);
+        if name.is_empty() || seen.contains(&name) {
+            continue;
+        }
+        let joined = name.replace(' ', "");
+        let mut best = 0.0f32;
+        if whole.chars().count() >= SHORTEST_GUESS {
+            best = alike(&whole, &joined);
+            // As `find` reads a name: its start, or its words in any order.
+            if name.starts_with(&wanted) {
+                best = best.max(0.9);
+            } else if words.iter().all(|w| name.split(' ').any(|have| have == *w)) {
+                best = best.max(0.85);
+            }
+            // A name of several words is also known by one of them, spelt nearly right.
+            for word in name.split(' ').filter(|word| word.len() >= SHORTEST_GUESS && *word != name) {
+                best = best.max(0.9 * spelt_alike(&whole, word));
+            }
+        }
+        for run in &inside {
+            let score = alike(run, &joined);
+            if score >= NEAR_INSIDE {
+                best = best.max(score);
+            }
+        }
+        if best > 0.0 {
+            seen.push(name);
+            found.push((best, app));
+        }
+    }
+    // Nearest first; as near, the shorter name, then the alphabet: the same list every time.
+    found.sort_by(|(a, x), (b, y)| b.total_cmp(a).then(x.name.len().cmp(&y.name.len())).then(x.name.cmp(&y.name)));
+    found.truncate(MOST_NEAR);
+    found
+}
+
+// Whether the nearest of them is the one to ask about by itself: alone, or
+/// clearly nearer than the next.
+pub fn clear(near: &[(f32, &App)]) -> bool {
+    match near {
+        [] => false,
+        [_] => true,
+        [(first, _), (second, _), ..] => first - second >= AHEAD,
+    }
+}
+
 /// Shortcuts that are not the app itself.
 fn is_noise(name: &str) -> bool {
     let name = name.to_lowercase();
@@ -235,6 +360,25 @@ pub fn installed() -> Vec<App> {
     apps
 }
 
+/// Listing the apps takes a quarter of a second: one sentence that looks a
+/// name up twice, and the answer to "did you mean", read the same list.
+const LISTED_FOR: std::time::Duration = std::time::Duration::from_secs(20);
+
+static LISTED: std::sync::Mutex<Option<(std::time::Instant, std::sync::Arc<Vec<App>>)>> = std::sync::Mutex::new(None);
+
+/// `installed`, read again only when the last reading is a while old.
+pub fn installed_lately() -> std::sync::Arc<Vec<App>> {
+    let mut listed = LISTED.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    match listed.as_ref() {
+        Some((at, apps)) if at.elapsed() < LISTED_FOR => apps.clone(),
+        _ => {
+            let apps = std::sync::Arc::new(installed());
+            *listed = Some((std::time::Instant::now(), apps.clone()));
+            apps
+        }
+    }
+}
+
 /// The most names a recogniser that only hears what it was given is given.
 const MOST_SAID: usize = 200;
 
@@ -320,6 +464,47 @@ mod tests {
     }
 
     #[test]
+    fn the_nearest_apps_to_a_misheard_name_are_ranked_for_a_question() {
+        let list = apps(&[
+            "Discord", "Figma", "Spotify", "Steam", "Slack", "Notion", "Visual Studio Code", "Visual Studio 2022", "Google Chrome",
+            "Calculator", "Notepad", "Paint", "Settings", "Microsoft Edge", "File Explorer", "Task Manager", "Snipping Tool", "Photos",
+        ]);
+        let names = |said: &str| near(said, &list).iter().map(|(_, app)| app.name.as_str()).collect::<Vec<_>>();
+        let first = |said: &str| names(said).first().copied();
+        // What Parakeet 0.6b wrote for the user's own voice (doc/voice.md 7.7, and the test of 2026-10-11).
+        assert_eq!(first("spy flight"), Some("Spotify"));
+        assert_eq!(first("spy-flight"), Some("Spotify"));
+        assert_eq!(first("this squad"), Some("Discord"));
+        assert_eq!(first("the squad"), Some("Discord"));
+        assert_eq!(first("up in spotify"), Some("Spotify"));
+        assert_eq!(first("upton spotify"), Some("Spotify"));
+        assert_eq!(first("fine figma"), Some("Figma"));
+        // Each of those is one app clearly ahead: asked about by itself.
+        for said in ["spy flight", "this squad", "the squad", "up in spotify"] {
+            assert!(clear(&near(said, &list)), "{said}: {:?}", names(said));
+        }
+        // Two as near as each other: both, to choose between.
+        assert_eq!(names("visual studio"), ["Visual Studio 2022", "Visual Studio Code"]);
+        assert!(!clear(&near("visual studio", &list)));
+        // What `find` finds is nearest here too.
+        assert_eq!(first("this cord"), Some("Discord"));
+        assert_eq!(first("chrome"), Some("Google Chrome"));
+        assert_eq!(first("Steam"), Some("Steam"));
+        // Nothing near: no question to ask.
+        for said in [
+            "ocean", "the weather", "photoshop", "", "...", "it", "the", "next track", "never mind", "what is two plus two",
+            "remind me in twenty minutes", "what is playing", "yeah allow it", "no decline that", "github dot com",
+        ] {
+            assert_eq!(names(said), Vec::<&str>::new(), "{said}");
+        }
+        assert!(near("spotify", &[]).is_empty());
+        // At most three, and the same app once.
+        let many = apps(&["Notes", "Notes 2", "Notes 3", "Notes 4", "Notes"]);
+        assert_eq!(near("notes", &many).len(), MOST_NEAR);
+        assert_eq!(near("notes", &many)[0].1.name, "Notes");
+    }
+
+    #[test]
     fn a_name_sounds_like_its_consonants_and_is_letters_away_from_another() {
         assert_eq!(sound("this cord"), sound("Discord"));
         assert_eq!(sound("Discord"), "tskrt");
@@ -338,20 +523,27 @@ mod tests {
         assert_eq!(sayable(&many).len(), MOST_SAID);
     }
 
-    /// What this machine lists, without the names: how many apps, and whether
-    /// `COUCOU_VOICE_APP` (a name as it might be heard) finds one.
+    /// What this machine lists, without the names: how many apps, how long the
+    /// listing takes, and whether `COUCOU_VOICE_APP` (names as they might be
+    /// heard, separated by `;`) finds one, or which are near.
     /// `cargo test -p coucou voice::apps -- --ignored --nocapture`
     #[test]
     #[cfg(windows)]
     #[ignore = "reads the apps installed on this machine"]
     fn windows_lists_its_apps_store_apps_included() {
+        let started = std::time::Instant::now();
         let listed = listed().expect("the Applications folder");
+        let took = started.elapsed();
         let store = listed.iter().filter(|app| app.path.to_string_lossy().contains('!')).count();
-        println!("{} apps listed, {store} of them from the Store, {} sayable", listed.len(), sayable(&listed).len());
+        println!("{} apps listed in {took:?}, {store} of them from the Store, {} sayable", listed.len(), sayable(&listed).len());
         assert!(listed.len() > 10);
         assert!(listed.iter().all(|app| app.path.to_string_lossy().starts_with("shell:AppsFolder\\")));
-        if let Ok(said) = std::env::var("COUCOU_VOICE_APP") {
-            println!("{said:?} is {:?}", find(&said, &listed).map(|app| &app.name));
+        for said in std::env::var("COUCOU_VOICE_APP").unwrap_or_default().split(';').filter(|said| !said.trim().is_empty()) {
+            let started = std::time::Instant::now();
+            let near = near(said, &listed);
+            let took = started.elapsed();
+            let names: Vec<String> = near.iter().map(|(score, app)| format!("{} {score:.2}", app.name)).collect();
+            println!("{said:?} is {:?}; near ({took:?}, clear: {}): {names:?}", find(said, &listed).map(|app| &app.name), clear(&near));
         }
     }
 
