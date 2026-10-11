@@ -37,6 +37,8 @@ export interface VoiceHost {
   voiceFollowing(on: boolean): void;
   /** A sentence said in that time: a command, or nothing meant for Coucou. */
   voiceAgain(text: string): void;
+  /** How loud the microphone hears while Coucou listens, 0…1. */
+  voiceLevel(level: number): void;
 }
 
 /** What the tools need of the island itself. */
@@ -317,6 +319,7 @@ export function sayResult(result: VoiceResult) {
 
 export function registerVoiceHandlers(island: VoiceHost) {
   void onEvent<VoiceEvent>("voice", (event) => applyVoice(island, event));
+  void onEvent<number>("voice-level", (level) => island.voiceLevel(level));
   void onEvent<{ sampleRate: number; pcm: string }>("voice-speech", playSpeech);
   // What the recogniser can hear: nothing listens until it has this.
   const grammar = buildGrammar(voicePills());

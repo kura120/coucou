@@ -965,20 +965,33 @@ body {
   background: #f97316;
 }
 
-/* Beside Mochi in the compact and open island, while another command may follow. */
-#follow-dot {
+/* Under the island while Coucou listens, for a command or for another after
+   it: an orange half-moon as wide as the island, which swells with the voice
+   (`--level`, 0…1, set from Rust's `voice-level`). Where no level comes —
+   Windows' recogniser has the microphone — it glows steadily. Nothing here
+   animates by itself: it moves only when a level arrives. */
+#listen-glow {
+  --level: 0.35;
   position: absolute;
-  top: 5px;
-  left: 22px;
-  width: 6px;
-  height: 6px;
-  display: none;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: radial-gradient(
+    ellipse 50% 100% at 50% 0,
+    rgba(249, 115, 22, 0.95) 0%,
+    rgba(249, 115, 22, 0.45) 38%,
+    rgba(249, 115, 22, 0) 72%
+  );
+  transform-origin: 50% 0;
+  transform: scaleY(calc(0.4 + 0.6 * var(--level)));
+  opacity: 0;
+  transition: opacity 0.25s ease-out, transform 0.09s linear;
   pointer-events: none;
-  z-index: 3;
 }
 
-#follow-dot.on {
-  display: block;
+#listen-glow.on {
+  opacity: calc(0.6 + 0.4 * var(--level));
 }
 
 .mic-dot.on {
