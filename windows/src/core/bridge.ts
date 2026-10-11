@@ -479,6 +479,8 @@ export const Bridge = {
   voiceSay: (text: string) => call<void>("voice_say", { text }),
   /** Opens the mail app on a draft, for the user to read and send. False when the recipient is not one address. */
   openMailDraft: (to: string, subject: string, body: string) => call<boolean>("open_mail_draft", { to, subject, body }),
+  /** The user is done talking: nothing more is listened for until the wake phrase. */
+  voiceRest: () => call<void>("voice_rest"),
   /** Holds Ctrl+Shift+1…`numbers` and, for a text field, Ctrl+Shift+Enter while a question is on screen; 0 and false lets go. */
   voiceAskKeys: (numbers: number, enter: boolean) => call<void>("voice_ask_keys", { numbers, enter }),
   /** Starts the installed app that name means: its name and whether a window of it was seen to come, or null. */

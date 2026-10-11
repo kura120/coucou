@@ -254,7 +254,8 @@ pub fn read(answer: &Value) -> Reply {
         Some(end) => text[end + "</think>".len()..].trim(),
         None => text,
     };
-    Reply { calls, text: text.chars().take(400).collect() }
+    // An answer of a few sentences is shown whole; a page is not an answer.
+    Reply { calls, text: text.chars().take(1500).collect() }
 }
 
 #[cfg(test)]

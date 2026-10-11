@@ -119,8 +119,8 @@ export function forModel(result: ToolResult): Record<string, unknown> {
   return out;
 }
 
-/** A spoken answer is a sentence or two, not a page. */
-export const MAX_SPOKEN = 220;
+/** An answer is a few sentences at most; it is shown whole, and said whole. */
+export const MAX_SPOKEN = 600;
 
 /** What Mochi says: the model's words when it has some, else the tool's line. */
 export function spoken(words: string | null | undefined, fallback: string): string {

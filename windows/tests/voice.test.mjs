@@ -148,6 +148,7 @@ test("each report reaches the island as what it is", () => {
     voiceAgain: (text) => calls.push(`again:${text}`),
     voiceLevel: () => calls.push("level"),
     voiceAskKey: () => calls.push("key"),
+    voiceSpoken: () => calls.push("spoken"),
   };
   for (const [phase, text] of [["woke", ""], ["partial", "next"], ["final", "next track"], ["missed", ""], ["cancelled", ""]]) {
     applyVoice(island, { phase, text });

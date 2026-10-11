@@ -26,19 +26,38 @@ const CALIBRATION_FRAMES: u32 = 22;
 /// Power over noise that starts a segment, and under which a frame is silence.
 const RISE: f64 = 8.0;
 const FALL: f64 = 2.0;
-/// About 800 ms of silence ends a segment.
-const SILENCE_FRAMES: u32 = 35;
+/// About 1.1 s of silence ends a segment. It was 0.8 s, and a breath in the
+/// middle of a sentence ended it: someone thinking of the next word was cut
+/// off. Every command now waits those three tenths of a second longer.
+const SILENCE_FRAMES: u32 = 48;
 /// About 7 s: continuous noise — music, a fan — is not one endless sentence,
-/// and the model that writes a sentence down fails on ten seconds or more
-/// (measured: 8 s is written, 10 s is not). A command is shorter than that.
+/// and Moonshine fails on ten seconds or more (measured: 8 s is written, 10 s
+/// is not). A command is shorter than that.
 const MAX_ACTIVE_FRAMES: u32 = 300;
+/// With a model that takes long sentences (Parakeet): about 20 s, for
+/// something dictated rather than commanded.
+const MAX_ACTIVE_FRAMES_LONG: u32 = 860;
 
-/// The most that is ever handed to the model: 8 s.
+/// The most that is ever handed to Moonshine: 8 s.
 pub const LONGEST: usize = (SAMPLE_RATE as usize) * 8;
+const LONGEST_LONG: usize = (SAMPLE_RATE as usize) * 22;
 
-/// A sentence as the model can take it: its last eight seconds at most.
+/// Whether the model that writes sentences down takes long ones. Set when the
+/// listener starts (mod.rs `Free::load`), from the hearing model chosen.
+static LONG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn takes_long_sentences(long: bool) {
+    LONG.store(long, std::sync::atomic::Ordering::Relaxed);
+}
+
+fn most_frames() -> u32 {
+    if LONG.load(std::sync::atomic::Ordering::Relaxed) { MAX_ACTIVE_FRAMES_LONG } else { MAX_ACTIVE_FRAMES }
+}
+
+/// A sentence as the model can take it: its end, as much of it as fits.
 pub fn fitting(sentence: &[f32]) -> &[f32] {
-    &sentence[sentence.len().saturating_sub(LONGEST)..]
+    let longest = if LONG.load(std::sync::atomic::Ordering::Relaxed) { LONGEST_LONG } else { LONGEST };
+    &sentence[sentence.len().saturating_sub(longest)..]
 }
 
 #[derive(Debug, Clone)]
@@ -94,7 +113,7 @@ impl EnergyVad {
         self.active_frames += 1;
         self.segment_sum += power;
         self.segment_count += 1;
-        if self.active_frames >= MAX_ACTIVE_FRAMES {
+        if self.active_frames >= most_frames() {
             // Music or a fan: that is the room now.
             self.noise = self.segment_sum / f64::from(self.segment_count.max(1));
             self.reset();
@@ -225,7 +244,7 @@ impl Hears {
                 }
                 (true, true) => {
                     *frames += 1;
-                    if *frames < MAX_ACTIVE_FRAMES {
+                    if *frames < most_frames() {
                         return Event::None;
                     }
                     // Someone who never stops: what follows is another sentence.
@@ -414,8 +433,8 @@ mod tests {
         let sentence = sentences.feed(&tone(1.2, 0.001)).expect("the silence ends it");
         assert!(!sentences.speaking());
         let seconds = sentence.len() as f64 / f64::from(SAMPLE_RATE);
-        // 0.3 s before, 1.5 s of speech, 0.8 s of the silence that ended it.
-        assert!((2.4..2.8).contains(&seconds), "{seconds}");
+        // 0.3 s before, 1.5 s of speech, 1.1 s of the silence that ended it.
+        assert!((2.7..3.1).contains(&seconds), "{seconds}");
         // The quiet lead-in is there, then the speech.
         assert!(sentence[..LEAD_IN / 2].iter().all(|s| s.abs() < 0.01));
         assert!(sentence[LEAD_IN + FRAME..LEAD_IN + FRAME * 2].iter().all(|s| s.abs() > 0.2));

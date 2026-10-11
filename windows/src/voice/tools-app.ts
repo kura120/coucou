@@ -75,7 +75,7 @@ export function appToolsFor(said: string, pills: readonly string[]): unknown[] {
   const wanted = new Set<string>();
   if (APP_VIEWS.some((view) => has(spoken, VIEW_NAMES[view]))) wanted.add("show_view");
   if (settings) wanted.add("get_setting").add("set_setting");
-  if (has(spoken, ["listening", "listen", "voice", "microphone", "mic"])) wanted.add("stop_listening");
+  if (has(spoken, ["voice", "microphone", "mic"])) wanted.add("stop_listening");
   if (has(spoken, ["coucou", "yourself", "the app", "a break"])) wanted.add("pause_coucou");
   if (has(spoken, ["note", "notify", "notification", "toast"])) wanted.add("notify");
   if (has(spoken, ["details", "detail", "more about", "report", "tell me more"])) wanted.add("service_info");
@@ -94,7 +94,7 @@ export function appToolSchemas(pills: readonly string[]): unknown[] {
       setting: { type: "string", enum: SETTING_KEYS },
       value: { type: "string" },
     }, ["setting", "value"]),
-    fn("stop_listening", "Turn voice off: Coucou stops listening and closes the microphone. Only when they ask it to stop listening."),
+    fn("stop_listening", "Turn voice off altogether: the microphone closes until it is turned back on in Settings. Only when they ask to turn voice or the microphone off — being done with a request is 'nothing'."),
     fn("pause_coucou", "Pause Coucou itself (not the music), as its tray menu does."),
     fn("notify", "Show a short note on screen.", { text: { type: "string" } }, ["text"]),
     fn("service_info", "Read what a service's card says now (GitHub, Vercel, Stripe, plan usage…), for a question about it.", {
@@ -124,7 +124,7 @@ const has = (spoken: string, phrases: readonly string[]) => phrases.some((p) => 
 const SEARCH_WORDS = ["search", "look up", "google", "find", "look for"];
 const MAIL_WORDS = ["email", "mail", "e mail", "message"];
 const TELL_WORDS = ["tell", "ask", "say to", "instruct", "have"];
-const STOP_WORDS = ["stop listening", "stop hearing", "turn voice off", "turn off voice", "turn the voice off", "voice off", "turn off the microphone",
+const STOP_WORDS = ["turn voice off", "turn off voice", "turn the voice off", "voice off", "turn off the microphone",
   "turn the microphone off", "close the microphone", "microphone off", "mic off", "stop voice", "disable voice"];
 const PAUSE_WORDS = ["pause coucou", "pause yourself", "pause the app", "pause everything", "take a break"];
 const SHOW_WORDS = ["show", "open", "go to", "switch to", "bring up", "pull up", "take me to", "back to"];

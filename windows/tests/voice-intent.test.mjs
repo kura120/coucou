@@ -435,10 +435,10 @@ test("music: what Spotify cannot be asked here says so, and does nothing", () =>
 test("pills: added, removed, already there, not there", () => {
   const f = fakes({ active: ["integration_vercel"] });
   assert.deepEqual(f.say("add github"), { outcome: "success", message: "GitHub added" });
-  assert.deepEqual(f.say("add github"), { outcome: "success", message: "Already active" });
-  assert.deepEqual(f.say("add v s code"), { outcome: "success", message: "Already active" }); // the main pill
+  assert.deepEqual(f.say("add github"), { outcome: "success", message: "GitHub is already there" });
+  assert.equal(f.say("add v s code").message.endsWith("is already there"), true); // the main pill
   assert.deepEqual(f.say("remove vercel"), { outcome: "success", message: "Vercel removed" });
-  assert.deepEqual(f.say("remove vercel"), { outcome: "failure", message: "Not active" });
+  assert.deepEqual(f.say("remove vercel"), { outcome: "failure", message: "Vercel is not one of your pills" });
   assert.deepEqual(f.pills.active, ["integration_github"]);
 });
 

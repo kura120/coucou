@@ -8,7 +8,7 @@ import { mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { availablePills } from "../src/core/pills.ts";
 import { readAnswer } from "../src/voice/ask.ts";
-import { MOST_MODEL_ROUNDS, VoiceConversation, WORDING_MS } from "../src/voice/conversation.ts";
+import { MOST_MODEL_ROUNDS, VoiceConversation, WORDING_MS, fromOpening } from "../src/voice/conversation.ts";
 import { FORGOTTEN_AFTER_MS, MOST_TURNS, VoiceMemory, resolveRelative } from "../src/voice/memory.ts";
 import { VoiceRunner } from "../src/voice/runner.ts";
 import { misheardApps, systemPrompt, toolSchemas } from "../src/voice/tools.ts";
@@ -534,8 +534,14 @@ test("a turn is a few rounds at most, and what failed is what the card shows, in
     brain: () => ({ calls: [call("cancel_timer")], text: "" }),
     after: () => ({ calls: [], text: "The timer is cancelled." }),
   });
-  // Whatever the model makes of a failure, the card says what did not happen.
-  assert.deepEqual(await failing.hear("get rid of that timer"), { outcome: "failure", message: "No timer is running" });
+  // What failed for a reason may be said in the model's words: the card is red all the same.
+  assert.deepEqual(await failing.hear("get rid of that timer"), { outcome: "failure", message: "The timer is cancelled." });
+  // What was refused is said in the tool's own.
+  const refused = setup({
+    brain: () => ({ calls: [call("decline_permission")], text: "" }),
+    after: () => ({ calls: [], text: "The request is declined." }),
+  });
+  assert.deepEqual(await refused.hear("what was that thing again"), { outcome: "failure", message: "Not recognised: « what was that thing again »" });
   assert.equal(JSON.parse(failing.rounds[0].steps[0].results[0]).status, "failed");
 });
 
@@ -620,3 +626,29 @@ test("a model that asks before any tool has run, or of nobody, asks nothing", as
   await quiet.hear("put stripe up there", { spokenTo: false });
 });
 
+// ── From the first run with a microphone (2026-10-11) ─────────────────────────
+
+test("a false start before open is not part of the sentence; a way of asking is", () => {
+  assert.equal(fromOpening("spo open spy flight"), "open spy flight");
+  assert.equal(fromOpening("Uh, launch Figma."), "launch Figma.");
+  for (const said of ["open spotify", "can you open spotify", "please open the chat", "don't open that", "how do I open a pdf", "what does open source mean", "open", "next track"]) {
+    assert.equal(fromOpening(said), said, said);
+  }
+});
+
+test("the model's calls written as text in a later round are run, and its plumbing is never Mochi's words", async () => {
+  const s = setup({
+    brain: () => ({ calls: [call("add_pills", { pills: ["Stripe"] })], text: "" }),
+    after: (steps) => (steps.length === 1 ? { calls: [], text: 'add_pills {"pills": ["Vercel"]}' } : { calls: [], text: '{"status": "ok"}' }),
+  });
+  assert.deepEqual(await s.hear("could you put stripe and vercel up there"), done("Vercel added"));
+  assert.deepEqual(s.log.filter((l) => l.startsWith("+")), ["+integration_stripe", "+integration_vercel"]);
+});
+
+test("being done closes without a word, whatever the way of saying it", async () => {
+  const s = setup({ brain: () => assert.fail("no model is asked whether someone is done") });
+  for (const said of ["Ok, done.", "never mind", "Nevermind.", "that's all", "Thanks!", "thank you", "stop listening", "I'm done", "nothing else"]) {
+    assert.equal(await s.hear(said), null, said);
+  }
+  assert.deepEqual(s.log, []);
+});

@@ -54,6 +54,8 @@ export interface VoiceHost {
   voiceLevel(level: number): void;
   /** Ctrl+Shift+number or Ctrl+Shift+Enter, pressed while a question is on screen: "1"…"9" or "enter". */
   voiceAskKey(key: string): void;
+  /** Mochi started saying an answer (its length in ms), or finished (null). */
+  voiceSpoken(ms: number | null): void;
 }
 
 /** What the tools need of the island itself. */
@@ -394,11 +396,27 @@ function playSpeech(speech: { sampleRate: number; pcm: string }) {
   source.buffer = buffer;
   source.connect(gain).connect(speechContext.destination);
   source.onended = () => {
-    if (speaking === source) speaking = null;
+    if (speaking !== source) return;
+    speaking = null;
+    spoken?.(null);
   };
   speaking = source;
   source.start();
+  spoken?.(Math.round((samples.length / speech.sampleRate) * 1000));
 }
+
+/** Told when Mochi starts saying something (how long it is, in ms) and when he has finished (null). */
+let spoken: ((ms: number | null) => void) | null = null;
+
+/** How long the card waits for Mochi's voice to be made before it stops waiting for it. */
+export const SPEECH_WAITED_MS = 6000;
+
+/** Whether this result will be said out loud: the card then stays until it has been. */
+export const willSpeak = (result: VoiceResult) =>
+  State.settings.voice.speak && State.settings.soundEnabled && language() === "en" && result.message.trim() !== "";
+
+/** "Ok done", "never mind", "thanks": the user is done talking. */
+export const saysDone = (said: string, pills: readonly PillDefinition[]) => parseIntent(said, pills).kind === "cancel";
 
 /**
  * Has Mochi say what a command did, when speaking is on. English only for
@@ -414,6 +432,7 @@ export function registerVoiceHandlers(island: VoiceHost) {
   void onEvent<number>("voice-level", (level) => island.voiceLevel(level));
   void onEvent<string>("voice-ask-key", (key) => island.voiceAskKey(key));
   void onEvent<{ sampleRate: number; pcm: string }>("voice-speech", playSpeech);
+  spoken = (ms) => island.voiceSpoken(ms);
   // What the recogniser can hear: nothing listens until it has this. The
   // installed apps are part of it ("open {app}"), so they are asked for first.
   void Bridge.voiceApps().then((apps) => {

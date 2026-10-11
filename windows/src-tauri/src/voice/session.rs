@@ -24,7 +24,9 @@ pub const WAKE_FLOOR: f32 = 0.85;
 pub const COMMAND_FLOOR: f32 = 0.60;
 
 /// How long the command is waited for, and how long once words are coming.
-const COMMAND_WAIT: Duration = Duration::from_secs(8);
+/// Long enough to think of what to say: the listening view does not close on
+/// someone who is still there. It was 8 s.
+const COMMAND_WAIT: Duration = Duration::from_secs(20);
 const SPEAKING_WAIT: Duration = Duration::from_secs(4);
 
 /// While the card of a command is on screen, before the follow-up time starts.
@@ -78,6 +80,22 @@ const FILLERS: &[&str] = &[
     "a", "ah", "and", "bye", "eh", "er", "ha", "hm", "hmm", "huh", "i", "mhm", "mm", "oh", "ok", "okay", "so", "thank", "thanks",
     "the", "uh", "um", "well", "yeah", "you",
 ];
+
+/// The user is done talking: "ok done", "that's all", "never mind", "thanks".
+/// Said in the time another command may follow, it ends that time.
+pub fn says_done(text: &str) -> bool {
+    let said: Vec<String> = text
+        .split_whitespace()
+        .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric() && c != '\'').to_lowercase())
+        .filter(|w| !w.is_empty())
+        .collect();
+    const DONE: &[&str] = &[
+        "done", "ok done", "okay done", "i'm done", "im done", "all done", "that's all", "thats all", "that's it", "thats it", "that is all",
+        "nothing else", "never mind", "nevermind", "thanks", "thank you", "ok thanks", "okay thanks", "ok thank you", "okay thank you",
+        "goodbye", "bye", "stop listening", "you can stop", "you can stop listening",
+    ];
+    DONE.contains(&said.join(" ").as_str())
+}
 
 /// One or two words that say nothing ("Uh.", "Thank you."): what a speech
 /// model makes of a noise more often than what someone asks for.
@@ -176,6 +194,12 @@ impl Session {
         self.command_until = None;
     }
 
+    /// The user is done: no command is waited for, and none may follow without the wake phrase.
+    pub fn rest(&mut self) {
+        self.command_until = None;
+        self.follow_until = None;
+    }
+
     pub fn hold(&mut self, held: bool) -> Option<Heard> {
         self.held = held;
         if held {
@@ -237,6 +261,11 @@ impl Session {
             }
             // Noise or a sentence that was not words is not an answer to anything.
             // Nor does it let another follow: the island says if it was a command.
+            // "Thanks", "that's all": the time another command may follow is over.
+            (Listen::FollowUp, Raw::Phrase { rule: Rule::Command, text, .. }) if says_done(&text) => {
+                self.follow_until = None;
+                None
+            }
             (Listen::FollowUp, Raw::Phrase { rule: Rule::Command, text, confidence })
                 if confidence >= COMMAND_FLOOR && !says_nothing(&text) =>
             {
@@ -377,6 +406,29 @@ mod tests {
         // After the wake phrase a word is an answer: "okay" to a question Mochi asked.
         s.talk(now);
         assert_eq!(s.heard(command("Okay.", 1.0), now), Some(Heard::Final("Okay.".into())));
+    }
+
+    #[test]
+    fn being_done_ends_the_time_another_command_may_follow() {
+        let now = Instant::now();
+        for done in ["Ok, done.", "That's all.", "Thank you.", "never mind", "Thanks!", "Stop listening."] {
+            assert!(says_done(done), "{done}");
+            let mut s = Session::new(true, Duration::from_secs(8));
+            s.heard(wake(0.95), now);
+            s.heard(command("pause", 1.0), now);
+            assert_eq!(s.listen(), Listen::FollowUp);
+            assert_eq!(s.heard(command(done, 1.0), now), None, "{done}");
+            assert_eq!(s.listen(), Listen::Wake, "{done}");
+        }
+        for not_done in ["are you done", "thanks for adding stripe now remove it", "stop", "done with stripe add vercel"] {
+            assert!(!says_done(not_done), "{not_done}");
+        }
+        // The island says so after a command that was only that.
+        let mut s = Session::new(true, Duration::from_secs(8));
+        s.heard(wake(0.95), now);
+        s.heard(command("ok done", 1.0), now);
+        s.rest();
+        assert_eq!(s.listen(), Listen::Wake);
     }
 
     #[test]
