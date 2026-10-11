@@ -1127,5 +1127,10 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       input.focus();
       input.select();
     },
+    // Voice's "tell the agent …": written here, sent by the user.
+    prefill(text: string) {
+      input.value = text;
+      input.dispatchEvent(new Event("input"));
+    },
   };
 }

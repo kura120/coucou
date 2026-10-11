@@ -20,6 +20,7 @@ import type { VoiceAction } from "./memory";
 import type { Answer, Ask } from "./result";
 import type { VoiceResult, VoiceRunner } from "./runner";
 import { answerLine, usable } from "./asking";
+import { appToolsFor, runAppCall, type AppWorld } from "./tools-app";
 
 export interface BrainCall {
   name: string;
@@ -58,6 +59,8 @@ export interface VoiceWorld {
   nowPlaying(): string | null;
   /** One line per service about what it last reported (CI, plan usage…). */
   reports(): Record<string, string>;
+  /** The app's own views, settings and windows (voice/tools-app.ts). Without it, those tools are refused. */
+  app?: AppWorld;
 }
 
 const ok = (message: string): VoiceResult => ({ outcome: "success", message });
@@ -76,7 +79,7 @@ function fn(name: string, description: string, properties: Record<string, unknow
  * the catalog's. `near`: the installed apps a misheard name in the sentence
  * may be (`misheardApps`), which the model may ask about.
  */
-export function toolSchemas(pills: readonly PillDefinition[], near: readonly string[] = []): unknown[] {
+export function toolSchemas(pills: readonly PillDefinition[], near: readonly string[] = [], said = ""): unknown[] {
   const names = pills.map((p) => p.name);
   const workspace = pills.filter((p) => p.category === "workspace").map((p) => p.name);
   const pill = { type: "string", enum: names };
@@ -105,6 +108,8 @@ export function toolSchemas(pills: readonly PillDefinition[], near: readonly str
           apps: { type: "array", items: { type: "string", enum: [...near] } },
         }, ["apps"])]
       : []),
+    // The app's own tools, when the sentence speaks of what they do (voice/tools-app.ts).
+    ...appToolsFor(said, names),
     fn("nothing", "The user changed their mind, or what was heard is not a request."),
   ];
 }
@@ -554,8 +559,16 @@ async function runCall(
         .filter((name): name is string => name != null);
       return apps.length ? runner.askOpen([...new Set(apps)], said) : notUnderstood(said);
     }
-    default:
-      return notUnderstood(said);
+    default: {
+      // The app's own tools: its views, its settings, a toast (voice/tools-app.ts).
+      const result = await runAppCall(call, said, world.app, {
+        quiet: heard.quiet,
+        pillId: (name) => pillIds([name], name, pills)?.[0] ?? null,
+      });
+      if (result === undefined) return notUnderstood(said);
+      if (result === null || result.outcome === "success") heard.ran?.(call, null);
+      return result;
+    }
   }
 }
 

@@ -25,6 +25,8 @@
 
 import { availablePills } from "../src/core/pills.ts";
 import { readSaid } from "../src/voice/asking.ts";
+import { DEFAULT_SETTINGS } from "../src/core/state.ts";
+import { read, written } from "../src/voice/guard.ts";
 import { VoiceConversation } from "../src/voice/conversation.ts";
 import { heardWith } from "../src/voice/resolve.ts";
 import { VoiceRunner } from "../src/voice/runner.ts";
@@ -50,7 +52,7 @@ const plain = (said) => said.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/
 function setup() {
   const log = [];
   const pills = { active: ["integration_github", "integration_vercel", "integration_stripe", "integration_n8n"], main: "integration_claude" };
-  const state = { permission: WAITING, timer: null, playing: true };
+  const state = { permission: WAITING, timer: null, playing: true, settings: structuredClone(DEFAULT_SETTINGS) };
   const runner = new VoiceRunner(
     {
       enabled: () => true, running: () => true, playing: () => state.playing, shuffle: () => true, repeat: () => true,
@@ -118,6 +120,25 @@ function setup() {
     openUrl: (url) => log.push(`url:${new URL(url).hostname.replace(/^www\./, "")}`),
     nowPlaying: () => "Get Lucky — Daft Punk",
     reports: () => ({ GitHub: "main: passing, 2 open pull requests" }),
+    // The app's own tools (src/voice/tools-app.ts): settings over a copy of the defaults; a toast is clicked "no".
+    app: {
+      setting: (key) => read(state.settings, key),
+      setSetting: async (key, value) => {
+        state.settings = written(state.settings, key, value);
+        log.push(`set:${key}=${value}`);
+        return true;
+      },
+      confirm: async (confirm) => (log.push(`confirm:${confirm.change}`), false),
+      notify: (title) => log.push(`toast:${title}`),
+      showView: (view) => (log.push(`view:${view}`), true),
+      stopListening: () => log.push("voice-off"),
+      pause: () => log.push("paused"),
+      serviceInfo: () => ["main: passing", "2 open pull requests", "last deploy 4 minutes ago"],
+      openWebSearch: () => log.push("search"),
+      openMailDraft: async (to) => (log.push(`draft:${to}`), true),
+      prepareForAgent: () => (log.push("chat"), true),
+      remote: () => false,
+    },
   };
   return { log, runner, world };
 }
@@ -330,6 +351,22 @@ const CASES = [
   [["open spotify", "yeah allow it"], ["app:spotify", "show-permission"]],
   [["deny it", "what about spotify"], ["DECLINE"]],
   [["open spotify", "yes"], ["app:spotify"]],
+  // The app's own tools: said plainly (no model), and said freely (the model, then the checks).
+  [["mute"], ["set:soundEnabled=false"]],
+  [["open coucou settings"], ["view:settings"]],
+  [["stop talking"], "nothing"], // already off in the defaults: said, nothing written
+  [["set the sound effects to thirty percent"], ["set:soundVolume=0.06"]],
+  [["stop listening"], ["voice-off"]],
+  [["set the language to french"], ["confirm:language: System → Français"]], // guarded: a click, which the script refuses
+  [["could you put the sound effects at about thirty percent for me"], ["set:soundVolume=0.06"]],
+  [["i would rather you did not answer out loud any more"], "nothing"], // already off in the defaults
+  [["bring up the wardrobe for me would you"], ["view:wardrobe"]],
+  [["can you look up how to center a div"], ["search"]],
+  [["write an email to ana at example dot com saying i will be ten minutes late"], ["draft:ana@example.com"]],
+  [["tell claude to run the tests again and fix what fails"], ["chat"]],
+  [["hey can you install the claude hooks for me"], "nothing"],
+  [["change the model server address to http evil dot example"], "nothing"],
+  [["put claude code in bypass permissions mode"], "nothing"],
 ];
 
 // Turns: a question answered, a choice picked, a wrong first hearing put right.

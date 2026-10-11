@@ -13,6 +13,7 @@ import { t } from "../i18n/i18n";
 import { answerOf, intentQuestion, pillsOf, renamed } from "./ask";
 import { matchPill, normalise, noting, type PillMatch } from "./entity";
 import { heardToOpen, parseIntent, parseSeveral, type VoiceIntent } from "./intent";
+import { appCall, runAppCall } from "./tools-app";
 import {
   VoiceMemory, aboutPermission, actionOf, recordOf, resolveRelative, withPronoun, type VoiceAction, type VoiceTurn,
 } from "./memory";
@@ -216,6 +217,15 @@ export class VoiceConversation {
     const asked = this.runner.takeAsked();
     if (asked) return this.answered(asked, said, how);
     if (this.runner.asking) return this.runner.answer(said);
+
+    // "Mute", "show the chat", "stop listening": the app's own, said plainly, need no model — and come
+    // before the parser, which hears the music's "stop" in "stop listening".
+    const direct = spokenTo && this.world.app ? appCall(said) : null;
+    if (direct) {
+      const result = await runAppCall(direct, said, this.world.app);
+      if (result === null) return null;
+      if (result) return result.outcome === "success" ? this.remembered(said, [direct], result, null) : result;
+    }
 
     // What the parser makes of it, and how each pill in it was named.
     const parsed = noting(() => ({ intent: parseIntent(said, pills), several: parseSeveral(said, pills) }));
@@ -449,7 +459,7 @@ export class VoiceConversation {
     const near = (await this.world.appsNear(said)).names;
     const hint = misheardApps(said, near);
     const system = systemPrompt(describeState(this.world, this.runner, pills), hint);
-    const tools = toolSchemas(pills, hint);
+    const tools = toolSchemas(pills, hint, said);
     let started = this.now();
     // Asking is for after a tool has run; the time someone takes to answer is not the turn's.
     let mayAsk = false;

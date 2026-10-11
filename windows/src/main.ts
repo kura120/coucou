@@ -89,6 +89,17 @@ async function main() {
   });
 
   // The settings window writes preferences; apply them here without a restart.
+  // Voice changes a setting or pauses Coucou the way Settings and the tray do.
+  island.onVoiceSettings = () => {
+    applyLanguage();
+    island.applySettings();
+    State.loadIntegrationTasks();
+  };
+  island.onVoicePause = () => {
+    setPaused(true);
+    island.fsm.forceHidden();
+  };
+
   await onEvent<Settings>("settings-changed", (s) => {
     const previousMain = State.mainPillId;
     State.settings = { ...State.settings, ...s };
