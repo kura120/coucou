@@ -8,7 +8,7 @@
 // In the browser preview, `coucouPreview` in the console shows every state
 // without a microphone; see `previewConsole`.
 
-import { Bridge, IS_TAURI } from "../core/bridge";
+import { Bridge, CONSOLE_HOOKS, IS_TAURI } from "../core/bridge";
 import type { IslandViewName } from "../core/layout";
 import { State } from "../core/state";
 import { language, onLanguageChange, setLanguage, t, type Language } from "../i18n/i18n";
@@ -152,7 +152,7 @@ export function registerVoiceCards(views: Map<IslandViewName, ViewHost>, actions
     MailCard.version += 1;
   });
 
-  if (!IS_TAURI && typeof window !== "undefined") {
+  if (CONSOLE_HOOKS && typeof window !== "undefined") {
     Object.assign(window, { coucouPreview: previewConsole(open) });
   }
 }
