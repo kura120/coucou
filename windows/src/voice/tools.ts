@@ -22,6 +22,7 @@ import type { Answer, Ask } from "./result";
 import type { VoiceResult, VoiceRunner } from "./runner";
 import { answerLine, usable } from "./asking";
 import { appToolsFor, runAppCall, type AppWorld } from "./tools-app";
+import { isPreviewTool, openPreview, previewToolsFor } from "./tools-preview";
 
 export interface BrainCall {
   name: string;
@@ -111,6 +112,8 @@ export function toolSchemas(pills: readonly PillDefinition[], near: readonly str
       : []),
     // The app's own tools, when the sentence speaks of what they do (voice/tools-app.ts).
     ...appToolsFor(said, names),
+    // Sample data only (voice/tools-preview.ts): web_search, check_inbox, read_message, write_draft.
+    ...previewToolsFor(said),
     fn("nothing", "The user changed their mind, or what was heard is not a request."),
   ];
 }
@@ -557,6 +560,8 @@ async function runCall(
       return apps.length ? runner.askOpen([...new Set(apps)], said) : notUnderstood(said);
     }
     default: {
+      // A sample tool opens its own card: nothing is left for the voice card to say.
+      if (isPreviewTool(call.name)) return openPreview(call, said, heard.quiet ? undefined : heard.ask);
       // The app's own tools: its views, its settings, a toast (voice/tools-app.ts).
       const result = await runAppCall(call, said, world.app, {
         quiet: heard.quiet,

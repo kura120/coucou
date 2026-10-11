@@ -2,6 +2,7 @@
    Every colour below is copied from the Swift views. */
 
 @import "./menu.css";
+@import "./views/voice-cards.css";
 
 :root {
   color-scheme: dark;

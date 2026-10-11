@@ -278,6 +278,8 @@ class AppState {
   conversationId: string | null = null;
   /** The chat's text field has the keyboard: the island stays open. */
   chatTyping = false;
+  /** A card that waits on the user is up (views/voice-cards.ts): the open island does not fold by itself. */
+  cardHeld = false;
   /**
    * The height the chat was dragged to, while the island stays open; 0 follows
    * the conversation. Forgotten when the island closes.
