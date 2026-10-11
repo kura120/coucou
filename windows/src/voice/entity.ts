@@ -4,7 +4,9 @@
 //
 // Resolution order, as on the Mac: aliases → exact name → a whole word of the
 // name → Levenshtein ≤ 2 (≤ 1 for short words), and nothing when two pills are
-// equally close.
+// equally close. Then, which the Mac does not have, what a speech model wrote
+// for a name it did not know: two words for one ("co pilot"), or other letters
+// for the same sound ("Kodaks" is Codex) — as apps are found (voice/apps.rs).
 
 import type { PillCategory, PillDefinition } from "../core/pills";
 
@@ -134,9 +136,58 @@ export function resolvePill(
   }
   if (!best) return null;
   const tolerance = [...q].length <= 4 ? 1 : 2;
-  if (best.dist > tolerance) return null;
+  if (best.dist > tolerance) return heardAs(q, pool);
   if (second && second.dist <= tolerance) return null;
   return best.id;
+}
+
+/**
+ * How a name sounds, roughly: its consonants, those a recogniser takes for
+ * one another made the same. The keys of `sound` in voice/apps.rs.
+ */
+export function soundKey(text: string): string {
+  const letters = [...normalise(text).replace(/ /g, "").replace(/th/g, "t").replace(/ph/g, "f").replace(/ck/g, "k").replace(/qu/g, "k").replace(/x/g, "ks")];
+  let out = "";
+  letters.forEach((c, i) => {
+    const soft = "eiy".includes(letters[i + 1] ?? " ");
+    let key = c;
+    if ("aeiouyhw".includes(c)) {
+      // Only where a name starts with one.
+      if (i > 0) return;
+      key = "a";
+    } else if (c === "b" || c === "p") key = "p";
+    else if (c === "d" || c === "t") key = "t";
+    else if (c === "c" && soft) key = "s";
+    else if ("cgkq".includes(c)) key = "k";
+    else if (c === "f" || c === "v") key = "f";
+    else if (c === "s" || c === "z") key = "s";
+    else if (c === "m" || c === "n") key = "n";
+    if (!out.endsWith(key)) out += key;
+  });
+  return out;
+}
+
+/** Under this many letters, or consonants, a sound is too short to tell a name by. */
+const SHORTEST_HEARD = 5;
+const FEWEST_CONSONANTS = 4;
+
+/**
+ * The pill a speech model meant by something that is nobody's name: the only
+ * one said that way once the spaces are gone ("co pilot"), else the only one
+ * that sounds the same ("ver sell", "kodaks"). Short sounds are left alone:
+ * "could" is not Claude.
+ */
+function heardAs(q: string, pool: readonly PillDefinition[]): string | null {
+  const joined = q.replace(/ /g, "");
+  const said = pool.map((p) => ({ id: p.id, forms: [normalise(p.name), ...spokenForms(p)].map((form) => form.replace(/ /g, "")) }));
+  const only = (ids: string[]) => (ids.length === 1 ? ids[0] : null);
+  if (q.includes(" ")) {
+    const same = said.filter((p) => p.forms.includes(joined)).map((p) => p.id);
+    if (same.length) return only(same);
+  }
+  const key = soundKey(joined);
+  if ([...joined].length < SHORTEST_HEARD || key.replace(/^a/, "").length < FEWEST_CONSONANTS) return null;
+  return only(said.filter((p) => p.forms.some((form) => soundKey(form) === key)).map((p) => p.id));
 }
 
 /** Wagner–Fischer, on characters. */

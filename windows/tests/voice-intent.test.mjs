@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PILL_CATALOG, availablePills } from "../src/core/pills.ts";
-import { SPOKEN, levenshtein, normalise, resolvePill, spokenForms } from "../src/voice/entity.ts";
+import { SPOKEN, levenshtein, normalise, resolvePill, soundKey, spokenForms } from "../src/voice/entity.ts";
 import { parseIntent, parseSeveral } from "../src/voice/intent.ts";
 import { buildGrammar, sentences } from "../src/voice/grammar.ts";
 import { VoiceRunner } from "../src/voice/runner.ts";
@@ -185,6 +185,42 @@ test("nothing close enough, or two pills as close, is no pill", () => {
   // "cli" is a whole word of two names.
   assert.equal(resolvePill("cli", PILLS), null);
   assert.equal(resolvePill("github", []), null);
+});
+
+test("a pill is found by what a speech model wrote for its name", () => {
+  // What the models wrote on the synthesised clips: a letter or two away.
+  for (const heard of ["versal", "Versal.", "versel"]) assert.equal(resolvePill(heard, PILLS), "integration_vercel", heard);
+  assert.equal(resolvePill("resent", PILLS), "integration_resend");
+  assert.equal(resolvePill("Kodex", PILLS), "agent_codex");
+  assert.equal(resolvePill("code X", PILLS), "agent_codex");
+  // Two words for one.
+  assert.equal(resolvePill("co pilot", PILLS), "agent_copilot");
+  assert.equal(resolvePill("anti gravity", PILLS), "agent_antigravity");
+  // Other letters for the same sound: Parakeet 0.6b, on a real voice, for "switch to Codex".
+  assert.equal(resolvePill("Kodaks", PILLS), "agent_codex");
+  assert.equal(resolvePill("ver sell", PILLS), "integration_vercel");
+  assert.equal(resolvePill("spot if i", PILLS), "integration_spotify");
+  assert.equal(resolvePill("and tropic", PILLS), "ai_anthropic");
+  assert.equal(resolvePill("kodaks", PILLS, "workspace"), "agent_codex");
+  assert.equal(resolvePill("ver sell", PILLS, "workspace"), null);
+});
+
+test("a short sound is not a pill's name", () => {
+  // "Claude" is three consonants: as many words sound like it as not.
+  for (const heard of ["could", "cloud", "called", "cold", "gold"]) assert.equal(resolvePill(heard, PILLS), null, heard);
+  // Hermes, Gemini, Ollama, Notion: the same.
+  for (const heard of ["warns", "horns", "jiminy", "alumni", "nathan"]) assert.equal(resolvePill(heard, PILLS), null, heard);
+  assert.equal(resolvePill("the weather", PILLS), null);
+});
+
+test("a name sounds like its consonants, as an app's does", () => {
+  // The keys of voice/apps.rs.
+  assert.equal(soundKey("Discord"), "tskrt");
+  assert.equal(soundKey("this cord"), soundKey("Discord"));
+  assert.equal(soundKey("versal"), soundKey("Vercel"));
+  assert.equal(soundKey("Kodaks"), soundKey("Codex"));
+  assert.notEqual(soundKey("Figma"), soundKey("Notion"));
+  assert.equal(soundKey(""), "");
 });
 
 test("the main pill is only looked for among the workspace tools", () => {
