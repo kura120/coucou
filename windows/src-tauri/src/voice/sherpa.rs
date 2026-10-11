@@ -308,6 +308,7 @@ impl Engine {
     }
 
     /// What was said in these samples (mono, -1…1). Empty when nothing was.
+    #[cfg(test)]
     pub fn transcribe(&self, sample_rate: u32, samples: &[f32]) -> String {
         self.transcribe_sure(sample_rate, samples).0
     }

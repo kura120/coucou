@@ -302,6 +302,15 @@ test("one candidate is a yes or no, several are a choice; an answer said or clic
   // A yes never stands for anything about a permission.
   for (const said of ["yes allow it", "approve", "allow"]) assert.equal(answerOf(said, yesNo, ["Spotify"]).kind, "other", said);
 
+  // A sentence about a permission is no answer: the question is dropped, and it is heard for what it is.
+  const waiting = setup({ brain: () => ({ calls: [call("decline_permission")], text: "" }) });
+  await waiting.hear("open spy flight");
+  assert.equal((await waiting.hear("no decline that")).outcome, "failure", "nothing waits to be declined here");
+  assert.ok(!waiting.runner.asking);
+  assert.equal(waiting.asked.length, 1, "the model was asked about that sentence, alone");
+  assert.deepEqual(waiting.asked[0].history, []);
+  assert.deepEqual(waiting.log, []);
+
   // Clicked, or Ctrl+Shift+number: the same answer, without a word.
   const s = setup();
   const asked = await s.full("open st");

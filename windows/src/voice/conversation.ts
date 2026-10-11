@@ -271,6 +271,9 @@ export class VoiceConversation {
   /** What was said in answer to a question about a name. */
   private async answered(asked: Asked, said: string, how: Hearing): Promise<VoiceResult | null> {
     const pills = this.pills();
+    // A sentence about a permission answers nothing Mochi asked: the question
+    // is dropped and the sentence heard for what it is ("no, decline that").
+    if (aboutPermission(said)) return this.hear(said, how);
     const answer = answerOf(said, asked.ask, asked.candidates.map((c) => c.label));
     if (answer.kind === "unclear") return asked.rounds < MOST_ROUNDS ? this.runner.ask({ ...asked, rounds: asked.rounds + 1 }) : leftAsIs();
     if (answer.kind !== "other") return this.settle(asked, answer, how);

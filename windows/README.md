@@ -158,6 +158,17 @@ without the yes. Nothing near is said at once. Windows' own recogniser is
 given no "yes" (it would hear one in too much): there, the app's name is the
 answer.
 
+The same goes for **any name**, not only an app's. A pill that was only nearly
+named is asked about before anything is touched — "remove strife" → **"Remove
+Stripe?"** — while a name said as it is written, or written with other letters
+for the same sounds ("versal", "get hub", "Kodaks"), is acted on at once: a
+common command is never questioned. The Parakeet speech models also say how
+sure they were of each word; a name they were unsure of is asked about unless
+it is spelt exactly. And when it is the verb that was misheard — "up in
+Spotify" — a word or two nobody knows followed by an app's name is asked about
+too ("Open Spotify?"), before any model. A question can be answered by voice
+or, as the island shows it, by a click.
+
 **A short memory.** For a minute and a half after a command, a sentence with
 no verb builds on it: after "open Spotify", "what about Steam?" opens Steam;
 after "add GitHub", "and Vercel too" adds Vercel; "put it back" or "undo"
@@ -166,7 +177,9 @@ that was opened). After the wake phrase a bare name is enough ("Steam");
 without it, only a sentence that says it follows ("and …", "what about …").
 The last few turns are kept in memory only — never on disk, never in the log —
 and are forgotten when voice is turned off. Nothing about a permission is ever
-carried over from the sentence before.
+carried over from the sentence before. "That one" and "it" mean the pill the
+last command was about ("take that one off"), and a correction swaps: "no,
+Vercel" after "add GitHub" takes GitHub off and puts Vercel on.
 
 - **Windows only, English only, for now.** It uses Windows' own speech
   recogniser, which needs the English speech pack (Settings → Time & language →
