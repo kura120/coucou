@@ -15,6 +15,7 @@ import { resolveRelative, withPronoun } from "../src/voice/memory.ts";
 import { certain, heardWith, howNamed, likeness, provideNames, resolveName, sureOf } from "../src/voice/resolve.ts";
 import { VoiceRunner } from "../src/voice/runner.ts";
 import { applyVoice } from "../src/island/voice.ts";
+import { names } from "../src/voice/tools.ts";
 
 const PILLS = availablePills("windows");
 const APPS = ["Spotify", "Steam", "Discord", "Figma", "Visual Studio Code", "Visual Studio 2022", "Claude"];
@@ -499,4 +500,40 @@ test("with a screen, a question about a name goes up, and the turn ends in what 
   assert.deepEqual(model.asked(), { kind: "yes_no", question: "Remove Stripe?" });
   model.conversation.answer({ kind: "yes_no", yes: true });
   assert.deepEqual(await proposed, done("Stripe removed"));
+});
+
+// ── Found by the evaluation of the app's own tools (2026-10-11) ───────────────
+
+test("claude code is never Codex: words of another pill's name are that pill's", async () => {
+  assert.equal(howNamed("put claude code in bypass permissions mode", "agent_codex", PILLS), null);
+  assert.equal(howNamed("put claude code in bypass permissions mode", "integration_claude", PILLS).how, "said");
+  assert.equal(names("put claude code in bypass permissions mode", "agent_codex", PILLS), false);
+  assert.equal(names("put claude code in bypass permissions mode", "integration_claude", PILLS), true);
+  // Said for itself, Codex is still Codex, and "code x" still sounds like it.
+  assert.equal(names("switch claude code over to codex", "agent_codex", PILLS), true);
+  assert.equal(names("use code x", "agent_codex", PILLS), true);
+  assert.equal(names("add get hub", "integration_github", PILLS), true);
+  // The model's call for it is refused: the main pill does not change for a sentence that named another tool.
+  const s = setup({ brain: () => ({ calls: [call("set_main_pill", { pill: "Codex" })], text: "" }) });
+  assert.equal((await s.hear("put claude code in bypass permissions mode")).outcome, "failure");
+  assert.deepEqual(s.log, []);
+  assert.equal(s.pills.main, "integration_claude");
+});
+
+test("stop, skip, next and back are the music's only in a short sentence or one about music", () => {
+  const kind = (said) => parseIntent(said, PILLS).kind;
+  for (const said of [
+    "i would like you to stop answering out loud please", "let claude code skip all permissions", "can you stop the codex agent from running",
+    "go back to the settings page for me", "what is the next thing on my list", "tell me when the next build is done please",
+  ]) {
+    assert.equal(kind(said), "unknown", said);
+  }
+  for (const [said, is] of [
+    ["stop", "musicPause"], ["pause", "musicPause"], ["stop the music", "musicPause"], ["please stop it now", "musicPause"], ["skip", "musicNext"],
+    ["skip this song", "musicNext"], ["next", "musicNext"], ["next track", "musicNext"], ["back", "musicPrevious"],
+    ["go back to the last track", "musicPrevious"], ["could you skip to the next track for me", "musicNext"],
+    ["i want you to pause the music right now", "musicPause"], ["previous song", "musicPrevious"],
+  ]) {
+    assert.equal(kind(said), is, said);
+  }
 });

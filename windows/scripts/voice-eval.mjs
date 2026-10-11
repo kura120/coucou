@@ -182,11 +182,14 @@ const WORDS = process.argv.includes("--words");
 async function ask(system, said, tools, history = [], steps = []) {
   asked += 1;
   const began = performance.now();
-  const reply = await fetch(`${SERVER}/v1/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MODEL, temperature: 0, stream: false, tools, messages: messages(system, history, said, steps) }),
-  });
+  const request = () =>
+    fetch(`${SERVER}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: MODEL, temperature: 0, stream: false, tools, messages: messages(system, history, said, steps) }),
+    });
+  // A server that is being restarted, or is busy with another session's model: once more, a little later.
+  const reply = await request().catch(() => new Promise((resolve) => setTimeout(resolve, 5000)).then(request));
   if (steps.length) wording.push(performance.now() - began);
   const message = (await reply.json()).choices?.[0]?.message ?? {};
   const calls = (message.tool_calls ?? []).map((c) => {

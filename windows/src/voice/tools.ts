@@ -14,6 +14,7 @@
 import type { PillDefinition } from "../core/pills";
 import { t } from "../i18n/i18n";
 import { normalise, resolvePill, spokenForms } from "./entity";
+import { howNamed } from "./resolve";
 import { askNearlyNamed, nearlyNamed } from "./ask";
 import type { VoiceIntent } from "./intent";
 import type { VoiceAction } from "./memory";
@@ -236,13 +237,9 @@ export function names(said: string, id: string, pills: readonly PillDefinition[]
   const words = normalise(said).split(" ").filter(Boolean);
   const text = ` ${words.join(" ")} `;
   if ([...spokenForms(def), normalise(def.name)].some((form) => text.includes(` ${form} `))) return true;
-  for (let size = 1; size <= 3; size++) {
-    for (let i = 0; i + size <= words.length; i++) {
-      const window = words.slice(i, i + size);
-      if (resolvePill(window.join(" "), pills) === id || resolvePill(window.join(""), pills) === id) return true;
-    }
-  }
-  return false;
+  // One to three words in a row that can only mean it — and are not part of
+  // another pill's name: "claude code" does not name Codex (voice/resolve.ts).
+  return howNamed(said, id, pills) != null;
 }
 
 const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");

@@ -185,14 +185,25 @@ const RANK: Record<NamedHow, number> = { said: 2, sound: 1, near: 0 };
  */
 export function howNamed(said: string, id: string, pills: readonly PillDefinition[]): PillMatch | null {
   const words = normalise(said).split(" ").filter(Boolean);
-  let best: PillMatch | null = null;
+  const found: { from: number; to: number; match: PillMatch }[] = [];
   for (let size = 1; size <= 3; size++) {
     for (let i = 0; i + size <= words.length; i++) {
       for (const text of [words.slice(i, i + size).join(" "), words.slice(i, i + size).join("")]) {
         const match = matchPill(text, pills);
-        if (match?.id === id && (!best || RANK[match.how] > RANK[best.how])) best = match;
+        if (match) found.push({ from: i, to: i + size, match });
       }
     }
+  }
+  // Words that are part of another pill's name as it is said are that pill's:
+  // the "code" of "claude code" is not Codex.
+  const taken = found.filter((f) => f.match.how === "said" && f.match.id !== id);
+  let best: PillMatch | null = null;
+  for (const { from, to, match } of found) {
+    if (match.id !== id) continue;
+    // Unless it is itself said outright, a run that shares a word with one is not counted.
+    if (match.how !== "said" && taken.some((t) => from < t.to && t.from < to)) continue;
+    if (taken.some((t) => t.from <= from && to <= t.to && t.to - t.from > to - from)) continue;
+    if (!best || RANK[match.how] > RANK[best.how]) best = match;
   }
   return best;
 }
