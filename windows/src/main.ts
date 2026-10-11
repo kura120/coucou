@@ -2,7 +2,7 @@
 
 import type { Ask } from "./voice/result";
 import "./style.css";
-import { Bridge, IS_TAURI, onEvent } from "./core/bridge";
+import { Bridge, CONSOLE_HOOKS, IS_TAURI, onEvent } from "./core/bridge";
 import { Sound } from "./core/sound";
 import { State, type Settings } from "./core/state";
 import { Island } from "./island/island";
@@ -132,9 +132,9 @@ async function main() {
 
   // In a plain browser there is no wake strip behind the cursor: make the whole
   // page wake the island so the visuals can be checked with `npm run dev`.
-  if (!IS_TAURI) {
-    document.addEventListener("click", () => Sound.resume(), { once: true });
-    // And no Rust to hear anything: what it would report can be typed in the
+  if (!IS_TAURI) document.addEventListener("click", () => Sound.resume(), { once: true });
+  if (CONSOLE_HOOKS) {
+    // With no Rust to hear anything, or to try a state by hand: what Rust would report can be typed in the
     // console, e.g. coucouVoice({ phase: "woke", text: "" }), and the
     // microphone's level with coucouLevel(0.6).
     Object.assign(window, {

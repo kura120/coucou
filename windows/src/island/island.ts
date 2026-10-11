@@ -795,7 +795,8 @@ export class Island {
     this.voiceWoke();
     void this.conversation.askUser(ask).then((answer) => {
       console.log("[coucou] answered", answer);
-      if (this.fsm.state === "listening") this.fsm.voiceFinished();
+      // Another question asked over this one dropped it: that one is on screen now.
+      if (this.fsm.state === "listening" && !this.conversation.asked) this.fsm.voiceFinished();
     });
   }
 

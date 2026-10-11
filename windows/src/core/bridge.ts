@@ -720,3 +720,10 @@ export async function onEvent<T>(name: string, handler: (payload: T) => void) {
   if (!IS_TAURI) return () => {};
   return listen<T>(name, (e) => handler(e.payload));
 }
+
+/**
+ * Whether the console hooks for trying things by hand (coucouVoice, coucouAsk,
+ * coucouPreview…) are installed: in a plain browser, and in a development
+ * build of the app — never in a release.
+ */
+export const CONSOLE_HOOKS = !IS_TAURI || Boolean((import.meta as { env?: { DEV?: boolean } }).env?.DEV);
