@@ -10,12 +10,15 @@
 import { availablePills } from "../src/core/pills.ts";
 import { parseIntent, parseSeveral } from "../src/voice/intent.ts";
 import { VoiceRunner } from "../src/voice/runner.ts";
-import { describeState, runProposal, systemPrompt, toolSchemas } from "../src/voice/tools.ts";
+import { describeState, notFound, openNamed, runProposal, systemPrompt, toolSchemas } from "../src/voice/tools.ts";
 
 const MODEL = process.argv[2] ?? "qwen2.5:7b-instruct";
 const SERVER = (process.argv[3] ?? "http://127.0.0.1:11434").replace(/\/$/, "");
 const PILLS = availablePills("windows");
 const WAITING = { agent: "Codex", request: "Bash: rm -rf dist" };
+/** What is installed, as Rust's lookup would find it by name. */
+const APPS = ["Figma", "Visual Studio Code", "Discord", "Spotify"];
+const FOLDERS = ["Downloads", "Desktop", "Documents", "Pictures"];
 
 function setup() {
   const log = [];
@@ -56,8 +59,16 @@ function setup() {
     timer: () => state.timer,
     setTimer: (minutes) => (log.push(`timer:${minutes}`), (state.timer = { label: "", minutesLeft: minutes })),
     cancelTimer: () => (log.push("timer:cancel"), true),
-    openApp: async (name) => (log.push(`app:${name.toLowerCase()}`), name),
-    openFolder: async (name) => (log.push(`folder:${name.toLowerCase()}`), name),
+    openApp: async (name) => {
+      const app = APPS.find((a) => a.toLowerCase() === name.toLowerCase());
+      if (app) log.push(`app:${app.toLowerCase()}`);
+      return app ?? null;
+    },
+    openFolder: async (name) => {
+      const folder = FOLDERS.find((f) => name.toLowerCase().split(" ").some((w) => w === f.toLowerCase() || `${w}s` === f.toLowerCase()));
+      if (folder) log.push(`folder:${folder.toLowerCase()}`);
+      return folder ?? null;
+    },
     openUrl: (url) => log.push(`url:${new URL(url).hostname.replace(/^www\./, "")}`),
     nowPlaying: () => "Get Lucky — Daft Punk",
     reports: () => ({ GitHub: "main: passing, 2 open pull requests" }),
@@ -100,9 +111,24 @@ async function hear(said) {
   if (intent.kind === "cancel") {
     result = null;
   } else if (intent.kind !== "unknown" || several) {
-    const results = (several ?? [intent]).map((one) => runner.run(one, said));
-    result = results.find((r) => r.outcome !== "success") ?? results[results.length - 1];
-  } else {
+    // "open …": the name is looked up, and what is not installed goes to the model.
+    const intents = several ?? [intent];
+    const results = [];
+    for (const one of intents) {
+      if (one.kind !== "open") {
+        results.push(runner.run(one, said));
+        continue;
+      }
+      const opened = await openNamed(one.name, world);
+      if (!opened && intents.length === 1) {
+        results.length = 0;
+        break;
+      }
+      results.push(opened ?? notFound(one.name));
+    }
+    if (results.length) result = results.find((r) => r.outcome !== "success") ?? results[results.length - 1];
+  }
+  if (result === undefined) {
     by = "model";
     const proposal = await ask(systemPrompt(describeState(world, runner, PILLS)), said, toolSchemas(PILLS));
     result = await runProposal(proposal, said, runner, world, PILLS);
@@ -137,6 +163,7 @@ const CASES = [
   ["timer five minutes", ["timer:5"]],
   ["cancel the timer", ["timer:cancel"]],
   ["open figma", ["app:figma"]],
+  ["open discord", ["app:discord"]],
   ["launch visual studio code", ["app:visual studio code"]],
   ["open github dot com", ["url:github.com"]],
   ["open my downloads folder", ["folder:downloads"]],
