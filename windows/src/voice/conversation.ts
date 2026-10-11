@@ -51,8 +51,8 @@ export interface Hearing {
    * what he does not understand is nothing at all.
    */
   spokenTo?: boolean;
-  /** Called when the answer has to be waited for: a lookup, a model. */
-  waiting?: () => void;
+  /** Called when the answer has to be waited for: a lookup, a model. `line`: what is being done, when known. */
+  waiting?: (line?: string) => void;
   /** Something was done and there is more to come: the line to show meanwhile. */
   working?: (line: string) => void;
   /** Asked before anything is done after a wait: false when nobody waits for it any more. */
@@ -158,14 +158,14 @@ export class VoiceConversation {
         action = record.action ?? action;
         continue;
       }
-      // The name is looked up among what is installed, which takes a moment.
-      how.waiting?.();
+      // The name is looked up among what is installed, started, and watched for.
+      how.waiting?.(t("Opening {0}…", { 0: intent.name }));
       const name = await openedName(intent.name, this.world);
       if (name) {
         const record = recordOf(intent, pills, null, name);
         calls.push(...record.calls);
         action = record.action;
-        results.push(opened(name));
+        results.push(opened(name, this.world));
         continue;
       }
       if (intents.length > 1) {
@@ -194,9 +194,9 @@ export class VoiceConversation {
     const pills = this.pills();
     const answer = readAnswer(said, asked.names);
     const open = async (name: string): Promise<VoiceResult | null> => {
-      how.waiting?.();
+      how.waiting?.(t("Opening {0}…", { 0: name }));
       const app = await openedName(name, this.world);
-      return app ? this.remembered(asked.said, [{ name: "open_app", arguments: { name: app } }], opened(app), { kind: "open" }) : null;
+      return app ? this.remembered(asked.said, [{ name: "open_app", arguments: { name: app } }], opened(app, this.world), { kind: "open" }) : null;
     };
     switch (answer.kind) {
       case "open":

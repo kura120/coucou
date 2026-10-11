@@ -262,7 +262,8 @@ class AppState {
    * What the listening view shows: the words so far, and the question Mochi
    * asked when he is listening for its answer.
    */
-  voice: { text: string; question: string; thinking?: boolean } = { text: "", question: "" };
+  /** `working`: what is being done while the answer is waited for ("Opening Spotify…"), when known. */
+  voice: { text: string; question: string; thinking?: boolean; working?: string } = { text: "", question: "" };
   /** Another command may be said without the wake phrase: Mochi still listens. */
   voiceFollowing = false;
   /** What the last voice command did, for its card. */

@@ -40,6 +40,11 @@ export interface VoiceWorld {
   /** The name of what was opened, or null when nothing by that name exists. */
   openApp(name: string): Promise<string | null>;
   /**
+   * Whether the app `openApp` just started was seen to come to the front.
+   * Without it, what was started is taken to have come.
+   */
+  appSeen?(): boolean;
+  /**
    * The installed apps nearest to what was heard, nearest first, for a
    * question: nothing is opened. `clear`: the first is the one to ask about.
    */
@@ -321,8 +326,8 @@ const FOLDER = /^(downloads?|desktop|documents?|pictures?|videos?|\w+ folder)$/;
  * that name. The one way in for "open …", from the parser and from a model.
  */
 export async function openNamed(name: string, world: VoiceWorld): Promise<VoiceResult | null> {
-  const opened = await openedName(name, world);
-  return opened ? ok(t("{0} opened", { 0: opened })) : null;
+  const app = await openedName(name, world);
+  return app ? opened(app, world) : null;
 }
 
 /** The same, as the name of what was opened. */
@@ -332,7 +337,12 @@ export async function openedName(name: string, world: VoiceWorld): Promise<strin
   return (FOLDER.test(wanted) ? await world.openFolder(wanted) : null) ?? (await world.openApp(wanted));
 }
 
-export const opened = (name: string) => ok(t("{0} opened", { 0: name }));
+/**
+ * What opening came to. "Opened" is for what was seen to come; an app that
+ * was started and not seen yet is said to have been asked for, no more.
+ */
+export const opened = (name: string, world?: Pick<VoiceWorld, "appSeen">) =>
+  ok(world?.appSeen?.() ?? true ? t("{0} opened", { 0: name }) : t("Asked Windows to open {0}", { 0: name }));
 
 export const notFound = (name: string) => fail(t("Not found: {0}", { 0: name.slice(0, 40) }));
 

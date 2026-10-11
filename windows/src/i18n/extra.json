@@ -4997,6 +4997,28 @@
    "pt-BR": "Este código também inclui a chave de acesso e a chave de ponta a ponta do relay {host}. «Parear de novo» cria uma chave e uma sala novas.",
    "ru": "Этот код также содержит ключ доступа и сквозной ключ для ретранслятора {host}. «Сопрячь заново» создаёт новый ключ и новую комнату.",
    "id": "Kode ini juga memuat kunci akses dan kunci ujung ke ujung untuk relay {host}. «Sandingkan ulang» membuat kunci dan ruang baru."
+  },
+  "Opening {0}…": {
+   "zh-Hans": "正在打开 {0}…",
+   "hi": "{0} खोला जा रहा है…",
+   "es": "Abriendo {0}…",
+   "ar": "جارٍ فتح {0}…",
+   "fr": "Ouverture de {0}…",
+   "bn": "{0} খোলা হচ্ছে…",
+   "pt-BR": "Abrindo {0}…",
+   "ru": "Открываю {0}…",
+   "id": "Membuka {0}…"
+  },
+  "Asked Windows to open {0}": {
+   "zh-Hans": "已请 Windows 打开 {0}",
+   "hi": "Windows से {0} खोलने को कहा गया",
+   "es": "Se pidió a Windows que abriera {0}",
+   "ar": "طُلب من Windows فتح {0}",
+   "fr": "Windows a été chargé d’ouvrir {0}",
+   "bn": "Windows-কে {0} খুলতে বলা হয়েছে",
+   "pt-BR": "O Windows foi solicitado a abrir {0}",
+   "ru": "Windows получил запрос открыть {0}",
+   "id": "Windows diminta membuka {0}"
   }
  }
 }

@@ -768,11 +768,15 @@ function buildListening(): ViewHost {
     h("div", { class: "listening-head" }, micDot, title),
     line,
   );
+  // Listening is cyan; doing something about what was heard is gray, and says what.
+  const hearing = card("cyan", body);
   return {
-    el: h("div", { class: "view" }, card("cyan", body)),
+    el: h("div", { class: "view" }, hearing),
     sync() {
-      const { text, question, thinking } = State.voice;
-      title.textContent = thinking ? t("Thinking…") : t("Listening…");
+      const { text, question, thinking, working } = State.voice;
+      hearing.style.setProperty("--wash", washRGBA(thinking ? "soft" : "cyan"));
+      hearing.classList.toggle("working", Boolean(thinking));
+      title.textContent = thinking ? (working || t("Thinking…")) : t("Listening…");
       // A question Mochi asked stays until its answer is being said.
       line.textContent = text || question || t("Say your command");
       line.classList.toggle("heard", text !== "");

@@ -192,6 +192,9 @@ function stopTimer(): boolean {
   return true;
 }
 
+/** Whether the app opened last was seen to come to the front. */
+let appSeen = false;
+
 export function createWorld(cards: VoiceCards): VoiceWorld {
   const pillName = (id: string) => pillDefinition(id)?.name ?? id;
   return {
@@ -232,7 +235,12 @@ export function createWorld(cards: VoiceCards): VoiceWorld {
       timer = { label, endsAt: Date.now() + ms, handle };
     },
     cancelTimer: stopTimer,
-    openApp: async (name) => (await Bridge.voiceOpenApp(name)) ?? null,
+    async openApp(name) {
+      const app = await Bridge.voiceOpenApp(name);
+      appSeen = app?.seen ?? false;
+      return app?.name ?? null;
+    },
+    appSeen: () => appSeen,
     appsNear: async (said) => (await Bridge.voiceAppsNear(said)) ?? { names: [], clear: false },
     openFolder: async (name) => (await Bridge.voiceOpenFolder(name)) ?? null,
     openUrl: (url) => void Bridge.openUrl(url),

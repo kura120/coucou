@@ -700,9 +700,14 @@ export class Island {
     let result: VoiceResult | null = null;
     try {
       result = await this.conversation.hear(said, {
-        waiting: () => {
-          if (!here() || State.voice.thinking) return;
-          State.voice = { ...State.voice, thinking: true };
+        waiting: (line) => {
+          if (!here() || (State.voice.thinking && State.voice.working === line)) return;
+          State.voice = { ...State.voice, thinking: true, working: line };
+          State.notify();
+        },
+        working: (line) => {
+          if (!here()) return;
+          State.voice = { ...State.voice, thinking: true, working: line };
           State.notify();
         },
         wanted: () => !late && here(),

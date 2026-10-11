@@ -477,8 +477,8 @@ export const Bridge = {
   voiceEngineRemove: (part: VoiceEnginePart) => call<void>("voice_engine_remove", { part }),
   /** Mochi says this out loud, when speaking is on and his voice is installed. */
   voiceSay: (text: string) => call<void>("voice_say", { text }),
-  /** Starts the Start-menu app that name means; its name, or null. */
-  voiceOpenApp: (name: string) => call<string | null>("voice_open_app", { name }),
+  /** Starts the installed app that name means: its name and whether a window of it was seen to come, or null. */
+  voiceOpenApp: (name: string) => call<{ name: string; seen: boolean } | null>("voice_open_app", { name }),
   /** The installed apps nearest to what was heard, for "Open Spotify?": opens nothing. */
   voiceAppsNear: (said: string) => call<{ names: string[]; clear: boolean }>("voice_apps_near", { said }),
   /** Opens one of the user's own folders; its name, or null. */
