@@ -16,7 +16,6 @@ export interface VoiceGrammar {
 
 const MUSIC = [
   "play", "play music", "play some music", "play spotify", "resume", "resume music",
-  "open spotify", "launch spotify",
   "pause", "pause music", "stop", "stop the music",
   "next", "next track", "next song", "skip",
   "previous", "previous track", "previous song",

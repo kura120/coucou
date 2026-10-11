@@ -136,7 +136,6 @@ command. A card says what was done, and the island goes back to where it was.
 | Say | What happens |
 |---|---|
 | "play", "pause", "next track", "previous track", "shuffle off", "repeat on" | Spotify, as from the music card. "play" opens Spotify when it is not running. |
-| "open Spotify" | Opens the app, whether or not its pill is on. |
 | "add GitHub", "show Vercel and Stripe" | Declares the pills, as in Settings → Active pills. |
 | "remove Notion", "hide Stripe and Notion" | Undeclares them. |
 | "replace n8n with GitHub", "keep only GitHub and Vercel" | Both at once. |

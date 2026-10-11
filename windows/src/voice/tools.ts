@@ -315,8 +315,6 @@ async function runCall(
       return world.cancelTimer() ? ok(t("Timer cancelled")) : fail(t("No timer is running"));
     case "open_app": {
       if (!OPEN_WORDS.test(normalise(said))) return notUnderstood(said);
-      // Spotify has its own way in (it may be the Store's app, with no shortcut to find).
-      if (names(said, "integration_spotify", pills)) return runner.run({ kind: "openSpotify" }, said);
       // The app as the user named it first: a model turns "visual studio code" into a pill's name.
       const wanted = [openedThing(said), str(a.name)].map((n) => n.slice(0, 80)).filter(Boolean);
       for (const name of wanted) {

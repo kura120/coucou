@@ -86,10 +86,6 @@ export class VoiceRunner {
     // Music the user switched off is not touched, and not started either.
     if (intent.kind.startsWith("music") && !music.enabled()) return fail(t("Spotify is off in Settings"));
     switch (intent.kind) {
-      case "openSpotify":
-        // The app was asked for by name: opened even when Coucou does not follow it.
-        music.open();
-        return ok(t("{0} opened", { 0: "Spotify" }));
       case "musicPlay":
         if (!music.running()) {
           music.open();
