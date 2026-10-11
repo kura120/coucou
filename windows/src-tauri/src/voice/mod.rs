@@ -303,11 +303,18 @@ pub struct EngineStatus {
     download_bytes: u64,
     /// False where there is no build of it for this system yet.
     available: bool,
+    /// It is being downloaded now: no second download of it is offered.
+    downloading: bool,
 }
 
 #[tauri::command]
 pub fn voice_engine_status(part: engine::Part) -> EngineStatus {
-    EngineStatus { installed: engine::installed(part), download_bytes: engine::download_bytes(part), available: cfg!(windows) }
+    EngineStatus {
+        installed: engine::installed(part),
+        download_bytes: engine::download_bytes(part),
+        available: cfg!(windows),
+        downloading: engine::downloading(part),
+    }
 }
 
 /// A hearing model the user may choose, for Settings → Voice.

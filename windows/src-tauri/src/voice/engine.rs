@@ -363,19 +363,58 @@ async fn install_one(app: &AppHandle, part: Part, archive: &'static Archive, bef
     result
 }
 
+/// One download at a time. Two at once — the button pressed again in a
+/// Settings window opened anew, or both parts wanting the library — worked in
+/// the same folder, and each wiped what the other had fetched: a model that
+/// "could not be unpacked", then one that "could not be checked".
+#[cfg(windows)]
+static ONE_AT_A_TIME: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// How many downloads of each part are under way or waiting their turn.
+static UNDER_WAY: [AtomicUsize; 2] = [AtomicUsize::new(0), AtomicUsize::new(0)];
+
+/// Whether that part is being downloaded right now: Settings then offers no
+/// second download of it.
+pub fn downloading(part: Part) -> bool {
+    UNDER_WAY[part as usize].load(Ordering::Relaxed) > 0
+}
+
+/// Counts a download for as long as it lives, however it ends.
+struct Counted(Part);
+
+impl Counted {
+    fn new(part: Part) -> Self {
+        UNDER_WAY[part as usize].fetch_add(1, Ordering::Relaxed);
+        Self(part)
+    }
+}
+
+impl Drop for Counted {
+    fn drop(&mut self) {
+        UNDER_WAY[self.0 as usize].fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
 /// Downloads, checks and unpacks one part of the engine. Progress goes out as
-/// `voice-engine` events; the result is said there too.
+/// `voice-engine` events; the result is said there too. Asked for again while
+/// it is under way, it waits its turn and finds everything there.
 #[cfg(windows)]
 pub async fn install(app: &AppHandle, part: Part) -> Result<(), String> {
+    let _counted = Counted::new(part);
     report(app, part, 0.0, false, None);
-    let total = download_bytes(part);
+    let _turn = ONE_AT_A_TIME.lock().await;
+    // What was asked for: the hearing model chosen now, whatever is chosen
+    // by the time it has arrived.
+    let archives = part.archives();
+    let missing: Vec<&'static Archive> = archives.iter().copied().filter(|archive| !present(archive)).collect();
+    let total: u64 = missing.iter().map(|archive| archive.size).sum();
     let result = async {
         let mut before = 0;
-        for archive in part.archives().into_iter().filter(|archive| !present(archive)) {
+        for archive in missing {
             install_one(app, part, archive, before, total).await?;
             before += archive.size;
         }
-        if installed(part) { Ok(()) } else { Err("the engine is incomplete".to_string()) }
+        if archives.iter().all(|archive| present(archive)) { Ok(()) } else { Err("the engine is incomplete".to_string()) }
     }
     .await;
     crate::log::line(match &result {
@@ -412,6 +451,19 @@ pub fn remove(part: Part) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_download_is_counted_while_it_lives_and_only_for_its_part() {
+        // Speaking's count is this test's alone: no other test downloads anything.
+        assert!(!downloading(Part::Speaking));
+        let first = Counted::new(Part::Speaking);
+        let second = Counted::new(Part::Speaking);
+        assert!(downloading(Part::Speaking));
+        drop(first);
+        assert!(downloading(Part::Speaking), "one is still waiting its turn");
+        drop(second);
+        assert!(!downloading(Part::Speaking));
+    }
 
     #[test]
     fn what_is_downloaded_is_pinned() {
