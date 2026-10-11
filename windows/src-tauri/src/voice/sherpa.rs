@@ -285,6 +285,135 @@ impl Drop for Engine {
     }
 }
 
+// ── Is someone speaking ───────────────────────────────────────────────────────
+
+#[repr(C)]
+struct SileroVad {
+    model: Text,
+    threshold: f32,
+    min_silence_duration: f32,
+    min_speech_duration: f32,
+    window_size: i32,
+    max_speech_duration: f32,
+}
+
+#[repr(C)]
+struct TenVad {
+    model: Text,
+    threshold: f32,
+    min_silence_duration: f32,
+    min_speech_duration: f32,
+    window_size: i32,
+    max_speech_duration: f32,
+}
+
+#[repr(C)]
+struct VadConfig {
+    silero_vad: SileroVad,
+    sample_rate: i32,
+    num_threads: i32,
+    provider: Text,
+    debug: i32,
+    ten_vad: TenVad,
+}
+
+type CreateVad = unsafe extern "C" fn(*const VadConfig, f32) -> *const c_void;
+type AcceptVad = unsafe extern "C" fn(*const c_void, *const f32, i32);
+type Detected = unsafe extern "C" fn(*const c_void) -> i32;
+
+/// The bundled engine's voice detector: Silero VAD, a small model that tells a
+/// voice from a keyboard, a click or a fan — which loudness alone cannot.
+pub struct Detector {
+    vad: *const c_void,
+    destroy: Destroy,
+    accept: AcceptVad,
+    detected: Detected,
+    clear: Destroy,
+    reset: Destroy,
+    _library: Library,
+}
+
+unsafe impl Send for Detector {}
+
+impl Detector {
+    /// The samples the model looks at in one go.
+    const WINDOW: usize = 512;
+    /// This much voice before it says someone is speaking: less is a noise.
+    const SHORTEST_SPEECH: f32 = 0.25;
+    /// How long after a voice began it is said to be one: the time above, and
+    /// the windows on either side of it.
+    pub const LATE: usize = 4000 + 2 * Self::WINDOW;
+
+    /// `silence`: how many seconds without a voice end a sentence.
+    pub fn load(runtime: &Path, model: &Path, silence: f32) -> Result<Self, String> {
+        let library = Library::open(&runtime.join(LIBRARY))?;
+        if !model.is_file() {
+            return Err("the voice detector is not installed".into());
+        }
+        let model = CString::new(model.to_string_lossy().as_bytes()).map_err(|_| "a path has a NUL".to_string())?;
+        let provider = CString::new("cpu").unwrap();
+        unsafe {
+            let mut config: VadConfig = std::mem::zeroed();
+            config.silero_vad = SileroVad {
+                model: model.as_ptr(),
+                threshold: 0.5,
+                min_silence_duration: silence,
+                min_speech_duration: Self::SHORTEST_SPEECH,
+                window_size: Self::WINDOW as i32,
+                // Sentences are cut where they are put together (vad.rs).
+                max_speech_duration: 30.0,
+            };
+            config.sample_rate = 16000;
+            config.num_threads = 1;
+            config.provider = provider.as_ptr();
+
+            let create: CreateVad = library.function("SherpaOnnxCreateVoiceActivityDetector")?;
+            let mut detector = Self {
+                vad: std::ptr::null(),
+                destroy: library.function("SherpaOnnxDestroyVoiceActivityDetector")?,
+                accept: library.function("SherpaOnnxVoiceActivityDetectorAcceptWaveform")?,
+                detected: library.function("SherpaOnnxVoiceActivityDetectorDetected")?,
+                clear: library.function("SherpaOnnxVoiceActivityDetectorClear")?,
+                reset: library.function("SherpaOnnxVoiceActivityDetectorReset")?,
+                _library: library,
+            };
+            // It keeps the sound of the sentence being said, to hand it over;
+            // here it is only asked whether someone speaks.
+            detector.vad = create(&config, 20.0);
+            if detector.vad.is_null() {
+                return Err("the voice detector could not be loaded".into());
+            }
+            Ok(detector)
+        }
+    }
+
+    /// More sound (16 kHz mono). Is someone speaking, now that it has heard it?
+    pub fn feed(&self, samples: &[f32]) -> bool {
+        unsafe {
+            (self.accept)(self.vad, samples.as_ptr(), samples.len() as i32);
+            let speaking = (self.detected)(self.vad) != 0;
+            if !speaking {
+                // The sentences it cut out itself are not wanted.
+                (self.clear)(self.vad);
+            }
+            speaking
+        }
+    }
+
+    /// Nobody is speaking, whatever was being said.
+    pub fn reset(&self) {
+        unsafe { (self.reset)(self.vad) };
+    }
+}
+
+impl Drop for Detector {
+    fn drop(&mut self) {
+        if !self.vad.is_null() {
+            unsafe { (self.destroy)(self.vad) };
+        }
+    }
+}
+
 // ── Saying a sentence ─────────────────────────────────────────────────────────
 
 #[repr(C)]
@@ -607,6 +736,8 @@ mod tests {
         assert_eq!(std::mem::size_of::<Qwen3Asr>(), 64);
         assert_eq!(std::mem::size_of::<ModelConfig>(), 504);
         assert_eq!(std::mem::size_of::<RecognizerConfig>(), 608);
+        assert_eq!(std::mem::size_of::<SileroVad>(), 32);
+        assert_eq!(std::mem::size_of::<VadConfig>(), 88);
     }
 
     /// With the real engine and voice on disk (`COUCOU_VOICE_RUNTIME`,
