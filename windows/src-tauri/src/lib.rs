@@ -894,6 +894,7 @@ pub fn run() {
             voice::voice_grammar,
             voice::voice_talk,
             voice::voice_open_app,
+            voice::voice_apps,
             voice::voice_open_folder,
             voice::voice_engine_status,
             voice::voice_engine_install,

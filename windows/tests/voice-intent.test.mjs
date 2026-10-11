@@ -33,8 +33,15 @@ const TABLE = [
   ["please play some music", play],
   ["can you play music", play],
   ["play spotify", { kind: "musicPlay", target: "spotify" }],
-  ["open spotify", unknown], // opening an app is for the model and its open_app tool, whatever the app
-  ["open figma", unknown],
+  // Opening is one thing for any app: the name goes as it was heard, and is
+  // looked up among what is installed when the command runs.
+  ["open spotify", { kind: "open", name: "spotify" }],
+  ["open figma", { kind: "open", name: "figma" }],
+  ["open this cord", { kind: "open", name: "this cord" }],
+  ["could you launch the visual studio code app", { kind: "open", name: "visual studio code" }],
+  ["open up my downloads", { kind: "open", name: "downloads" }],
+  ["open", unknown],
+  ["open the app", unknown],
   ["play music on spotify", { kind: "musicPlay", target: "spotify" }],
   ["pause", { kind: "musicPause" }],
   ["pause music", { kind: "musicPause" }],
@@ -150,6 +157,7 @@ test("several commands in one sentence are each understood, or it is one command
   // "cursor" alone means nothing: this is one command, adding two pills.
   assert.equal(parseSeveral("add gemini and copilot", PILLS), null);
   assert.equal(parseSeveral("pause", PILLS), null);
+  assert.deepEqual(parseSeveral("open discord and pause", PILLS), [{ kind: "open", name: "discord" }, { kind: "musicPause" }]);
 });
 
 // ── Pill names ────────────────────────────────────────────────────────────────
@@ -257,6 +265,20 @@ test("everything the recogniser can hear, the parser understands", () => {
     }
   }
   assert.ok(checked > 300, `${checked} sentences`);
+});
+
+test("with the installed apps' names, opening any of them can be heard and is understood", () => {
+  const apps = ["discord", "visual studio code", "7 zip file manager"];
+  const grammar = buildGrammar(PILLS, apps);
+  assert.deepEqual(grammar.slots.app, apps);
+  assert.ok(grammar.commands.includes("open {app}") && grammar.commands.includes("launch {app}"));
+  for (const command of ["open {app}", "launch {app}"]) {
+    for (const [i, sentence] of sentences(command, grammar.slots).entries()) {
+      assert.deepEqual(parse(sentence), { kind: "open", name: apps[i] }, sentence);
+    }
+  }
+  // Rust refuses a slot with nothing in it: without apps, nothing about them is sent.
+  assert.ok(!GRAMMAR.commands.some((c) => c.includes("{app}")) && !("app" in GRAMMAR.slots));
 });
 
 test("the recogniser is never given a way to approve or to send", () => {

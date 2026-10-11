@@ -140,6 +140,7 @@ command. A card says what was done, and the island goes back to where it was.
 | "remove Notion", "hide Stripe and Notion" | Undeclares them. |
 | "replace n8n with GitHub", "keep only GitHub and Vercel" | Both at once. |
 | "switch to Cursor", "use Codex" | Changes the main pill (workspace tools only). |
+| "open Discord", "launch Visual Studio Code", "open my downloads" | Starts that app, or opens that folder of yours. Any app Windows lists under All apps, Microsoft Store apps included, by its name — and by what the name was heard as: "this cord" is Discord. Two apps as close as each other, and nothing is opened. |
 | "never mind" | Closes without doing anything. |
 
 With six pills already there, "add Gemini" makes Mochi ask **which one to
@@ -159,7 +160,8 @@ it is. Spotify takes no slot, as everywhere else.
   default, in Settings → Shortcuts). The microphone is also closed while Coucou
   is paused from the tray, while the screen is locked and on battery saver.
 - **It can only hear what it was given**: the wake phrases and the commands
-  above, with any pill's name in them. So it cannot be asked for a song, an
+  above, with any pill's name and any installed app's name in them (the first
+  200, as read when Coucou starts). So it cannot be asked for a song, an
   artist or a playlist, and Spotify's volume is out of reach on Windows. The
   wake phrase and the command are two sentences, with a pause between them.
   "Coucou" alone does not wake it, and a wake phrase is ignored while a
@@ -171,8 +173,8 @@ it is. Spotify takes no slot, as everywhere else.
 model server you connected in Local models (Ollama, LM Studio or your own) and
 one of its models. A sentence the parser does not know is then put to that
 model with the tools Coucou offers — the music, the pills, an agent's session,
-the waiting permission (show it, or decline it), a timer, opening an app from
-the Start menu, one of your folders or a web address — or it answers a question
+the waiting permission (show it, or decline it), a timer, opening an app, one
+of your folders or a web address — or it answers a question
 about what Coucou shows. The model only proposes: every call is checked against
 what was actually said before anything happens. A pill is touched only if the
 sentence names it, a permission is declined only if the sentence says decline,

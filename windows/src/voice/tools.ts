@@ -274,6 +274,23 @@ export function intentOf(call: BrainCall, said: string, pills: readonly PillDefi
 const notUnderstood = (said: string) =>
   fail(said ? t("Not recognised: « {0} »", { 0: said }) : t("Command not recognised"));
 
+/** One of the user's own folders, said as nothing else: "downloads", "the pictures folder". */
+const FOLDER = /^(downloads?|desktop|documents?|pictures?|videos?|\w+ folder)$/;
+
+/**
+ * Opens what a name means — one of the user's folders when it is said as one,
+ * else the installed app it was heard as — and says which. Null: nothing by
+ * that name. The one way in for "open …", from the parser and from a model.
+ */
+export async function openNamed(name: string, world: VoiceWorld): Promise<VoiceResult | null> {
+  const wanted = name.slice(0, 80);
+  if (!wanted) return null;
+  const opened = (FOLDER.test(wanted) ? await world.openFolder(wanted) : null) ?? (await world.openApp(wanted));
+  return opened ? ok(t("{0} opened", { 0: opened })) : null;
+}
+
+export const notFound = (name: string) => fail(t("Not found: {0}", { 0: name.slice(0, 40) }));
+
 /** Whether the model made anything of the sentence: false for "not recognised". */
 export const understood = (result: VoiceResult, said: string) => result.message !== notUnderstood(said).message;
 
@@ -319,12 +336,12 @@ async function runCall(
     case "open_app": {
       if (!OPEN_WORDS.test(normalise(said))) return notUnderstood(said);
       // The app as the user named it first: a model turns "visual studio code" into a pill's name.
-      const wanted = [openedThing(said), str(a.name)].map((n) => n.slice(0, 80)).filter(Boolean);
+      const wanted = [openedThing(said), str(a.name)].filter(Boolean);
       for (const name of wanted) {
-        const opened = await world.openApp(name);
-        if (opened) return ok(t("{0} opened", { 0: opened }));
+        const opened = await openNamed(name, world);
+        if (opened) return opened;
       }
-      return fail(t("Not found: {0}", { 0: (wanted[0] ?? "").slice(0, 40) }));
+      return notFound(wanted[0] ?? "");
     }
     case "open_folder": {
       if (!OPEN_WORDS.test(normalise(said))) return notUnderstood(said);

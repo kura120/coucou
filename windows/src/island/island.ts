@@ -32,10 +32,11 @@ import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
 import { interruptedAfter, isPlace } from "./restore";
 import {
-  RESULT_SHOWN_MS, askBrain, brainChosen, createWorld, followUpKind, sayResult, stopSpeaking, voicePills, voiceRunner,
-  wakeBlocked,
+  RESULT_SHOWN_MS, askBrain, brainChosen, createWorld, followUpKind, runOpening, sayResult, stopSpeaking, voicePills,
+  voiceRunner, wakeBlocked,
 } from "./voice";
-import { parseIntent, parseSeveral } from "../voice/intent";
+import { parseIntent, parseSeveral, type VoiceIntent } from "../voice/intent";
+import { notFound } from "../voice/tools";
 import type { VoiceResult } from "../voice/runner";
 import { installContextMenu, type ContextMenu, type Rect } from "../views/menu";
 
@@ -683,8 +684,23 @@ export class Island {
       void this.voiceAsk(said);
       return;
     }
-    const results = (several ?? [intent]).map((one) => voiceRunner.run(one, said));
+    const intents = several ?? [intent];
+    if (intents.some((one) => one.kind === "open")) {
+      void this.voiceOpen(said, intents);
+      return;
+    }
+    const results = intents.map((one) => voiceRunner.run(one, said));
     this.voiceResult(results.find((r) => r.outcome !== "success") ?? results[results.length - 1]);
+  }
+
+  /** "Open Discord": the name is looked up among what is installed, then the card says which. */
+  private async voiceOpen(said: string, intents: readonly VoiceIntent[]) {
+    const result = await runOpening(intents, said, this.voiceWorld);
+    if (this.fsm.state !== "listening" || State.view !== "listening" || State.voice.text !== said) return;
+    if (result) this.voiceResult(result);
+    // Nothing installed by that name: a session or a web address, the model may know.
+    else if (brainChosen()) void this.voiceAsk(said);
+    else this.voiceResult(notFound(intents[0].kind === "open" ? intents[0].name : said));
   }
 
   /** Not a sentence the parser knows: the model is asked, and its proposal checked. */

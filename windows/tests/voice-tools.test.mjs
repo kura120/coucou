@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { availablePills } from "../src/core/pills.ts";
 import { VoiceRunner } from "../src/voice/runner.ts";
 import {
-  asksToApprove, describeState, intentOf, minutesSaid, names, runProposal, systemPrompt, toolSchemas, webAddress,
+  asksToApprove, describeState, intentOf, minutesSaid, names, openNamed, runProposal, systemPrompt, toolSchemas, webAddress,
 } from "../src/voice/tools.ts";
 
 const PILLS = availablePills("windows");
@@ -251,6 +251,12 @@ test("opening: an app by name, a folder of the user's, an http address — or no
   const s = setup();
   assert.deepEqual(await s.propose("open figma", [call("open_app", { name: "figma" })]), { outcome: "success", message: "Figma opened" });
   assert.deepEqual(await s.propose("open photoshop", [call("open_app", { name: "photoshop" })]), { outcome: "failure", message: "Not found: photoshop" });
+  // The same way in for the parser's "open …": a folder said as one, else an app, else nothing.
+  assert.deepEqual(await openNamed("figma", s.world), { outcome: "success", message: "Figma opened" });
+  assert.deepEqual(await openNamed("downloads", s.world), { outcome: "success", message: "Downloads opened" });
+  assert.deepEqual(await openNamed("downloads folder", s.world), { outcome: "success", message: "Downloads opened" });
+  assert.equal(await openNamed("photoshop", s.world), null);
+  assert.equal(await openNamed("", s.world), null);
   assert.deepEqual(await s.propose("open my downloads folder", [call("open_folder", { name: "downloads" })]), { outcome: "success", message: "Downloads opened" });
   assert.equal((await s.propose("open the system folder", [call("open_folder", { name: "C:\\Windows" })])).outcome, "failure");
   assert.deepEqual(await s.propose("open github dot com", [call("open_url", { url: "github.com" })]), { outcome: "success", message: "github.com opened" });

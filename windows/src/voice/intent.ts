@@ -3,8 +3,10 @@
 // sentence gives the same intent every time, and the same one as on the Mac.
 // No DOM, no Tauri, no state: text and the pill catalog in, an intent out.
 //
-// Two things the Mac does not have: shuffle and repeat (Spotify's, on the
-// music card here), and "never mind", which the Mac's listener handles itself.
+// Three things the Mac does not have: shuffle and repeat (Spotify's, on the
+// music card here), "never mind", which the Mac's listener handles itself, and
+// "open …" for whatever is named — an app is looked up among the installed
+// ones when the command runs, not known here.
 
 import type { PillDefinition } from "../core/pills";
 import { normalise, resolvePill } from "./entity";
@@ -33,6 +35,8 @@ export type VoiceIntent =
   | { kind: "pillSetMain"; id: string }
   | { kind: "pillReplace"; old: string; new: string }
   | { kind: "pillOnly"; ids: string[] }
+  // an installed app or one of the user's folders, by the name it was heard as
+  | { kind: "open"; name: string }
   | { kind: "cancel" }
   | { kind: "unknown" };
 
@@ -56,6 +60,10 @@ const MAIN = [["switch", "to"], ["set", "main", "to"], ["change", "to"], ["use"]
 const MUSIC_OR_PILL = [["play"], ["start"], ["resume"]];
 const ADD = [["add"], ["enable"], ["show"], ["activate"]];
 const REMOVE = [["remove"], ["disable"], ["hide"], ["delete"]];
+/** What follows is the name of something to open, whatever it is. */
+const OPEN = [["open", "up"], ["open"], ["launch"], ["bring", "up"], ["fire", "up"]];
+/** Words around a name that are not part of it. */
+const NOT_A_NAME = new Set(["the", "my", "a", "an", "up", "app", "application", "program", "please"]);
 const BARE_MUSIC = new Set(["play", "start", "resume"]);
 const GENERIC_MUSIC = new Set(["music", "audio"]);
 const MUSIC_SERVICES = new Set(["integration_music", "integration_spotify"]);
@@ -168,6 +176,13 @@ export function parseIntent(text: string, pills: readonly PillDefinition[]): Voi
   if (!words.length) return UNKNOWN;
 
   if (CANCEL.some((seq) => seq.length === words.length && startsWith(words, seq))) return { kind: "cancel" };
+
+  // "open Discord": the name is whatever follows, as it was heard.
+  const opening = OPEN.find((seq) => startsWith(words, seq));
+  if (opening) {
+    const name = words.slice(opening.length).filter((w) => !NOT_A_NAME.has(w)).join(" ");
+    if (name) return { kind: "open", name };
+  }
 
   // Shuffle and repeat first: "stop repeating this" is not "stop".
   for (const [stems, kind] of [[SHUFFLE, "musicShuffle"], [REPEAT, "musicRepeat"]] as const) {

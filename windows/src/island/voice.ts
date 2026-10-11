@@ -12,7 +12,8 @@ import { lastTextStep } from "../core/diff";
 import { Sound } from "../core/sound";
 import { language, t } from "../i18n/i18n";
 import { showToast } from "../toast/api";
-import { describeState, runProposal, systemPrompt, toolSchemas, understood, type VoiceWorld } from "../voice/tools";
+import { describeState, notFound, openNamed, runProposal, systemPrompt, toolSchemas, understood, type VoiceWorld } from "../voice/tools";
+import type { VoiceIntent } from "../voice/intent";
 import { SPOTIFY_ID, Spotify } from "../core/spotify";
 import { State } from "../core/state";
 import { buildGrammar } from "../voice/grammar";
@@ -231,6 +232,26 @@ export function createWorld(cards: VoiceCards): VoiceWorld {
   };
 }
 
+/**
+ * Does what the parser understood, when opening something is part of it: the
+ * name is looked up among what is installed, which takes a moment. Null: the
+ * one thing asked for is nothing that is installed — a model may know better
+ * (a session, a web address).
+ */
+export async function runOpening(intents: readonly VoiceIntent[], said: string, world: VoiceWorld): Promise<VoiceResult | null> {
+  const results: VoiceResult[] = [];
+  for (const intent of intents) {
+    if (intent.kind !== "open") {
+      results.push(voiceRunner.run(intent, said));
+      continue;
+    }
+    const opened = await openNamed(intent.name, world);
+    if (!opened && intents.length === 1) return null;
+    results.push(opened ?? notFound(intent.name));
+  }
+  return results.find((r) => r.outcome !== "success") ?? results[results.length - 1];
+}
+
 /** A model server and a model are chosen for voice in Settings. */
 export const brainChosen = () => Boolean(State.settings.voice.brain && State.settings.voice.brainModel);
 
@@ -321,7 +342,10 @@ export function registerVoiceHandlers(island: VoiceHost) {
   void onEvent<VoiceEvent>("voice", (event) => applyVoice(island, event));
   void onEvent<number>("voice-level", (level) => island.voiceLevel(level));
   void onEvent<{ sampleRate: number; pcm: string }>("voice-speech", playSpeech);
-  // What the recogniser can hear: nothing listens until it has this.
-  const grammar = buildGrammar(voicePills());
-  void Bridge.voiceGrammar(grammar.commands, grammar.slots);
+  // What the recogniser can hear: nothing listens until it has this. The
+  // installed apps are part of it ("open {app}"), so they are asked for first.
+  void Bridge.voiceApps().then((apps) => {
+    const grammar = buildGrammar(voicePills(), apps ?? []);
+    void Bridge.voiceGrammar(grammar.commands, grammar.slots);
+  });
 }
