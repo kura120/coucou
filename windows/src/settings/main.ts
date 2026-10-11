@@ -661,6 +661,7 @@ function localSection(customKey: boolean): HTMLElement {
       const disconnect = h("button", { class: "danger", text: CHAT_STRINGS.disconnect });
       disconnect.addEventListener("click", async () => {
         settings[field] = "";
+        voiceServersRedraw?.();
         if (settings.chatProvider === id) settings.chatProvider = "anthropic";
         if (id === "custom") {
           await Bridge.secretClear(CUSTOM_SERVER_KEY).catch(() => {});
@@ -721,6 +722,7 @@ function localSection(customKey: boolean): HTMLElement {
           status.append(h("div", { class: "notice err", text: CHAT_STRINGS.noModels(t(def.name)) }));
         } else {
           settings[field] = server.url;
+          voiceServersRedraw?.();
           if (!server.models.includes(settings.chatModels[id] ?? "")) {
             settings.chatModels = { ...settings.chatModels, [id]: server.models[0] };
           }
@@ -1057,10 +1059,17 @@ function voiceSection(): HTMLElement {
   // connected in Local models, and one of its models.
   const server = h("select", {}) as HTMLSelectElement;
   const model = h("select", {}) as HTMLSelectElement;
-  const connected = (Object.keys(LOCAL) as LocalId[]).filter((id) => settings[providerDef(id).urlField!]);
-  server.append(h("option", { value: "", text: t("None") }));
-  for (const id of connected) server.append(h("option", { value: id, text: t(LOCAL[id].name) }));
-  server.value = connected.includes(settings.voice.brain as LocalId) ? settings.voice.brain : "";
+  /** The servers connected right now; redrawn when one is connected or let go. */
+  const fillServers = () => {
+    const connected = (Object.keys(LOCAL) as LocalId[]).filter((id) => settings[providerDef(id).urlField!]);
+    const shown = [...server.options].map((o) => o.value).join("|");
+    if (shown === ["", ...connected].join("|")) return;
+    clear(server);
+    server.append(h("option", { value: "", text: t("None") }));
+    for (const id of connected) server.append(h("option", { value: id, text: t(LOCAL[id].name) }));
+    server.value = connected.includes(settings.voice.brain as LocalId) ? settings.voice.brain : "";
+    void fillModels();
+  };
   const fillModels = async () => {
     clear(model);
     model.style.display = server.value ? "" : "none";
@@ -1082,7 +1091,8 @@ function voiceSection(): HTMLElement {
     void fillModels();
   });
   model.addEventListener("change", () => change({ brainModel: model.value }));
-  void fillModels();
+  fillServers();
+  voiceServersRedraw = fillServers;
 
   // The bundled engine's two parts, each downloaded when asked for: a row with
   // its switch once it is here, a Download button until then.
@@ -1188,6 +1198,8 @@ function voiceSection(): HTMLElement {
 }
 
 let voiceListener: ((s: VoiceStatus | null) => void) | null = null;
+/** Redraws the voice section's list of model servers. */
+let voiceServersRedraw: (() => void) | null = null;
 type EngineProgress = { part: VoiceEnginePart; done: number; installed: boolean; error: string | null };
 const voiceEngineListeners: Partial<Record<VoiceEnginePart, (p: EngineProgress) => void>> = {};
 
@@ -1487,6 +1499,8 @@ async function main() {
     for (const redraw of declaredViews) redraw();
     const after = `${settings.chatProvider}|${settings.ollamaUrl}|${settings.lmstudioUrl}|${settings.customUrl}`;
     if (before !== after) localRedraw?.();
+    // A server connected in Local models can be chosen for voice at once.
+    voiceServersRedraw?.();
     applyLanguage();
   });
 }

@@ -33,6 +33,8 @@ const TABLE = [
   ["please play some music", play],
   ["can you play music", play],
   ["play spotify", { kind: "musicPlay", target: "spotify" }],
+  ["open spotify", unknown], // opening an app is for the model and its open_app tool, whatever the app
+  ["open figma", unknown],
   ["play music on spotify", { kind: "musicPlay", target: "spotify" }],
   ["pause", { kind: "musicPause" }],
   ["pause music", { kind: "musicPause" }],

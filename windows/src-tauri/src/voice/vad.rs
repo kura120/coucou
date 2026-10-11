@@ -22,8 +22,18 @@ const RISE: f64 = 8.0;
 const FALL: f64 = 2.0;
 /// About 800 ms of silence ends a segment.
 const SILENCE_FRAMES: u32 = 35;
-/// About 30 s: continuous noise is not one endless sentence.
-const MAX_ACTIVE_FRAMES: u32 = 1300;
+/// About 7 s: continuous noise — music, a fan — is not one endless sentence,
+/// and the model that writes a sentence down fails on ten seconds or more
+/// (measured: 8 s is written, 10 s is not). A command is shorter than that.
+const MAX_ACTIVE_FRAMES: u32 = 300;
+
+/// The most that is ever handed to the model: 8 s.
+pub const LONGEST: usize = (SAMPLE_RATE as usize) * 8;
+
+/// A sentence as the model can take it: its last eight seconds at most.
+pub fn fitting(sentence: &[f32]) -> &[f32] {
+    &sentence[sentence.len().saturating_sub(LONGEST)..]
+}
 
 #[derive(Debug, Clone)]
 pub struct EnergyVad {
@@ -311,6 +321,27 @@ mod tests {
         // A sentence shorter than the wake phrase is said to be: nothing after it.
         assert_eq!(after_wake(seconds(0.5), Duration::from_millis(900)), None);
         assert_eq!(after_wake(0, Duration::ZERO), None);
+    }
+
+    #[test]
+    fn no_sentence_is_longer_than_the_model_can_take() {
+        // Someone who never stops, or music: cut, and what comes out fits.
+        let mut sentences = Sentences::default();
+        sentences.feed(&tone(1.0, 0.001));
+        let mut longest = 0;
+        for chunk in tone(40.0, 0.3).chunks(160) {
+            if let Some(sentence) = sentences.feed(chunk) {
+                longest = longest.max(sentence.len());
+            }
+        }
+        assert!(longest > 0, "it was cut at least once");
+        assert!(longest <= LONGEST, "{} samples", longest);
+        // And whatever is handed over is cut to fit, keeping its end.
+        let long: Vec<f32> = (0..LONGEST + 5000).map(|i| i as f32).collect();
+        let fit = fitting(&long);
+        assert_eq!(fit.len(), LONGEST);
+        assert_eq!(fit[fit.len() - 1], (LONGEST + 4999) as f32);
+        assert_eq!(fitting(&long[..100]).len(), 100);
     }
 
     #[test]

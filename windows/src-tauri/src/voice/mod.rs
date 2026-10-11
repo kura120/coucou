@@ -32,7 +32,8 @@
 // that understands them: nothing listens until it has sent them.
 //
 // The island is told with one event, `voice`: { phase, text }, phase being
-// "woke", "partial", "final", "missed" or "cancelled". Settings follows
+// "woke", "partial", "final", "missed" or "cancelled" — and "following" /
+// "rested" around the time another command may follow without the wake phrase. Settings follows
 // `voice-status`.
 
 use std::collections::BTreeMap;
@@ -339,6 +340,11 @@ struct Event {
     text: String,
 }
 
+/// Something for the island that is not something heard.
+fn note(app: &AppHandle, phase: &'static str) {
+    let _ = app.emit_to(WINDOW_LABEL, EVENT, Event { phase, text: String::new() });
+}
+
 fn tell(app: &AppHandle, heard: Heard) {
     let (phase, text) = match heard {
         Heard::Woke => ("woke", String::new()),
@@ -425,7 +431,7 @@ impl Free {
     }
 
     fn written(&self, samples: &[f32]) -> Raw {
-        let text = session::without_wake(&self.engine.transcribe(vad::SAMPLE_RATE, samples));
+        let text = session::without_wake(&self.engine.transcribe(vad::SAMPLE_RATE, vad::fitting(samples)));
         if text.chars().any(char::is_alphanumeric) {
             Raw::Phrase { rule: Rule::Command, text, confidence: 1.0 }
         } else {
@@ -585,6 +591,13 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
                     tell(app, Heard::Cancelled);
                 }
                 return give_up(app, generation, why);
+            }
+            // Another command may follow without the wake phrase: the island
+            // shows Mochi still listening, and that he has stopped.
+            if want == Listen::FollowUp {
+                note(app, "following");
+            } else if ear == Listen::FollowUp && want != Listen::Command {
+                note(app, "rested");
             }
             ear = want;
             let status = match want {

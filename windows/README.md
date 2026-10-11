@@ -193,8 +193,13 @@ GitHub releases, checked against a pinned SHA-256) and uses it for the command:
   "hold the music for a sec", "get rid of Stripe". It is written down once you
   stop speaking, in a few hundredths of a second.
 - **Keep listening after a command**: for a few seconds (8 by default) after a
-  command, another can be said without the wake phrase. Anything said nearby in
-  that time is heard as a command too, so turn it off in a noisy room.
+  command, another can be said without the wake phrase. The view closes as
+  usual; Mochi keeps his listening look and a small orange dot sits beside him
+  for as long as he still listens. Anything said nearby in that time is heard
+  as a command too, so turn it off in a noisy room.
+- A command is at most about seven seconds: the model that writes it down
+  fails on ten seconds and more, so a longer sentence — or music that never
+  pauses — is cut there.
 - **One breath.** "OK Coucou, next track" as one sentence works too: Windows'
   recogniser says when the wake phrase ended, and what the microphone gave
   after that moment is written down. Said with a pause — "OK Coucou" … "next

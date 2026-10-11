@@ -83,6 +83,8 @@ export class Island {
   private bodyTarget: RGB | null = null;
   /** What is playing, passing through the middle of the compact island. */
   private nowPlaying = createMarquee("now-playing");
+  /** The microphone dot beside Mochi while another command may follow. */
+  private followDot!: HTMLElement;
   /** The music card was there at the last sync: the island is wider with it. */
   private hadMusicCard = false;
   private countdown!: HTMLElement;
@@ -321,6 +323,7 @@ export class Island {
     this.greetingCanvas = h("canvas", { id: "greeting-canvas" });
     this.miniGrid = h("div", { id: "mini-grid" });
     this.nowPlaying.el.id = "now-playing";
+    this.followDot = h("i", { class: "mic-dot", id: "follow-dot" });
     this.countdown = h("div", { id: "countdown" });
 
     this.header = buildHeader(actions);
@@ -356,6 +359,7 @@ export class Island {
       this.botGlow,
       this.botCanvas,
       this.nowPlaying.el,
+      this.followDot,
       this.miniGrid,
       this.countdown,
     );
@@ -597,6 +601,21 @@ export class Island {
     this.voiceResult(voiceRunner.asking ? voiceRunner.answer("") : voiceRunner.run({ kind: "unknown" }));
   }
 
+  /**
+   * After a command, another may follow without the wake phrase: the view
+   * closes as usual, and Mochi keeps his listening look until that time is over.
+   */
+  voiceFollowing(on: boolean) {
+    State.voiceFollowing = on;
+    if (on) {
+      this.engine.enterListening();
+      if (State.mode === "hidden") this.revealSilently();
+    } else if (this.fsm.state !== "listening") {
+      this.engine.exitListening();
+    }
+    State.notify();
+  }
+
   /** Nothing was said: back to where the island was. */
   voiceCancelled() {
     voiceRunner.reset();
@@ -668,7 +687,7 @@ export class Island {
       return;
     }
     State.voiceResult = result;
-    this.engine.exitListening();
+    if (!State.voiceFollowing) this.engine.exitListening();
     this.engine.triggerEmote(result.outcome === "success" ? "happy" : "surprised");
     this.setView("voiceResult");
     this.voiceEndsIn(RESULT_SHOWN_MS);
@@ -691,7 +710,7 @@ export class Island {
   private leftListening() {
     this.clearVoiceTimer();
     voiceRunner.reset();
-    this.engine.exitListening();
+    if (!State.voiceFollowing) this.engine.exitListening();
     // Rust stops waiting for a command; it has nothing to stop when it ended this itself.
     void Bridge.voiceCancel();
   }
@@ -1533,6 +1552,9 @@ export class Island {
     }
 
     this.syncNowPlaying();
+    // Still listening after a command: said beside Mochi, wherever the island is,
+    // except on the listening view, which has its own dot.
+    this.followDot.classList.toggle("on", State.voiceFollowing && State.mode !== "hidden" && State.view !== "listening");
 
     syncMiniBotStates(State.tasks);
     this.engine.setState(State.effectiveState);

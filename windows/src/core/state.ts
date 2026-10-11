@@ -250,6 +250,8 @@ class AppState {
    * asked when he is listening for its answer.
    */
   voice: { text: string; question: string; thinking?: boolean } = { text: "", question: "" };
+  /** Another command may be said without the wake phrase: Mochi still listens. */
+  voiceFollowing = false;
   /** What the last voice command did, for its card. */
   voiceResult: VoiceResult | null = null;
   searchResult: SearchResult | null = null;

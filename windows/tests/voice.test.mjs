@@ -143,14 +143,19 @@ test("each report reaches the island as what it is", () => {
     voiceHeard: (text, final) => calls.push(`${final ? "final" : "partial"}:${text}`),
     voiceMissed: () => calls.push("missed"),
     voiceCancelled: () => calls.push("cancelled"),
+    voiceFollowing: (on) => calls.push(on ? "following" : "rested"),
   };
   for (const [phase, text] of [["woke", ""], ["partial", "next"], ["final", "next track"], ["missed", ""], ["cancelled", ""]]) {
     applyVoice(island, { phase, text });
   }
   assert.deepEqual(calls, ["woke", "partial:next", "final:next track", "missed", "cancelled"]);
+  // Around the time another command may follow without the wake phrase.
+  applyVoice(island, { phase: "following", text: "" });
+  applyVoice(island, { phase: "rested", text: "" });
+  assert.deepEqual(calls.slice(5), ["following", "rested"]);
   // A phase a later build might add is ignored, not an error.
   applyVoice(island, { phase: "something-new", text: "" });
-  assert.equal(calls.length, 5);
+  assert.equal(calls.length, 7);
 });
 
 // ── Mochi's voice ─────────────────────────────────────────────────────────────
