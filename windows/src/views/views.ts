@@ -29,6 +29,7 @@ import { SPOTIFY_ID } from "../core/spotify";
 import type { Outfit, OutfitSelection } from "../mochi/wardrobe";
 import { language, t, tl, type Msg } from "../i18n/i18n";
 import type { ViewCommand } from "../island/shortcuts";
+import { registerVoiceCards } from "./voice-cards";
 
 export interface ViewActions {
   setView(v: IslandViewName): void;
@@ -944,5 +945,7 @@ export function buildViews(
   map.set("mail", buildPlaceholder(tl("Sending by email isn't in this version."), ""));
   map.set("searching", buildPlaceholder(tl("Claude is searching…"), ""));
   map.set("result", buildPlaceholder(tl("Result"), ""));
+  // The web answer and email cards, on sample data for now (views/voice-cards.ts).
+  registerVoiceCards(map, actions);
   return map;
 }

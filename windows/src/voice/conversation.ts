@@ -20,6 +20,7 @@ import {
   AFTER_TOOLS, ASK_USER, describeState, didYouMean, misheardApps, notAnApp, notFound, opened, openedName, runProposal, systemPrompt, toolSchemas, understood,
   type BrainCall, type VoiceWorld,
 } from "./tools";
+import { heardPreview } from "./tools-preview";
 
 /** An earlier turn, as a model is given it: the sentence, what was done, what came of it. */
 export type BrainTurn = Pick<VoiceTurn, "said" | "calls" | "result">;
@@ -165,6 +166,9 @@ export class VoiceConversation {
     // Looked for first, or its first word alone would be taken for the whole.
     const several = parseSeveral(said, pills);
     const known = intent.kind !== "unknown" || several != null;
+    // Sample data only (voice/tools-preview.ts): "search the web for …", "check my emails", "write an email to …".
+    const preview = !known && spokenTo ? heardPreview(said, (question) => this.askUser(question), how.waiting) : null;
+    if (preview) return preview;
     // "put it back" before the parser, which hears "back"; any other follow-up
     // only when the sentence is no command of its own.
     const relative = resolveRelative(said, this.last(), pills, spokenTo);

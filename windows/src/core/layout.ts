@@ -25,7 +25,9 @@ export type IslandViewName =
   | "recap"
   | "wardrobe"
   | "listening"
-  | "voiceResult";
+  | "voiceResult"
+  | "webAnswer"
+  | "email";
 
 export type BotStateName =
   | "idle"
@@ -104,6 +106,10 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   listening: { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "none" },
   // What a voice command did, for two seconds.
   voiceResult: { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "none" },
+  // A web answer with its sources, and the email cards (views/voice-cards.ts). Their
+  // heights are where they start: each card sets its own as its content changes.
+  webAnswer: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "none" },
+  email: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "none" },
 };
 
 // The upload views above are only the fallback geometry. Once a file is actually

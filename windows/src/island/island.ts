@@ -1733,7 +1733,7 @@ export class Island {
 
     // Nobody's words are folded away mid-sentence: while the chat field has the
     // keyboard the auto-close waits, and starts over once it lets go.
-    const typing = State.chatTyping && State.view === "prompt" && State.mode === "expanded";
+    const typing = ((State.chatTyping && State.view === "prompt") || State.cardHeld) && State.mode === "expanded";
     if (typing !== this.fsm.typing) {
       this.fsm.typing = typing;
       if (!typing && !this.wasInIsland && this.fsm.state === "home") this.fsm.mouseLeft();
