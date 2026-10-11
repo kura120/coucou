@@ -1098,7 +1098,7 @@ function voiceSection(): HTMLElement {
   // its switch once it is here, a Download button until then.
   const enginePart = (part: VoiceEnginePart, label: string, isOn: () => boolean, turn: (on: boolean) => void, extra?: HTMLElement) => {
     const row = h("div", { class: "row" });
-    const draw = (installed: boolean, available: boolean, megabytes: number, note = "") => {
+    const draw = (installed: boolean, available: boolean, megabytes: number, note = "", downloading = false) => {
       clear(row);
       row.append(h("label", { text: label }));
       if (installed) {
@@ -1119,13 +1119,16 @@ function voiceSection(): HTMLElement {
             void Bridge.voiceEngineInstall(part);
           },
         });
+        // Already on its way — asked for before this window was opened, or
+        // before the row was drawn again: a second download is not offered.
+        if (downloading) download.setAttribute("disabled", "");
         row.append(download);
       }
       if (note) row.append(h("span", { class: "hint", text: note }));
     };
     const refresh = (note = "") =>
       void Bridge.voiceEngineStatus(part).then((s) => {
-        if (s) draw(s.installed, s.available, Math.round(s.downloadBytes / 1_000_000), note);
+        if (s) draw(s.installed, s.available, Math.round(s.downloadBytes / 1_000_000), note, s.downloading);
       });
     draw(false, false, 0);
     refresh();
