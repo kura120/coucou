@@ -4381,6 +4381,28 @@
    "pt-BR": "O Mochi diz o que um comando fez, com uma voz calma gerada neste computador (Supertonic, baixado do GitHub quando você pede). Em inglês, e em silêncio quando o som está desligado.",
    "ru": "Mochi спокойным голосом сообщает, что сделала команда; голос создаётся на этом компьютере (Supertonic, скачивается с GitHub по вашей просьбе). На английском; молчит, когда звук выключен.",
    "id": "Mochi mengucapkan hasil perintah dengan suara tenang yang dibuat di komputer ini (Supertonic, diunduh dari GitHub saat Anda memintanya). Dalam bahasa Inggris, dan diam saat Suara dimatikan."
+  },
+  "Speech model": {
+   "zh-Hans": "语音模型",
+   "hi": "स्पीच मॉडल",
+   "es": "Modelo de voz",
+   "ar": "نموذج الكلام",
+   "fr": "Modèle de reconnaissance vocale",
+   "bn": "স্পিচ মডেল",
+   "pt-BR": "Modelo de fala",
+   "ru": "Модель распознавания речи",
+   "id": "Model ucapan"
+  },
+  "A larger model hears names and accents better, and takes a little longer to write a sentence down. Each is downloaded from GitHub when you ask for it. Parakeet is NVIDIA's (CC BY 4.0).": {
+   "zh-Hans": "较大的模型能更好地听懂名称和口音，写下一句话也稍慢一些。每个模型都在你需要时从 GitHub 下载。Parakeet 来自 NVIDIA（CC BY 4.0）。",
+   "hi": "बड़ा मॉडल नाम और लहजे बेहतर सुनता है, और वाक्य लिखने में थोड़ा अधिक समय लेता है। हर मॉडल आपके कहने पर GitHub से डाउनलोड होता है। Parakeet NVIDIA का है (CC BY 4.0)।",
+   "es": "Un modelo más grande oye mejor los nombres y los acentos, y tarda un poco más en escribir una frase. Cada uno se descarga de GitHub cuando lo pides. Parakeet es de NVIDIA (CC BY 4.0).",
+   "ar": "النموذج الأكبر يسمع الأسماء واللهجات بشكل أفضل، ويستغرق وقتًا أطول قليلًا لكتابة الجملة. يُنزَّل كل نموذج من GitHub عندما تطلبه. Parakeet من NVIDIA (CC BY 4.0).",
+   "fr": "Un modèle plus gros entend mieux les noms et les accents, et met un peu plus de temps à écrire une phrase. Chacun est téléchargé depuis GitHub quand vous le demandez. Parakeet est de NVIDIA (CC BY 4.0).",
+   "bn": "বড় মডেল নাম ও উচ্চারণ ভালো শোনে, আর একটি বাক্য লিখতে একটু বেশি সময় নেয়। প্রতিটি মডেল আপনি চাইলে GitHub থেকে ডাউনলোড হয়। Parakeet NVIDIA-র (CC BY 4.0)।",
+   "pt-BR": "Um modelo maior ouve melhor nomes e sotaques, e leva um pouco mais de tempo para escrever uma frase. Cada um é baixado do GitHub quando você pede. O Parakeet é da NVIDIA (CC BY 4.0).",
+   "ru": "Более крупная модель лучше слышит названия и акценты и чуть дольше записывает фразу. Каждая загружается с GitHub, когда вы об этом просите. Parakeet — модель NVIDIA (CC BY 4.0).",
+   "id": "Model yang lebih besar mendengar nama dan aksen dengan lebih baik, dan sedikit lebih lama menuliskan kalimat. Masing-masing diunduh dari GitHub saat Anda memintanya. Parakeet milik NVIDIA (CC BY 4.0)."
   }
  }
 }

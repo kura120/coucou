@@ -134,6 +134,8 @@ struct Plan {
     wake: bool,
     /// The bundled engine writes down the command, when it is installed.
     free: bool,
+    /// Which hearing model it does so with (engine.rs): a new one is a new listener.
+    hearing: usize,
     follow_up: u32,
 }
 
@@ -164,9 +166,11 @@ pub fn sync(app: &AppHandle, pref: &VoicePref) {
     if !(pref.enabled && pref.speak) {
         speak::unload();
     }
+    let hearing = engine::choose(&pref.hearing_model);
     let want = pref.enabled.then(|| Plan {
         wake: pref.wake,
         free: pref.engine == "bundled",
+        hearing,
         follow_up: pref.follow_up.min(MAX_FOLLOW_UP),
     });
     let mut s = shared();
@@ -306,6 +310,24 @@ pub fn voice_engine_status(part: engine::Part) -> EngineStatus {
     EngineStatus { installed: engine::installed(part), download_bytes: engine::download_bytes(part), available: cfg!(windows) }
 }
 
+/// A hearing model the user may choose, for Settings → Voice.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HearingChoice {
+    id: &'static str,
+    name: &'static str,
+    download_bytes: u64,
+    installed: bool,
+}
+
+#[tauri::command]
+pub fn voice_hearing_models() -> Vec<HearingChoice> {
+    engine::HEARING_MODELS
+        .iter()
+        .map(|model| HearingChoice { id: model.id, name: model.name, download_bytes: model.download_bytes(), installed: model.installed() })
+        .collect()
+}
+
 /// Settings → Voice → Download: fetches that part of the engine. The listener
 /// starts again, to hear with it if that is what came.
 #[tauri::command]
@@ -425,7 +447,7 @@ impl Free {
                 vad::Sentences::default()
             }
         };
-        match sherpa::Engine::load(&engine::runtime_dir(), &engine::model_dir(engine::Part::Hearing)) {
+        match sherpa::Engine::load(&engine::runtime_dir(), &engine::model_dir(engine::Part::Hearing), engine::hearing().family) {
             Ok(engine) => Some(Self {
                 engine,
                 capture: None,
@@ -825,7 +847,7 @@ mod tests {
     #[ignore = "needs the downloaded engine and recorded clips"]
     fn a_command_said_in_the_same_breath_as_the_wake_phrase_is_written_down() {
         let var = |name: &str| std::path::PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set")));
-        let engine = sherpa::Engine::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_MODEL")).expect("engine");
+        let engine = sherpa::Engine::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_MODEL"), sherpa::test_family()).expect("engine");
         let commands: Vec<String> = vec!["next track".into()];
         let grammar = Grammar::parse(&commands, &BTreeMap::new()).expect("grammar");
 
@@ -873,7 +895,7 @@ mod tests {
     #[ignore = "needs the downloaded engine"]
     fn a_sentence_in_a_stream_is_cut_out_and_written_down() {
         let var = |name: &str| std::path::PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set")));
-        let engine = sherpa::Engine::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_MODEL")).expect("engine");
+        let engine = sherpa::Engine::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_MODEL"), sherpa::test_family()).expect("engine");
         let bytes = std::fs::read(var("COUCOU_VOICE_WAV")).expect("wav");
         let rate = u32::from_le_bytes(bytes[24..28].try_into().unwrap()) as f64;
         let data = bytes.windows(4).position(|w| w == b"data").expect("data chunk") + 8;

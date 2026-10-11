@@ -170,6 +170,8 @@ export interface Settings {
     /** What writes down a command: "system" (Windows' recogniser) or "bundled" (free speech, downloaded). */
     engine: string;
     /** Seconds after a command during which another needs no wake phrase; 0 for none. */
+    /** Which model the bundled engine hears with (Rust's `HEARING_MODELS`). */
+    hearingModel: string;
     followUp: number;
     /** Mochi says what a command did, out loud. */
     speak: boolean;
@@ -211,7 +213,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mochiOutfit: DEFAULT_OUTFIT,
   pillColors: {},
   language: "",
-  voice: { enabled: false, wake: true, brain: "", brainModel: "", engine: "system", followUp: 8, speak: false, speaker: "female" },
+  voice: { enabled: false, wake: true, brain: "", brainModel: "", engine: "system", hearingModel: "moonshine-tiny", followUp: 8, speak: false, speaker: "female" },
 };
 
 type Listener = () => void;

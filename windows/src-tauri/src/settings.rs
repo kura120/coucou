@@ -97,6 +97,9 @@ pub struct VoicePref {
     /// the sentences it was given) or "bundled" (the downloaded engine, which
     /// hears anything — voice/sherpa.rs). The wake phrase is Windows' either way.
     pub engine: String,
+    /// Which model the bundled engine writes a command down with: one of
+    /// `voice::engine::HEARING_MODELS` by its id, the smallest when unknown.
+    pub hearing_model: String,
     /// Seconds after a command during which another may be said without the
     /// wake phrase. 0 turns it off. Only with the bundled engine.
     pub follow_up: u32,
@@ -114,6 +117,7 @@ impl Default for VoicePref {
             brain: String::new(),
             brain_model: String::new(),
             engine: "system".into(),
+            hearing_model: "moonshine-tiny".into(),
             follow_up: 8,
             speak: false,
             speaker: "female".into(),
@@ -458,7 +462,7 @@ mod tests {
   "pillColors": { "integration_claude": "#2DD4BF" },
   "language": "pt-BR",
   "desktopMochi": { "onDesktop": true, "spot": { "x": 1500.5, "y": -300.0, "space": "screen" } },
-  "voice": { "enabled": true, "wake": false, "brain": "ollama", "brainModel": "qwen2.5:7b-instruct", "engine": "bundled", "followUp": 5, "speak": true, "speaker": "male" }
+  "voice": { "enabled": true, "wake": false, "brain": "ollama", "brainModel": "qwen2.5:7b-instruct", "engine": "bundled", "hearingModel": "parakeet-110m", "followUp": 5, "speak": true, "speaker": "male" }
 }"##;
 
     fn custom() -> Value {
