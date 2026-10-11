@@ -32,7 +32,8 @@ import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
 import { interruptedAfter, isPlace } from "./restore";
 import {
-  RESULT_SHOWN_MS, askBrain, brainChosen, createWorld, sayResult, stopSpeaking, voicePills, voiceRunner, wakeBlocked,
+  RESULT_SHOWN_MS, askBrain, brainChosen, createWorld, followUpKind, sayResult, stopSpeaking, voicePills, voiceRunner,
+  wakeBlocked,
 } from "./voice";
 import { parseIntent, parseSeveral } from "../voice/intent";
 import type { VoiceResult } from "../voice/runner";
@@ -614,6 +615,40 @@ export class Island {
       this.engine.exitListening();
     }
     State.notify();
+  }
+
+  /**
+   * A sentence said in that time. Typing, a cough or a word to someone else is
+   * cut out as a sentence too: the island opens only when it is a command.
+   */
+  voiceAgain(said: string) {
+    if (wakeBlocked(State.view, State.mode, State.pendingApproval != null, State.paused)) return;
+    switch (followUpKind(said, voicePills(), brainChosen())) {
+      case "command":
+        void Bridge.voiceFollowed();
+        this.voiceWoke();
+        this.voiceHeard(said, true);
+        break;
+      case "ask":
+        void this.voiceAskQuietly(said);
+        break;
+      case "nothing":
+        break;
+    }
+  }
+
+  /** The model is asked without a word on screen; only what it made of the sentence is shown. */
+  private async voiceAskQuietly(said: string) {
+    const result = await askBrain(said, this.voiceWorld, true);
+    if (!result) return;
+    // The wake phrase was said meanwhile: that command is the one being heard.
+    if (this.fsm.state === "listening" && State.view === "listening") return;
+    if (wakeBlocked(State.view, State.mode, State.pendingApproval != null, State.paused)) return;
+    void Bridge.voiceFollowed();
+    this.voiceWoke();
+    if (this.fsm.state !== "listening") return;
+    State.voice = { ...State.voice, text: said };
+    this.voiceResult(result);
   }
 
   /** Nothing was said: back to where the island was. */
