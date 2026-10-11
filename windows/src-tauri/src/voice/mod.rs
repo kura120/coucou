@@ -322,15 +322,22 @@ pub struct EngineStatus {
     download_bytes: u64,
     /// False where there is no build of it for this system yet.
     available: bool,
+    /// It is being downloaded now: no second download of it is offered.
+    downloading: bool,
 }
 
 #[tauri::command]
 pub fn voice_engine_status(shared: State<crate::Shared>, part: engine::Part) -> EngineStatus {
     // With the model server as the speech model, nothing has to be downloaded to hear.
     if part == engine::Part::Hearing && cfg!(windows) && server_hears(&shared.settings.lock().unwrap()) {
-        return EngineStatus { installed: true, download_bytes: 0, available: true };
+        return EngineStatus { installed: true, download_bytes: 0, available: true, downloading: false };
     }
-    EngineStatus { installed: engine::installed(part), download_bytes: engine::download_bytes(part), available: cfg!(windows) }
+    EngineStatus {
+        installed: engine::installed(part),
+        download_bytes: engine::download_bytes(part),
+        available: cfg!(windows),
+        downloading: engine::downloading(part),
+    }
 }
 
 /// The settings name the model server as the speech model, and it may hear.

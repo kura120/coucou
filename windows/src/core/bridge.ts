@@ -277,7 +277,7 @@ export const Bridge = {
     ),
   /** Whether a part of the bundled engine is on this machine, and what getting it costs. */
   voiceEngineStatus: (part: VoiceEnginePart) =>
-    call<{ installed: boolean; downloadBytes: number; available: boolean }>("voice_engine_status", { part }),
+    call<{ installed: boolean; downloadBytes: number; available: boolean; downloading: boolean }>("voice_engine_status", { part }),
   /** Downloads that part; progress arrives as `voice-engine` events. */
   voiceEngineInstall: (part: VoiceEnginePart) => call<void>("voice_engine_install", { part }),
   voiceEngineRemove: (part: VoiceEnginePart) => call<void>("voice_engine_remove", { part }),

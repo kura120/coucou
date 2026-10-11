@@ -355,6 +355,74 @@ mod tests {
         }
     }
 
+    /// Starting an app by the identifier Windows lists it under, which is what
+    /// `App::open` does and nothing else here shows. `COUCOU_VOICE_LAUNCH`
+    /// names the apps, separated by `;` — "Calculator;Character Map" is one
+    /// from the Store and one that is not. Each is found, started, and a
+    /// window that was not there comes up. It really starts them, and leaves
+    /// them open: not for a machine nobody is looking at.
+    /// `cargo test -p coucou voice::apps -- --ignored --nocapture`
+    #[test]
+    #[cfg(windows)]
+    #[ignore = "starts the apps it is given"]
+    fn an_app_is_started_by_its_identifier() {
+        use std::time::{Duration, Instant};
+        use windows::core::BOOL;
+        use windows::Win32::Foundation::{HWND, LPARAM};
+        use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextLengthW, IsWindowVisible};
+
+        /// The windows a user can see: visible, with a title.
+        fn windows_shown() -> Vec<isize> {
+            unsafe extern "system" fn collect(hwnd: HWND, lparam: LPARAM) -> BOOL {
+                unsafe {
+                    if IsWindowVisible(hwnd).as_bool() && GetWindowTextLengthW(hwnd) > 0 {
+                        (*(lparam.0 as *mut Vec<isize>)).push(hwnd.0 as isize);
+                    }
+                }
+                BOOL(1)
+            }
+            let mut list: Vec<isize> = Vec::new();
+            unsafe {
+                let _ = EnumWindows(Some(collect), LPARAM(&mut list as *mut _ as isize));
+            }
+            list
+        }
+
+        let wanted = std::env::var("COUCOU_VOICE_LAUNCH").expect("COUCOU_VOICE_LAUNCH");
+        let listed = listed().expect("the Applications folder");
+        let (mut store, mut classic) = (0, 0);
+        for said in wanted.split(';').map(str::trim).filter(|said| !said.is_empty()) {
+            let app = find(said, &listed).unwrap_or_else(|| panic!("{said:?} is not an app Windows lists"));
+            let id = app.path.to_string_lossy();
+            assert!(id.starts_with("shell:AppsFolder\\"), "{said}");
+            // A Store app's identifier is its package and its entry, with a "!" between.
+            let from_store = id.contains('!');
+            let before = windows_shown();
+            app.open();
+            let started = Instant::now();
+            let mut came = false;
+            while !came && started.elapsed() < Duration::from_secs(20) {
+                std::thread::sleep(Duration::from_millis(250));
+                came = windows_shown().iter().any(|window| !before.contains(window));
+            }
+            println!(
+                "{:?} ({}): {}",
+                app.name,
+                if from_store { "from the Store" } else { "not from the Store" },
+                if came { format!("a window came up after {:?}", started.elapsed()) } else { "no window came up".to_string() }
+            );
+            assert!(came, "{said}: nothing opened");
+            if from_store {
+                store += 1;
+            } else {
+                classic += 1;
+            }
+            // The next one's window is not to be taken for this one's.
+            std::thread::sleep(Duration::from_secs(2));
+        }
+        println!("{store} from the Store and {classic} not: give one of each to have checked both");
+    }
+
     #[test]
     fn two_apps_as_close_or_nothing_close_is_no_app() {
         let list = apps(&["Visual Studio Code", "Visual Studio 2022", "Figma"]);
