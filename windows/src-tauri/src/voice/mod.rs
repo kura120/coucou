@@ -202,6 +202,7 @@ fn plan(settings: &Settings) -> Option<Plan> {
 }
 
 /// What writes a command down.
+#[cfg_attr(not(windows), allow(dead_code))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Ears {
     /// The bundled model: alone, or behind the model server for the
