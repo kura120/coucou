@@ -21,7 +21,9 @@
 //! read from the JSON; `--agent` is absent for Claude Code), or
 //! `coucou-hook --statusline` as Claude Code's status line command (plan usage,
 //! see statusline.rs): it passes the plan limits on and runs the status line the
-//! user had before, so that keeps working.
+//! user had before, so that keeps working. And `coucou-hook --mcp`, started by
+//! the Claude Code that Coucou itself runs for a voice turn: a stdio MCP server
+//! that carries each message to the app over the same pipe (mcp.rs).
 
 use std::io::{Read, Write};
 use std::sync::mpsc;
@@ -29,6 +31,7 @@ use std::time::Duration;
 
 use serde_json::{Map, Value};
 
+mod mcp;
 mod normalize;
 mod reply;
 
@@ -102,6 +105,9 @@ struct Event {
 fn main() {
     if std::env::args().skip(1).any(|a| a == "--statusline") {
         statusline::run();
+    }
+    if std::env::args().skip(1).any(|a| a == "--mcp") {
+        mcp::run();
     }
     let args = args();
     let mut raw = Vec::new();
