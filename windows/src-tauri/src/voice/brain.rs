@@ -110,6 +110,24 @@ pub fn warm(settings: &Settings) {
 /// Addresses the "not on this machine" toast was shown for, this run.
 static WARNED: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
 
+/// Something said is about to go to this server: when it is not this computer,
+/// a toast says so, once per address. Whatever sends a sentence there calls
+/// this first (embed.rs too).
+pub(super) fn tell_if_elsewhere(app: &AppHandle, server: &local_chat::Server) {
+    let Ok(url) = net::normalise_server_url(&server.url) else { return };
+    if net::is_loopback_url(&url) {
+        return;
+    }
+    let address = url.as_str().trim_end_matches('/').to_string();
+    if WARNED.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(address.clone()) {
+        toast::warn(
+            app,
+            t("What you say goes to another computer"),
+            Some(tf("Voice asks the model server at {url}, which is not this machine.", &[("url", &address)])),
+        );
+    }
+}
+
 pub async fn ask(
     app: &AppHandle,
     settings: &Settings,
@@ -128,18 +146,7 @@ pub async fn ask(
     if system.len() > MAX_SYSTEM || said.len() > MAX_SAID || tools_size > MAX_TOOLS || !tools.is_array() {
         return Err("voice: request refused".into());
     }
-    if let Ok(url) = net::normalise_server_url(&server.url) {
-        if !net::is_loopback_url(&url) {
-            let address = url.as_str().trim_end_matches('/').to_string();
-            if WARNED.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(address.clone()) {
-                toast::warn(
-                    app,
-                    t("What you say goes to another computer"),
-                    Some(tf("Voice asks the model server at {url}, which is not this machine.", &[("url", &address)])),
-                );
-            }
-        }
-    }
+    tell_if_elsewhere(app, &server);
     let body = json!({
         "model": model,
         "messages": with_steps(messages(system, history, said), steps),

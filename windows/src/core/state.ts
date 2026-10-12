@@ -189,12 +189,29 @@ export interface Settings {
     speak: boolean;
     /** "female" or "male". */
     speaker: string;
+    /** The embedding model, on the server `brain` names, that capabilities are ranked with: "" for none. */
+    embedModel: string;
+    /** What the local model could not do may go to the provider chosen for chat. Off by default. */
+    cloud: boolean;
+    /** A question alone may be answered from the web. Off by default. */
+    webAnswers: boolean;
+    /**
+     * Who answers a web question: Brave Search with the user's key, Anthropic,
+     * or nobody ("browser": the browser opens on the search). Rust keeps the
+     * value as written and reads one it does not know as "browser".
+     */
+    webSearch: WebSearchChoice;
   };
+  /** The search engine the browser opens a search on. */
+  searchEngine: string;
   desktopMochi?: {
     onDesktop: boolean;
     spot: { x: number; y: number; space: string } | null;
   };
 }
+
+/** `voice.webSearch` (src-tauri/src/settings.rs). */
+export type WebSearchChoice = "brave" | "anthropic" | "browser";
 
 export const DEFAULT_SETTINGS: Settings = {
   soundEnabled: true,
@@ -225,7 +242,8 @@ export const DEFAULT_SETTINGS: Settings = {
   mochiOutfit: DEFAULT_OUTFIT,
   pillColors: {},
   language: "",
-  voice: { enabled: false, wake: true, brain: "", brainModel: "", engine: "system", hearingModel: "parakeet-0.6b", followUp: 8, speak: false, speaker: "female" },
+  voice: { enabled: false, wake: true, brain: "", brainModel: "", engine: "system", hearingModel: "parakeet-0.6b", followUp: 8, speak: false, speaker: "female", embedModel: "", cloud: false, webAnswers: false, webSearch: "browser" },
+  searchEngine: "google",
 };
 
 type Listener = () => void;

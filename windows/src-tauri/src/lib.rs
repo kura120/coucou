@@ -38,6 +38,7 @@ mod spotify;
 mod toast;
 mod tray;
 mod voice;
+mod web_search;
 #[cfg(windows)]
 mod webview_drop;
 
@@ -981,6 +982,9 @@ pub fn run() {
             voice::voice_engine_install,
             voice::voice_engine_remove,
             voice_brain,
+            voice::embed::voice_embed,
+            voice::embed::voice_embed_models,
+            web_search::web_search,
             voice_say,
         ])
         .setup(move |app| {

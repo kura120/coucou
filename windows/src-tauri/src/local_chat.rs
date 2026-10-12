@@ -36,8 +36,32 @@ const MAX_LINE: usize = 1024 * 1024;
 const MAX_ANSWER: usize = 4 * 1024 * 1024;
 /// Ollama and LM Studio ignore the key, but some clients insist on sending one.
 const NO_KEY: &str = "ollama";
-/// Models that embed or rank rather than chat are left out of the list.
-const NOT_CHAT: &[&str] = &["embed", "bge-", "all-minilm", "clip", "rerank"];
+/// What a model's name says it is for. A server's list does not say, so the
+/// name does: one list of fragments, read by the chat picker (which leaves out
+/// what does not chat) and by voice's choice of an embedding model.
+const EMBEDS: &[&str] = &["embed", "bge-", "all-minilm"];
+/// Neither chat nor text to rank capabilities with: pictures, and re-rankers.
+const OTHER: &[&str] = &["clip", "rerank"];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    Chat,
+    Embedding,
+    Other,
+}
+
+fn kind(id: &str) -> Kind {
+    let id = id.to_lowercase();
+    let has = |fragments: &[&str]| fragments.iter().any(|f| id.contains(f));
+    // "bge-reranker" ranks: it is not an embedding model for all its "bge-".
+    if has(OTHER) {
+        Kind::Other
+    } else if has(EMBEDS) {
+        Kind::Embedding
+    } else {
+        Kind::Chat
+    }
+}
 
 // ── The custom server's key ───────────────────────────────────────────────────
 //
@@ -148,7 +172,7 @@ pub async fn connect(id: &str, typed: &str) -> Result<Connected, String> {
     let raw = if typed.trim().is_empty() { usual_address(id).unwrap_or_default() } else { typed.to_string() };
     let url = net::normalise_server_url(&raw)?;
     let key = if id == "custom" { custom_key_for(&url) } else { None };
-    let models = list(&url, key.as_deref()).await?;
+    let models = list(&url, key.as_deref(), Kind::Chat).await?;
     Ok(Connected {
         url: url.as_str().trim_end_matches('/').to_string(),
         models,
@@ -159,15 +183,22 @@ pub async fn connect(id: &str, typed: &str) -> Result<Connected, String> {
 /// The models of a connected server, for the picker in the chat view.
 pub async fn models(server: &Server) -> Result<Vec<ModelInfo>, String> {
     let url = base_url(server)?;
-    let models = list(&url, server.key.as_deref()).await?;
+    let models = list(&url, server.key.as_deref(), Kind::Chat).await?;
     if models.is_empty() {
         return Err(tf("No models yet. Download one in {name} first.", &[("name", &t(server.name))]));
     }
     Ok(models.into_iter().map(|id| ModelInfo { label: id.clone(), id }).collect())
 }
 
-/// `GET /v1/models`, chat models only, or why the server can't be reached.
-async fn list(base: &Url, key: Option<&str>) -> Result<Vec<String>, String> {
+/// The embedding models of a connected server, by name: what voice may rank
+/// the app's capabilities with (voice/embed.rs). Empty when it has none.
+pub async fn embedding_models(server: &Server) -> Result<Vec<String>, String> {
+    let url = base_url(server)?;
+    list(&url, server.key.as_deref(), Kind::Embedding).await
+}
+
+/// `GET /v1/models`, the models of one kind, or why the server can't be reached.
+async fn list(base: &Url, key: Option<&str>, wanted: Kind) -> Result<Vec<String>, String> {
     let response = net::client(base, Duration::from_secs(5))?
         .get(net::join(base, "v1/models"))
         .header("Authorization", bearer(key))
@@ -182,16 +213,16 @@ async fn list(base: &Url, key: Option<&str>) -> Result<Vec<String>, String> {
     }
     let bytes = net::read_capped(response, net::MAX_BODY).await?;
     let body: Value = serde_json::from_slice(&bytes).map_err(|_| unreachable(base))?;
-    parse_models(&body).ok_or_else(|| unreachable(base))
+    parse_models(&body, wanted).ok_or_else(|| unreachable(base))
 }
 
-fn parse_models(body: &Value) -> Option<Vec<String>> {
+fn parse_models(body: &Value, wanted: Kind) -> Option<Vec<String>> {
     let items = body.get("data")?.as_array()?;
     Some(
         items
             .iter()
             .filter_map(|m| m.get("id").and_then(Value::as_str))
-            .filter(|id| !NOT_CHAT.iter().any(|n| id.to_lowercase().contains(n)))
+            .filter(|id| kind(id) == wanted)
             .map(str::to_string)
             .collect(),
     )
@@ -264,8 +295,19 @@ pub async fn complete(server: &Server, body: &Value, timeout: Duration) -> Resul
 /// own making (voice/hear.rs, which lets a sentence's sound go nowhere but
 /// this computer).
 pub async fn complete_at(client: reqwest::Client, base: &Url, server: &Server, body: &Value) -> Result<Value, String> {
+    post_at(client, base, server, "v1/chat/completions", body).await
+}
+
+/// `POST /v1/embeddings`, answered whole: what voice ranks with
+/// (voice/embed.rs). The errors are for the caller to tell apart, not to show.
+pub async fn embeddings(server: &Server, body: &Value, timeout: Duration) -> Result<Value, String> {
+    let base = base_url(server)?;
+    post_at(net::client(&base, timeout)?, &base, server, "v1/embeddings", body).await
+}
+
+async fn post_at(client: reqwest::Client, base: &Url, server: &Server, path: &str, body: &Value) -> Result<Value, String> {
     let reply = client
-        .post(net::join(base, "v1/chat/completions"))
+        .post(net::join(base, path))
         .header("Authorization", bearer(server.key.as_deref()))
         .json(body)
         .send()
@@ -493,15 +535,58 @@ mod tests {
     fn the_model_list_leaves_out_embedding_models_and_says_when_nothing_answers() {
         let body = br#"{"data":[{"id":"llama3.2"},{"id":"nomic-embed-text"},{"id":"BGE-large"},{"id":"qwen2.5-coder"}]}"#;
         let u = serve_once("200 OK", &format!("Content-Length: {}\r\n", body.len()), body.to_vec());
-        assert_eq!(block_on(list(&url(&u), None)).unwrap(), vec!["llama3.2", "qwen2.5-coder"]);
+        assert_eq!(block_on(list(&url(&u), None, Kind::Chat)).unwrap(), vec!["llama3.2", "qwen2.5-coder"]);
 
         let u = serve_once("500 Internal Server Error", "Content-Length: 2\r\n", b"{}".to_vec());
-        assert!(block_on(list(&url(&u), None)).unwrap_err().starts_with("Cannot reach"));
+        assert!(block_on(list(&url(&u), None, Kind::Chat)).unwrap_err().starts_with("Cannot reach"));
         let u = serve_once("200 OK", "Content-Length: 8\r\n", b"not json".to_vec());
-        assert!(block_on(list(&url(&u), None)).unwrap_err().starts_with("Cannot reach"));
-        assert!(block_on(list(&url("http://127.0.0.1:1"), None)).unwrap_err().starts_with("Cannot reach"));
+        assert!(block_on(list(&url(&u), None, Kind::Chat)).unwrap_err().starts_with("Cannot reach"));
+        assert!(block_on(list(&url("http://127.0.0.1:1"), None, Kind::Chat)).unwrap_err().starts_with("Cannot reach"));
         let u = serve_once("401 Unauthorized", "Content-Length: 2\r\n", b"{}".to_vec());
-        assert!(block_on(list(&url(&u), Some("bad"))).unwrap_err().contains("refused the key"));
+        assert!(block_on(list(&url(&u), Some("bad"), Kind::Chat)).unwrap_err().contains("refused the key"));
+    }
+
+    #[test]
+    fn the_embedding_models_are_the_ones_the_chat_list_leaves_out_but_not_what_ranks_or_sees() {
+        let body = json!({ "data": [
+            { "id": "llama3.2" }, { "id": "nomic-embed-text:latest" }, { "id": "BGE-m3" }, { "id": "all-minilm:l6-v2" },
+            { "id": "bge-reranker-v2-m3" }, { "id": "clip-vit-b32" }, { "id": "qwen3-embedding:0.6b" }, { "name": "no id" },
+        ] });
+        assert_eq!(
+            parse_models(&body, Kind::Embedding).unwrap(),
+            vec!["nomic-embed-text:latest", "BGE-m3", "all-minilm:l6-v2", "qwen3-embedding:0.6b"]
+        );
+        assert_eq!(parse_models(&body, Kind::Chat).unwrap(), vec!["llama3.2"]);
+        // Every model is of one kind: nothing is in both lists.
+        assert_eq!(kind("bge-reranker-v2-m3"), Kind::Other);
+        assert!(parse_models(&json!({ "models": [] }), Kind::Embedding).is_none());
+
+        let listed = br#"{"data":[{"id":"llama3.2"},{"id":"nomic-embed-text"}]}"#;
+        let u = serve_once("200 OK", &format!("Content-Length: {}\r\n", listed.len()), listed.to_vec());
+        let server = Server { id: "ollama", name: "Ollama", url: u, key: None };
+        assert_eq!(block_on(embedding_models(&server)).unwrap(), vec!["nomic-embed-text"]);
+        let nowhere = Server { id: "ollama", name: "Ollama", url: String::new(), key: None };
+        assert!(block_on(embedding_models(&nowhere)).is_err());
+    }
+
+    #[test]
+    fn an_embedding_request_goes_to_its_own_path_and_comes_back_whole() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = format!("http://{}", listener.local_addr().unwrap());
+        let asked = std::thread::spawn(move || {
+            let (mut conn, _) = listener.accept().unwrap();
+            let mut buf = [0u8; 8192];
+            let n = conn.read(&mut buf).unwrap();
+            let body = br#"{"data":[{"index":0,"embedding":[1,0]}]}"#;
+            let _ = conn.write_all(format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len()).as_bytes());
+            let _ = conn.write_all(body);
+            String::from_utf8_lossy(&buf[..n]).to_string()
+        });
+        let server = Server { id: "ollama", name: "Ollama", url: address, key: None };
+        let answer = block_on(embeddings(&server, &json!({ "model": "m", "input": ["a"] }), Duration::from_secs(5))).unwrap();
+        assert_eq!(answer["data"][0]["embedding"], json!([1, 0]));
+        assert!(asked.join().unwrap().starts_with("POST /v1/embeddings "));
     }
 
     #[test]
