@@ -98,6 +98,12 @@ export interface Capability {
   available?(): true | string;
   /** For `confirm`: the exact change, for the toast. Called with resolved arguments, before `run`. */
   describe?(args: Args): Confirm | Promise<Confirm>;
+  /**
+   * How the question about a name the executor is not sure of is worded, with
+   * the nearest thing's label: "Open Spotify?". `arg`: the argument it is for.
+   * Without it the registry's own general question is asked.
+   */
+  question?(label: string, arg: string): string;
   /** Does it, and says what really happened. Arguments are validated and entities resolved to ids. */
   run(args: Args, context: RunContext): Promise<ToolResult>;
   /**
@@ -147,7 +153,7 @@ export interface Registry {
   get(name: string): Capability | undefined;
   /** The areas, each with the names of its capabilities. */
   areas(): readonly { area: string; names: readonly string[] }[];
-  /** One capability as a tool in the OpenAI function format — the same JSON Schema an MCP tool takes. */
+  /** One capability as a tool in the OpenAI function format — the same JSON Schema an MCP tool takes. Null for a name not declared. */
   schema(name: string): unknown;
   /** What a model is told of the app every time: the `inSnapshot` reads, what is on screen, the entity kinds. */
   snapshot(): Promise<Record<string, unknown>>;
