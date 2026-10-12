@@ -1,22 +1,26 @@
 // What the web answer card and the email cards share (views/websearch.ts,
-// views/email.ts): the card with Mochi's place on its left, its head with the
-// "Sample data" mark, the dots of a wait, and the island growing to what a
-// card holds.
+// views/email.ts): the card with Mochi's place on its left, its head, the
+// dots of a wait, and the island growing to what a card holds.
 
 import { clear, h, svg } from "./dom";
 import { ICONS } from "./icons";
 import { VIEW_LAYOUTS, washRGBA, type IslandViewName, type Wash } from "../core/layout";
 import { State } from "../core/state";
-import { language, tl, type Msg } from "../i18n/i18n";
+import { language, type Msg } from "../i18n/i18n";
 import type { Answer, Ask } from "../voice/result";
 import { buildAsk } from "./ask";
-import type { BrainCall } from "../voice/tools";
 import type { ViewActions } from "./views";
 
-/** What a card asks of whoever runs the tools (views/voice-cards.ts). */
+/** What a card's own button asks for: one of the app's capabilities, by its name. */
+export interface CardCall {
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+/** What a card asks of whoever runs the capabilities (views/voice-cards.ts). */
 export interface CardDriver {
-  /** Runs a tool and shows what comes of it. */
-  run(call: BrainCall): void;
+  /** Runs a capability and shows what comes of it. */
+  run(call: CardCall): void;
   /** The answer to the question on screen. */
   answer(answer: Answer): void;
   /** Closes the card; whatever was still on its way is dropped. */
@@ -57,14 +61,13 @@ const CARD_INSET = 12;
 const HEAD_GAP = 8;
 
 /**
- * A card as every sample card is laid out: a head — an icon, what the card
- * is, and "Sample data" at the far end — over the card's content, with room
- * on the left for Mochi.
+ * A card as these are laid out: a head — an icon and what the card is — over
+ * the card's content, with room on the left for Mochi.
  */
 export function buildShell(name: string): Shell {
   const icon = h("span", { class: "vc-icon" });
   const title = h("span", { class: "vc-title" });
-  const head = h("div", { class: "vc-head" }, icon, title, h("span", { class: "grow" }), sampleBadge());
+  const head = h("div", { class: "vc-head" }, icon, title, h("span", { class: "grow" }));
   const main = h("div", { class: "vc-main" });
   const cardEl = h("div", { class: "card vc" }, h("div", { class: `vc-body ${name}` }, head, main));
   let shownIcon = "";
@@ -101,11 +104,6 @@ export function buildShell(name: string): Shell {
       if (inner) fit(view, Math.max(SMALLEST_CARD, inner + HEAD_GAP + 2 * CARD_INSET), actions);
     },
   };
-}
-
-/** Said on every card that shows made-up data. */
-export function sampleBadge(): HTMLElement {
-  return h("span", { class: "vc-sample", text: tl("Sample data") });
 }
 
 /** Three dots that take turns, and a line beside them: something is being waited for. */
@@ -187,7 +185,7 @@ export interface CardAsk {
 }
 
 /**
- * A question on a card itself, for a tool started from a card's own button
+ * A question on a card itself, for something started from a card's own button
  * (Reply, Retry, Back) rather than by voice: the island's question component
  * (views/ask.ts) under the line that asks. In a voice turn the same question
  * goes up in the listening card instead, where it can also be answered aloud.

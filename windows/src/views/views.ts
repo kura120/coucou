@@ -9,7 +9,7 @@ import { State, type AgentTask } from "../core/state";
 import { washRGBA, type IslandViewName, type Wash } from "../core/layout";
 import { createMiniBot, pruneMiniBots } from "../mochi/minibots";
 import { buildAsk } from "./ask";
-import type { Answer } from "../voice/result";
+import type { Answer, ToolResult } from "../voice/result";
 import { buildPrompt } from "./chat";
 import { buildChoose, buildUpload, buildUploading } from "./upload";
 import { renderIntegrationCard, type IntegrationCardHooks } from "./integrations";
@@ -66,6 +66,8 @@ export interface ViewActions {
   setAutoClose(seconds: number): void;
   openSettingsWindow(): void;
   blip(): void;
+  /** One of the app's capabilities, asked for by a card's own button: the interface's own call (core/capabilities). */
+  capability(call: { name: string; arguments: Record<string, unknown> }): Promise<ToolResult>;
   /** Wardrobe click: keeps the outfit ("auto" and "none" included). */
   chooseOutfit(selection: OutfitSelection): void;
   /** Wardrobe hover: shows an outfit on Mochi without keeping it; null ends it. */
@@ -949,7 +951,7 @@ export function buildViews(
   map.set("mail", buildPlaceholder(tl("Sending by email isn't in this version."), ""));
   map.set("searching", buildPlaceholder(tl("Claude is searching…"), ""));
   map.set("result", buildPlaceholder(tl("Result"), ""));
-  // The web answer and email cards, on sample data for now (views/voice-cards.ts).
+  // The web answer card, and the email cards for when email is built (views/voice-cards.ts).
   registerVoiceCards(map, actions);
   // Each view says what it shows (island/screen.ts).
   for (const [name, shown] of Object.entries(VIEW_SCREENS)) {

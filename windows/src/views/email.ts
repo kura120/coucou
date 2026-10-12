@@ -1,7 +1,8 @@
 // The email cards, one view with a step at a time: which account, what to
 // look for, the list, one message, and the card an email is prepared on.
-// Today they show SAMPLE DATA (voice/tools-preview.ts): no mailbox is read
-// and Send sends nothing — it says so.
+// Email is not built yet: no mailbox is read, nothing here is reachable from
+// the island, and Send sends nothing — it says so. The cards stay for when it
+// is; what they would show is typed below.
 //
 // The compose card is the Mac's (MailView in IslandViewContent.swift): "New
 // email", To, Subject, the text, Send and Cancel, plus which account it goes
@@ -13,10 +14,51 @@ import { ICONS } from "./icons";
 import { State } from "../core/state";
 import { t, tl } from "../i18n/i18n";
 import type { Ask } from "../voice/result";
-import type { BrainCall } from "../voice/tools";
-import { SAMPLE_ACCOUNTS, type MailDraft, type MailListData, type MailMessage, type MailScope, type MailSummary } from "../voice/tools-preview";
-import { CARD_ICONS, buildShell, button, cardAsk, failure, waiting, whenShort, type CardDriver } from "./sample";
+import { CARD_ICONS, buildShell, button, cardAsk, failure, waiting, whenShort, type CardCall, type CardDriver } from "./card";
 import type { ViewActions, ViewHost } from "./views";
+
+export interface MailAccount {
+  id: string;
+  /** What the user called it: "Work". */
+  name: string;
+  address: string;
+}
+
+export interface MailSummary {
+  id: string;
+  account: string;
+  from: { name: string; address: string };
+  subject: string;
+  /** The first line of the text. */
+  snippet: string;
+  /** How long ago it arrived, in minutes: the card shows a time or a day. */
+  minutesAgo: number;
+  unread: boolean;
+  /** The name of the attached file, if one is. */
+  attachment?: string;
+}
+
+export interface MailMessage extends MailSummary {
+  body: string;
+}
+
+export type MailScope = { kind: "recent" } | { kind: "person"; who: string } | { kind: "topic"; topic: string };
+
+export interface MailListData {
+  account: MailAccount;
+  scope: MailScope;
+  messages: MailSummary[];
+}
+
+export interface MailDraft {
+  from: MailAccount;
+  to: string;
+  /** The contact's name when the address came from one. */
+  toName: string;
+  subject: string;
+  body: string;
+  attachment?: string;
+}
 
 export type MailState =
   | { step: "idle" }
@@ -28,11 +70,13 @@ export type MailState =
   /** One email, opened. `back`: the list it was opened from. */
   | { step: "message"; message: MailMessage; back: MailListData | null }
   | { step: "compose"; draft: MailDraft }
-  | { step: "failed"; line: string; detail: string; retry: BrainCall | null };
+  | { step: "failed"; line: string; detail: string; retry: CardCall | null };
 
 /** What the cards show. Set it with `show`; the island redraws. */
 export const MailCard = {
   state: { step: "idle" } as MailState,
+  /** The user's accounts: none until email is built. */
+  accounts: [] as MailAccount[],
   /** Under the compose card's fields: what Send did, or why it did not. */
   note: { text: "", bad: false },
   /** Changes with every `show`, so a card is drawn once per state and not on every frame. */
@@ -120,7 +164,7 @@ export function buildEmail(actions: ViewActions, driver: CardDriver): ViewHost {
   // ── One message ─────────────────────────────────────────────────────────────
 
   function opened(message: MailMessage, back: MailListData | null) {
-    const account = SAMPLE_ACCOUNTS.find((a) => a.id === message.account);
+    const account = MailCard.accounts.find((a) => a.id === message.account);
     shell.setTitle(CARD_ICONS.mail, account?.name ?? t("Email"), 2);
     const goBack = () => (back ? MailCard.show({ step: "list", data: back }) : driver.close());
     shell.main.append(
@@ -169,7 +213,9 @@ export function buildEmail(actions: ViewActions, driver: CardDriver): ViewHost {
     };
     // Another account: the next one, round and round.
     fromChip.addEventListener("click", () => {
-      from = SAMPLE_ACCOUNTS[(SAMPLE_ACCOUNTS.findIndex((a) => a.id === from.id) + 1) % SAMPLE_ACCOUNTS.length];
+      const accounts = MailCard.accounts;
+      if (accounts.length < 2) return;
+      from = accounts[(accounts.findIndex((a) => a.id === from.id) + 1) % accounts.length];
       showFrom();
     });
     showFrom();
@@ -203,10 +249,10 @@ export function buildEmail(actions: ViewActions, driver: CardDriver): ViewHost {
       note.classList.toggle("bad", bad);
       shell.fit("email", actions);
     };
-    // The one thing that could ever send: a click here. In this build it says what it is.
+    // The one thing that could ever send: a click here. Nothing sends yet, and it says so.
     const send = button(tl("Send"), "primary", () => {
       if (!to.input.value.trim()) return say(t("Missing recipient."), true);
-      say(t("Sample: nothing was sent."), false);
+      say(t("Sending by email isn't in this version."), true);
     });
 
     shell.main.append(to.el, subject.el, body, chips, note, h("div", { class: "actions" }, send, close(tl("Cancel"))));

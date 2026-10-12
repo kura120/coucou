@@ -4118,17 +4118,6 @@
    "ru": "Выключено: микрофон включается только по сочетанию клавиш «Поговорить с Coucou». Пока идёт прослушивание, Windows показывает микрофон на панели задач.",
    "id": "Mati: mikrofon hanya terbuka untuk pintasan “Bicara dengan Coucou”. Selama mendengarkan, Windows menampilkan mikrofon di bilah tugas."
   },
-  "{0} active — remove which?": {
-   "zh-Hans": "{0} 个激活 — 删除哪个？",
-   "hi": "{0} सक्रिय — कौन सा हटाएं?",
-   "es": "{0} activas — ¿cuál quitar?",
-   "ar": "{0} نشطة — أيها أزيل؟",
-   "fr": "{0} actives — laquelle retirer ?",
-   "bn": "{0}টি সক্রিয় — কোনটি সরাবো?",
-   "pt-BR": "{0} ativas — qual remover?",
-   "ru": "{0} активно — что удалить?",
-   "id": "{0} aktif — mana yang dihapus?"
-  },
   "Thinking…": {
    "zh-Hans": "思考中…",
    "hi": "सोच रहा है…",
@@ -4414,17 +4403,6 @@
    "pt-BR": "O som de cada frase é enviado ao servidor deste modelo, neste computador, e a nenhum outro lugar. Precisa ser um modelo que aceite áudio, como o Gemma 4. Quando ele não responde a tempo, um modelo baixado ouve no lugar dele.",
    "ru": "Звук каждой фразы отправляется на сервер этой модели, на этом компьютере, и больше никуда. Нужна модель, которая принимает аудио, например Gemma 4. Если она не отвечает вовремя, вместо неё слушает загруженная модель.",
    "id": "Suara setiap kalimat dikirim ke server model ini, di komputer ini, dan tidak ke tempat lain. Modelnya harus menerima audio, seperti Gemma 4. Jika tidak menjawab tepat waktu, model yang diunduh yang mendengarkan."
-  },
-  "Open {0}?": {
-   "zh-Hans": "打开 {0}？",
-   "hi": "{0} खोलूँ?",
-   "es": "¿Abrir {0}?",
-   "ar": "أفتح {0}؟",
-   "fr": "Ouvrir {0} ?",
-   "bn": "{0} খুলব?",
-   "pt-BR": "Abrir {0}?",
-   "ru": "Открыть {0}?",
-   "id": "Buka {0}?"
   },
   "{0} or {1}?": {
    "zh-Hans": "{0} 还是 {1}？",
@@ -4998,61 +4976,6 @@
    "ru": "Этот код также содержит ключ доступа и сквозной ключ для ретранслятора {host}. «Сопрячь заново» создаёт новый ключ и новую комнату.",
    "id": "Kode ini juga memuat kunci akses dan kunci ujung ke ujung untuk relay {host}. «Sandingkan ulang» membuat kunci dan ruang baru."
   },
-  "Add {0}?": {
-   "zh-Hans": "添加 {0}？",
-   "hi": "{0} जोड़ूँ?",
-   "es": "¿Añadir {0}?",
-   "ar": "أضيف {0}؟",
-   "fr": "Ajouter {0} ?",
-   "bn": "{0} যোগ করব?",
-   "pt-BR": "Adicionar {0}?",
-   "ru": "Добавить {0}?",
-   "id": "Tambahkan {0}?"
-  },
-  "Remove {0}?": {
-   "zh-Hans": "移除 {0}？",
-   "hi": "{0} हटाऊँ?",
-   "es": "¿Quitar {0}?",
-   "ar": "أزيل {0}؟",
-   "fr": "Retirer {0} ?",
-   "bn": "{0} সরাব?",
-   "pt-BR": "Remover {0}?",
-   "ru": "Убрать {0}?",
-   "id": "Hapus {0}?"
-  },
-  "Switch to {0}?": {
-   "zh-Hans": "切换到 {0}？",
-   "hi": "{0} पर जाऊँ?",
-   "es": "¿Cambiar a {0}?",
-   "ar": "أنتقل إلى {0}؟",
-   "fr": "Passer à {0} ?",
-   "bn": "{0}-এ যাব?",
-   "pt-BR": "Mudar para {0}?",
-   "ru": "Переключиться на {0}?",
-   "id": "Beralih ke {0}?"
-  },
-  "Replace {0} with {1}?": {
-   "zh-Hans": "把 {0} 换成 {1}？",
-   "hi": "{0} की जगह {1} रखूँ?",
-   "es": "¿Cambiar {0} por {1}?",
-   "ar": "أستبدل {0} بـ {1}؟",
-   "fr": "Remplacer {0} par {1} ?",
-   "bn": "{0}-এর জায়গায় {1} রাখব?",
-   "pt-BR": "Trocar {0} por {1}?",
-   "ru": "Заменить {0} на {1}?",
-   "id": "Ganti {0} dengan {1}?"
-  },
-  "Keep only {0}?": {
-   "zh-Hans": "只保留 {0}？",
-   "hi": "सिर्फ़ {0} रखूँ?",
-   "es": "¿Dejar solo {0}?",
-   "ar": "أُبقي {0} فقط؟",
-   "fr": "Garder seulement {0} ?",
-   "bn": "শুধু {0} রাখব?",
-   "pt-BR": "Manter só {0}?",
-   "ru": "Оставить только {0}?",
-   "id": "Simpan hanya {0}?"
-  },
   "{0}, {1} or {2}?": {
    "zh-Hans": "{0}、{1} 还是 {2}？",
    "hi": "{0}, {1} या {2}?",
@@ -5174,28 +5097,6 @@
    "ru": "Ищу в интернете « {0} »",
    "id": "Mencari « {0} » di web"
   },
-  "The draft is open: read it and send it yourself": {
-   "zh-Hans": "草稿已打开：请阅读后自行发送",
-   "hi": "ड्राफ़्ट खुला है: पढ़ें और ख़ुद भेजें",
-   "es": "El borrador está abierto: léelo y envíalo tú",
-   "ar": "المسودة مفتوحة: اقرأها وأرسلها بنفسك",
-   "fr": "Le brouillon est ouvert : relisez-le et envoyez-le vous-même",
-   "bn": "খসড়া খোলা আছে: পড়ে নিজে পাঠান",
-   "pt-BR": "O rascunho está aberto: leia e envie você mesmo",
-   "ru": "Черновик открыт: прочитайте и отправьте сами",
-   "id": "Draf terbuka: baca dan kirim sendiri"
-  },
-  "No mail app opened": {
-   "zh-Hans": "没有打开邮件应用",
-   "hi": "कोई मेल ऐप नहीं खुला",
-   "es": "No se abrió ninguna app de correo",
-   "ar": "لم يُفتح أي تطبيق بريد",
-   "fr": "Aucune application de messagerie ne s’est ouverte",
-   "bn": "কোনো মেইল অ্যাপ খোলেনি",
-   "pt-BR": "Nenhum app de e-mail foi aberto",
-   "ru": "Почтовое приложение не открылось",
-   "id": "Tidak ada aplikasi email yang terbuka"
-  },
   "It is in the chat: read it and send it yourself": {
    "zh-Hans": "已放入聊天：请阅读后自行发送",
    "hi": "यह चैट में है: पढ़ें और ख़ुद भेजें",
@@ -5239,28 +5140,6 @@
    "pt-BR": "Reativar",
    "ru": "Включить снова",
    "id": "Nyalakan kembali"
-  },
-  "Sample data": {
-   "zh-Hans": "示例数据",
-   "hi": "नमूना डेटा",
-   "es": "Datos de ejemplo",
-   "ar": "بيانات تجريبية",
-   "fr": "Données d'exemple",
-   "bn": "নমুনা ডেটা",
-   "pt-BR": "Dados de exemplo",
-   "ru": "Демо-данные",
-   "id": "Data contoh"
-  },
-  "Sample: nothing was sent.": {
-   "zh-Hans": "示例：未发送任何内容。",
-   "hi": "नमूना: कुछ भी नहीं भेजा गया।",
-   "es": "Ejemplo: no se ha enviado nada.",
-   "ar": "تجربة: لم يُرسَل شيء.",
-   "fr": "Exemple : rien n'a été envoyé.",
-   "bn": "নমুনা: কিছুই পাঠানো হয়নি।",
-   "pt-BR": "Exemplo: nada foi enviado.",
-   "ru": "Демо: ничего не отправлено.",
-   "id": "Contoh: tidak ada yang dikirim."
   },
   "Web search": {
    "zh-Hans": "网页搜索",
@@ -5328,17 +5207,6 @@
    "ru": "Расскажи подробнее",
    "id": "Ceritakan lebih lanjut"
   },
-  "What should I look up?": {
-   "zh-Hans": "要查什么？",
-   "hi": "मैं क्या खोजूँ?",
-   "es": "¿Qué busco?",
-   "ar": "عمّ أبحث؟",
-   "fr": "Qu'est-ce que je cherche ?",
-   "bn": "কী খুঁজব?",
-   "pt-BR": "O que devo procurar?",
-   "ru": "Что найти?",
-   "id": "Apa yang perlu saya cari?"
-  },
   "Email": {
    "zh-Hans": "邮件",
    "hi": "ईमेल",
@@ -5350,28 +5218,6 @@
    "ru": "Почта",
    "id": "Email"
   },
-  "Which email account do you want to use?": {
-   "zh-Hans": "要使用哪个邮箱账户？",
-   "hi": "आप कौन सा ईमेल खाता इस्तेमाल करना चाहते हैं?",
-   "es": "¿Qué cuenta de correo quieres usar?",
-   "ar": "أي حساب بريد تريد استخدامه؟",
-   "fr": "Quel compte e-mail veux-tu utiliser ?",
-   "bn": "কোন ইমেইল অ্যাকাউন্ট ব্যবহার করতে চান?",
-   "pt-BR": "Qual conta de e-mail você quer usar?",
-   "ru": "Какой почтовый аккаунт использовать?",
-   "id": "Akun email mana yang ingin digunakan?"
-  },
-  "Recent emails, or a person or a topic in particular?": {
-   "zh-Hans": "看最近的邮件，还是某个人或某个主题的？",
-   "hi": "हाल के ईमेल, या किसी खास व्यक्ति या विषय के?",
-   "es": "¿Los correos recientes, o una persona o un tema en concreto?",
-   "ar": "الرسائل الأخيرة، أم شخص أو موضوع بعينه؟",
-   "fr": "Les e-mails récents, ou une personne ou un sujet en particulier ?",
-   "bn": "সাম্প্রতিক ইমেইল, নাকি নির্দিষ্ট কোনো ব্যক্তি বা বিষয়?",
-   "pt-BR": "Os e-mails recentes, ou uma pessoa ou um assunto em particular?",
-   "ru": "Последние письма — или от конкретного человека, на конкретную тему?",
-   "id": "Email terbaru, atau orang atau topik tertentu?"
-  },
   "Recent emails": {
    "zh-Hans": "最近的邮件",
    "hi": "हाल के ईमेल",
@@ -5382,50 +5228,6 @@
    "pt-BR": "E-mails recentes",
    "ru": "Последние письма",
    "id": "Email terbaru"
-  },
-  "From someone": {
-   "zh-Hans": "来自某个人",
-   "hi": "किसी व्यक्ति से",
-   "es": "De alguien",
-   "ar": "من شخص معيّن",
-   "fr": "De quelqu'un",
-   "bn": "কারও কাছ থেকে",
-   "pt-BR": "De alguém",
-   "ru": "От кого-то",
-   "id": "Dari seseorang"
-  },
-  "About a topic": {
-   "zh-Hans": "关于某个主题",
-   "hi": "किसी विषय पर",
-   "es": "Sobre un tema",
-   "ar": "عن موضوع معيّن",
-   "fr": "Sur un sujet",
-   "bn": "কোনো বিষয়ে",
-   "pt-BR": "Sobre um assunto",
-   "ru": "На тему",
-   "id": "Tentang suatu topik"
-  },
-  "Who from?": {
-   "zh-Hans": "谁发来的？",
-   "hi": "किसकी ओर से?",
-   "es": "¿De quién?",
-   "ar": "ممّن؟",
-   "fr": "De qui ?",
-   "bn": "কার কাছ থেকে?",
-   "pt-BR": "De quem?",
-   "ru": "От кого?",
-   "id": "Dari siapa?"
-  },
-  "About what?": {
-   "zh-Hans": "关于什么？",
-   "hi": "किस बारे में?",
-   "es": "¿Sobre qué?",
-   "ar": "عن ماذا؟",
-   "fr": "À quel sujet ?",
-   "bn": "কী বিষয়ে?",
-   "pt-BR": "Sobre o quê?",
-   "ru": "О чём?",
-   "id": "Tentang apa?"
   },
   "From {name}": {
    "zh-Hans": "来自 {name}",
@@ -5449,28 +5251,6 @@
    "ru": "О теме: {topic}",
    "id": "Tentang {topic}"
   },
-  "Checking {account}…": {
-   "zh-Hans": "正在查看 {account}…",
-   "hi": "{account} देख रहा हूँ…",
-   "es": "Revisando {account}…",
-   "ar": "جارٍ فحص {account}…",
-   "fr": "Je regarde {account}…",
-   "bn": "{account} দেখা হচ্ছে…",
-   "pt-BR": "Verificando {account}…",
-   "ru": "Проверяю {account}…",
-   "id": "Memeriksa {account}…"
-  },
-  "Emails in {account}": {
-   "zh-Hans": "{account} 中的邮件",
-   "hi": "{account} के ईमेल",
-   "es": "Correos de {account}",
-   "ar": "رسائل {account}",
-   "fr": "E-mails de {account}",
-   "bn": "{account}-এর ইমেইল",
-   "pt-BR": "E-mails de {account}",
-   "ru": "Письма в {account}",
-   "id": "Email di {account}"
-  },
   "No emails match.": {
    "zh-Hans": "没有符合的邮件。",
    "hi": "कोई ईमेल मेल नहीं खाता।",
@@ -5482,28 +5262,6 @@
    "ru": "Подходящих писем нет.",
    "id": "Tidak ada email yang cocok."
   },
-  "Couldn't reach {account}.": {
-   "zh-Hans": "无法连接 {account}。",
-   "hi": "{account} तक नहीं पहुँच सका।",
-   "es": "No se ha podido acceder a {account}.",
-   "ar": "تعذّر الوصول إلى {account}.",
-   "fr": "Impossible de joindre {account}.",
-   "bn": "{account}-এ পৌঁছানো যায়নি।",
-   "pt-BR": "Não foi possível acessar {account}.",
-   "ru": "Не удалось подключиться к {account}.",
-   "id": "Tidak dapat menjangkau {account}."
-  },
-  "Email not found": {
-   "zh-Hans": "未找到邮件",
-   "hi": "ईमेल नहीं मिला",
-   "es": "Correo no encontrado",
-   "ar": "الرسالة غير موجودة",
-   "fr": "E-mail introuvable",
-   "bn": "ইমেইল পাওয়া যায়নি",
-   "pt-BR": "E-mail não encontrado",
-   "ru": "Письмо не найдено",
-   "id": "Email tidak ditemukan"
-  },
   "Reply": {
    "zh-Hans": "回复",
    "hi": "जवाब दें",
@@ -5514,72 +5272,6 @@
    "pt-BR": "Responder",
    "ru": "Ответить",
    "id": "Balas"
-  },
-  "Who is the email for?": {
-   "zh-Hans": "这封邮件发给谁？",
-   "hi": "ईमेल किसके लिए है?",
-   "es": "¿Para quién es el correo?",
-   "ar": "لمن هذه الرسالة؟",
-   "fr": "Pour qui est l'e-mail ?",
-   "bn": "ইমেইলটি কার জন্য?",
-   "pt-BR": "Para quem é o e-mail?",
-   "ru": "Кому письмо?",
-   "id": "Email ini untuk siapa?"
-  },
-  "Which {name}?": {
-   "zh-Hans": "哪一位 {name}？",
-   "hi": "कौन से {name}?",
-   "es": "¿Qué {name}?",
-   "ar": "أي {name}؟",
-   "fr": "Quel {name} ?",
-   "bn": "কোন {name}?",
-   "pt-BR": "Qual {name}?",
-   "ru": "Какой {name}?",
-   "id": "{name} yang mana?"
-  },
-  "I can't find {name}. What's the address?": {
-   "zh-Hans": "找不到 {name}。邮箱地址是什么？",
-   "hi": "मुझे {name} नहीं मिला। पता क्या है?",
-   "es": "No encuentro a {name}. ¿Cuál es la dirección?",
-   "ar": "لا أجد {name}. ما العنوان؟",
-   "fr": "Je ne trouve pas {name}. Quelle est l'adresse ?",
-   "bn": "{name}-কে খুঁজে পাচ্ছি না। ঠিকানা কী?",
-   "pt-BR": "Não encontro {name}. Qual é o endereço?",
-   "ru": "Не нахожу {name}. Какой адрес?",
-   "id": "Saya tidak menemukan {name}. Apa alamatnya?"
-  },
-  "What should it say?": {
-   "zh-Hans": "邮件要写些什么？",
-   "hi": "इसमें क्या लिखूँ?",
-   "es": "¿Qué debe decir?",
-   "ar": "ماذا أكتب فيها؟",
-   "fr": "Qu'est-ce que je lui dis ?",
-   "bn": "এতে কী লিখব?",
-   "pt-BR": "O que devo dizer?",
-   "ru": "Что написать?",
-   "id": "Apa isinya?"
-  },
-  "Writing the email…": {
-   "zh-Hans": "正在写邮件…",
-   "hi": "ईमेल लिख रहा हूँ…",
-   "es": "Escribiendo el correo…",
-   "ar": "جارٍ كتابة الرسالة…",
-   "fr": "J'écris l'e-mail…",
-   "bn": "ইমেইল লেখা হচ্ছে…",
-   "pt-BR": "Escrevendo o e-mail…",
-   "ru": "Пишу письмо…",
-   "id": "Menulis email…"
-  },
-  "Here's your email. Check it and click Send.": {
-   "zh-Hans": "邮件写好了。请检查后点击“发送”。",
-   "hi": "यह रहा आपका ईमेल। जाँचकर भेजें पर क्लिक करें।",
-   "es": "Aquí tienes tu correo. Revísalo y haz clic en Enviar.",
-   "ar": "ها هي رسالتك. راجعها ثم انقر على إرسال.",
-   "fr": "Voilà ton e-mail. Relis-le et clique sur Envoyer.",
-   "bn": "এই যে আপনার ইমেইল। দেখে নিয়ে পাঠান-এ ক্লিক করুন।",
-   "pt-BR": "Aqui está seu e-mail. Confira e clique em Enviar.",
-   "ru": "Вот ваше письмо. Проверьте и нажмите «Отправить».",
-   "id": "Ini email Anda. Periksa lalu klik Kirim."
   },
   "Remove attachment": {
    "zh-Hans": "移除附件",
@@ -5910,6 +5602,61 @@
    "pt-BR": "Você quis dizer {0}?",
    "ru": "Вы имели в виду {0}?",
    "id": "Maksud Anda {0}?"
+  },
+  "Was that for me?": {
+   "zh-Hans": "这是对我说的吗？",
+   "hi": "क्या यह मेरे लिए था?",
+   "es": "¿Eso era para mí?",
+   "ar": "هل كان ذلك موجهاً لي؟",
+   "fr": "C'était pour moi ?",
+   "bn": "এটা কি আমাকে বলা হয়েছিল?",
+   "pt-BR": "Isso era para mim?",
+   "ru": "Это было мне?",
+   "id": "Apakah itu untuk saya?"
+  },
+  "Voice needs a model server. Choose one in Settings.": {
+   "zh-Hans": "语音需要模型服务器。请在设置中选择一个。",
+   "hi": "आवाज़ के लिए एक मॉडल सर्वर चाहिए। सेटिंग्स में एक चुनें।",
+   "es": "La voz necesita un servidor de modelos. Elige uno en Ajustes.",
+   "ar": "يحتاج الصوت إلى خادم نماذج. اختر واحداً من الإعدادات.",
+   "fr": "La voix a besoin d'un serveur de modèles. Choisissez-en un dans les Réglages.",
+   "bn": "ভয়েসের জন্য একটি মডেল সার্ভার দরকার। সেটিংসে একটি বেছে নিন।",
+   "pt-BR": "A voz precisa de um servidor de modelos. Escolha um nos Ajustes.",
+   "ru": "Голосу нужен сервер моделей. Выберите его в настройках.",
+   "id": "Suara memerlukan server model. Pilih salah satu di Pengaturan."
+  },
+  "The model did not answer.": {
+   "zh-Hans": "模型没有回应。",
+   "hi": "मॉडल ने जवाब नहीं दिया।",
+   "es": "El modelo no respondió.",
+   "ar": "لم يُجب النموذج.",
+   "fr": "Le modèle n'a pas répondu.",
+   "bn": "মডেল উত্তর দেয়নি।",
+   "pt-BR": "O modelo não respondeu.",
+   "ru": "Модель не ответила.",
+   "id": "Model tidak menjawab."
+  },
+  "That is more than I can do here.": {
+   "zh-Hans": "这超出了我在这里能做的事。",
+   "hi": "यह मैं यहाँ नहीं कर सकता।",
+   "es": "Eso es más de lo que puedo hacer aquí.",
+   "ar": "هذا أكثر مما أستطيع فعله هنا.",
+   "fr": "C'est plus que ce que je peux faire ici.",
+   "bn": "এটা আমি এখানে করতে পারি তার চেয়ে বেশি।",
+   "pt-BR": "Isso é mais do que posso fazer aqui.",
+   "ru": "Это больше, чем я могу сделать здесь.",
+   "id": "Itu lebih dari yang bisa saya lakukan di sini."
+  },
+  "Asking a bigger model…": {
+   "zh-Hans": "正在询问更强的模型…",
+   "hi": "बड़े मॉडल से पूछ रहा हूँ…",
+   "es": "Preguntando a un modelo más grande…",
+   "ar": "جارٍ سؤال نموذج أكبر…",
+   "fr": "Je demande à un plus grand modèle…",
+   "bn": "বড় মডেলকে জিজ্ঞাসা করছি…",
+   "pt-BR": "Perguntando a um modelo maior…",
+   "ru": "Спрашиваю модель побольше…",
+   "id": "Bertanya ke model yang lebih besar…"
   }
  }
 }

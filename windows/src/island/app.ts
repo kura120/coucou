@@ -436,6 +436,8 @@ export function createAppHost(island: IslandPorts): AppHost {
 
     // ── The web ──
     async webSearch(query) {
+      // A question is answered from the web only when the user said it may be (Settings → Voice).
+      if (!State.settings.voice.webAnswers) return { error: "Answering from the web is turned off in Settings. open_web_search shows the results in the browser instead." };
       try {
         const results = await Bridge.webSearch(query);
         island.webSearched(query, results);

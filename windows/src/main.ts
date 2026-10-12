@@ -89,17 +89,13 @@ async function main() {
   });
 
   // The settings window writes preferences; apply them here without a restart.
-  // Voice changes a setting or pauses Coucou the way Settings and the tray do.
+  // The app's own capabilities change a setting or pause Coucou the way Settings and the tray do (island/app.ts).
   island.onVoiceSettings = () => {
     applyLanguage();
     island.applySettings();
     State.loadIntegrationTasks();
   };
-  island.onVoicePause = () => {
-    setPaused(true);
-    island.fsm.forceHidden();
-  };
-  // The same for the app's own capabilities (island/app.ts): paused, the island hides; lifted, it is back.
+  // Paused, the island hides; lifted, it is back.
   island.onPause = (on) => {
     setPaused(on);
     if (on) island.fsm.forceHidden();
