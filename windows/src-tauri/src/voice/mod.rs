@@ -67,11 +67,13 @@ use crate::settings::{Settings, VoicePref};
 mod apps;
 pub mod ask_keys;
 pub mod brain;
+pub mod cloud;
 pub mod embed;
 #[cfg(windows)]
 mod capture;
 pub mod engine;
 mod hear;
+pub mod mcp;
 #[cfg(windows)]
 mod sapi;
 mod sherpa;
@@ -523,9 +525,11 @@ pub fn voice_engine_remove(app: AppHandle, part: engine::Part) {
 }
 
 /// The island left the listening view by itself (Escape, a card coming up).
+/// A turn put to the cloud model is stopped with it (cloud.rs).
 #[tauri::command]
 pub fn voice_cancel() {
     send(&shared(), Control::Cancel);
+    cloud::cancel();
 }
 
 /// The sentence said without the wake phrase was a command, and is done:
