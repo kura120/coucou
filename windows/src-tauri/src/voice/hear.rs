@@ -13,7 +13,7 @@
 // Only Windows has a listener to call this yet (mod.rs).
 #![cfg_attr(not(windows), allow(dead_code))]
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -108,23 +108,21 @@ fn wav(samples: &[f32]) -> Vec<u8> {
 const MAX_NAMES: usize = 140;
 const MAX_NAMES_LENGTH: usize = 4000;
 
-/// The names a sentence may hold, from what the island said can be heard
-/// (the grammar's slots: pills, installed apps): the pills first, each name
-/// once, and no more than the model is given.
-pub fn names(slots: &BTreeMap<String, Vec<String>>) -> Vec<String> {
-    let pills = slots.get("pill").into_iter().flatten();
-    let others = slots.iter().filter(|(slot, _)| slot.as_str() != "pill").flat_map(|(_, values)| values);
+/// The names a sentence may hold, as the model is told them: those given
+/// (the installed apps', mod.rs), in their order, each once, and no more
+/// than the model is given.
+pub fn names<'a>(known: impl IntoIterator<Item = &'a str>) -> Vec<String> {
     let mut seen = BTreeSet::new();
     let mut length = 0;
-    pills
-        .chain(others)
-        .filter(|name| seen.insert(name.as_str()))
+    known
+        .into_iter()
+        .filter(|name| !name.trim().is_empty() && seen.insert(name.to_lowercase()))
         .take(MAX_NAMES)
         .take_while(|name| {
             length += name.len() + 2;
             length <= MAX_NAMES_LENGTH
         })
-        .cloned()
+        .map(str::to_string)
         .collect()
 }
 
@@ -313,20 +311,16 @@ mod tests {
     }
 
     #[test]
-    fn the_names_told_are_the_pills_then_the_rest_once_each_and_not_without_end() {
-        let list = |values: &[&str]| values.iter().map(|v| v.to_string()).collect::<Vec<_>>();
-        let mut slots = BTreeMap::new();
-        slots.insert("app".to_string(), list(&["discord", "figma", "spotify"]));
-        slots.insert("pill".to_string(), list(&["github", "figma"]));
-        assert_eq!(names(&slots), ["github", "figma", "discord", "spotify"]);
-        assert!(names(&BTreeMap::new()).is_empty());
-        slots.insert("app".to_string(), (0..500).map(|i| format!("an app with a long name {i}")).collect());
-        let told = names(&slots);
-        assert_eq!(told[0], "github");
+    fn the_names_told_are_given_once_each_in_their_order_and_not_without_end() {
+        assert_eq!(names(["Discord", "Figma", "discord", " ", "Spotify"]), ["Discord", "Figma", "Spotify"]);
+        assert!(names([]).is_empty());
+        let many: Vec<String> = (0..500).map(|i| format!("an app with a long name {i}")).collect();
+        let told = names(many.iter().map(String::as_str));
+        assert_eq!(told[0], "an app with a long name 0");
         assert_eq!(told.len(), MAX_NAMES);
         assert!(asked(&told).len() < PROMPT.len() + MAX_NAMES_LENGTH + 40);
-        slots.insert("app".to_string(), vec!["x".repeat(300); 1].into_iter().chain((0..100).map(|i| format!("{i}{}", "y".repeat(300)))).collect());
-        assert!(names(&slots).iter().map(String::len).sum::<usize>() <= MAX_NAMES_LENGTH);
+        let long: Vec<String> = (0..100).map(|i| format!("{i}{}", "y".repeat(300))).collect();
+        assert!(names(long.iter().map(String::as_str)).iter().map(String::len).sum::<usize>() <= MAX_NAMES_LENGTH);
     }
 
     #[test]

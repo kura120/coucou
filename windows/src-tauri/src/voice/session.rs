@@ -4,14 +4,16 @@
 //
 //   wake phrase  →  the command, for a few seconds  →  back to the wake phrase
 //
-// With an engine that hears free speech there is one more step: for a few
-// seconds after a command, another one may be said without the wake phrase.
+// The command is free speech, so there is one more step: for a few seconds
+// after a command, another one may be said without the wake phrase (a time
+// the user sets, or turns off).
 // Anything may be said in that time, to someone else too: only what the island
 // found to be a command (`followed`) lets yet another follow.
 //
 // The floors come from one voice on one machine (2026-10-09, Windows' own
 // recogniser): the wake phrase scored 0.90–0.94, "coucou" alone and "ok cool,
-// cool" 0.77–0.79; commands 0.77–0.95.
+// cool" 0.77–0.79. A command has no such score: the engine that writes it
+// down either made words of it or did not.
 
 use std::time::{Duration, Instant};
 
@@ -20,7 +22,8 @@ pub const WAKE_PHRASES: &[&str] = &["ok coucou", "okay coucou", "hey coucou"];
 
 /// Under this, a wake phrase is something else that sounded like it.
 pub const WAKE_FLOOR: f32 = 0.85;
-/// Commands are only listened for after a wake, so they can be heard lower.
+/// Under this, what was written down is not taken for a command. The free
+/// engine reports 1.0 for whatever it made words of.
 pub const COMMAND_FLOOR: f32 = 0.60;
 
 /// How long the command is waited for, and how long once words are coming.
@@ -156,7 +159,7 @@ pub struct Session {
     held: bool,
     command_until: Option<Instant>,
     /// How long after a command another may follow without the wake phrase;
-    /// zero where the engine cannot tell a command from any other sentence.
+    /// zero when the user turned that off.
     follow_up: Duration,
     follow_until: Option<Instant>,
 }
@@ -294,8 +297,8 @@ impl Session {
 mod tests {
     use super::*;
 
-    /// A session with a grammar engine: no follow-up.
-    fn grammar(wake: bool) -> Session {
+    /// A session with the follow-up turned off.
+    fn plain(wake: bool) -> Session {
         Session::new(wake, Duration::ZERO)
     }
 
@@ -465,9 +468,9 @@ mod tests {
     }
 
     #[test]
-    fn a_grammar_engine_has_no_follow_up() {
+    fn with_the_follow_up_off_nothing_follows_a_command() {
         let now = Instant::now();
-        let mut s = grammar(true);
+        let mut s = plain(true);
         s.heard(wake(0.95), now);
         s.heard(command("pause", 0.9), now);
         assert_eq!(s.listen(), Listen::Wake);
@@ -484,7 +487,7 @@ mod tests {
     #[test]
     fn the_wake_phrase_opens_a_command_and_the_command_closes_it() {
         let now = Instant::now();
-        let mut s = grammar(true);
+        let mut s = plain(true);
         assert_eq!(s.listen(), Listen::Wake);
         assert_eq!(s.heard(wake(0.92), now), Some(Heard::Woke));
         assert_eq!(s.listen(), Listen::Command);
@@ -496,7 +499,7 @@ mod tests {
     fn what_only_sounds_like_the_wake_phrase_wakes_nothing() {
         // The measured false wakes: "coucou" alone at 0.77, "ok cool, cool" at 0.79.
         let now = Instant::now();
-        let mut s = grammar(true);
+        let mut s = plain(true);
         for confidence in [0.77, 0.79, 0.84] {
             assert_eq!(s.heard(wake(confidence), now), None);
             assert_eq!(s.listen(), Listen::Wake);
@@ -508,7 +511,7 @@ mod tests {
     #[test]
     fn a_command_is_never_taken_without_a_wake() {
         let now = Instant::now();
-        let mut s = grammar(true);
+        let mut s = plain(true);
         assert_eq!(s.heard(command("decline", 0.99), now), None);
         assert_eq!(s.heard(Raw::Rejected, now), None);
         assert_eq!(s.listen(), Listen::Wake);
@@ -517,7 +520,7 @@ mod tests {
     #[test]
     fn a_wake_phrase_said_again_during_the_command_is_not_a_command() {
         let now = Instant::now();
-        let mut s = grammar(true);
+        let mut s = plain(true);
         s.heard(wake(0.95), now);
         assert_eq!(s.heard(wake(0.95), now), None);
         assert_eq!(s.listen(), Listen::Command);
@@ -526,7 +529,7 @@ mod tests {
     #[test]
     fn words_so_far_are_shown_and_keep_the_session_open() {
         let now = Instant::now();
-        let mut s = grammar(true);
+        let mut s = plain(true);
         s.heard(wake(0.95), now);
         let later = now + Duration::from_secs(7);
         assert_eq!(
@@ -541,7 +544,7 @@ mod tests {
     #[test]
     fn a_command_heard_too_faintly_or_not_at_all_is_missed() {
         let now = Instant::now();
-        let mut s = grammar(true);
+        let mut s = plain(true);
         s.heard(wake(0.95), now);
         assert_eq!(s.heard(command("play", 0.4), now), Some(Heard::Missed));
         s.heard(wake(0.95), now);
@@ -555,7 +558,7 @@ mod tests {
     #[test]
     fn silence_after_the_wake_ends_the_session() {
         let now = Instant::now();
-        let mut s = grammar(true);
+        let mut s = plain(true);
         s.heard(wake(0.95), now);
         assert_eq!(s.tick(now + Duration::from_secs(7)), None);
         assert_eq!(s.tick(now + COMMAND_WAIT), Some(Heard::Cancelled));
@@ -566,7 +569,7 @@ mod tests {
     #[test]
     fn without_the_wake_phrase_the_microphone_opens_only_for_the_shortcut() {
         let now = Instant::now();
-        let mut s = grammar(false);
+        let mut s = plain(false);
         assert_eq!(s.listen(), Listen::Nothing);
         assert_eq!(s.talk(now), Some(Heard::Woke));
         assert_eq!(s.listen(), Listen::Command);
@@ -578,7 +581,7 @@ mod tests {
     #[test]
     fn held_means_closed_and_ends_what_was_going_on() {
         let now = Instant::now();
-        let mut s = grammar(true);
+        let mut s = plain(true);
         s.heard(wake(0.95), now);
         assert_eq!(s.hold(true), Some(Heard::Cancelled));
         assert_eq!(s.listen(), Listen::Nothing);
@@ -591,7 +594,7 @@ mod tests {
     #[test]
     fn the_island_closing_the_view_ends_the_session_quietly() {
         let now = Instant::now();
-        let mut s = grammar(true);
+        let mut s = plain(true);
         s.heard(wake(0.95), now);
         s.cancel();
         assert_eq!(s.listen(), Listen::Wake);
