@@ -106,6 +106,10 @@ pub struct Settings {
     pub phone_relay: bool,
     /// The relay's address (`wss://…`), empty until the user enters it. Not a secret. Owned by Rust.
     pub phone_relay_url: String,
+    /// The search engine the browser opens a search on: "google" until the
+    /// user picks another. Kept as it comes, like `mochi_outfit`: the island
+    /// reads one it does not know as the default.
+    pub search_engine: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -135,6 +139,32 @@ pub struct VoicePref {
     pub speak: bool,
     /// "female" or "male".
     pub speaker: String,
+    /// The embedding model, on the server `brain` names, that the app's
+    /// capabilities are ranked against a sentence with (voice/embed.rs).
+    /// Empty: none, and nothing is ranked.
+    pub embed_model: String,
+    /// What the local model could not do may be put to the provider chosen for
+    /// chat. Off until the user turns it on: what was said then leaves for it.
+    pub cloud: bool,
+    /// A question alone may be answered from the web, without "search for".
+    /// Off until the user turns it on.
+    pub web_answers: bool,
+    /// Who answers a web question: "brave" (web_search.rs, the user's key),
+    /// "anthropic", or "browser" (nothing is asked: the browser opens on the
+    /// search). Kept as it comes; read it through `searches_with`.
+    pub web_search: String,
+}
+
+impl VoicePref {
+    /// `web_search` as one of its three values: anything else is "browser",
+    /// the one that sends nothing anywhere.
+    pub fn searches_with(&self) -> &'static str {
+        match self.web_search.as_str() {
+            "brave" => "brave",
+            "anthropic" => "anthropic",
+            _ => "browser",
+        }
+    }
 }
 
 impl Default for VoicePref {
@@ -149,6 +179,10 @@ impl Default for VoicePref {
             follow_up: 8,
             speak: false,
             speaker: "female".into(),
+            embed_model: String::new(),
+            cloud: false,
+            web_answers: false,
+            web_search: "browser".into(),
         }
     }
 }
@@ -220,6 +254,7 @@ impl Default for Settings {
             phone_services: Vec::new(),
             phone_relay: false,
             phone_relay_url: String::new(),
+            search_engine: "google".into(),
         }
     }
 }
@@ -500,7 +535,7 @@ mod tests {
   "pillColors": { "integration_claude": "#2DD4BF" },
   "language": "pt-BR",
   "desktopMochi": { "onDesktop": true, "spot": { "x": 1500.5, "y": -300.0, "space": "screen" } },
-  "voice": { "enabled": true, "wake": false, "brain": "ollama", "brainModel": "qwen2.5:7b-instruct", "engine": "bundled", "hearingModel": "parakeet-110m", "followUp": 5, "speak": true, "speaker": "male" },
+  "voice": { "enabled": true, "wake": false, "brain": "ollama", "brainModel": "qwen2.5:7b-instruct", "engine": "bundled", "hearingModel": "parakeet-110m", "followUp": 5, "speak": true, "speaker": "male", "embedModel": "nomic-embed-text", "cloud": true, "webAnswers": true, "webSearch": "brave" },
   "phoneLink": true,
   "phoneChat": true,
   "phoneChatModels": ["openai/gpt-x"],
@@ -510,7 +545,8 @@ mod tests {
   "phoneUsage": true,
   "phoneServices": ["integration_stripe"],
   "phoneRelay": true,
-  "phoneRelayUrl": "wss://relay.example.workers.dev"
+  "phoneRelayUrl": "wss://relay.example.workers.dev",
+  "searchEngine": "duckduckgo"
 }"##;
 
     fn custom() -> Value {
@@ -708,6 +744,69 @@ mod tests {
         let odd = parse(&custom_with("phoneDetails", Some(serde_json::json!("yes")))).unwrap();
         assert!(!odd.phone_details, "a wrong type does not switch it on");
         assert_eq!(odd.mochi_outfit, "witchHat");
+    }
+
+    #[test]
+    fn a_file_from_before_the_voice_brain_sends_nothing_anywhere_new() {
+        // The cloud tier and web answers send what was said off this machine:
+        // never on by default, and an older file is not consent.
+        let d = Settings::default();
+        assert_eq!(d.voice.embed_model, "");
+        assert!(!d.voice.cloud);
+        assert!(!d.voice.web_answers);
+        assert_eq!(d.voice.web_search, "browser");
+        assert_eq!(d.search_engine, "google");
+
+        // A voice section written before them keeps what it had.
+        let before = json!({ "enabled": true, "wake": false, "brain": "ollama", "brainModel": "qwen2.5:7b-instruct", "followUp": 5 });
+        let old = parse(&custom_with("voice", Some(before))).unwrap();
+        assert!(old.voice.enabled && !old.voice.wake);
+        assert_eq!(old.voice.brain_model, "qwen2.5:7b-instruct");
+        assert_eq!(old.voice.embed_model, "");
+        assert!(!old.voice.cloud && !old.voice.web_answers);
+        assert_eq!(old.voice.searches_with(), "browser");
+        assert_eq!(parse(&custom_with("searchEngine", None)).unwrap().search_engine, "google");
+
+        // Written, they are read.
+        let new = parse(CUSTOM.as_bytes()).unwrap();
+        assert_eq!(new.voice.embed_model, "nomic-embed-text");
+        assert!(new.voice.cloud && new.voice.web_answers);
+        assert_eq!(new.voice.searches_with(), "brave");
+        assert_eq!(new.search_engine, "duckduckgo");
+    }
+
+    #[test]
+    fn a_web_search_choice_this_build_does_not_know_opens_the_browser() {
+        let with = |choice: Value| {
+            let mut voice = custom()["voice"].clone();
+            voice["webSearch"] = choice;
+            parse(&custom_with("voice", Some(voice))).unwrap()
+        };
+        assert_eq!(with(json!("anthropic")).voice.searches_with(), "anthropic");
+        // Kept as written, so a newer build's choice survives a save by this
+        // one; read as the choice that asks nobody.
+        let later = with(json!("searxng"));
+        assert_eq!(later.voice.web_search, "searxng");
+        assert_eq!(later.voice.searches_with(), "browser");
+        assert_eq!(with(json!("Brave")).voice.searches_with(), "browser");
+        assert_eq!(with(json!("")).voice.searches_with(), "browser");
+
+        // A wrong type switches nothing on. The whole voice section falls
+        // back with it — off — and nothing else does.
+        let (dir, file) = scratch("voice-brain");
+        for (key, wrong) in [("cloud", json!("yes")), ("webAnswers", json!(1)), ("webSearch", json!(["brave"])), ("embedModel", json!(3))] {
+            let mut voice = custom()["voice"].clone();
+            voice[key] = wrong;
+            std::fs::write(&file, custom_with("voice", Some(voice))).unwrap();
+            let odd = load_from(&file);
+            assert_eq!(odd.voice, VoicePref::default(), "bad {key}");
+            assert_eq!(odd.mochi_outfit, "witchHat");
+            assert_eq!(odd.search_engine, "duckduckgo");
+        }
+        let odd = parse(&custom_with("searchEngine", Some(json!(7)))).unwrap();
+        assert_eq!(odd.search_engine, "google");
+        assert!(odd.voice.cloud, "and the rest is kept");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1022,6 +1121,7 @@ mod tests {
                 "phoneServices",
                 "phoneRelay",
                 "phoneRelayUrl",
+                "searchEngine",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);
