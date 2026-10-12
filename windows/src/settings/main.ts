@@ -4,14 +4,14 @@
 
 import "./settings.css";
 import {
-  Bridge, onEvent, type HookPreview, type HookStatus, type ShortcutsReport, type VoiceEnginePart, type VoiceStatus,
+  BRAVE_SEARCH_KEY, Bridge, onEvent, type HookPreview, type HookStatus, type ShortcutsReport, type VoiceEnginePart, type VoiceStatus,
 } from "../core/bridge";
 import { CUSTOM_SERVER_KEY, providerDef, urlExposure } from "../core/providers";
 import {
   ISLAND_SHORTCUTS, SHORTCUTS, SHORTCUT_TEXT, activeKeys, displayKeys, duplicates, effective,
   recordPress, type Binding,
 } from "../core/shortcuts";
-import { DEFAULT_SETTINGS, type Settings } from "../core/state";
+import { DEFAULT_SETTINGS, type Settings, type WebSearchChoice } from "../core/state";
 import { SOUND_NAMES } from "../core/sound";
 import {
   MAX_DECLARED, PILL_CATEGORIES, availablePills, chooseMainPill, isComingSoon, mainPillChoices, slotsUsed, takesSlot,
@@ -24,6 +24,7 @@ import { phoneSection } from "./phone";
 import { colorDot } from "./colors";
 import { initMotion } from "./motion";
 import { renderDiff, statusDot } from "./parts";
+import { SEARCH_ENGINES } from "./search";
 import {
   LANGUAGES, N_, isRtl, onLanguageChange, resolveLanguage, setLanguage, systemLanguages, t, tn,
 } from "../i18n/i18n";
@@ -1053,8 +1054,29 @@ function voiceSection(): HTMLElement {
   show(null);
   void Bridge.voiceStatus().then(show);
   voiceListener = show;
+
+  // What voice needs to understand a command: a line, and a notice while the
+  // model server, its model or the speech engine is missing.
+  const needs = h("div", { class: "hint" });
+  /** Whether the hearing part is on this machine, once Rust has said. */
+  let engineHere = false;
+  const drawNeeds = () => {
+    const missing: string[] = [];
+    if (!server.value || !settings.voice.brainModel) {
+      missing.push(t("No model server and model are chosen yet: see “{row}” below.", { row: t("Understand free speech with") }));
+    }
+    if (!engineHere || settings.voice.engine !== "bundled") {
+      missing.push(t("The speech engine is not downloaded or not turned on yet: see “{row}” below.", { row: t("Hear free speech") }));
+    }
+    needs.className = missing.length ? "notice warn" : "hint";
+    needs.textContent = [
+      t("To understand a command, voice needs a model server with a model, and the downloaded speech engine."),
+      ...missing,
+    ].join(" ");
+  };
   const change = (patch: Partial<Settings["voice"]>) => {
     settings.voice = { ...settings.voice, ...patch };
+    drawNeeds();
     return save();
   };
 
@@ -1072,6 +1094,7 @@ function voiceSection(): HTMLElement {
     for (const id of connected) server.append(h("option", { value: id, text: t(LOCAL[id].name) }));
     server.value = connected.includes(settings.voice.brain as LocalId) ? settings.voice.brain : "";
     void fillModels();
+    void fillEmbed();
   };
   const fillModels = async () => {
     clear(model);
@@ -1088,9 +1111,44 @@ function voiceSection(): HTMLElement {
     for (const id of ids) model.append(h("option", { value: id, text: id }));
     model.value = ids.includes(wanted) ? wanted : (ids[0] ?? "");
     if (model.value !== wanted) change({ brainModel: model.value });
+    drawNeeds();
   };
+
+  // The embedding model capabilities are ranked with: one the same server
+  // has. Coucou installs none; without one, voice is slower to choose.
+  const embed = h("select", {}) as HTMLSelectElement;
+  const embedRow = h("div", { class: "row" }, h("label", { text: t("Embedding model") }), embed);
+  const embedAbout = h("div", { class: "hint", text: t("Finds which of Coucou's commands a sentence is closest to, before any model is asked. It runs on the server chosen above.") });
+  const embedNone = h("div", { class: "hint", text: t("This server has no embedding model. You install one on your server yourself: Coucou downloads nothing here.") });
+  const embedWithout = h("div", { class: "hint", text: t("Without an embedding model, voice still works but takes longer to choose, and every command needs « OK Coucou »: listening after a command is off.") });
+  const fillEmbed = async () => {
+    const chosen = server.value !== "";
+    for (const el of [embedRow, embedAbout, embedNone, embedWithout]) el.style.display = "none";
+    if (!chosen) return;
+    // Rust answers for the server the settings name: asked once they are saved.
+    const ids = (await Bridge.voiceEmbedModels()) ?? [];
+    const wanted = settings.voice.embedModel;
+    // The server is not running: the model already chosen stays in the list.
+    if (wanted && !ids.includes(wanted)) ids.unshift(wanted);
+    clear(embed);
+    embed.append(h("option", { value: "", text: t("None") }));
+    for (const id of ids) embed.append(h("option", { value: id, text: id }));
+    embed.value = wanted;
+    embedAbout.style.display = "";
+    embedRow.style.display = ids.length ? "" : "none";
+    embedNone.style.display = ids.length ? "none" : "";
+    embedWithout.style.display = embed.value ? "none" : "";
+  };
+  // Nothing to show until a server is chosen.
+  void fillEmbed();
+  embed.addEventListener("change", () => {
+    embedWithout.style.display = embed.value ? "none" : "";
+    change({ embedModel: embed.value });
+  });
+
   server.addEventListener("change", () => {
-    change({ brain: server.value, brainModel: "" });
+    // Another server has other models: neither choice is carried over.
+    void change({ brain: server.value, brainModel: "", embedModel: "" }).then(fillEmbed);
     void fillModels();
   });
   model.addEventListener("change", () => change({ brainModel: model.value }));
@@ -1100,6 +1158,7 @@ function voiceSection(): HTMLElement {
   voiceServersRedraw = () => {
     fillServers();
     void fillHearing();
+    cloudHint.textContent = cloudText();
   };
 
   // The bundled engine's two parts, each downloaded when asked for: a row with
@@ -1137,6 +1196,10 @@ function voiceSection(): HTMLElement {
     const refresh = (note = "") =>
       void Bridge.voiceEngineStatus(part).then((s) => {
         if (s) draw(s.installed, s.available, Math.round(s.downloadBytes / 1_000_000), note, s.downloading);
+        if (part === "hearing") {
+          engineHere = s?.installed ?? false;
+          drawNeeds();
+        }
       });
     draw(false, false, 0);
     refresh();
@@ -1216,6 +1279,108 @@ function voiceSection(): HTMLElement {
   followUp.value = String(settings.voice.followUp);
   followUp.addEventListener("change", () => change({ followUp: Number(followUp.value) }));
 
+  // The cloud tier: off unless asked for, and the line says what it sends.
+  const cloudText = () =>
+    t("When the local model cannot handle a request, the sentence and a description of Coucou's state are sent to the provider chosen for chat ({provider}). It counts against your plan or key with that provider. Off: nothing is sent to it.", {
+      provider: t(providerDef(settings.chatProvider).name),
+    });
+  const cloudHint = h("div", { class: "hint", text: cloudText() });
+
+  // Web answers: who is asked, the key when it is Brave Search, and where the
+  // browser opens. The key goes to the keychain and is never read back.
+  const WEB_CHOICES: [WebSearchChoice, string][] = [
+    ["browser", t("Nobody: the browser opens")],
+    ["brave", "Brave Search"],
+    ["anthropic", "Anthropic"],
+  ];
+  const WEB_HINTS: Record<WebSearchChoice, string> = {
+    browser: t("Coucou sends nothing: your browser opens on the search."),
+    brave: t("What you ask is sent to Brave Search with your own key, and the results are read on this computer. Coucou keeps nothing."),
+    anthropic: t("What you ask and the last few turns are sent to Anthropic, which searches the web. It counts against your Claude plan or key. Coucou keeps nothing."),
+  };
+  const webSearch = h("select", {}) as HTMLSelectElement;
+  for (const [id, label] of WEB_CHOICES) webSearch.append(h("option", { value: id, text: label }));
+  // A value this build does not know is the browser, as Rust takes it.
+  webSearch.value = WEB_CHOICES.some(([id]) => id === settings.voice.webSearch) ? settings.voice.webSearch : "browser";
+  const webHint = h("div", { class: "hint" });
+
+  let braveKey = false;
+  const braveField = h("input", {
+    type: "password",
+    autocomplete: "off",
+    spellcheck: "false",
+    style: "flex:1 1 auto;min-width:0",
+  }) as HTMLInputElement;
+  const braveFeedback = h("div", {});
+  const braveSave = h("button", { text: CHAT_STRINGS.save });
+  const braveRemove = h("button", { class: "danger", text: CHAT_STRINGS.remove });
+  const braveRefresh = () => {
+    braveField.placeholder = braveKey ? CHAT_STRINGS.stored : "BSA…";
+    braveRemove.style.display = braveKey ? "" : "none";
+    drawWeb();
+  };
+  braveSave.addEventListener("click", async () => {
+    const value = braveField.value.trim();
+    if (!value) return;
+    clear(braveFeedback);
+    try {
+      await Bridge.secretSet(BRAVE_SEARCH_KEY, value);
+      braveKey = true;
+      braveField.value = "";
+      braveFeedback.append(h("div", { class: "notice ok", text: t("Saved. It never touches disk.") }));
+    } catch (err) {
+      braveFeedback.append(h("div", { class: "notice err", text: t("Could not save: {error}", { error: String(err) }) }));
+    }
+    braveRefresh();
+  });
+  braveRemove.addEventListener("click", async () => {
+    clear(braveFeedback);
+    try {
+      await Bridge.secretClear(BRAVE_SEARCH_KEY);
+      braveKey = false;
+      braveFeedback.append(h("div", { class: "notice ok", text: t("Key removed.") }));
+    } catch (err) {
+      braveFeedback.append(h("div", { class: "notice err", text: t("Could not remove: {error}", { error: String(err) }) }));
+    }
+    braveRefresh();
+  });
+  const braveRow = h("div", { class: "row" },
+    h("label", { text: t("Brave Search key") }),
+    braveField, braveSave, braveRemove,
+  );
+  const braveWhere = h("div", { class: "hint", text: t("Key from {site}", { site: "brave.com/search/api" }) });
+
+  const drawWeb = () => {
+    const choice = webSearch.value as WebSearchChoice;
+    webHint.textContent = WEB_HINTS[choice];
+    braveRow.style.display = braveWhere.style.display = choice === "brave" ? "" : "none";
+    // Empty, it would still take a gap of the section.
+    braveFeedback.style.display = choice === "brave" && braveFeedback.childElementCount ? "" : "none";
+  };
+  braveRefresh();
+  void Bridge.secretPresent(BRAVE_SEARCH_KEY).then((present) => {
+    braveKey = present ?? false;
+    braveRefresh();
+  });
+  webSearch.addEventListener("change", () => {
+    drawWeb();
+    change({ webSearch: webSearch.value as WebSearchChoice });
+  });
+
+  const engine = h("select", {}) as HTMLSelectElement;
+  for (const { id, name } of SEARCH_ENGINES) engine.append(h("option", { value: id, text: name }));
+  // One written by hand in the settings file stays, shown as it is written.
+  if (!SEARCH_ENGINES.some((e) => e.id === settings.searchEngine)) {
+    engine.append(h("option", { value: settings.searchEngine, text: settings.searchEngine }));
+  }
+  engine.value = settings.searchEngine;
+  engine.addEventListener("change", () => {
+    settings.searchEngine = engine.value;
+    void save();
+  });
+
+  drawNeeds();
+
   return h(
     "section",
     {},
@@ -1226,6 +1391,7 @@ function voiceSection(): HTMLElement {
       status,
     ),
     problem,
+    needs,
     h("div", { class: "hint", text: t("Say « OK Coucou », then your command. Coucou listens on this computer only: nothing is recorded and no audio leaves it. English only for now.") }),
     h("div", { class: "row" },
       h("label", { text: t("Listen for « OK Coucou »") }),
@@ -1241,8 +1407,30 @@ function voiceSection(): HTMLElement {
     h("div", { class: "hint", text: t("For a few seconds after a command, another can be said without « OK Coucou ». Only with free speech.") }),
     h("div", { class: "row" }, h("label", { text: t("Understand free speech with") }), server, model),
     h("div", { class: "hint", text: t("A sentence Coucou does not know is put to this model, with the tools Coucou offers. The model proposes; Coucou checks before acting, and never approves a permission. Connect a server in Local models first.") }),
+    embedRow,
+    embedAbout,
+    embedNone,
+    embedWithout,
+    h("div", { class: "row" },
+      h("label", { text: t("Use the cloud when needed") }),
+      toggle(settings.voice.cloud, (v) => change({ cloud: v })),
+    ),
+    cloudHint,
     spoken,
     h("div", { class: "hint", text: t("Mochi says what a command did, in a calm voice made on this computer (Supertonic, downloaded from GitHub when you ask). In English, and quiet when Sound is off.") }),
+    h("div", { class: "subhead", text: t("Web answers") }),
+    h("div", { class: "row" }, h("label", { text: t("Answered by") }), webSearch),
+    webHint,
+    braveRow,
+    braveFeedback,
+    braveWhere,
+    h("div", { class: "row" },
+      h("label", { text: t("Answer questions from the web") }),
+      toggle(settings.voice.webAnswers, (v) => change({ webAnswers: v })),
+    ),
+    h("div", { class: "hint", text: t("A question alone is answered from the web, without being asked to search. Off: the web is used only when you ask for a search.") }),
+    h("div", { class: "row" }, h("label", { text: t("Search engine") }), engine),
+    h("div", { class: "hint", text: t("Where your browser opens when a search is opened in it.") }),
   );
 }
 
