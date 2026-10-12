@@ -483,6 +483,26 @@ export const Bridge = {
    * unless `voice.webSearch` is "brave".
    */
   webSearch: (query: string) => callOrThrow<WebResult[]>("web_search", { query }),
+  /**
+   * The capabilities a cloud model may ask for, as tools (core/capabilities
+   * `Registry.schema`): what the MCP endpoint lists. Sent when they change.
+   */
+  capabilityPublish: (tools: unknown[]) => call<void>("capability_publish", { tools }),
+  /** What a `capability-call` came to, as the text a model is given back (voice/result.ts `forModel`). */
+  capabilityResult: (id: string, result: string) => call<void>("capability_result", { id, result }),
+  /**
+   * The turn the local model handed up, put to the provider chosen for chat
+   * (`voice.cloud` on): it reaches the capabilities through the MCP endpoint,
+   * each call arriving here as a `capability-call`. Its last words, or null
+   * when it cannot be asked or did not answer.
+   */
+  voiceCloud: (
+    system: string,
+    said: string,
+    history: { said: string; calls: { name: string; arguments: Record<string, unknown> }[]; result: string }[] = [],
+  ) => call<{ text: string }>("voice_cloud", { system, said, history }),
+  /** The user's own folders voice may open, by name (src-tauri/src/voice/apps.rs `folder`). */
+  voiceFolders: () => call<string[]>("voice_folders"),
   /** Whether a part of the bundled engine is on this machine, and what getting it costs. */
   voiceEngineStatus: (part: VoiceEnginePart) =>
     call<{ installed: boolean; downloadBytes: number; available: boolean; downloading: boolean }>("voice_engine_status", { part }),
@@ -599,6 +619,17 @@ export interface LocalServer {
   models: string[];
   /** The address is this machine. */
   loopback: boolean;
+}
+
+/**
+ * The `capability-call` event: a cloud model asked for a capability through
+ * the MCP endpoint (src-tauri/src/voice/mcp.rs). The island runs it through
+ * the registry, origin "cloud", and answers with `capabilityResult` by `id`.
+ */
+export interface CapabilityCallEvent {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
 }
 
 /** One web search result (src-tauri/src/web_search.rs): text only, the address http(s). */
