@@ -5866,6 +5866,50 @@
    "pt-BR": "Saindo",
    "ru": "Выход",
    "id": "Keluar"
+  },
+  "I can't do that": {
+   "zh-Hans": "我做不了这个",
+   "hi": "मैं यह नहीं कर सकता",
+   "es": "No puedo hacer eso",
+   "ar": "لا أستطيع فعل ذلك",
+   "fr": "Je ne peux pas faire ça",
+   "bn": "আমি এটা করতে পারি না",
+   "pt-BR": "Não posso fazer isso",
+   "ru": "Я не могу этого сделать",
+   "id": "Saya tidak bisa melakukan itu"
+  },
+  "That isn't possible right now": {
+   "zh-Hans": "现在无法这样做",
+   "hi": "यह अभी संभव नहीं है",
+   "es": "Eso no es posible ahora mismo",
+   "ar": "هذا غير ممكن الآن",
+   "fr": "Ce n'est pas possible pour le moment",
+   "bn": "এটা এখন সম্ভব নয়",
+   "pt-BR": "Isso não é possível agora",
+   "ru": "Сейчас это невозможно",
+   "id": "Itu tidak bisa dilakukan sekarang"
+  },
+  "There is nothing to put back": {
+   "zh-Hans": "没有可以恢复的更改",
+   "hi": "वापस करने के लिए कुछ नहीं है",
+   "es": "No hay nada que deshacer",
+   "ar": "لا يوجد شيء لإرجاعه",
+   "fr": "Il n'y a rien à rétablir",
+   "bn": "ফিরিয়ে আনার মতো কিছু নেই",
+   "pt-BR": "Não há nada para desfazer",
+   "ru": "Нечего возвращать",
+   "id": "Tidak ada yang bisa dikembalikan"
+  },
+  "Did you mean {0}?": {
+   "zh-Hans": "你是指 {0} 吗？",
+   "hi": "क्या आपका मतलब {0} था?",
+   "es": "¿Querías decir {0}?",
+   "ar": "هل تقصد {0}؟",
+   "fr": "Vouliez-vous dire {0} ?",
+   "bn": "আপনি কি {0} বোঝাতে চেয়েছেন?",
+   "pt-BR": "Você quis dizer {0}?",
+   "ru": "Вы имели в виду {0}?",
+   "id": "Maksud Anda {0}?"
   }
  }
 }

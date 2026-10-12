@@ -202,6 +202,8 @@ export interface AppHost {
   monitors(): Awaitable<readonly Option[]>;
   /** The models the bundled engine can hear with. */
   hearingModels(): Awaitable<readonly Option[]>;
+  /** The embedding models of the server chosen for voice; "" is none. */
+  embedModels(): Awaitable<readonly Option[]>;
 
   // ── Chat ──
   chat(): ChatNow;

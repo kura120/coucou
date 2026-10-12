@@ -42,6 +42,9 @@ import type { Answer, Ask } from "../voice/result";
 import { askRoom, resultRoom } from "../views/ask";
 import type { AppView } from "../voice/tools-app";
 import { installContextMenu, type ContextMenu, type Rect } from "../views/menu";
+import { createAppRegistry } from "./app";
+import type { ScreenContext } from "../core/capabilities/types";
+import type { OutfitSelection } from "../mochi/wardrobe";
 
 const BOT_OVERHANG = 40;
 const CLAUDE_DESKTOP_ID = "agent_claude-desktop";
@@ -144,6 +147,28 @@ export class Island {
       pause: () => this.onVoicePause?.(),
     }),
   );
+  /**
+   * Everything Coucou lets its assistant see and do, declared on this island
+   * (island/app.ts): made once, and the only way anything it asks for runs.
+   */
+  readonly registry = createAppRegistry({
+    desktop: () => this.desktop,
+    place: () => this.voicePlace(),
+    goTo: (view, after) => this.voiceGoTo(view, after),
+    showWaitingCard: () => this.showWaitingCard(),
+    declineWaiting: () => this.declineWaiting(),
+    answerWaiting: (answers) => this.answerWaiting(answers),
+    prefillChat: (message) => {
+      const chat = this.views.get("prompt");
+      chat?.prefill?.(message);
+      return chat?.prefill != null;
+    },
+    wearOutfit: (selection) => this.wearOutfit(selection),
+    settingsChanged: () => this.onVoiceSettings?.(),
+    setPaused: (paused) => this.onPause?.(paused),
+    screen: () => this.voiceScreen(),
+    webSearched: () => {},
+  });
   /** Counts the sentences being understood: an answer that comes for an earlier one is dropped. */
   private voiceTurn = 0;
   private prevViewBeforeConfused: IslandViewName = "overview";
@@ -323,14 +348,7 @@ export class Island {
       },
       openSettingsWindow: () => void Bridge.openSettingsWindow(),
       blip: () => Sound.play("blip"),
-      chooseOutfit: (selection) => {
-        if (parseOutfit(State.settings.mochiOutfit) === selection) return;
-        State.settings.mochiOutfit = selection;
-        void Bridge.saveSettings(State.settings);
-        Sound.play("pop");
-        this.engine.triggerEmote("proud");
-        State.notify();
-      },
+      chooseOutfit: (selection) => this.wearOutfit(selection),
       previewOutfit: (outfit) => {
         State.wardrobePreview = outfit;
         State.notify();
@@ -695,6 +713,61 @@ export class Island {
     this.listenGlow.style.setProperty("--level", String(Math.max(0, Math.min(1, level || 0))));
   }
 
+  // ── What the app's capabilities need of the island (island/app.ts) ──────────
+
+  /** Set by main.ts: the tray's Pause (the island hides), and its way back. */
+  onPause: ((paused: boolean) => void) | null = null;
+
+  /** A turn is being worked out: what it asks to show waits for its end. */
+  private voiceBusy = false;
+  /** The view a turn asked for, shown when it ends. */
+  private voiceNext: { view: IslandViewName; after?: () => void } | null = null;
+  /** Where the island was when it started listening. */
+  private voiceFrom: { view: IslandViewName; open: boolean } | null = null;
+
+  /** The view under the listening one — or the one a turn has just asked for — and whether the island is open on it. */
+  private voicePlace(): { view: IslandViewName; open: boolean } {
+    if (this.voiceNext) return { view: this.voiceNext.view, open: true };
+    if (this.fsm.state === "listening" && this.voiceFrom) return this.voiceFrom;
+    return { view: State.view, open: State.mode === "expanded" };
+  }
+
+  /** Opens the island on a view: when the turn that asked ends, or at once when none runs. */
+  private voiceGoTo(view: IslandViewName, after?: () => void) {
+    if (this.voiceBusy) {
+      this.voiceNext = { view, after };
+      return;
+    }
+    this.alert(view);
+    after?.();
+  }
+
+  /** What the view under the listening one shows, as it says itself (island/screen.ts). */
+  private voiceScreen(): ScreenContext | null {
+    const { view } = this.voicePlace();
+    return { view, subjects: [], ...this.views.get(view)?.screen?.() };
+  }
+
+  /** Keeps an outfit, as a click in the wardrobe does. */
+  private wearOutfit(selection: OutfitSelection) {
+    if (parseOutfit(State.settings.mochiOutfit) === selection) return;
+    State.settings.mochiOutfit = selection;
+    void Bridge.saveSettings(State.settings);
+    Sound.play("pop");
+    this.engine.triggerEmote("proud");
+    State.notify();
+  }
+
+  /** Answers the waiting question, as a click on its card does. */
+  private answerWaiting(answers: Record<string, string | string[]>): boolean {
+    const pending = State.pendingApproval;
+    if (!pending?.questions) return false;
+    Sound.play("approve");
+    void Bridge.approvalAnswer(pending.requestId, answers);
+    this.closeApproval();
+    return true;
+  }
+
   // ── The app's own tools (voice/tools-app.ts) ─────────────────────────────────
 
   /** Set by main.ts: applies a settings change the way one from the Settings window is applied. */
@@ -885,22 +958,24 @@ export class Island {
   }
 
   /** The waiting permission card, up and unanswered (voice: "what is the request?"). */
-  private showWaitingCard() {
+  private showWaitingCard(): boolean {
     const pending = State.pendingApproval;
-    if (!pending) return;
+    if (!pending) return false;
     State.setFocus(pending.pillId);
-    this.alert(pending.questions ? "question" : "approval");
+    this.voiceGoTo(pending.questions ? "question" : "approval");
+    return true;
   }
 
   /** Declines the waiting permission, as a click on Deny does. Never a question, never an Allow. */
-  private declineWaiting() {
+  private declineWaiting(): boolean {
     const pending = State.pendingApproval;
-    if (!pending || pending.questions) return;
+    if (!pending || pending.questions) return false;
     void Bridge.log(`decide deny (voice) req=${pending.requestId}`);
     Sound.play("blip");
     void Bridge.approvalDecision(pending.requestId, "deny");
     State.endApproval();
     this.fsm.pinned = false;
+    return true;
   }
 
   private voiceResult(result: VoiceResult) {

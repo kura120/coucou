@@ -709,6 +709,25 @@ function buildPulls(onChange: () => void): PullList {
 
 // ── View ──────────────────────────────────────────────────────────────────────
 
+/**
+ * The chat as the app's capabilities reach it (island/app.ts): what its field
+ * and its buttons do, no more. Filled in when the view is built.
+ */
+export const ChatControls = {
+  /** What the field holds, unsent. */
+  draft: (): string => "",
+  /** An answer is on its way. */
+  busy: (): boolean => false,
+  /** Sends what the field holds, as the button does. True when it left. */
+  send: (): boolean => false,
+  /** Ends the answer that is on its way. False when none can be stopped. */
+  stop: (): boolean => false,
+  /** A new conversation, in the folder the chat works in. */
+  startNew: (): boolean => false,
+  /** Opens a saved conversation. True when the chat is now in it. */
+  open: async (_id: string): Promise<boolean> => false,
+};
+
 export function buildPrompt(onHeightChange: () => void): ViewHost {
   const chipRow = h("div", { class: "chip-row" });
   const log = h("div", { class: "chat-log" });
@@ -946,6 +965,28 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     Sound.play("blip");
     showConversation();
   }
+
+  ChatControls.draft = () => input.value;
+  ChatControls.busy = () => sending;
+  ChatControls.send = () => {
+    if (!input.value.trim() || sending) return false;
+    void submit();
+    return true;
+  };
+  ChatControls.stop = () => {
+    if (!sending || !stoppable) return false;
+    void Bridge.chatStop();
+    return true;
+  };
+  ChatControls.startNew = () => {
+    if (sending) return false;
+    startIn(State.settings.claudeCodeDir);
+    return true;
+  };
+  ChatControls.open = async (id) => {
+    await openConversation(id);
+    return State.conversationId === id;
+  };
 
   /** A new conversation in `dir` ("" for a plain chat). */
   function startIn(dir: string) {

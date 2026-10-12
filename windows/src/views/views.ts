@@ -30,6 +30,7 @@ import type { Outfit, OutfitSelection } from "../mochi/wardrobe";
 import { language, t, tl, type Msg } from "../i18n/i18n";
 import type { ViewCommand } from "../island/shortcuts";
 import { registerVoiceCards } from "./voice-cards";
+import { VIEW_SCREENS, type Shown } from "../island/screen";
 
 export interface ViewActions {
   setView(v: IslandViewName): void;
@@ -80,6 +81,8 @@ export interface ViewHost {
   prefill?(text: string): void;
   /** Called every frame while the view is on screen. True = needs another frame. */
   tick?(nowMs: number): boolean | void;
+  /** What the view shows, for the assistant (island/screen.ts). */
+  screen?(): Shown;
   /** Ctrl+O / Ctrl+E while the view is on screen (island/shortcuts.ts). */
   command?(command: ViewCommand): void;
 }
@@ -948,5 +951,10 @@ export function buildViews(
   map.set("result", buildPlaceholder(tl("Result"), ""));
   // The web answer and email cards, on sample data for now (views/voice-cards.ts).
   registerVoiceCards(map, actions);
+  // Each view says what it shows (island/screen.ts).
+  for (const [name, shown] of Object.entries(VIEW_SCREENS)) {
+    const view = map.get(name as IslandViewName);
+    if (view) view.screen = shown;
+  }
   return map;
 }

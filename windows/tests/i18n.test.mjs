@@ -256,6 +256,7 @@ const NOT_TEXT = new Set([
   "file", // the kind of a chat context: { kind: "file" }
   "finished", // a task state and a pill badge
   "unknown", // a CI state
+  "session", // a kind of thing the app has (core/capabilities `EntityKind`)
   "Resend", // the service's name (the Mac's "Resend" is a button: send again)
 ]);
 

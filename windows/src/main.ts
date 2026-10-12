@@ -99,6 +99,12 @@ async function main() {
     setPaused(true);
     island.fsm.forceHidden();
   };
+  // The same for the app's own capabilities (island/app.ts): paused, the island hides; lifted, it is back.
+  island.onPause = (on) => {
+    setPaused(on);
+    if (on) island.fsm.forceHidden();
+    else island.reveal();
+  };
 
   await onEvent<Settings>("settings-changed", (s) => {
     const previousMain = State.mainPillId;
