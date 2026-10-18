@@ -227,7 +227,7 @@ test("other letters for the same sounds is that thing, unless the speech model d
 test("a name that is only near one thing is asked about, in the capability's words, and a yes goes on", async () => {
   const { call, log } = setup({ answers: [{ kind: "yes_no", yes: true }] });
   const result = await call("show_pill", { pill: "strife" });
-  assert.deepEqual(log.asked, [{ kind: "yes_no", question: "Show Stripe?" }]);
+  assert.deepEqual(log.asked, [{ kind: "yes_no", question: "Show Stripe?", about: "pill" }]);
   assert.equal(result.status, "done");
   assert.deepEqual(log.ran, [{ name: "show_pill", args: { pill: "integration_stripe" } }]);
 });

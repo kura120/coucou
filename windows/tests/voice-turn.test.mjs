@@ -354,7 +354,7 @@ test("an answer in words, with nothing called, is Mochi's answer; asking for not
   const empty = scripted(says(""), says(""));
   assert.deepEqual((await turns({ local: empty.model }).hear("mumble")).result, { outcome: "failure", message: "Not recognised" });
   assert.equal(empty.asked.length, 2);
-  assert.match(empty.asked[1].system, /Your last answer was empty/);
+  assert.match(empty.asked[1].system, /called a capability that does not exist here[\s\S]*Call one of your tools — [a-z_, ]*more_tools/);
   const second = scripted(says(""), calls(call("pause_music")));
   assert.deepEqual((await turns({ local: second.model }).hear("pause")).result, { outcome: "success", message: "Paused" });
 });
@@ -694,4 +694,18 @@ test("a name the sentence does not hold and that is nothing of its kind is the t
   const remove = app.registry.get("remove_pills");
   const correction = { said: "no i meant stripe", named: [{ kind: "pill", id: "stripe", label: "Stripe" }] };
   assert.deepEqual((await asHeard(call("remove_pills", { pills: ["vercel"] }), remove, correction, named)).arguments, { pills: ["vercel"] });
+});
+
+test("a no that names another thing of the kind asked about is what was meant instead, whatever the reader said of it", async () => {
+  const embed = embedBy({ "remove strife": { remove_pills: 1 } });
+  for (const [said, next] of [["no, github", "no, github"], ["no", undefined], ["no, the chat", undefined]]) {
+    app = makeApp();
+    const t = turns({ embed, local: scripted(calls(call("answer", { option: "no", also_asks: false }))).model });
+    t.onAsk = (ask) => {
+      if (ask) queueMicrotask(() => void t.answerSaid(said));
+    };
+    const heard = await t.hear("remove strife");
+    assert.equal(heard.next, next, said);
+    assert.deepEqual(app.state.log, []);
+  }
 });

@@ -281,8 +281,10 @@ async function local(system, said, tools, history = [], steps = []) {
   }
   if (process.env.VOICE_EVAL_DUMP) {
     const { writeFileSync } = await import("node:fs");
-    writeFileSync(`${process.env.VOICE_EVAL_DUMP}/system.txt`, system);
-    writeFileSync(`${process.env.VOICE_EVAL_DUMP}/tools.json`, JSON.stringify(tools));
+    // Each call to the model in its own pair of files, numbered: what one round was given can be sent again by hand.
+    writeFileSync(`${process.env.VOICE_EVAL_DUMP}/system-${rounds.length}.txt`, system);
+    writeFileSync(`${process.env.VOICE_EVAL_DUMP}/tools-${rounds.length}.json`, JSON.stringify(tools));
+    writeFileSync(`${process.env.VOICE_EVAL_DUMP}/messages-${rounds.length}.json`, JSON.stringify(messages(system, history, said, steps)));
   }
   const began = performance.now();
   const request = () =>

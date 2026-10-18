@@ -214,8 +214,12 @@ const ASIDE =
 const AFTER_CALLS =
   "The results of your calls are above. If what was asked needs another capability, call it now. Otherwise say what happened in one short sentence, from the results alone.";
 
-/** Said when the model answered with nothing at all. */
-const EMPTY = "Your last answer was empty. Call the capability that does what was asked, or the one named nothing, or answer in words.";
+/**
+ * Said when the model answered with nothing at all. Measured: that is a call
+ * to a capability that does not exist ("approve_permission_request"), which
+ * the model server drops, since it is not among the tools.
+ */
+const EMPTY = "Your last answer called a capability that does not exist here, and nothing was done. Call one of your tools — {tools} — the one nearest to what was asked, or answer in words.";
 
 /** Once the app's capabilities ran, the model only decides what else to call: its words are not what Mochi says. */
 const AFTER_RAN = "The results of your calls are above. If a call failed and can be made right with another value or another setting, make it now. If what was asked needs another capability, call it now. Otherwise reply with the one word: done.";
@@ -371,7 +375,9 @@ export class VoiceTurns {
     if (!given) return { is: "unclear" };
     // "No, Discord": no to this, and a request of its own, heard once this turn is over.
     const refusal = given.kind === "dropped" || (given.kind === "yes_no" && !given.yes);
-    if (refusal && call?.arguments?.also_asks === true) this.nextSaid = sentence;
+    // Or a no that names another thing of the kind it was asked about: what was meant instead.
+    const instead = refusal && ask.about != null && (await this.registry.named(sentence)).some((n) => n.kind === ask.about && !n.near);
+    if (refusal && (call?.arguments?.also_asks === true || instead)) this.nextSaid = sentence;
     this.answer(given);
     return { is: "answer" };
   }
@@ -553,7 +559,8 @@ export class VoiceTurns {
     if (how.wanted && !how.wanted()) return { is: "dropped" };
     // An empty answer — no call, no words — is a small model's call that did not come out: asked once more.
     if (reply && !reply.calls.length && !reply.text.trim()) {
-      reply = await local(`${system}\n\n${EMPTY}`, said, tools(), history);
+      const offered = tools().map((tool) => (tool as { function: { name: string } }).function.name);
+      reply = await local(`${system}\n\n${EMPTY.replace("{tools}", offered.join(", "))}`, said, tools(), history);
       if (how.wanted && !how.wanted()) return { is: "dropped" };
     }
     if (!reply) return { is: "silent" };

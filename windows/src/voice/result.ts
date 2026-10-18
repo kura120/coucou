@@ -29,10 +29,10 @@ export type ToolStatus =
 
 /** A question on screen, in one of the three shapes the island can show. */
 export type Ask =
-  /** A numbered list, two to nine: a click, Ctrl+Shift+number, or said. */
-  | { kind: "choice"; question: string; options: AskOption[] }
-  /** Two buttons. A spoken yes is an answer here, never a guard's confirmation. */
-  | { kind: "yes_no"; question: string; yes?: string; no?: string }
+  /** A numbered list, two to nine: a click, Ctrl+Shift+number, or said. `about`: the kind of thing it asks which of. */
+  | { kind: "choice"; question: string; options: AskOption[]; about?: string }
+  /** Two buttons. A spoken yes is an answer here, never a guard's confirmation. `about`: the kind of thing it asks whether. */
+  | { kind: "yes_no"; question: string; yes?: string; no?: string; about?: string }
   /** A field: dictated into, edited by hand, confirmed with Ctrl+Shift+Enter. */
   | { kind: "text"; question: string; value?: string; placeholder?: string };
 

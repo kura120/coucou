@@ -44,7 +44,7 @@ export function usable(ask: Ask): Ask | null {
       .map((o) => ({ id: String(o.id), label: String(o.label ?? "").replace(/\s+/g, " ").trim().slice(0, 80), ...(o.hint ? { hint: String(o.hint).slice(0, 80) } : {}) }))
       .filter((o) => o.id && o.label)
       .slice(0, MOST_OPTIONS);
-    return options.length >= 2 ? { kind: "choice", question, options } : null;
+    return options.length >= 2 ? { kind: "choice", question, options, ...(ask.about ? { about: ask.about } : {}) } : null;
   }
   return { ...ask, question };
 }

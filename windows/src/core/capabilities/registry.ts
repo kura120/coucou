@@ -138,8 +138,8 @@ export function createRegistry(options: RegistryOptions): Registry {
 
     const [first, ...others] = found.candidates;
     const ask: Ask = others.length
-      ? { kind: "choice", question: words.which(found.candidates.map((c) => c.label)), options: found.candidates.map(({ id, label, hint }) => ({ id, label, ...(hint ? { hint } : {}) })) }
-      : { kind: "yes_no", question: capability.question?.(first.label, arg) ?? words.one(first.label) };
+      ? { kind: "choice", question: words.which(found.candidates.map((c) => c.label)), options: found.candidates.map(({ id, label, hint }) => ({ id, label, ...(hint ? { hint } : {}) })), about: kind }
+      : { kind: "yes_no", question: capability.question?.(first.label, arg) ?? words.one(first.label), about: kind };
     const answer: Answer = await context.ask(ask);
     if (answer.kind === "yes_no" && answer.yes && !others.length) return { id: first.id };
     const chosen = answer.kind === "choice" && others.length ? found.candidates.find((c) => c.id === answer.id) : undefined;
