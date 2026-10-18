@@ -676,7 +676,7 @@ for (const row of report) {
       `${seconds(median(row.modelled))} median, ${seconds(Math.max(0, ...row.modelled))} longest (${row.modelled.length})`,
       `${median(row.asked)} median, ${Math.max(0, ...row.asked)} most`,
       `${seconds(median(row.rounds))} median, ${seconds(Math.max(0, ...row.rounds))} longest (${row.rounds.length})`,
-      `${row.worded.filter((w) => w === true).length} of ${row.worded.length} (not: ${["unseen", "thing", "number", "action", "empty"].map((why) => `${why} ${row.worded.filter((w) => w === why).length}`).join(", ")})`,
+      `${row.worded.filter((w) => w === true).length} of ${row.worded.length} (not: ${["unseen", "thing", "number", "empty"].map((why) => `${why} ${row.worded.filter((w) => w === why).length}`).join(", ")})`,
     ].join(" | "),
   );
 }

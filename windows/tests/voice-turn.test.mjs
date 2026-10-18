@@ -733,32 +733,27 @@ test("after a no to a name, the same call written with the name itself is not as
   assert.deepEqual(heard.result, { outcome: "success", message: "Leaving it as is" });
 });
 
-test("words are checked against the results: things, numbers, what was seen, and with a ranking the action", async () => {
+test("words are checked against the results: what was seen, things, numbers", async () => {
   const named = (said) => app.registry.named(said);
   const ran = (name, args, result) => ({ call: call(name, args), result });
   const removed = [ran("remove_pills", { pills: ["stripe"] }, done("Stripe removed", true))];
-  assert.equal(await grounded("Stripe is off the island.", removed, { named }), true);
+  assert.equal(await grounded("Stripe is off the island.", removed, named), true);
   // A thing the results do not hold.
-  assert.equal(await grounded("Stripe and Vercel are gone.", removed, { named }), false);
+  assert.equal(await grounded("Stripe and Vercel are gone.", removed, named), false);
   // A number the results do not hold.
   const volume = [ran("set_music_volume", { percent: 30 }, done("Volume 30%", true))];
-  assert.equal(await grounded("The volume is at 30 now.", volume, { named }), true);
-  assert.equal(await grounded("The volume is at 40 now.", volume, { named }), false);
+  assert.equal(await grounded("The volume is at 30 now.", volume, named), true);
+  assert.equal(await grounded("The volume is at 40 now.", volume, named), false);
   // Only asked for, not seen.
-  assert.equal(await grounded("Spotify is open.", [ran("open_app", { app: "Spotify" }, done("Asked Windows to open Spotify", false))], { named }), false);
-  // Nearest to a capability that did not run.
-  const paused = [ran("pause_music", {}, done("Paused", true))];
-  assert.equal(await grounded("Coucou is paused.", paused, { named, nearest: async () => ["quit_coucou", "pause_coucou", "stop_listening"] }), false);
-  assert.equal(await grounded("The music is paused.", paused, { named, nearest: async () => ["pause_coucou", "pause_music"] }), true);
+  assert.equal(await grounded("Spotify is open.", [ran("open_app", { app: "Spotify" }, done("Asked Windows to open Spotify", false))], named), false);
 });
 
-test("why words do not hold up is said: unseen, a thing, a number, the action", async () => {
+test("why words do not hold up is said: unseen, a thing, a number", async () => {
   const named = (said) => app.registry.named(said);
   const ran = (name, args, result) => ({ call: call(name, args), result });
   const removed = [ran("remove_pills", { pills: ["stripe"] }, done("Stripe removed", true))];
-  assert.equal(await unfounded("Stripe is gone.", removed, { named }), null);
-  assert.equal(await unfounded("Stripe is gone.", [ran("remove_pills", {}, done("Asked", false))], { named }), "unseen");
-  assert.equal(await unfounded("Stripe and Vercel are gone.", removed, { named }), "thing");
-  assert.equal(await unfounded("Stripe is gone, 2 left.", removed, { named }), "number");
-  assert.equal(await unfounded("Stripe is gone.", removed, { named, nearest: async () => ["quit_coucou"] }), "action");
+  assert.equal(await unfounded("Stripe is gone.", removed, named), null);
+  assert.equal(await unfounded("Stripe is gone.", [ran("remove_pills", {}, done("Asked", false))], named), "unseen");
+  assert.equal(await unfounded("Stripe and Vercel are gone.", removed, named), "thing");
+  assert.equal(await unfounded("Stripe is gone, 2 left.", removed, named), "number");
 });
