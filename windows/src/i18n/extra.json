@@ -5635,6 +5635,237 @@
    "pt-BR": "Nenhuma dessas está entre suas pílulas",
    "ru": "Ничего из этого нет среди ваших пилюль",
    "id": "Tidak satu pun ada di antara pil Anda"
+  },
+  "That did not work": {
+   "zh-Hans": "没有成功",
+   "hi": "यह नहीं हो पाया",
+   "es": "No ha funcionado",
+   "ar": "لم ينجح ذلك",
+   "fr": "Ça n'a pas marché",
+   "bn": "এটি কাজ করেনি",
+   "pt-BR": "Não funcionou",
+   "ru": "Не получилось",
+   "id": "Itu tidak berhasil"
+  },
+  "The chat is still answering": {
+   "zh-Hans": "聊天仍在回答",
+   "hi": "चैट अभी जवाब दे रही है",
+   "es": "El chat sigue respondiendo",
+   "ar": "المحادثة ما زالت تجيب",
+   "fr": "Le chat répond encore",
+   "bn": "চ্যাট এখনও উত্তর দিচ্ছে",
+   "pt-BR": "O chat ainda está respondendo",
+   "ru": "Чат ещё отвечает",
+   "id": "Obrolan masih menjawab"
+  },
+  "The chat has no message to send": {
+   "zh-Hans": "聊天中没有要发送的消息",
+   "hi": "चैट में भेजने के लिए कोई संदेश नहीं है",
+   "es": "El chat no tiene ningún mensaje que enviar",
+   "ar": "لا توجد رسالة لإرسالها في المحادثة",
+   "fr": "Le chat n'a aucun message à envoyer",
+   "bn": "চ্যাটে পাঠানোর মতো কোনো বার্তা নেই",
+   "pt-BR": "O chat não tem mensagem para enviar",
+   "ru": "В чате нет сообщения для отправки",
+   "id": "Obrolan tidak punya pesan untuk dikirim"
+  },
+  "Send this message?": {
+   "zh-Hans": "发送这条消息？",
+   "hi": "यह संदेश भेजें?",
+   "es": "¿Enviar este mensaje?",
+   "ar": "إرسال هذه الرسالة؟",
+   "fr": "Envoyer ce message ?",
+   "bn": "এই বার্তাটি পাঠাবেন?",
+   "pt-BR": "Enviar esta mensagem?",
+   "ru": "Отправить это сообщение?",
+   "id": "Kirim pesan ini?"
+  },
+  "Sent": {
+   "zh-Hans": "已发送",
+   "hi": "भेज दिया",
+   "es": "Enviado",
+   "ar": "تم الإرسال",
+   "fr": "Envoyé",
+   "bn": "পাঠানো হয়েছে",
+   "pt-BR": "Enviado",
+   "ru": "Отправлено",
+   "id": "Terkirim"
+  },
+  "The chat is not answering": {
+   "zh-Hans": "聊天没有在回答",
+   "hi": "चैट जवाब नहीं दे रही है",
+   "es": "El chat no está respondiendo",
+   "ar": "المحادثة لا تجيب الآن",
+   "fr": "Le chat ne répond pas",
+   "bn": "চ্যাট উত্তর দিচ্ছে না",
+   "pt-BR": "O chat não está respondendo",
+   "ru": "Чат сейчас не отвечает",
+   "id": "Obrolan tidak sedang menjawab"
+  },
+  "Stopped": {
+   "zh-Hans": "已停止",
+   "hi": "रोक दिया",
+   "es": "Detenido",
+   "ar": "تم الإيقاف",
+   "fr": "Arrêté",
+   "bn": "থামানো হয়েছে",
+   "pt-BR": "Parado",
+   "ru": "Остановлено",
+   "id": "Dihentikan"
+  },
+  "Start a new chat? This one is not saved.": {
+   "zh-Hans": "开始新聊天？当前聊天未保存。",
+   "hi": "नई चैट शुरू करें? यह वाली सहेजी नहीं गई है।",
+   "es": "¿Empezar un chat nuevo? Este no está guardado.",
+   "ar": "بدء محادثة جديدة؟ هذه المحادثة غير محفوظة.",
+   "fr": "Commencer un nouveau chat ? Celui-ci n'est pas enregistré.",
+   "bn": "নতুন চ্যাট শুরু করবেন? এটি সংরক্ষিত নয়।",
+   "pt-BR": "Começar um novo chat? Este não está salvo.",
+   "ru": "Начать новый чат? Этот не сохранён.",
+   "id": "Mulai obrolan baru? Yang ini tidak disimpan."
+  },
+  "No conversations yet": {
+   "zh-Hans": "还没有对话",
+   "hi": "अभी कोई बातचीत नहीं",
+   "es": "Aún no hay conversaciones",
+   "ar": "لا توجد محادثات بعد",
+   "fr": "Pas encore de conversation",
+   "bn": "এখনও কোনো কথোপকথন নেই",
+   "pt-BR": "Ainda não há conversas",
+   "ru": "Пока нет бесед",
+   "id": "Belum ada percakapan"
+  },
+  "Mochi stays in the island on this desktop": {
+   "zh-Hans": "在此桌面上，Mochi 只待在灵动岛里",
+   "hi": "इस डेस्कटॉप पर Mochi आइलैंड में ही रहता है",
+   "es": "En este escritorio, Mochi se queda en la isla",
+   "ar": "على سطح المكتب هذا يبقى Mochi في الجزيرة",
+   "fr": "Sur ce bureau, Mochi reste dans l'île",
+   "bn": "এই ডেস্কটপে Mochi আইল্যান্ডেই থাকে",
+   "pt-BR": "Nesta área de trabalho, Mochi fica na ilha",
+   "ru": "На этом рабочем столе Mochi остаётся в острове",
+   "id": "Di desktop ini, Mochi tetap di pulau"
+  },
+  "On the desktop": {
+   "zh-Hans": "在桌面上",
+   "hi": "डेस्कटॉप पर",
+   "es": "En el escritorio",
+   "ar": "على سطح المكتب",
+   "fr": "Sur le bureau",
+   "bn": "ডেস্কটপে",
+   "pt-BR": "Na área de trabalho",
+   "ru": "На рабочем столе",
+   "id": "Di desktop"
+  },
+  "In the island": {
+   "zh-Hans": "在灵动岛里",
+   "hi": "आइलैंड में",
+   "es": "En la isla",
+   "ar": "في الجزيرة",
+   "fr": "Dans l'île",
+   "bn": "আইল্যান্ডে",
+   "pt-BR": "Na ilha",
+   "ru": "В острове",
+   "id": "Di pulau"
+  },
+  "Asleep": {
+   "zh-Hans": "睡着了",
+   "hi": "सो रहा है",
+   "es": "Dormido",
+   "ar": "نائم",
+   "fr": "Endormi",
+   "bn": "ঘুমাচ্ছে",
+   "pt-BR": "Dormindo",
+   "ru": "Спит",
+   "id": "Tidur"
+  },
+  "Awake": {
+   "zh-Hans": "醒着",
+   "hi": "जाग रहा है",
+   "es": "Despierto",
+   "ar": "مستيقظ",
+   "fr": "Réveillé",
+   "bn": "জেগে আছে",
+   "pt-BR": "Acordado",
+   "ru": "Не спит",
+   "id": "Bangun"
+  },
+  "Decline this request?": {
+   "zh-Hans": "拒绝这个请求？",
+   "hi": "यह अनुरोध अस्वीकार करें?",
+   "es": "¿Rechazar esta solicitud?",
+   "ar": "رفض هذا الطلب؟",
+   "fr": "Refuser cette demande ?",
+   "bn": "এই অনুরোধটি প্রত্যাখ্যান করবেন?",
+   "pt-BR": "Recusar este pedido?",
+   "ru": "Отклонить этот запрос?",
+   "id": "Tolak permintaan ini?"
+  },
+  "Send this answer?": {
+   "zh-Hans": "发送这个回答？",
+   "hi": "यह जवाब भेजें?",
+   "es": "¿Enviar esta respuesta?",
+   "ar": "إرسال هذه الإجابة؟",
+   "fr": "Envoyer cette réponse ?",
+   "bn": "এই উত্তরটি পাঠাবেন?",
+   "pt-BR": "Enviar esta resposta?",
+   "ru": "Отправить этот ответ?",
+   "id": "Kirim jawaban ini?"
+  },
+  "Coucou is not paused": {
+   "zh-Hans": "Coucou 没有暂停",
+   "hi": "Coucou रुका हुआ नहीं है",
+   "es": "Coucou no está en pausa",
+   "ar": "Coucou ليس متوقفًا مؤقتًا",
+   "fr": "Coucou n'est pas en pause",
+   "bn": "Coucou বিরতিতে নেই",
+   "pt-BR": "Coucou não está em pausa",
+   "ru": "Coucou не на паузе",
+   "id": "Coucou tidak sedang dijeda"
+  },
+  "Coucou is back": {
+   "zh-Hans": "Coucou 回来了",
+   "hi": "Coucou वापस आ गया",
+   "es": "Coucou ha vuelto",
+   "ar": "عاد Coucou",
+   "fr": "Coucou est de retour",
+   "bn": "Coucou ফিরে এসেছে",
+   "pt-BR": "Coucou voltou",
+   "ru": "Coucou снова здесь",
+   "id": "Coucou kembali"
+  },
+  "Quit Coucou?": {
+   "zh-Hans": "退出 Coucou？",
+   "hi": "Coucou बंद करें?",
+   "es": "¿Salir de Coucou?",
+   "ar": "إنهاء Coucou؟",
+   "fr": "Quitter Coucou ?",
+   "bn": "Coucou বন্ধ করবেন?",
+   "pt-BR": "Sair do Coucou?",
+   "ru": "Выйти из Coucou?",
+   "id": "Keluar dari Coucou?"
+  },
+  "Coucou closes until you start it again.": {
+   "zh-Hans": "Coucou 将关闭，直到你再次启动它。",
+   "hi": "Coucou तब तक बंद रहेगा जब तक आप इसे फिर से शुरू नहीं करते।",
+   "es": "Coucou se cierra hasta que lo vuelvas a abrir.",
+   "ar": "سيُغلق Coucou إلى أن تشغّله من جديد.",
+   "fr": "Coucou se ferme jusqu'à ce que vous le relanciez.",
+   "bn": "আপনি আবার চালু না করা পর্যন্ত Coucou বন্ধ থাকবে।",
+   "pt-BR": "O Coucou fecha até você abri-lo de novo.",
+   "ru": "Coucou закроется, пока вы не запустите его снова.",
+   "id": "Coucou ditutup sampai Anda membukanya lagi."
+  },
+  "Quitting": {
+   "zh-Hans": "正在退出",
+   "hi": "बंद हो रहा है",
+   "es": "Saliendo",
+   "ar": "جارٍ الإنهاء",
+   "fr": "Fermeture",
+   "bn": "বন্ধ হচ্ছে",
+   "pt-BR": "Saindo",
+   "ru": "Выход",
+   "id": "Keluar"
   }
  }
 }
