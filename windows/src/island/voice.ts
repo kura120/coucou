@@ -121,8 +121,25 @@ export function brainHere(url = brainUrl(), brain = State.settings.voice.brain):
  * Settings → Voice; the cloud model is asked only when the user turned it on.
  * One that cannot be asked answers nothing.
  */
+/** Lines for the voice debug log, sent together once the turn's step is over. */
+let debugLines: string[] = [];
+
+/** One line for voice-debug.log, only while the user has the debug log on. */
+function debugTrace(line: string) {
+  if (!State.settings.voice.debugLog) return;
+  if (!debugLines.length) {
+    queueMicrotask(() => {
+      const lines = debugLines;
+      debugLines = [];
+      void Bridge.voiceDebugLog(lines);
+    });
+  }
+  debugLines.push(line);
+}
+
 export function createTurns(registry: Registry): VoiceTurns {
   return new VoiceTurns({
+    trace: debugTrace,
     registry,
     embed: async (texts) => (brainChosen() && State.settings.voice.embedModel ? Bridge.voiceEmbed(texts) : null),
     embedChosen: () => Boolean(State.settings.voice.embedModel),

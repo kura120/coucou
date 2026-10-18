@@ -815,3 +815,27 @@ test("the model may ask the user when it is not sure, is always offered to, and 
   assert.deepEqual(questions, ["Discord or Steam?"]);
   assert.deepEqual(app.state.log, ["open:Discord"]);
 });
+
+test("with the debug log on, each step of a turn is told in a line: heard, ranked, asked, answered, ran, the card", async () => {
+  const lines = [];
+  const embed = embedBy({ "could you pause the music for me": { pause_music: 0.6, play_music: 0.55 } });
+  const local = scripted(calls(call("pause_music")), says("Paused."));
+  const t = new VoiceTurns({
+    registry: app.registry, embed, embedChosen: () => true, local: () => local.model, cloud: () => null, followUp: () => false,
+    words: TURN_WORDS, now: () => now, trace: (line) => lines.push(line),
+  });
+  await t.hear("could you pause the music for me");
+  const text = lines.join("\n");
+  assert.match(lines[0], /^── heard: "could you pause the music for me"/);
+  assert.match(text, /ranked: pause_music \d\.\d{3}/);
+  assert.match(text, /model asked: "could you pause the music for me" · tools: [^\n]*pause_music/);
+  assert.match(text, /model instructions: You are the voice of Coucou/);
+  assert.match(text, /model answered in \d+ ms: calls \[\{"name":"pause_music"/);
+  assert.match(text, /ran \(local\): pause_music \{\} → done, seen · "Paused"/);
+  assert.match(lines[lines.length - 1], /^card: success "Paused\."/);
+  // Another turn without it tells this log nothing.
+  const before = lines.length;
+  const quiet = scripted(calls(call("pause_music")), says("Paused."));
+  await turns({ embed, local: quiet.model }).hear("could you pause the music for me");
+  assert.equal(lines.length, before);
+});

@@ -5899,6 +5899,50 @@
    "pt-BR": "A voz precisa de um modelo de embeddings: é ele que encontra a qual comando do Coucou uma frase se refere. Nas nossas medições, o mxbai-embed-large foi o que melhor escolheu.",
    "ru": "Голосу нужна модель эмбеддингов: именно она находит, к какой команде Coucou относится фраза. В наших замерах лучше всех выбирала mxbai-embed-large.",
    "id": "Suara memerlukan model embedding: dialah yang menemukan perintah Coucou mana yang dimaksud sebuah kalimat. Dalam pengukuran kami, mxbai-embed-large memilih paling baik."
+  },
+  "Debugging": {
+   "zh-Hans": "调试",
+   "hi": "डीबगिंग",
+   "es": "Depuración",
+   "ar": "تصحيح الأخطاء",
+   "fr": "Débogage",
+   "bn": "ডিবাগিং",
+   "pt-BR": "Depuração",
+   "ru": "Отладка",
+   "id": "Debugging"
+  },
+  "Keep a voice debug log": {
+   "zh-Hans": "保留语音调试日志",
+   "hi": "आवाज़ का डीबग लॉग रखें",
+   "es": "Guardar un registro de depuración de la voz",
+   "ar": "الاحتفاظ بسجل تصحيح للصوت",
+   "fr": "Tenir un journal de débogage de la voix",
+   "bn": "ভয়েসের ডিবাগ লগ রাখুন",
+   "pt-BR": "Manter um registro de depuração da voz",
+   "ru": "Вести журнал отладки голоса",
+   "id": "Simpan log debug suara"
+  },
+  "Writes what you say and everything voice does with it — what it ranked, what the models were asked and answered, what ran — to voice-debug.log on this computer, to find what went wrong. Nothing is sent anywhere. Turning it off deletes the file.": {
+   "zh-Hans": "把你说的话以及语音对它所做的一切——排序结果、向模型提出的问题和它们的回答、执行了什么——写入这台电脑上的 voice-debug.log，用来查找问题所在。不会发送到任何地方。关闭后文件会被删除。",
+   "hi": "आप जो कहते हैं और आवाज़ उसके साथ जो कुछ करती है — उसने क्या क्रम में रखा, मॉडलों से क्या पूछा गया और उन्होंने क्या जवाब दिया, क्या चलाया गया — यह सब इस कंप्यूटर पर voice-debug.log में लिखता है, ताकि पता चले कि क्या गलत हुआ। कुछ भी कहीं नहीं भेजा जाता। इसे बंद करने पर फ़ाइल मिट जाती है।",
+   "es": "Escribe lo que dices y todo lo que la voz hace con ello —lo que clasificó, lo que se preguntó a los modelos y lo que respondieron, lo que se ejecutó— en voice-debug.log en este ordenador, para encontrar qué salió mal. No se envía nada a ninguna parte. Al desactivarlo se borra el archivo.",
+   "ar": "يكتب ما تقوله وكل ما يفعله الصوت به — ما رتّبه، وما سُئلت عنه النماذج وما أجابت، وما نُفّذ — في الملف voice-debug.log على هذا الحاسوب، لمعرفة ما الذي حدث خطأ. لا يُرسَل أي شيء إلى أي مكان. عند إيقافه يُحذف الملف.",
+   "fr": "Écrit ce que vous dites et tout ce que la voix en fait — ce qu'elle a classé, ce qui a été demandé aux modèles et leurs réponses, ce qui a été exécuté — dans voice-debug.log sur cet ordinateur, pour trouver ce qui n'a pas marché. Rien n'est envoyé nulle part. Le désactiver supprime le fichier.",
+   "bn": "আপনি যা বলেন এবং ভয়েস তা নিয়ে যা যা করে — কী ক্রমে সাজিয়েছে, মডেলদের কী জিজ্ঞেস করা হয়েছে ও তারা কী উত্তর দিয়েছে, কী চালানো হয়েছে — সব এই কম্পিউটারের voice-debug.log-এ লেখে, যাতে কী ভুল হয়েছে তা খুঁজে পাওয়া যায়। কিছুই কোথাও পাঠানো হয় না। বন্ধ করলে ফাইলটি মুছে যায়।",
+   "pt-BR": "Escreve o que você diz e tudo o que a voz faz com isso — o que ela classificou, o que foi perguntado aos modelos e o que responderam, o que foi executado — em voice-debug.log neste computador, para descobrir o que deu errado. Nada é enviado a lugar nenhum. Desativar apaga o arquivo.",
+   "ru": "Записывает то, что вы говорите, и всё, что голос с этим делает — что он ранжировал, что спросили у моделей и что они ответили, что было выполнено, — в voice-debug.log на этом компьютере, чтобы найти, что пошло не так. Ничего никуда не отправляется. При выключении файл удаляется.",
+   "id": "Menulis apa yang Anda ucapkan dan semua yang dilakukan suara dengannya — apa yang diurutkannya, apa yang ditanyakan ke model dan jawabannya, apa yang dijalankan — ke voice-debug.log di komputer ini, untuk menemukan apa yang salah. Tidak ada yang dikirim ke mana pun. Mematikannya menghapus berkasnya."
+  },
+  "Open the log's folder": {
+   "zh-Hans": "打开日志所在文件夹",
+   "hi": "लॉग का फ़ोल्डर खोलें",
+   "es": "Abrir la carpeta del registro",
+   "ar": "فتح مجلد السجل",
+   "fr": "Ouvrir le dossier du journal",
+   "bn": "লগের ফোল্ডার খুলুন",
+   "pt-BR": "Abrir a pasta do registro",
+   "ru": "Открыть папку журнала",
+   "id": "Buka folder log"
   }
  }
 }

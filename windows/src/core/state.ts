@@ -201,6 +201,8 @@ export interface Settings {
      * value as written and reads one it does not know as "browser".
      */
     webSearch: WebSearchChoice;
+    /** Opt-in: each turn written to voice-debug.log (src-tauri/src/voice/debug.rs). */
+    debugLog: boolean;
   };
   /** The search engine the browser opens a search on. */
   searchEngine: string;
@@ -242,7 +244,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mochiOutfit: DEFAULT_OUTFIT,
   pillColors: {},
   language: "",
-  voice: { enabled: false, wake: true, brain: "", brainModel: "", engine: "system", hearingModel: "parakeet-0.6b", followUp: 8, speak: false, speaker: "female", embedModel: "", cloud: false, webAnswers: false, webSearch: "browser" },
+  voice: { enabled: false, wake: true, brain: "", brainModel: "", engine: "system", hearingModel: "parakeet-0.6b", followUp: 8, speak: false, speaker: "female", embedModel: "", cloud: false, webAnswers: false, webSearch: "browser", debugLog: false },
   searchEngine: "google",
 };
 

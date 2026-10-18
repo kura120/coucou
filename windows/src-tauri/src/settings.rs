@@ -153,6 +153,11 @@ pub struct VoicePref {
     /// "anthropic", or "browser" (nothing is asked: the browser opens on the
     /// search). Kept as it comes; read it through `searches_with`.
     pub web_search: String,
+    /// Opt-in, for debugging: every turn — what was heard, what was ranked,
+    /// what the models were asked and answered, what ran and what came of it —
+    /// is written to voice-debug.log on this computer (voice/debug.rs). Off
+    /// until the user turns it on; turning it off deletes the file.
+    pub debug_log: bool,
 }
 
 impl VoicePref {
@@ -183,6 +188,7 @@ impl Default for VoicePref {
             cloud: false,
             web_answers: false,
             web_search: "browser".into(),
+            debug_log: false,
         }
     }
 }
@@ -535,7 +541,7 @@ mod tests {
   "pillColors": { "integration_claude": "#2DD4BF" },
   "language": "pt-BR",
   "desktopMochi": { "onDesktop": true, "spot": { "x": 1500.5, "y": -300.0, "space": "screen" } },
-  "voice": { "enabled": true, "wake": false, "brain": "ollama", "brainModel": "qwen2.5:7b-instruct", "engine": "bundled", "hearingModel": "parakeet-110m", "followUp": 5, "speak": true, "speaker": "male", "embedModel": "nomic-embed-text", "cloud": true, "webAnswers": true, "webSearch": "brave" },
+  "voice": { "enabled": true, "wake": false, "brain": "ollama", "brainModel": "qwen2.5:7b-instruct", "engine": "bundled", "hearingModel": "parakeet-110m", "followUp": 5, "speak": true, "speaker": "male", "embedModel": "nomic-embed-text", "cloud": true, "webAnswers": true, "webSearch": "brave", "debugLog": true },
   "phoneLink": true,
   "phoneChat": true,
   "phoneChatModels": ["openai/gpt-x"],

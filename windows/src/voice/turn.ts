@@ -119,6 +119,13 @@ export interface TurnOptions {
   followUp?: () => boolean;
   /** Gives the cloud model's endpoint the capabilities it may ask for. */
   publish?: (tools: unknown[]) => void;
+  /**
+   * The debug log, when the user turned it on (voice/debug.rs): told each
+   * step of a turn in a line — what was heard and ranked, what the models
+   * were asked and answered, what ran and what came of it. Absent: nothing is
+   * written anywhere.
+   */
+  trace?: (line: string) => void;
   words: TurnWords;
   now?: () => number;
 }
@@ -278,6 +285,7 @@ export class VoiceTurns {
   private followUp: () => boolean;
   private words: TurnWords;
   private now: () => number;
+  private trace: (line: string) => void;
 
   /** What the index was last given, to see that the capabilities changed. */
   private indexed = "";
@@ -301,6 +309,22 @@ export class VoiceTurns {
     this.followUp = options.followUp ?? (() => false);
     this.words = options.words;
     this.now = options.now ?? (() => Date.now());
+    this.trace = options.trace ?? (() => {});
+  }
+
+  /** The model, with each question to it and its answer told to the debug log. */
+  private traced(local: LocalModel | null, label = "model"): LocalModel | null {
+    if (!local) return null;
+    return async (system, said, tools, history, steps) => {
+      const names = tools.map((tool) => (tool as { function?: { name?: string } }).function?.name ?? "?");
+      this.trace(`${label} asked${steps?.length ? ` (round ${steps.length + 1})` : ""}: ${JSON.stringify(said)} · tools: ${names.join(", ") || "none"} · turns before: ${history.length}`);
+      if (!steps?.length) this.trace(`${label} instructions: ${system}`);
+      const started = this.now();
+      const reply = await local(system, said, tools, history, steps);
+      const took = `${Math.round(this.now() - started)} ms`;
+      this.trace(reply ? `${label} answered in ${took}: calls ${JSON.stringify(reply.calls)} · words ${JSON.stringify(reply.text)}` : `${label} did not answer (${took})`);
+      return reply;
+    };
   }
 
   /** Voice was turned off, or the conversation is over: nothing is remembered. */
@@ -365,8 +389,9 @@ export class VoiceTurns {
     const sentence = said.trim();
     if (!ask || !sentence) return { is: "unclear" };
     if (ask.kind === "text") return { is: "draft", value: draft.trim() ? `${draft.trim()} ${sentence}` : sentence };
-    const local = this.local();
+    const local = this.traced(this.local(), "answer reader");
     if (!local) return { is: "unclear" };
+    this.trace(`answer said to "${ask.question}": ${JSON.stringify(sentence)}`);
 
     // A choice's options with their place among them, for an answer by place ("the last one").
     const options = ask.kind === "choice"
@@ -387,6 +412,7 @@ export class VoiceTurns {
       chosen === "none" ? { kind: "dropped" }
       : ask.kind === "yes_no" ? (chosen === "yes" || chosen === "no" ? { kind: "yes_no", yes: chosen === "yes" } : null)
       : ask.options[Number(chosen) - 1] ? { kind: "choice", id: ask.options[Number(chosen) - 1].id } : null;
+    this.trace(`answer read as: ${given ? JSON.stringify(given) : "unclear"}`);
     if (!given) return { is: "unclear" };
     // "No, Discord": no to this, and a request of its own, heard once this turn is over.
     const refusal = given.kind === "dropped" || (given.kind === "yes_no" && !given.yes);
@@ -407,13 +433,20 @@ export class VoiceTurns {
     // Without the wake phrase: only a model on this computer is given it, and with no model it is for nobody.
     if (!wake && (!this.followUp() || !this.local())) return IGNORED;
     const turn: Running = { said: sentence, how, ran: [], started: this.now(), taken: wake, named: [] };
+    this.trace(`── heard${wake ? "" : " without the wake phrase"}: ${JSON.stringify(sentence)}${how.sure?.length ? ` · sure ${how.sure.map((x) => x.toFixed(2)).join(" ")}` : ""}`);
     if (wake) how.taken?.();
     const before = this.memory.recent(this.now());
     turn.named = await this.registry.named(sentence);
+    if (turn.named.length) this.trace(`names found: ${turn.named.map((n) => `${n.near ? "~" : ""}${n.label} (${n.kind}${n.heard ? `, heard "${n.heard}"` : ""})`).join("; ")}`);
     const ranked = await this.ranked(turn, before[before.length - 1]?.said);
+    this.trace(ranked ? `ranked: ${ranked.slice(0, 8).map((r) => `${r.name} ${r.score.toFixed(3)}`).join(", ")}` : "ranked: no embedding model answered");
 
     const heard = await this.understand(turn, ranked);
-    if (!turn.taken) return IGNORED;
+    if (!turn.taken) {
+      this.trace("ignored: not taken as said to Coucou");
+      return IGNORED;
+    }
+    this.trace(`card: ${heard.result ? `${heard.result.outcome} ${JSON.stringify(heard.result.message)}` : "nothing shown"}${heard.worded === false ? ` · the model's words did not hold up (${heard.unworded})` : ""}${heard.rest ? " · done talking" : ""}`);
     const next = this.nextSaid;
     this.nextSaid = null;
     return next ? { ...heard, next } : heard;
@@ -427,13 +460,14 @@ export class VoiceTurns {
     }
     // Tier 1: the ranking names one capability, clearly. No model is asked — and not for a sentence that may be for nobody.
     const name = ranked && turn.taken ? instant(ranked, this.registry.all()) : null;
+    if (ranked) this.trace(`instant: ${name ?? "none"}`);
     if (name) {
       const done = await this.instantly(name, turn);
       if (done) return this.end(turn, "");
     }
 
     // Tier 2: the local model.
-    const local = this.local();
+    const local = this.traced(this.local());
     if (!local) return this.end(turn, "", this.words.noModel());
     turn.how.waiting?.();
     const came = await this.locally(local, turn, ranked);
@@ -460,7 +494,9 @@ export class VoiceTurns {
     const cloud = this.cloud();
     if (!cloud) return this.end(turn, "", came.is === "escalated" ? this.words.beyond() : this.words.silent());
     turn.how.waiting?.(this.words.askingCloud(), CLOUD_BUDGET_MS);
+    this.trace(`cloud asked (${came.is})`);
     const words = await this.cloudly(cloud, turn);
+    this.trace(words == null ? "cloud did not answer" : `cloud answered: ${JSON.stringify(words)}`);
     if (turn.how.wanted && !turn.how.wanted()) return { result: null, taken: true, rest: false };
     return this.end(turn, await this.checked(turn, words ?? ""), words == null && !shownOf(turn).length ? this.words.silent() : undefined);
   }
@@ -535,6 +571,7 @@ export class VoiceTurns {
     const given = await this.heardCall(call, turn);
     const result = await this.registry.execute(given, this.context(origin, turn));
     turn.ran.push({ call: given, result, capability: this.registry.get(call.name) });
+    this.traceRan(origin, given, result);
     return result;
   }
 
@@ -561,7 +598,12 @@ export class VoiceTurns {
 
   private record(turn: Running, name: string, args: Record<string, unknown>, result: ToolResult): true {
     turn.ran.push({ call: { name, arguments: args }, result, capability: this.registry.get(name) });
+    this.traceRan("instant", { name, arguments: args }, result);
     return true;
+  }
+
+  private traceRan(origin: string, call: ModelCall, result: ToolResult) {
+    this.trace(`ran (${origin}): ${call.name} ${JSON.stringify(call.arguments ?? {})} → ${result.status}${result.status === "done" ? (result.verified ? ", seen" : ", not seen") : ""} · ${JSON.stringify(result.line)}${result.detail && result.detail !== result.line ? ` · ${JSON.stringify(result.detail)}` : ""}${result.data !== undefined ? ` · data ${JSON.stringify(result.data)}` : ""}`);
   }
 
   // ── Tier 2 ──────────────────────────────────────────────────────────────────
@@ -659,7 +701,7 @@ export class VoiceTurns {
     }
     // What only read is said from what was read, and from nothing else.
     if (shownOf(turn).length && !acted(turn) && shownOf(turn).every((ran) => ran.result.status === "done")) {
-      words = (await this.report(local, turn)) ?? "";
+      words = (await this.report(this.traced(this.local(), "reporter") ?? local, turn)) ?? "";
       if (how.wanted && !how.wanted()) return { is: "dropped" };
     }
     return { is: "answered", words };

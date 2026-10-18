@@ -1434,6 +1434,17 @@ function voiceSection(): HTMLElement {
     h("div", { class: "hint", text: t("A question alone is answered from the web, without being asked to search. Off: the web is used only when you ask for a search.") }),
     h("div", { class: "row" }, h("label", { text: t("Search engine") }), engine),
     h("div", { class: "hint", text: t("Where your browser opens when a search is opened in it.") }),
+    h("div", { class: "subhead", text: t("Debugging") }),
+    h("div", { class: "row" },
+      h("label", { text: t("Keep a voice debug log") }),
+      toggle(settings.voice.debugLog, (v) => {
+        // Off deletes what was written: what was said is kept only while this is on.
+        if (!v) void Bridge.voiceDebugClear();
+        return change({ debugLog: v });
+      }),
+    ),
+    h("div", { class: "hint", text: t("Writes what you say and everything voice does with it — what it ranked, what the models were asked and answered, what ran — to voice-debug.log on this computer, to find what went wrong. Nothing is sent anywhere. Turning it off deletes the file.") }),
+    h("div", { class: "row" }, h("button", { text: t("Open the log's folder"), onclick: () => void Bridge.voiceDebugReveal() })),
   );
 }
 
