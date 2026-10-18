@@ -31,7 +31,7 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
       capability({
         name: "pause_coucou",
         area: AREA,
-        description: "Pauses Coucou itself, as its tray menu does: the island hides and the services are no longer asked. Not the music.",
+        description: "Pauses the whole Coucou app, as its tray menu does: the island hides and the services are no longer asked. Not the music.",
         args: {},
         tier: "reversible",
         inverse: () => (host.paused() ? null : { name: "resume_coucou", arguments: {} }),

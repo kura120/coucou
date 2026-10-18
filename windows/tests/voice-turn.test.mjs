@@ -212,7 +212,7 @@ test("without the wake phrase the ranking decides: far from everything is ignore
 // ── Tier 1 ────────────────────────────────────────────────────────────────────
 
 test("tier 1: a clear command runs with no model call, and the thing it names is found in the sentence", async () => {
-  const embed = embedBy({ "pause the music": { pause_music: 1 }, "add vercel": { add_pills: 1 }, "show me the wardrobe": { show_view: 1 } });
+  const embed = embedBy({ "pause the music": { pause_music: 1 }, "add": { add_pills: 1 }, "show me the": { show_view: 1 } });
   const local = scripted();
   const t = turns({ embed, local: local.model });
   assert.deepEqual((await t.hear("pause the music")).result, { outcome: "success", message: "Paused" });
@@ -261,13 +261,13 @@ test("with no model server, voice says what it needs", async () => {
 });
 
 test("tier 2, ranked: the model is shown the nearest capabilities, its calls run, and its words are Mochi's", async () => {
-  const embed = embedBy({ "could you stop the song and bring stripe in": { pause_music: 0.6, add_pills: 0.6, play_music: 0.5 } });
+  const embed = embedBy({ "could you stop the song and bring in": { pause_music: 0.6, add_pills: 0.55, play_music: 0.5 } });
   const local = scripted(calls(call("pause_music"), call("add_pills", { pills: ["stripe"] })), says("Paused, and Stripe is in."));
   const heard = await turns({ embed, local: local.model }).hear("could you stop the song and bring stripe in");
   assert.deepEqual(app.state.log, ["pause", "add:stripe"]);
   assert.deepEqual(heard.result, { outcome: "success", message: "Paused, and Stripe is in." });
-  // The nearest first, then the ones always shown — and no handing up, with nobody to hand up to.
-  assert.deepEqual(local.asked[0].tools.slice(0, 3), ["pause_music", "add_pills", "play_music"]);
+  // The nearest first — Stripe is a pill, so what takes pills is counted nearer — then the ones always shown, and no handing up with nobody to hand up to.
+  assert.deepEqual(local.asked[0].tools.slice(0, 3), ["add_pills", "pause_music", "play_music"]);
   assert.ok(local.asked[0].tools.includes("more_tools") && local.asked[0].tools.includes("nothing"));
   assert.ok(!local.asked[0].tools.includes("escalate"));
   // The second round is given what each call came to: its status first.
@@ -504,4 +504,23 @@ test("a turn nobody waits for any more does nothing further", async () => {
   const heard = await turns({ local: local.model }).hear("pause", { wanted: () => wanted });
   assert.deepEqual(heard, { result: null, taken: true, rest: false });
   assert.deepEqual(app.state.log, []);
+});
+
+test("a name the app has is not embedded, and what takes its kind is ranked nearer", async () => {
+  const seen = [];
+  const names = () => app.registry.all().map((c) => c.name);
+  // The embedding model as a table: "remove" alone is nearest to undo, a little less to the pills.
+  const embed = async (texts) =>
+    texts.map((text) => {
+      seen.push(text);
+      const own = app.registry.all().find((c) => text === `${c.area}: ${c.description}`);
+      if (own) return names().map((n) => (n === own.name ? 1 : 0));
+      return names().map((n) => ({ undo: 0.72, remove_pills: 0.7, add_pills: 0.69 })[n] ?? 0.05);
+    });
+  const local = scripted(calls(call("remove_pills", { pills: ["stripe"] })), says("Stripe is gone."));
+  await turns({ embed, local: local.model }).hear("remove Stripe");
+  assert.ok(seen.includes("remove"), "the name is taken out of what is embedded");
+  assert.ok(!seen.some((text) => /stripe/i.test(text) && !text.includes(":")));
+  // Stripe is a pill: remove_pills and add_pills, which take pills, come before undo.
+  assert.deepEqual(local.asked[0].tools.slice(0, 3), ["remove_pills", "add_pills", "undo"]);
 });

@@ -23,7 +23,7 @@
 import type { Answer, Ask, Capability, Registry, RunContext, ToolResult } from "../core/capabilities/types";
 import { usable } from "./asking";
 import { VoiceMemory, type ModelCall, type VoiceTurn } from "./memory";
-import { ALWAYS_SHOWN, CapabilityIndex, directed, instant, shortlist, type Embed, type Ranked } from "./rank";
+import { ALWAYS_SHOWN, CapabilityIndex, directed, indexText, instant, shortlist, type Embed, type Ranked } from "./rank";
 import { forModel, spoken, type VoiceResult } from "./result";
 
 export type { ModelCall } from "./memory";
@@ -388,7 +388,7 @@ export class VoiceTurns {
 
   /** The capabilities by how near the sentence is to each; null with no embedding model. */
   private async ranked(sentence: string, previous?: string): Promise<Ranked[] | null> {
-    const capabilities = this.registry.all().map((c) => ({ name: c.name, text: `${c.area}: ${c.description}` }));
+    const capabilities = this.registry.all().map((c) => ({ name: c.name, text: indexText(c), kinds: kindsOf(c) }));
     const key = capabilities.map((c) => `${c.name}\n${c.text}`).join("\n\n");
     if (key !== this.indexed) {
       // An embedding model that is not there is not asked at every sentence.
@@ -399,7 +399,9 @@ export class VoiceTurns {
       }
       this.indexed = key;
     }
-    return this.index.rank(sentence, previous);
+    // The names the app has that the sentence holds: they are not embedded, and what takes their kind is nearer.
+    const named = await this.registry.named(sentence);
+    return this.index.rank(sentence, previous, { kinds: [...new Set(named.map((n) => n.kind))], labels: named.map((n) => n.label) });
   }
 
   // ── Running a capability ────────────────────────────────────────────────────
@@ -597,6 +599,10 @@ export class VoiceTurns {
 }
 
 // ── Small things ──────────────────────────────────────────────────────────────
+
+/** The kinds of thing a capability takes as an argument. */
+export const kindsOf = (capability: Capability): string[] =>
+  Object.values(capability.args).flatMap((spec) => (spec.type === "entity" || spec.type === "entities" ? [spec.kind] : []));
 
 /** What ran that is the app's doing: not the capabilities that are about the conversation. */
 const shownOf = (turn: Running) => turn.ran.filter((ran) => ![MORE_TOOLS, NOTHING, ESCALATE].includes(ran.call.name));

@@ -4,7 +4,7 @@
 // machine, with a table of capabilities described the way the app's are and
 // sentences said freely. A manual check, not a test: it needs a model.
 //
-//   node --import ./tests/setup.mjs scripts/voice-rank-eval.mjs [model] [server] [--all] [--query=…] [--text=…]
+//   node --import ./tests/setup.mjs scripts/voice-rank-eval.mjs [model] [server] [--all] [--query=…] [--text=…] [--app]
 //
 // `server`: http://127.0.0.1:11434 by default (Ollama; LM Studio answers the
 // same on its own port). `model`: by default the first embedding model the
@@ -13,6 +13,12 @@
 // best. `--query=` and `--text=` are put before each sentence and each
 // description: some models were trained with such a prefix ("search_query: "
 // and "search_document: " for nomic-embed-text) and rank worse without.
+//
+// `--app`: the app's own capabilities (src/capabilities, on a fake of the
+// app that lists its things), not the table below; each sentence is ranked as
+// the turn ranks it, with the names the registry finds in it taken out and
+// what takes their kind counted nearer (rank.ts `NAMED_BOOST`). It also
+// prints the ranking at several boosts, to set that one by.
 //
 // The table has four kinds of sentence:
 //   plain     a command or a question, with the capability that should be first
@@ -27,9 +33,13 @@
 // from those where each threshold would sit.
 
 import {
-  CapabilityIndex, CONTEXT_SHARE, DIRECTED_ACT, DIRECTED_ASK, FOLLOWS_TURN_EASE, INSTANT_MARGIN, INSTANT_SCORE, SHORTLIST,
-  directed, instant, shortlist,
+  CapabilityIndex, CONTEXT_SHARE, DIRECTED_ACT, DIRECTED_ASK, FOLLOWS_TURN_EASE, INSTANT_MARGIN, INSTANT_SCORE, NAMED_BOOST, SHORTLIST,
+  directed, indexText, instant, shortlist,
 } from "../src/voice/rank.ts";
+import { registerApp } from "../src/capabilities/index.ts";
+import { createRegistry } from "../src/core/capabilities/registry.ts";
+import { availablePills } from "../src/core/pills.ts";
+import { kindsOf } from "../src/voice/turn.ts";
 
 const FLAGS = process.argv.slice(2).filter((arg) => arg.startsWith("--"));
 const ARGS = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
@@ -38,6 +48,7 @@ const SERVER = (ARGS[1] ?? "http://127.0.0.1:11434").replace(/\/$/, "");
 const QUERY = flag("query");
 const TEXT = flag("text");
 const ALL = FLAGS.includes("--all");
+const APP = FLAGS.includes("--app");
 
 // ── The capabilities ──────────────────────────────────────────────────────────
 
@@ -49,7 +60,7 @@ const number = (description) => ({ type: "number", description });
 const cap = (name, area, tier, description, args = {}) => ({ name, area, tier, description, args, run });
 
 /** Written the way the app's own are to be: what it does, and when it is the wrong one. */
-const CAPABILITIES = [
+const INVENTED = [
   cap("play_music", "music", "reversible", "Starts or resumes the music in the music app. Not for choosing a particular song."),
   cap("pause_music", "music", "reversible", "Pauses the music that is playing. Not for pausing Coucou itself."),
   cap("next_track", "music", "reversible", "Skips to the next track."),
@@ -98,14 +109,53 @@ const CAPABILITIES = [
   cap("more_tools", "app", "read", "Lists the other tools of one area of the app, when none of those shown fits.", { area: text("The area.") }),
 ];
 
+// ── The app's own (--app) ─────────────────────────────────────────────────────
+
+/** A fake of the app that only lists its things: a name the registry finds is a name the app has. */
+function appRegistry() {
+  const registry = createRegistry({ guard: { confirm: async () => false }, words: {} });
+  const APPS = ["Spotify", "Figma", "Visual Studio Code", "Discord", "Steam", "Slack", "Google Chrome"];
+  const listed = {
+    pillCatalog: () => availablePills("windows").map(({ id, name, category }) => ({ id, name, category })),
+    pills: () => ({ active: ["integration_github", "integration_vercel", "integration_stripe"], main: "integration_claude" }),
+    sessions: () => [{ id: "integration_claude", name: "VS Code", state: "working", doing: "" }, { id: "agent_codex", name: "Codex", state: "approval", doing: "" }],
+    appsNear: async (said) => APPS.filter((a) => ` ${said.toLowerCase()} `.includes(` ${a.toLowerCase()} `)).map((name) => ({ name, score: 1 })),
+    folders: () => ["Downloads", "Desktop", "Documents", "Pictures"].map((name) => ({ id: name, label: name })),
+    outfits: () => ["Auto (seasons)", "None", "Crown", "Party hat", "Witch hat", "Sunglasses"].map((label) => ({ id: label, label })),
+    services: () => [{ id: "integration_github", name: "GitHub", line: "" }, { id: "integration_vercel", name: "Vercel", line: "" }, { id: "integration_stripe", name: "Stripe", line: "" }],
+    chatModels: async () => [{ provider: "claudecode", providerName: "Claude Code", id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5" }],
+    conversations: async () => [{ id: "c1", title: "The relay", dir: "", updated: 0 }],
+    music: () => ({ enabled: true, running: true, playing: true, shuffle: false, repeat: false, volume: 40, position: 0, track: null }),
+    chat: () => ({ provider: "claudecode", model: "claude-sonnet-5-5", busy: false, draft: "", conversationId: null, messages: 0 }),
+    currentView: () => ({ view: "overview", open: false }),
+    mochi: () => ({ supported: true, onDesktop: false, asleep: false }),
+    recapOptions: () => ({ enabled: true, hideProjects: false }),
+  };
+  registerApp(registry, new Proxy(listed, { get: (target, key) => target[key] ?? (() => []) }));
+  return registry;
+}
+
+/** The invented table's capabilities, as the app names them; several when more than one is right. */
+const AS_APP = {
+  add_pill: ["add_pills"], remove_pill: ["remove_pills"], prefill_chat: ["prepare_chat_message"], send_chat: ["send_chat_message"],
+  reset_chat: ["new_chat"], session_output: ["read_session_output"], show_permission: ["show_waiting_card", "read_permission_request"],
+  answer_question: ["answer_agent_question"], start_timer: ["set_timer"], timer_left: ["read_timer"], web_search: ["web_search", "open_web_search"],
+  show_recap: ["read_recap", "show_view"], change_outfit: ["wear_outfit"], toggle_desktop_mochi: ["mochi_to_desktop", "mochi_come_home"],
+  // The app has no such capability: the sentence is left out.
+  close_view: [],
+};
+const REGISTRY = APP ? appRegistry() : null;
+const CAPABILITIES = REGISTRY ? REGISTRY.all() : INVENTED;
+
 // ── The sentences ─────────────────────────────────────────────────────────────
 
-const plain = (want, ...says) => says.map((say) => ({ kind: "plain", say, want }));
-const follow = (want, after, say) => ({ kind: "follow", say, after, want });
-const negation = (...says) => says.map((say) => ({ kind: "negation", say, want: "nothing" }));
-const nobody = (say, after) => ({ kind: "nobody", say, after, want: "nothing" });
+const wants = (want) => (APP ? (AS_APP[want] ?? [want]) : [want]);
+const plain = (want, ...says) => says.map((say) => ({ kind: "plain", say, want, wants: wants(want) }));
+const follow = (want, after, say) => ({ kind: "follow", say, after, want, wants: wants(want) });
+const negation = (...says) => says.map((say) => ({ kind: "negation", say, want: "nothing", wants: ["nothing"] }));
+const nobody = (say, after) => ({ kind: "nobody", say, after, want: "nothing", wants: ["nothing"] });
 
-const CASES = [
+const TABLE = [
   ...plain("pause_music", "pause", "pause the music", "hold the song for a second", "can you stop the music"),
   ...plain("play_music", "play", "resume the music", "put the music back on"),
   ...plain("next_track", "next song", "skip this one", "I don't like this track, next"),
@@ -179,6 +229,9 @@ const CASES = [
   nobody("hang on, someone's at the door", "open Spotify"),
 ];
 
+/** Those the app can answer: with --app, a sentence for a capability it has no twin of is left out. */
+const CASES = TABLE.filter((c) => c.wants.length > 0);
+
 // ── The model server ──────────────────────────────────────────────────────────
 
 async function json(url, init) {
@@ -240,11 +293,11 @@ async function embed(texts) {
 // ── The run ───────────────────────────────────────────────────────────────────
 
 /** What the index is given for a capability: its area and its description. */
-const textOf = (capability) => `${capability.area}: ${capability.description}`;
+const textOf = (capability) => (FLAGS.includes("--whole") ? `${capability.area}: ${capability.description}` : indexText(capability));
 const DESCRIPTIONS = new Set(CAPABILITIES.map(textOf));
 const index = new CapabilityIndex((texts) => embed(texts.map((t) => (DESCRIPTIONS.has(t) ? TEXT : QUERY) + t)));
 
-if (!(await index.sync(CAPABILITIES.map((c) => ({ name: c.name, text: textOf(c) }))))) {
+if (!(await index.sync(CAPABILITIES.map((c) => ({ name: c.name, text: textOf(c), kinds: APP ? kindsOf(c) : [] }))))) {
   console.log(`${MODEL} did not answer POST ${SERVER}/v1/embeddings with vectors.`);
   process.exit(1);
 }
@@ -253,9 +306,25 @@ const syncMs = took.splice(0).reduce((a, b) => a + b, 0);
 /** Whether the capability's own rules let tier 1 run it, whatever the scores: the real `instant` on a ranking nothing can beat. */
 const allowed = (name) => instant([{ name, score: 2 }, { name: "", score: -2 }], CAPABILITIES) === name;
 
+/** What the registry finds named in a sentence, as the turn gives it to the ranking. */
+async function namedIn(sentence) {
+  if (!REGISTRY) return undefined;
+  const named = await REGISTRY.named(sentence);
+  return { kinds: [...new Set(named.map((n) => n.kind))], labels: named.map((n) => n.label) };
+}
+/** A ranking with another boost for what is named: the turn's scores, with the difference added. */
+function boosted(ranked, named, boost) {
+  if (!named?.kinds.length) return ranked;
+  const takes = (name) => kindsOf(CAPABILITIES.find((c) => c.name === name) ?? { args: {} }).some((k) => named.kinds.includes(k));
+  return ranked.map((r) => ({ name: r.name, score: r.score + (takes(r.name) ? boost - NAMED_BOOST : 0) })).sort((a, b) => b.score - a.score);
+}
+
 const rows = [];
+const sweeps = [];
 for (const c of CASES) {
-  const ranked = await index.rank(c.say, c.after);
+  const named = await namedIn(c.say);
+  const ranked = await index.rank(c.say, c.after, named);
+  if (APP) sweeps.push({ c, named, ranked });
   if (!ranked) {
     console.log(`No ranking for "${c.say}": the model stopped answering.`);
     process.exit(1);
@@ -263,11 +332,11 @@ for (const c of CASES) {
   const alone = c.after ? await index.rank(c.say) : ranked;
   rows.push({
     ...c, ranked, alone,
-    place: ranked.findIndex((r) => r.name === c.want) + 1,
+    place: ranked.findIndex((r) => c.wants.includes(r.name)) + 1,
     best: ranked[0], margin: ranked[0].score - ranked[1].score,
     instant: instant(ranked, CAPABILITIES),
     directed: directed(ranked, { followsTurn: Boolean(c.after) }),
-    shown: shortlist(ranked, CAPABILITIES).includes(c.want),
+    shown: shortlist(ranked, CAPABILITIES).some((name) => c.wants.includes(name)),
   });
 }
 // The second `rank` of a follow-up is this script's own, for comparison.
@@ -281,7 +350,7 @@ const sorted = (xs) => [...xs].sort((a, b) => a - b);
 const at = (xs, q) => (xs.length === 0 ? undefined : sorted(xs)[Math.min(xs.length - 1, Math.floor(q * xs.length))]);
 const spread = (xs) => `least ${f(sorted(xs)[0])}  a tenth under ${f(at(xs, 0.1))}  median ${f(at(xs, 0.5))}  most ${f(sorted(xs).at(-1))}  (${xs.length})`;
 const of = (kind) => rows.filter((r) => r.kind === kind);
-const line = (r) => `  ${r.place === 1 ? "✓" : "✗"} ${r.after ? `[${r.after}] ` : ""}"${r.say}" → ${r.ranked.slice(0, 3).map((x) => `${x.name} ${f(x.score)}`).join(", ")}${r.place === 1 ? "" : `   (wanted ${r.want}, placed ${r.place})`}`;
+const line = (r) => `  ${r.place === 1 ? "✓" : "✗"} ${r.after ? `[${r.after}] ` : ""}"${r.say}" → ${r.ranked.slice(0, 3).map((x) => `${x.name} ${f(x.score)}`).join(", ")}${r.place === 1 ? "" : `   (wanted ${r.wants.join(" or ")}, placed ${r.place})`}`;
 
 console.log(`\n${MODEL} on ${SERVER} — ${CAPABILITIES.length} capabilities, ${CASES.length} sentences`);
 if (QUERY || TEXT) console.log(`prefixes: sentence "${QUERY}", description "${TEXT}"`);
@@ -293,6 +362,19 @@ for (const kind of ["plain", "follow", "negation", "nobody"]) {
   console.log(`${kind.padEnd(9)} top-1 ${pct(these.filter((r) => r.place === 1).length, these.length).padEnd(14)} top-3 ${pct(these.filter((r) => r.place >= 1 && r.place <= 3).length, these.length).padEnd(14)} in the shortlist of ${SHORTLIST} ${pct(these.filter((r) => r.shown).length, these.length)}`);
 }
 const follows = of("follow");
+if (APP) {
+  console.log(`\nWith what is named counted nearer by (NAMED_BOOST is ${NAMED_BOOST}; 0 and no names taken out is the plain ranking below it):`);
+  const plainRanked = [];
+  for (const { c } of sweeps) plainRanked.push({ c, ranked: await index.rank(c.say, c.after) });
+  const rate = (list, n) => list.filter(({ c, ranked }) => ranked.slice(0, n).some((r) => c.wants.includes(r.name))).length;
+  const meant = (list) => list.filter(({ c }) => c.kind === "plain" || c.kind === "follow");
+  const row = (label, list) => {
+    const m = meant(list);
+    console.log(`  ${label.padEnd(22)} top-1 ${pct(rate(m, 1), m.length).padEnd(14)} top-3 ${pct(rate(m, 3), m.length).padEnd(14)} shortlist ${pct(m.filter(({ c, ranked }) => shortlist(ranked, CAPABILITIES).some((n) => c.wants.includes(n))).length, m.length)}`);
+  };
+  row("names left in", plainRanked);
+  for (const boost of [0, 0.03, 0.05, 0.08, 0.1, 0.15]) row(`names out, boost ${boost}`, sweeps.map(({ c, named, ranked }) => ({ c, ranked: boosted(ranked, named, boost) })));
+}
 console.log(`follow-ups scored alone: top-1 ${pct(follows.filter((r) => r.alone[0].name === r.want).length, follows.length)} — with their turn (a share of ${CONTEXT_SHARE}): ${pct(follows.filter((r) => r.place === 1).length, follows.length)}`);
 console.log(ALL ? "\nEvery sentence:" : "\nNot first (plain and follow-ups):");
 for (const r of rows) if (ALL || (r.place !== 1 && (r.kind === "plain" || r.kind === "follow"))) console.log(line(r));

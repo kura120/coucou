@@ -242,6 +242,22 @@ export function createRegistry(options: RegistryOptions): Registry {
     return run(inverse, context, true);
   }
 
+  // ── What a sentence names ───────────────────────────────────────────────────
+
+  async function namedIn(sentence: string): Promise<{ kind: string; id: string; label: string }[]> {
+    const out: { kind: string; id: string; label: string }[] = [];
+    for (const source of sources.values()) {
+      try {
+        // A kind too large to list is asked for what is near the sentence; only what is said whole in it counts.
+        const things = source.near ? await source.near(sentence) : await source.list();
+        for (const thing of contained(sentence, things)) out.push({ kind: source.kind, id: thing.id, label: thing.label });
+      } catch {
+        // A source that breaks names nothing.
+      }
+    }
+    return out;
+  }
+
   // ── What a model is told every time ─────────────────────────────────────────
 
   async function snapshot(): Promise<Record<string, unknown>> {
@@ -316,6 +332,7 @@ export function createRegistry(options: RegistryOptions): Registry {
       return capability ? schemaOf(capability) : null;
     },
     snapshot,
+    named: namedIn,
     execute: (call, context) => run(call, context, false),
     undo,
   };
