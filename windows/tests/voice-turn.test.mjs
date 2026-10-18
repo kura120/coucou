@@ -757,3 +757,27 @@ test("why words do not hold up is said: unseen, a thing, a number", async () => 
   assert.equal(await unfounded("Stripe and Vercel are gone.", removed, named), "thing");
   assert.equal(await unfounded("Stripe is gone, 2 left.", removed, named), "number");
 });
+
+test("a thing nearly named, when all the model called failed, is asked about in place of those calls", async () => {
+  app.registry.declare({
+    name: "launch", area: "apps", description: "Opens an installed app.", tier: "free",
+    args: { app: { type: "entity", kind: "app", description: "The app." } },
+    run: async (args) => (app.state.log.push(`launch:${args.app}`), done(`${args.app} opened`, true)),
+  });
+  app.registry.entities({
+    kind: "app", description: "The installed apps.", list: () => [],
+    near: async (said) => (/spy flight/.test(said) ? [{ id: "Spotify", label: "Spotify", score: 0.8 }] : []),
+  });
+  const asked = [];
+  const local = scripted(calls(call("open_app", { app: "Nope" })), says("done"));
+  const t = turns({ local: local.model });
+  t.onAsk = (ask) => {
+    if (!ask) return;
+    asked.push(ask.question);
+    t.answer({ kind: "yes_no", yes: true });
+  };
+  const heard = await t.hear("open spy flight");
+  assert.deepEqual(asked, ["Did you mean Spotify?"]);
+  assert.deepEqual(app.state.log, ["open:Nope", "launch:Spotify"]);
+  assert.deepEqual(heard.result, { outcome: "success", message: "Spotify opened" });
+});

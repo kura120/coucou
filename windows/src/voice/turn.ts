@@ -440,8 +440,15 @@ export class VoiceTurns {
       // The sentence nearly names a thing and the model did nothing with it ("open spy flight" taken for
       // nonsense): the capability that takes such a thing is called with it as heard, and the executor
       // asks the user whether it is that thing. A question, never an act on a guess.
-      const near = turn.taken && !shownOf(turn).length && !turn.ran.some((ran) => ran.call.name === NOTHING) ? misheard(ranked, this.registry.all(), turn.named) : null;
-      if (near && (await this.instantly(near.name, turn, near.heard))) return this.end(turn, "");
+      // So too when all it called came to nothing ("open st" as a web address): those calls are replaced by the question.
+      const failed = shownOf(turn).every((ran) => ran.result.status === "failed" || ran.result.status === "not_found" || ran.result.status === "refused");
+      const near = turn.taken && failed && !turn.ran.some((ran) => ran.call.name === NOTHING) ? misheard(ranked, this.registry.all(), turn.named) : null;
+      if (near) {
+        const before = turn.ran;
+        turn.ran = turn.ran.filter((ran) => !shownOf(turn).includes(ran));
+        if (await this.instantly(near.name, turn, near.heard)) return this.end(turn, "");
+        turn.ran = before;
+      }
       return this.end(turn, await this.checked(turn, came.words));
     }
     // What may have been said to someone else never goes further than this computer.
