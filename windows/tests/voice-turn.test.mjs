@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { createRegistry } from "../src/core/capabilities/registry.ts";
 import { done, failed } from "../src/voice/result.ts";
 import { FORGOTTEN_AFTER_MS } from "../src/voice/memory.ts";
-import { MOST_MODEL_ROUNDS, VoiceTurns, looksWritten, written } from "../src/voice/turn.ts";
+import { MOST_MODEL_ROUNDS, VoiceTurns, asHeard, grounded, looksWritten, unfounded, written } from "../src/voice/turn.ts";
 
 const WORDS = {
   refused: () => "I can't do that", unavailable: () => "Not possible now", failed: () => "That did not work",
@@ -264,12 +264,14 @@ test("with no model server, voice says what it needs", async () => {
   assert.deepEqual(app.state.log, []);
 });
 
-test("tier 2, ranked: the model is shown the nearest capabilities, its calls run, and its words are Mochi's", async () => {
+test("tier 2, ranked: the model is shown the nearest capabilities, its calls run, and its words are checked against what they did", async () => {
   const embed = embedBy({ "could you stop the song and bring in": { pause_music: 0.6, add_pills: 0.55, play_music: 0.5 } });
   const local = scripted(calls(call("pause_music"), call("add_pills", { pills: ["stripe"] })), says("Paused, and Stripe is in."));
   const heard = await turns({ embed, local: local.model }).hear("could you stop the song and bring stripe in");
   assert.deepEqual(app.state.log, ["pause", "add:stripe"]);
+  // The model's words, which name only what ran.
   assert.deepEqual(heard.result, { outcome: "success", message: "Paused, and Stripe is in." });
+  assert.equal(heard.worded, true);
   // The nearest first — Stripe is a pill, so what takes pills is counted nearer — then the ones always shown, and no handing up with nobody to hand up to.
   assert.deepEqual(local.asked[0].tools.slice(0, 3), ["add_pills", "pause_music", "play_music"]);
   assert.ok(local.asked[0].tools.includes("more_tools") && local.asked[0].tools.includes("nothing"));
@@ -349,8 +351,13 @@ test("an answer in words, with nothing called, is Mochi's answer; asking for not
   });
   const none = scripted(calls(call("nothing")));
   assert.deepEqual(await turns({ local: none.model }).hear("never mind"), { result: null, taken: true, rest: true });
-  const empty = scripted(says(""));
+  // An empty answer is asked for once more; empty again, it was not understood.
+  const empty = scripted(says(""), says(""));
   assert.deepEqual((await turns({ local: empty.model }).hear("mumble")).result, { outcome: "failure", message: "Not recognised" });
+  assert.equal(empty.asked.length, 2);
+  assert.match(empty.asked[1].system, /called a capability that does not exist here[\s\S]*Call one of your tools — [a-z_, ]*more_tools/);
+  const second = scripted(says(""), calls(call("pause_music")));
+  assert.deepEqual((await turns({ local: second.model }).hear("pause")).result, { outcome: "success", message: "Paused" });
 });
 
 test("calls a model wrote out as text are calls, and its plumbing is never said", async () => {
@@ -399,7 +406,7 @@ test("a spoken answer to a choice or a yes/no is read by the model, given the qu
   assert.deepEqual(await t.answerSaid("the home one"), { is: "answer" });
   assert.deepEqual(await which, { kind: "choice", id: "home" });
   assert.deepEqual(reader.asked[0].tools, ["answer"]);
-  assert.match(reader.asked[0].system, /Which account\?[\s\S]*1: Work\n2: Home \(a@home\)/);
+  assert.match(reader.asked[0].system, /Which account\?[\s\S]*1: Work, option 1 of 2, the first\n2: Home \(a@home\), option 2 of 2, the last/);
   assert.equal(reader.asked[0].said, "the home one");
   // Not an answer: the question stays.
   const open = t.askUser({ kind: "yes_no", question: "Open Spotify?" });
@@ -493,6 +500,7 @@ test("a local model that does not answer: the cloud model when allowed, else it 
     return { text: "Paused." };
   };
   t = turns({ local: silent, cloud });
+  // The cloud model's words, checked against what ran like the local model's.
   assert.deepEqual((await t.hear("pause")).result, { outcome: "success", message: "Paused." });
   assert.deepEqual(app.state.log, ["pause"]);
 });
@@ -529,7 +537,7 @@ test("a name the app has is not embedded, and what takes its kind is ranked near
   assert.deepEqual(local.asked[0].tools.slice(0, 3), ["remove_pills", "add_pills", "undo"]);
 });
 
-test("a name the app only nearly has is told to the model as perhaps that thing, and counted in the ranking", async () => {
+test("a name the app only nearly has is told to the model as most likely that thing, and counted in the ranking", async () => {
   // A kind too large to list: its source ranks what is near the sentence (as Rust ranks the installed apps).
   app.registry.entities({
     kind: "app",
@@ -540,8 +548,8 @@ test("a name the app only nearly has is told to the model as perhaps that thing,
   assert.deepEqual(await app.registry.named("open spy flight"), [{ kind: "app", id: "Spotify", label: "Spotify", near: true }]);
   const local = scripted(calls(call("nothing")));
   await turns({ local: local.model }).hear("open spy flight");
-  assert.match(local.asked[0].system, /the app finds: perhaps Spotify \(app, heard as something close to it\)/);
-  assert.doesNotMatch(local.asked[0].system, /Steam/);
+  assert.match(local.asked[0].system, /In what was said, most likely Spotify \(app\), misheard: call with that name; the app asks the user before it acts on it\./);
+  assert.doesNotMatch(local.asked[0].system, /In what was said[^\n]*Steam/);
 });
 
 test("what cannot be used right now is not offered, and is offered once a call makes it usable", async () => {
@@ -556,4 +564,220 @@ test("what cannot be used right now is not offered, and is offered once a call m
   assert.ok(local.asked[0].tools.includes("write_note"));
   assert.ok(!local.asked[0].tools.includes("send_note"));
   assert.ok(local.asked[1].tools.includes("send_note"));
+});
+
+// ── Follow-ups, names, and what Mochi says ────────────────────────────────────
+
+test("a follow-up is shown what the turn before called, however it ranks alone", async () => {
+  // "add" is plainly adding pills (tier 1); "and the other one too" is near everything but adding.
+  const others = { now_playing: 0.5, pause_music: 0.5, play_music: 0.5, remove_pills: 0.01, show_view: 0.5, open_app: 0.5, quit_coucou: 0.5, undo: 0.5 };
+  const embed = embedBy({ add: { add_pills: 1 }, "and the other one too": others });
+  const local = scripted(calls(call("nothing")));
+  const t = turns({ embed, local: local.model });
+  await t.hear("add vercel");
+  assert.deepEqual(app.state.log, ["add:vercel"]);
+  await t.hear("and the other one too");
+  assert.ok(local.asked[0].tools.includes("add_pills"));
+  // Alone, it is not shown.
+  const alone = scripted(calls(call("nothing")));
+  await turns({ embed, local: alone.model }).hear("and the other one too");
+  assert.ok(!alone.asked[0].tools.includes("add_pills"));
+});
+
+test("what takes a kind of thing the sentence names is shown, however near the rest of the sentence is to others", async () => {
+  const others = { now_playing: 0.5, pause_music: 0.5, play_music: 0.5, add_pills: 0.5, remove_pills: 0.5, open_app: 0.5, quit_coucou: 0.5, undo: 0.5 };
+  const embed = embedBy({ "bring up the": others });
+  const local = scripted(calls(call("show_view", { view: "wardrobe" })));
+  await turns({ embed, local: local.model }).hear("bring up the wardrobe");
+  assert.equal(local.asked[0].tools[0], "show_view");
+  assert.deepEqual(app.state.log, ["view:wardrobe"]);
+});
+
+test("what only read is said by a model given the results alone; what was done, in the capabilities' lines", async () => {
+  const local = scripted(calls(call("now_playing")), says("done"), says("Song by Artist is playing."));
+  const heard = await turns({ local: local.model }).hear("hey what is this song called");
+  assert.deepEqual(heard.result, { outcome: "success", message: "Song by Artist is playing." });
+  const report = local.asked[2];
+  // Not the sentence, not the turns before, no tools: the results.
+  assert.deepEqual(report.tools, []);
+  assert.deepEqual(report.history, []);
+  assert.equal(report.said, "What did the app read?");
+  assert.doesNotMatch(report.system, /song called/);
+  assert.match(report.system, /"title":"Song"/);
+  // Words that name what nothing did are never said: the lines are.
+  const claims = scripted(calls(call("pause_music")), says("Paused, and Stripe is gone too."));
+  const claimed = await turns({ local: claims.model }).hear("pause and remove stripe");
+  assert.deepEqual(claimed.result, { outcome: "success", message: "Paused" });
+  assert.equal(claimed.worded, false);
+  // Words that hold up are Mochi's.
+  const fine = scripted(calls(call("pause_music")), says("The music is paused."));
+  const kept = await turns({ local: fine.model }).hear("pause");
+  assert.deepEqual(kept.result, { outcome: "success", message: "The music is paused." });
+  assert.equal(kept.worded, true);
+  // A report that does not come: the reads' own lines.
+  const mute = scripted(calls(call("now_playing")), says("done"));
+  assert.deepEqual((await turns({ local: mute.model }).hear("what is playing")).result, { outcome: "success", message: "Song — Artist" });
+});
+
+test("a thing of a listed kind said a letter or a sound away is perhaps named; a word that only sounds alike is not", async () => {
+  app.registry.entities({ kind: "setting", description: "Settings.", list: () => [{ id: "screen", label: "Screen" }, { id: "settings", label: "Settings" }] });
+  assert.deepEqual(await app.registry.named("remove strife"), [{ kind: "pill", id: "stripe", label: "Stripe", near: true, heard: "strife" }]);
+  assert.deepEqual(await app.registry.named("ad get hub"), [{ kind: "pill", id: "github", label: "GitHub", near: true, heard: "get hub" }]);
+  // Whole names are named, not perhaps named.
+  assert.deepEqual(await app.registry.named("remove stripe"), [{ kind: "pill", id: "stripe", label: "Stripe" }]);
+  // Sounds alike, starts otherwise; several words that only sound like a name.
+  assert.deepEqual(await app.registry.named("that's better thanks"), []);
+  assert.deepEqual(await app.registry.named("is the ci green"), []);
+});
+
+test("a capability's name written as text, alone or with its arguments, is a call", () => {
+  const known = new Set(["nothing", "read_session_output"]);
+  assert.deepEqual(written("nothing", known), [call("nothing")]);
+  assert.deepEqual(written('read_session_output {"lines": 8, "session": "VS Code"}', known), [call("read_session_output", { lines: 8, session: "VS Code" })]);
+  assert.deepEqual(written('read_session_output({"session": "Codex"})', known), [call("read_session_output", { session: "Codex" })]);
+  // Not a capability's name, or words: no call.
+  assert.deepEqual(written("Nothing.", known), []);
+  assert.deepEqual(written("rm_rf", known), []);
+  assert.deepEqual(written("nothing to do here", known), []);
+});
+
+test("a name the model wrote for a thing only nearly said is put back as heard, so the executor asks", async () => {
+  const local = scripted(calls(call("remove_pills", { pills: ["Stripe"] })), says("done"));
+  const t = turns({ local: local.model });
+  const asked = [];
+  t.onAsk = (ask) => {
+    if (!ask) return;
+    asked.push(ask.question);
+    t.answer({ kind: "yes_no", yes: false });
+  };
+  await t.hear("remove strife");
+  assert.deepEqual(asked, ["Did you mean Stripe?"]);
+  assert.deepEqual(app.state.log, []);
+  // Said whole, it is the name: no question.
+  const whole = scripted(calls(call("remove_pills", { pills: ["Stripe"] })), says("done"));
+  await turns({ local: whole.model }).hear("remove stripe");
+  assert.deepEqual(app.state.log, ["remove:stripe"]);
+  assert.deepEqual(asked.length, 1);
+});
+
+test("a thing nearly named that the model did nothing with is asked about by the app, never acted on", async () => {
+  app.registry.declare({
+    name: "launch", area: "apps", description: "Opens an installed app.", tier: "free",
+    args: { app: { type: "entity", kind: "app", description: "The app." } },
+    run: async (args) => (app.state.log.push(`launch:${args.app}`), done(`${args.app} opened`, true)),
+  });
+  app.registry.entities({
+    kind: "app", description: "The installed apps.", list: () => [],
+    near: async (said) => (/spy flight/.test(said) ? [{ id: "Spotify", label: "Spotify", score: 0.8 }] : []),
+  });
+  const asked = [];
+  const words = scripted(says("I don't know what spy flight is."));
+  const t = turns({ local: words.model });
+  t.onAsk = (ask) => {
+    if (!ask) return;
+    asked.push(ask.question);
+    t.answer({ kind: "yes_no", yes: true });
+  };
+  await t.hear("open spy flight");
+  assert.deepEqual(asked, ["Did you mean Spotify?"]);
+  assert.deepEqual(app.state.log, ["launch:Spotify"]);
+  // Told not to: the model's nothing stands.
+  const no = scripted(calls(call("nothing")));
+  const other = turns({ local: no.model });
+  other.onAsk = (ask) => ask && asked.push(ask.question);
+  await other.hear("don't open spy flight");
+  assert.equal(asked.length, 1);
+});
+
+test("a name the sentence does not hold and that is nothing of its kind is the thing the sentence names", async () => {
+  const named = (text) => app.registry.named(text);
+  const show = app.registry.get("show_view");
+  const turn = { said: "bring up the wardrobe", named: [{ kind: "view", id: "wardrobe", label: "Wardrobe" }] };
+  assert.deepEqual((await asHeard(call("show_view", { view: "Closet" }), show, turn, named)).arguments, { view: "wardrobe" });
+  // Said as it is, a thing of that kind that exists, or nothing of that kind named: as written.
+  assert.deepEqual((await asHeard(call("show_view", { view: "wardrobe" }), show, turn, named)).arguments, { view: "wardrobe" });
+  assert.deepEqual((await asHeard(call("show_view", { view: "Chat" }), show, turn, named)).arguments, { view: "Chat" });
+  assert.deepEqual((await asHeard(call("show_view", { view: "Chat" }), show, { said: "show it", named: [] }, named)).arguments, { view: "Chat" });
+  // A correction names another thing of the kind than the one to put back: left to the model.
+  const remove = app.registry.get("remove_pills");
+  const correction = { said: "no i meant stripe", named: [{ kind: "pill", id: "stripe", label: "Stripe" }] };
+  assert.deepEqual((await asHeard(call("remove_pills", { pills: ["vercel"] }), remove, correction, named)).arguments, { pills: ["vercel"] });
+});
+
+test("a no that names another thing of the kind asked about is what was meant instead, whatever the reader said of it", async () => {
+  const embed = embedBy({ "remove strife": { remove_pills: 1 } });
+  for (const [said, next] of [["no, github", "no, github"], ["no", undefined], ["no, the chat", undefined]]) {
+    app = makeApp();
+    const t = turns({ embed, local: scripted(calls(call("answer", { option: "no", also_asks: false }))).model });
+    t.onAsk = (ask) => {
+      if (ask) queueMicrotask(() => void t.answerSaid(said));
+    };
+    const heard = await t.hear("remove strife");
+    assert.equal(heard.next, next, said);
+    assert.deepEqual(app.state.log, []);
+  }
+});
+
+test("after a no to a name, the same call written with the name itself is not asked again", async () => {
+  const local = scripted(calls(call("remove_pills", { pills: ["strife"] })), calls(call("remove_pills", { pills: ["Stripe"] })), says("done"));
+  const t = turns({ local: local.model });
+  const asked = [];
+  t.onAsk = (ask) => {
+    if (!ask) return;
+    asked.push(ask.question);
+    queueMicrotask(() => t.answer({ kind: "yes_no", yes: false }));
+  };
+  const heard = await t.hear("remove strife");
+  assert.deepEqual(asked, ["Did you mean Stripe?"]);
+  assert.deepEqual(app.state.log, []);
+  assert.deepEqual(heard.result, { outcome: "success", message: "Leaving it as is" });
+});
+
+test("words are checked against the results: what was seen, things, numbers", async () => {
+  const named = (said) => app.registry.named(said);
+  const ran = (name, args, result) => ({ call: call(name, args), result });
+  const removed = [ran("remove_pills", { pills: ["stripe"] }, done("Stripe removed", true))];
+  assert.equal(await grounded("Stripe is off the island.", removed, named), true);
+  // A thing the results do not hold.
+  assert.equal(await grounded("Stripe and Vercel are gone.", removed, named), false);
+  // A number the results do not hold.
+  const volume = [ran("set_music_volume", { percent: 30 }, done("Volume 30%", true))];
+  assert.equal(await grounded("The volume is at 30 now.", volume, named), true);
+  assert.equal(await grounded("The volume is at 40 now.", volume, named), false);
+  // Only asked for, not seen.
+  assert.equal(await grounded("Spotify is open.", [ran("open_app", { app: "Spotify" }, done("Asked Windows to open Spotify", false))], named), false);
+});
+
+test("why words do not hold up is said: unseen, a thing, a number", async () => {
+  const named = (said) => app.registry.named(said);
+  const ran = (name, args, result) => ({ call: call(name, args), result });
+  const removed = [ran("remove_pills", { pills: ["stripe"] }, done("Stripe removed", true))];
+  assert.equal(await unfounded("Stripe is gone.", removed, named), null);
+  assert.equal(await unfounded("Stripe is gone.", [ran("remove_pills", {}, done("Asked", false))], named), "unseen");
+  assert.equal(await unfounded("Stripe and Vercel are gone.", removed, named), "thing");
+  assert.equal(await unfounded("Stripe is gone, 2 left.", removed, named), "number");
+});
+
+test("a thing nearly named, when all the model called failed, is asked about in place of those calls", async () => {
+  app.registry.declare({
+    name: "launch", area: "apps", description: "Opens an installed app.", tier: "free",
+    args: { app: { type: "entity", kind: "app", description: "The app." } },
+    run: async (args) => (app.state.log.push(`launch:${args.app}`), done(`${args.app} opened`, true)),
+  });
+  app.registry.entities({
+    kind: "app", description: "The installed apps.", list: () => [],
+    near: async (said) => (/spy flight/.test(said) ? [{ id: "Spotify", label: "Spotify", score: 0.8 }] : []),
+  });
+  const asked = [];
+  const local = scripted(calls(call("open_app", { app: "Nope" })), says("done"));
+  const t = turns({ local: local.model });
+  t.onAsk = (ask) => {
+    if (!ask) return;
+    asked.push(ask.question);
+    t.answer({ kind: "yes_no", yes: true });
+  };
+  const heard = await t.hear("open spy flight");
+  assert.deepEqual(asked, ["Did you mean Spotify?"]);
+  assert.deepEqual(app.state.log, ["open:Nope", "launch:Spotify"]);
+  assert.deepEqual(heard.result, { outcome: "success", message: "Spotify opened" });
 });

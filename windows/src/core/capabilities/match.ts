@@ -11,7 +11,7 @@
 // live (voice/resolve.ts, voice/entity.ts); the thresholds were set on speech
 // models' own spellings, and the apps' are Rust's (apps.rs).
 
-import { normalise, soundKey } from "../../voice/entity";
+import { levenshtein, normalise, soundKey } from "../../voice/entity";
 import { likeness } from "../../voice/resolve";
 import type { Entity } from "./types";
 
@@ -41,6 +41,13 @@ export interface MatchOptions {
 /** Under this many letters, a sound key or a name is too short to tell a thing by. */
 const SHORTEST_KEY = 4;
 const SHORTEST_NAME = 4;
+/**
+ * A shorter sound key is enough when the letters agree as well: "get hub"
+ * and GitHub are three sounds and one letter apart. Two measures that agree
+ * are taken where one alone is too short to tell.
+ */
+const SHORT_KEY = 3;
+const SHORT_KEY_LETTERS = 0.8;
 /** How much nearer the first must be than the next to be asked about alone (apps.rs `AHEAD`). */
 const AHEAD = 0.15;
 /** A word of what was said, against a whole name, counts for a little less than the whole of it. */
@@ -64,6 +71,54 @@ export function contained(said: string, things: readonly Entity[]): Entity[] {
   return found
     .filter((one) => !found.some((other) => other.form !== one.form && ` ${other.form} `.includes(` ${one.form} `)))
     .map((one) => one.thing);
+}
+
+/** The longest run of words of a sentence compared with a name: names are one to three words. */
+const SPAN_WORDS = 3;
+
+/**
+ * The things a sentence perhaps names: a run of its words that is a name
+ * misheard, a letter or a sound away ("strife" for Stripe, "cortex" for
+ * Codex, "get hub" for GitHub) — the measures `among` asks about, made
+ * stricter for a sentence, where every word is a chance to sound like some
+ * name: a run of several words by its letters only, and a word by its sound
+ * only when it starts as the name does ("thanks" is not Settings). Nearest
+ * first, with how near and the words it was heard as. Nothing is resolved here: what is said whole is `contained`'s.
+ */
+export function nearly(said: string, things: readonly Entity[], least: number): (Entity & { score: number; heard: string })[] {
+  const words = normalise(said).split(" ").filter(Boolean);
+  const spans: string[] = [];
+  for (let from = 0; from < words.length; from++) {
+    for (let to = from + 1; to <= Math.min(words.length, from + SPAN_WORDS); to++) {
+      const span = words.slice(from, to).join(" ");
+      if (span.replace(/ /g, "").length >= SHORTEST_NAME) spans.push(span);
+    }
+  }
+  return things
+    .map((thing) => {
+      // The run of words it is nearest to: what the user said for it.
+      let best = { score: 0, heard: "" };
+      for (const span of spans) for (const form of forms(thing)) {
+        const score = heardAs(span, form);
+        if (score > best.score) best = { score, heard: span };
+      }
+      return { ...thing, ...best };
+    })
+    .filter((thing) => thing.score >= least)
+    .sort((x, y) => y.score - x.score || x.label.localeCompare(y.label));
+}
+
+/** How near a run of words of a sentence is to a name, by `nearly`'s rules. */
+function heardAs(span: string, form: string): number {
+  if (span.includes(" ") || span[0] !== form[0]) return letters(span, form);
+  return likeness(span, form);
+}
+
+/** How alike two names are by their letters alone, spaces aside, 0…1. */
+function letters(a: string, b: string): number {
+  const x = a.replace(/ /g, "");
+  const y = b.replace(/ /g, "");
+  return x && y ? 1 - levenshtein(x, y) / Math.max(x.length, y.length) : 0;
 }
 
 /** One thing among several by a name or an id. */
@@ -92,14 +147,16 @@ export function among(said: string, things: readonly Entity[], options: MatchOpt
   const scored = things
     .map((thing) => ({ thing, score: given ? (given.get(thing.id) ?? 0) : ranked(thing) }))
     .filter((c) => c.score > 0)
-    .sort((x, y) => y.score - x.score || x.thing.label.length - y.thing.label.length || x.thing.label.localeCompare(y.thing.label));
+    // Equal scores: a source that ranked them keeps its own order; else the shorter name, then the alphabet.
+    .sort((x, y) => y.score - x.score || (given ? 0 : x.thing.label.length - y.thing.label.length || x.thing.label.localeCompare(y.thing.label)));
   // A source that ranked them itself has already judged short names.
   if (!scored.length || (!given && q.replace(/ /g, "").length < SHORTEST_NAME)) return { is: "none", near: loosely(q, things) };
 
   // The same sounds in other letters, and nothing else as near: that name.
   const best = scored[0];
   const key = soundKey(q);
-  const same = key.length >= SHORTEST_KEY && forms(best.thing).some((form) => soundKey(form) === key);
+  const long = key.length >= SHORTEST_KEY || (key.length >= SHORT_KEY && best.score >= SHORT_KEY_LETTERS);
+  const same = long && forms(best.thing).some((form) => soundKey(form) === key);
   if (same && (scored.length === 1 || scored[1].score < best.score) && !options.doubted?.(said)) return sure(best.thing);
   return unsure(scored);
 }

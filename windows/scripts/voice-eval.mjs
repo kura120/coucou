@@ -270,6 +270,8 @@ function messages(system, history, said, steps = []) {
   return list;
 }
 
+/** For each turn where something ran and a model worded it: whether the words held up (voice/turn.ts `grounded`). */
+const worded = [];
 /** How many times the model was asked, and how long each took. */
 const rounds = [];
 let refusedBySize = 0;
@@ -281,8 +283,10 @@ async function local(system, said, tools, history = [], steps = []) {
   }
   if (process.env.VOICE_EVAL_DUMP) {
     const { writeFileSync } = await import("node:fs");
-    writeFileSync(`${process.env.VOICE_EVAL_DUMP}/system.txt`, system);
-    writeFileSync(`${process.env.VOICE_EVAL_DUMP}/tools.json`, JSON.stringify(tools));
+    // Each call to the model in its own pair of files, numbered: what one round was given can be sent again by hand.
+    writeFileSync(`${process.env.VOICE_EVAL_DUMP}/system-${rounds.length}.txt`, system);
+    writeFileSync(`${process.env.VOICE_EVAL_DUMP}/tools-${rounds.length}.json`, JSON.stringify(tools));
+    writeFileSync(`${process.env.VOICE_EVAL_DUMP}/messages-${rounds.length}.json`, JSON.stringify(messages(system, history, said, steps)));
   }
   const began = performance.now();
   const request = () =>
@@ -341,7 +345,13 @@ async function run(steps) {
   /** The turn that waits on a question, and who is told when one goes up. */
   let turn = null;
   let up = () => {};
-  turns.onAsk = (ask) => ask && up(ask);
+  /** Once the steps are over, a question that still goes up is for nobody: dropped, as when the island closes. */
+  let over = false;
+  turns.onAsk = (ask) => {
+    if (TRACE) console.log(`    asks ${ask ? JSON.stringify(ask.question) : "no more"}`);
+    if (ask && over) queueMicrotask(() => turns.answer({ kind: "dropped" }));
+    else if (ask) up(ask);
+  };
   /** The turn's end, or the question it stopped on. */
   const shown = async () => {
     const question = new Promise((resolve) => (up = resolve));
@@ -349,6 +359,8 @@ async function run(steps) {
     const came = await Promise.race([turn.then((heard) => ({ heard })), question.then((ask) => ({ ask }))]);
     if ("ask" in came) return { asks: came.ask.question };
     turn = null;
+    // Whether the model's words for what ran held up against the results.
+    if (came.heard.worded != null) worded.push(came.heard.worded || came.heard.unworded || "empty");
     // Said in place of an answer, and a request of its own: heard at once, as the island does.
     if (came.heard.next) {
       turn = turns.hear(came.heard.next);
@@ -383,6 +395,7 @@ async function run(steps) {
   }
   // A question nobody answered is dropped, as when the island closes.
   if (turn) {
+    over = true;
     turns.answer({ kind: "dropped" });
     await turn;
   }
@@ -589,6 +602,17 @@ function right(expected, { log, last }) {
 const median = (list) => (list.length ? [...list].sort((a, b) => a - b)[Math.floor(list.length / 2)] : 0);
 const seconds = (ms) => `${(ms / 1000).toFixed(2)} s`;
 
+// `--named`: what the app finds named in each sentence, with no model at all.
+if (FLAGS.includes("--named")) {
+  const { registry } = setup();
+  const sentences = new Set(PARTS.flatMap(([, cases]) => cases.flatMap(([steps]) => steps.map((step) => (typeof step === "string" ? step : (step.said ?? step.again))).filter(Boolean))));
+  for (const said of sentences) {
+    const named = await registry.named(said);
+    console.log(`${JSON.stringify(said)}: ${named.map((n) => `${n.near ? "~" : ""}${n.label} (${n.kind})`).join(", ")}`);
+  }
+  process.exit(0);
+}
+
 const tags = await fetch(`${SERVER}/api/tags`).then((r) => r.json()).then((list) => list.models ?? []).catch(() => []);
 const installed = tags.length ? tags.map((m) => m.name) : await fetch(`${SERVER}/v1/models`).then((r) => r.json()).then((l) => (l.data ?? []).map((m) => m.id)).catch(() => []);
 const has = (model) => installed.includes(model) || installed.includes(`${model}:latest`);
@@ -610,6 +634,7 @@ for (const model of MODELS) {
     console.log(`\n${model} · ${path}${EMBED ? ` (${EMBED})` : ""}`);
     const row = { name: `${model} · ${path}`, parts: [], wrong: 0, dangerous: 0, instant: [], modelled: [], asked: [] };
     rounds.length = 0;
+    worded.length = 0;
     for (const [, cases] of PARTS) {
       let ok = 0;
       for (const [steps, wanted] of cases) {
@@ -634,6 +659,7 @@ for (const model of MODELS) {
       row.parts.push(`${ok}/${cases.length}`);
     }
     row.rounds = [...rounds];
+    row.worded = [...worded];
     report.push(row);
   }
 }
@@ -641,7 +667,7 @@ for (const model of MODELS) {
 const total = PARTS.reduce((n, [, cases]) => n + cases.length, 0);
 console.log(`\n${total} cases · ${PARTS.map(([part, cases]) => `${part} ${cases.length}`).join(", ")}`);
 if (refusedBySize) console.log(`${refusedBySize} requests were larger than Rust allows and were not sent.`);
-console.log(`model · path | ${PARTS.map(([part]) => part).join(" | ")} | wrong | dangerous | turns with no model | a turn with the model | model calls a turn | one model call`);
+console.log(`model · path | ${PARTS.map(([part]) => part).join(" | ")} | wrong | dangerous | turns with no model | a turn with the model | model calls a turn | one model call | words that held up`);
 for (const row of report) {
   console.log(
     [
@@ -650,6 +676,7 @@ for (const row of report) {
       `${seconds(median(row.modelled))} median, ${seconds(Math.max(0, ...row.modelled))} longest (${row.modelled.length})`,
       `${median(row.asked)} median, ${Math.max(0, ...row.asked)} most`,
       `${seconds(median(row.rounds))} median, ${seconds(Math.max(0, ...row.rounds))} longest (${row.rounds.length})`,
+      `${row.worded.filter((w) => w === true).length} of ${row.worded.length} (not: ${["unseen", "thing", "number", "empty"].map((why) => `${why} ${row.worded.filter((w) => w === why).length}`).join(", ")})`,
     ].join(" | "),
   );
 }

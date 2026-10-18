@@ -3,6 +3,7 @@
 // of the app runs, nothing is asked of a model.
 
 import { test } from "node:test";
+import { among } from "../src/core/capabilities/match.ts";
 import assert from "node:assert/strict";
 import { createRegistry } from "../src/core/capabilities/registry.ts";
 import { done } from "../src/voice/result.ts";
@@ -97,6 +98,8 @@ function setup({ click = true, answers = [], doubted } = {}) {
       name: "tell_agent", area: "chat", description: "Sends a message to an agent.", tier: "confirm",
       args: { text: { type: "string", description: "The message." } },
       describe: (args) => ({ title: "Send this?", change: args.text, action: "Send" }),
+      // What it cannot send is said before any click.
+      check: (args) => (args.text !== "nothing" ? null : { status: "failed", verified: false, line: "Nothing to send", detail: "The message is empty." }),
       run: async (args) => (ran("tell_agent", args), done("Sent")),
     },
     {
@@ -224,7 +227,7 @@ test("other letters for the same sounds is that thing, unless the speech model d
 test("a name that is only near one thing is asked about, in the capability's words, and a yes goes on", async () => {
   const { call, log } = setup({ answers: [{ kind: "yes_no", yes: true }] });
   const result = await call("show_pill", { pill: "strife" });
-  assert.deepEqual(log.asked, [{ kind: "yes_no", question: "Show Stripe?" }]);
+  assert.deepEqual(log.asked, [{ kind: "yes_no", question: "Show Stripe?", about: "pill" }]);
   assert.equal(result.status, "done");
   assert.deepEqual(log.ran, [{ name: "show_pill", args: { pill: "integration_stripe" } }]);
 });
@@ -358,6 +361,14 @@ test("confirm: the exact change is shown, and a click does it", async () => {
   }
 });
 
+test("arguments a capability cannot do end the call before any click", async () => {
+  const { call, log } = setup({ click: true });
+  const result = await call("tell_agent", { text: "nothing" });
+  assert.deepEqual([result.status, result.line, result.detail], ["failed", "Nothing to send", "The message is empty."]);
+  assert.deepEqual(log.confirmed, []);
+  assert.deepEqual(log.ran, []);
+});
+
 test("confirm: no click is done-and-unchanged, and nothing ran", async () => {
   const { call, log } = setup({ click: false });
   const result = await call("tell_agent", { text: "ship it" });
@@ -485,4 +496,13 @@ test("putting back goes through the same guard", async () => {
   await registry.execute({ name: "bad", arguments: {} }, context());
   assert.equal((await registry.undo(context())).status, "refused");
   assert.equal(app.volume, 40);
+});
+
+test("a short sound key is enough when the letters agree too; one measure alone is not", () => {
+  const things = [{ id: "github", label: "GitHub" }, { id: "stripe", label: "Stripe" }, { id: "codex", label: "Codex" }];
+  // Three sounds alike and one letter apart: that thing.
+  assert.deepEqual(among("get hub", things), { is: "sure", id: "github", label: "GitHub" });
+  // A letter apart and other sounds, or alike in sound and not in letters: asked about.
+  assert.equal(among("strife", things).is, "unsure");
+  assert.equal(among("cortex", things).is, "unsure");
 });

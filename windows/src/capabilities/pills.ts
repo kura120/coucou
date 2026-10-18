@@ -142,6 +142,10 @@ export function pills(host: AppHost): Area {
           const next = str(args.add);
           if (!known(old)) return unknownArgument(args, "remove");
           if (!known(next)) return unknownArgument(args, "add");
+          // Nothing to swap: the one to hide is not there and the other already is.
+          if (!host.pills().active.includes(old) && shown(next)) {
+            return failed(t("That did not change"), `${name(old)} is not shown, and ${name(next)} already is.`);
+          }
           if (host.pills().active.includes(old)) host.togglePill(old);
           if (!shown(next) && host.pillFits(next)) host.togglePill(next);
           if (!shown(next)) return failed(t("That did not change"), `${name(next)} could not be shown.`);
@@ -171,7 +175,7 @@ export function pills(host: AppHost): Area {
       capability({
         name: "set_main_pill",
         area: AREA,
-        description: "Chooses the main workspace tool, the pill that is always shown. Not for bringing a session to the front: that is open_session.",
+        description: "Switches to another workspace tool or agent as the main pill, the one always shown: what switching to one means. Not for bringing a session's window to the front: that is open_session.",
         args: { pill: { type: "entity", kind: "workspace_pill", description: "The workspace tool to make the main one." } },
         tier: "reversible",
         inverse: (args) => (str(args.pill) === host.pills().main ? null : { name: "set_main_pill", arguments: { pill: host.pills().main } }),

@@ -576,11 +576,16 @@ test("set_setting: its tier is the setting's, and one it does not know takes a c
 test("set_setting: a switch, a level in percent, a delay, a choice by value or by label", async () => {
   const { get, s } = app();
   const set = (args) => get("set_setting").run(args, context());
-  assert.equal((await set({ setting: "soundVolume", number: 50 })).line, "Sound volume: 50 %");
+  assert.equal((await set({ setting: "soundVolume", number: 50 })).line, "Sound effects volume: 50 %");
   assert.equal(s.settings.soundVolume, 0.1);
   assert.equal((await set({ setting: "voice.followUp", number: 12 })).line, "Follow-up time: 12 seconds");
   assert.equal(s.settings.voice.followUp, 12);
   assert.equal((await set({ setting: "language", option: "Français" })).line, "Language: Français");
+  assert.equal(s.settings.language, "fr");
+  // A language by its name in English too, as the platform writes it.
+  assert.equal((await set({ setting: "language", option: "english" })).line, "Language: English");
+  assert.equal(s.settings.language, "en");
+  await set({ setting: "language", option: "french" });
   assert.equal(s.settings.language, "fr");
   assert.equal((await set({ setting: "voice.hearingModel", option: "moonshine-tiny" })).status, "done");
   assert.equal((await set({ setting: "screen", option: "cursor" })).status, "done");
@@ -601,13 +606,29 @@ test("set_setting: a value the setting does not take changes nothing, and says w
     assert.equal((await set(args)).status, "failed", JSON.stringify(args));
   }
   assert.deepEqual((await set({ setting: "language", option: "Klingon" })).near, ["System", "English", "Français"]);
+  // The same is said by check, before the click a setting may take: none is asked for what cannot be done.
+  const check = (args) => get("set_setting").check(args);
+  assert.deepEqual((await check({ setting: "language", option: "Klingon" })).near, ["System", "English", "Français"]);
+  assert.equal(await check({ setting: "language", option: "Français" }), null);
+  assert.equal((await check({ setting: "nonsense", on: true })).status, "failed");
+  // A level asked of a switch: the settings that take one are named.
+  assert.match((await check({ setting: "soundEnabled", number: 30 })).detail, /A level is one of: Sound effects volume/);
   assert.deepEqual(log, []);
+});
+
+test("a session is known by its agent's name too, as its card shows it", async () => {
+  const { registry } = app();
+  const sessions = await registry.sources.find((source) => source.kind === "session").list();
+  const claude = sessions.find((session) => session.id === "integration_claude");
+  assert.deepEqual(claude.spoken, ["Claude Code"]);
+  const listed = await registry.get("list_sessions").run({}, context());
+  for (const session of listed.data) if (session.agent) assert.notEqual(session.agent, session.name);
 });
 
 test("get_setting reads a value as a person reads it, with a choice's values", async () => {
   const { get } = app();
   const read = async (setting) => (await get("get_setting").run({ setting }, context())).data;
-  assert.deepEqual(await read("soundVolume"), { setting: "Sound volume", value: "60 %" });
+  assert.deepEqual(await read("soundVolume"), { setting: "Sound effects volume", value: "60 %" });
   assert.deepEqual(await read("soundEnabled"), { setting: "Sound effects", value: "on" });
   assert.deepEqual(await read("language"), { setting: "Language", value: "System", options: ["System", "English", "Français"] });
 });
@@ -783,4 +804,14 @@ test("appAreas gives each area's capabilities under one area name", () => {
   const areas = appAreas(made.host, registry());
   assert.equal(areas.length, 15);
   for (const area of areas) assert.equal(new Set(area.capabilities.map((c) => c.area)).size, 1);
+});
+
+test("replacing a pill that is not shown by one that already is changes nothing, and says so", async () => {
+  const { get, s, log } = app();
+  const shown = s.pills.active.find((id) => id !== s.pills.main);
+  const hidden = "integration_notion" === shown ? "integration_resend" : "integration_notion";
+  const result = await get("replace_pill").run({ remove: hidden, add: shown }, context());
+  assert.equal(result.status, "failed");
+  assert.match(result.detail, /is not shown, and .* already is/);
+  assert.deepEqual(log, []);
 });

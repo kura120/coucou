@@ -71,7 +71,7 @@ export function music(host: AppHost): Area {
       capability({
         name: "pause_music",
         area: AREA,
-        description: "Pauses the music. Not for pausing Coucou itself, and not for stopping the microphone.",
+        description: "Pauses the music that is playing, whether for a moment or not. What a pause means when nothing else is named. Not for pausing Coucou itself, and not for stopping the microphone.",
         args: {},
         tier: "reversible",
         available,
@@ -133,7 +133,7 @@ export function music(host: AppHost): Area {
       capability({
         name: "set_music_volume",
         area: AREA,
-        description: "Sets the music player's volume. Not the volume of Coucou's own sounds, which is a setting.",
+        description: "Sets the music player's volume, from 0 to 100. Not for muting Coucou, nor for the volume of Coucou's own sounds and Mochi's voice: those are the settings Sound effects and Sound effects volume.",
         args: { percent: { type: "number", min: 0, max: 100, description: "The volume, from 0 to 100." } },
         tier: "reversible",
         available,

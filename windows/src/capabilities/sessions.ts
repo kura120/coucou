@@ -1,6 +1,7 @@
 // The agents' sessions: what each is doing, its recent output, and bringing
 // one and its terminal to the front. Nothing here writes to a session.
 
+import { sessionSubtitle } from "../core/pills";
 import { t } from "../i18n/i18n";
 import { done, failed } from "../voice/result";
 import type { AppHost } from "./host";
@@ -13,13 +14,21 @@ const MOST_LINES = 20;
 
 export function sessions(host: AppHost): Area {
   const find = (id: string) => host.sessions().find((s) => s.id === id);
+  /** The agent a session runs, as its card names it ("Claude Code" in the VS Code pill); null when the card says only "Agent". */
+  const agentOf = (id: string, name: string): string | null => {
+    const agent = sessionSubtitle(id);
+    return agent === sessionSubtitle("") || agent === name ? null : agent;
+  };
 
   return {
     sources: [
       {
         kind: "session",
-        description: "The agents' sessions with something going on, each by its pill's name, with its state.",
-        list: () => host.sessions().map((s) => ({ id: s.id, label: s.name, hint: cut(`${s.state}${s.doing ? `: ${s.doing}` : ""}`, 80) })),
+        description: "The agents' sessions with something going on, each by its pill's name and the agent it runs, with its state.",
+        list: () => host.sessions().map((s) => {
+          const agent = agentOf(s.id, s.name);
+          return { id: s.id, label: s.name, ...(agent ? { spoken: [agent] } : {}), hint: cut(`${agent ? `${agent}, ` : ""}${s.state}${s.doing ? `: ${s.doing}` : ""}`, 80) };
+        }),
       },
     ],
     capabilities: [
@@ -31,7 +40,10 @@ export function sessions(host: AppHost): Area {
         tier: "read",
         inSnapshot: true,
         async run() {
-          const list = host.sessions().map(({ name, state, doing }) => ({ name, state, doing: cut(doing, 120) }));
+          const list = host.sessions().map(({ id, name, state, doing }) => {
+            const agent = agentOf(id, name);
+            return { name, ...(agent ? { agent } : {}), state, doing: cut(doing, 120) };
+          });
           return list.length
             ? done(list.map((s) => s.name).join(", "), true, list)
             : done(t("Nothing running right now."), true, []);
@@ -58,7 +70,7 @@ export function sessions(host: AppHost): Area {
       capability({
         name: "open_session",
         area: AREA,
-        description: "Brings an agent's session and its terminal to the front. Not for starting an application, and not for choosing the main pill.",
+        description: "Shows the terminal window of an agent's session, to look at what it is doing. Not for starting an application, and not for switching to another workspace tool (set_main_pill).",
         args: { session: { type: "entity", kind: "session", description: "The session to bring forward." } },
         tier: "free",
         async run(args) {

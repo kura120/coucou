@@ -21,12 +21,17 @@
 // handed to a model whole; what it means is theirs to work out, and what may
 // be done is the executor's to decide (the capability's tier, a click for
 // `confirm`). The texts below are instructions to a model, not rules about
-// wording. Nothing said is written to disk or logged.
+// wording. The one comparison with the sentence is of names: whether it
+// holds a name a model wrote (`asHeard`), by the matcher's own normalising.
+// What Mochi says of what was done is the capabilities' own lines; a model
+// words only what was read, given nothing but the results (`report`).
+// Nothing said is written to disk or logged.
 
 import type { Answer, Ask, Capability, Registry, RunContext, ToolResult } from "../core/capabilities/types";
 import { usable } from "./asking";
+import { normalise } from "./entity";
 import { VoiceMemory, type ModelCall, type VoiceTurn } from "./memory";
-import { ALWAYS_SHOWN, CapabilityIndex, indexText, instant, shortlist, type Embed, type Ranked } from "./rank";
+import { ALWAYS_SHOWN, CapabilityIndex, indexText, instant, SHORTLIST, shortlist, type Embed, type Ranked } from "./rank";
 import { forModel, spoken, type VoiceResult } from "./result";
 
 export type { ModelCall } from "./memory";
@@ -136,6 +141,14 @@ export interface Heard {
   rest: boolean;
   /** Said in place of an answer to a question, and a request of its own: to be heard as the next turn. */
   next?: string;
+  /**
+   * Something ran: true when the model's words for it were said, false when
+   * they did not hold up against the results and the capabilities' lines were
+   * said instead. Absent when nothing ran, or no model put it in words.
+   */
+  worded?: boolean;
+  /** Why they did not: "unseen", "thing" or "number" (`unfounded`). */
+  unworded?: string;
 }
 
 /** What a sentence said while a question is on screen does to it. */
@@ -163,8 +176,11 @@ interface Running {
   started: number;
   /** Taken as said to Coucou: by the wake phrase, or by the local model calling something. */
   taken: boolean;
+  /** Whether the model's words for what ran held up against the results (`checked`), and if not, why. */
+  worded?: boolean;
+  unworded?: string;
   /** The app's things the sentence names, or perhaps names (Registry.named). */
-  named: readonly { kind: string; id: string; label: string; near?: boolean }[];
+  named: readonly { kind: string; id: string; label: string; near?: boolean; heard?: string }[];
 }
 
 const IGNORED: Heard = { result: null, taken: false, rest: false };
@@ -177,13 +193,16 @@ const INTRO = "You are the voice of Coucou, a small desktop app: its user has ju
 const ROLE = [
   "How to act:",
   "- Do what was asked by calling capabilities. Several things asked are several calls.",
-  "- Names: write each name in the arguments in the user's own words, as it was heard, even when it looks misheard, cut short or unlike anything in the state (\"open st\" is the app \"st\"). The app looks it up and asks the user when it is not sure. Never write a name the user did not say.",
-  "- When the user says not to do something, do not do it: call the capability named nothing.",
+  "- Names: write each name in the arguments in the user's own words, as it was heard, even when it looks misheard, cut short or unlike anything in the state (\"open st\" is the app \"st\", \"open this squad\" the app \"this squad\"). The app looks it up and asks the user when it is not sure. A name you do not know is never a reason to do nothing. Never write a name or an address the user did not say.",
+  "- A sentence that goes on from the turn before (\"and Discord too\", \"what about Steam\") asks for the same again, for what it names now.",
+  "- A correction of the turn before (\"no, I meant Resend\", \"take that one off\") is a request: put the last change back with undo, then do what is meant now, if anything.",
   "- Some capabilities wait for the user's click before anything happens. That is the app's doing: call them when they are what was asked.",
   "- A question about the app is answered from its state, below, or by a capability that reads.",
   "- When what was heard asks nothing of Coucou, call the capability named nothing.",
+  "- When no capability does what was asked, say so in words. Never call one that does something else instead.",
   "- Never say something was done unless a capability's result says so.",
   "- When you answer in words: one or two short sentences, plain text, no lists.",
+  "- Last, and above all: when the sentence says not to do something, or never to do it, nothing is done. Call the capability named nothing.",
 ].join("\n");
 
 /**
@@ -205,10 +224,37 @@ const BY_AREA = "Your tools are the capabilities of the areas the sentence is ab
 
 /** Told to the model of a sentence said without the wake phrase. */
 const ASIDE =
-  "This sentence was said without Coucou's name, a few seconds after the turn above: it may have been said to someone else in the room. Unless it plainly asks Coucou for something, call the capability named nothing.";
+  "This sentence was said without Coucou's name, a few seconds after the turn above: it may have been said to someone else in the room. Unless it plainly asks Coucou for one of the things its capabilities do, call the capability named nothing: a remark, a plan, a time or a question a person in the room could be asked is for them.";
 
 const AFTER_CALLS =
   "The results of your calls are above. If what was asked needs another capability, call it now. Otherwise say what happened in one short sentence, from the results alone.";
+
+/**
+ * Said when the model answered with nothing at all. Measured: that is a call
+ * to a capability that does not exist ("approve_permission_request"), which
+ * the model server drops, since it is not among the tools.
+ */
+const EMPTY = "Your last answer called a capability that does not exist here, and nothing was done. Call one of your tools — {tools} — the one nearest to what was asked, or answer in words.";
+
+/** Once the app's capabilities ran, the model only decides what else to call: its words are not what Mochi says. */
+const AFTER_RAN = "The results of your calls are above. If a call failed and can be made right with another value or another setting, make it now. If what was asked needs another capability, call it now. Otherwise tell the user, in one short sentence, what the results say was done — only that.";
+
+/** After what was only asked for, not seen: the model only decides what else to call. */
+const AFTER_RAN_DONE = "The results of your calls are above. If a call failed and can be made right with another value or another setting, make it now. If what was asked needs another capability, call it now. Otherwise reply with the one word: done.";
+
+/**
+ * What only read the app is put in words by a model given those results and
+ * nothing else — not the sentence, not the turns before, no tools — so that
+ * it has nothing to say but what they hold.
+ */
+const REPORT = [
+  "An assistant has just read parts of a desktop app's state for its user, through the app's own capabilities. What each read gave back is below, as JSON.",
+  "{results}",
+  "Tell the user what they hold, as if you had looked yourself: one or two short sentences of plain text that keep every fact, a state such as passing or failing above all. Only what is in the results: add nothing, guess nothing, offer nothing, ask nothing. Do not mention the app, the reads or the results.",
+].join("\n\n");
+
+/** The user's message of that call: the results are in the system's. */
+const REPORT_ASKED = "What did the app read?";
 
 const READ_ANSWER = [
   "The user of a desktop app was asked a question on screen and has just answered out loud. Read their answer and call the tool named answer, once.",
@@ -325,8 +371,12 @@ export class VoiceTurns {
     const local = this.local();
     if (!local) return { is: "unclear" };
 
+    // A choice's options with their place among them, for an answer by place ("the last one").
     const options = ask.kind === "choice"
-      ? ask.options.map((option, i) => ({ value: String(i + 1), label: option.hint ? `${option.label} (${option.hint})` : option.label }))
+      ? ask.options.map((option, i, all) => ({
+        value: String(i + 1),
+        label: `${option.label}${option.hint ? ` (${option.hint})` : ""}, option ${i + 1} of ${all.length}${i === 0 ? ", the first" : i === all.length - 1 ? ", the last" : ""}`,
+      }))
       : [{ value: "yes", label: ask.yes ?? "Yes" }, { value: "no", label: ask.no ?? "No" }];
     const system = READ_ANSWER
       .replace("{question}", ask.question)
@@ -343,7 +393,9 @@ export class VoiceTurns {
     if (!given) return { is: "unclear" };
     // "No, Discord": no to this, and a request of its own, heard once this turn is over.
     const refusal = given.kind === "dropped" || (given.kind === "yes_no" && !given.yes);
-    if (refusal && call?.arguments?.also_asks === true) this.nextSaid = sentence;
+    // Or a no that names another thing of the kind it was asked about: what was meant instead.
+    const instead = refusal && ask.about != null && (await this.registry.named(sentence)).some((n) => n.kind === ask.about && !n.near);
+    if (refusal && (call?.arguments?.also_asks === true || instead)) this.nextSaid = sentence;
     this.answer(given);
     return { is: "answer" };
   }
@@ -384,7 +436,21 @@ export class VoiceTurns {
     turn.how.waiting?.();
     const came = await this.locally(local, turn, ranked);
     if (came.is === "dropped") return { result: null, taken: true, rest: false };
-    if (came.is === "answered") return this.end(turn, came.words);
+    if (came.is === "answered") {
+      // The sentence nearly names a thing and the model did nothing with it ("open spy flight" taken for
+      // nonsense): the capability that takes such a thing is called with it as heard, and the executor
+      // asks the user whether it is that thing. A question, never an act on a guess.
+      // So too when all it called came to nothing ("open st" as a web address): those calls are replaced by the question.
+      const failed = shownOf(turn).every((ran) => ran.result.status === "failed" || ran.result.status === "not_found" || ran.result.status === "refused");
+      const near = turn.taken && failed && !turn.ran.some((ran) => ran.call.name === NOTHING) ? misheard(ranked, this.registry.all(), turn.named) : null;
+      if (near) {
+        const before = turn.ran;
+        turn.ran = turn.ran.filter((ran) => !shownOf(turn).includes(ran));
+        if (await this.instantly(near.name, turn, near.heard)) return this.end(turn, "");
+        turn.ran = before;
+      }
+      return this.end(turn, await this.checked(turn, came.words));
+    }
     // What may have been said to someone else never goes further than this computer.
     if (!turn.taken) return IGNORED;
 
@@ -394,7 +460,7 @@ export class VoiceTurns {
     turn.how.waiting?.(this.words.askingCloud(), CLOUD_BUDGET_MS);
     const words = await this.cloudly(cloud, turn);
     if (turn.how.wanted && !turn.how.wanted()) return { result: null, taken: true, rest: false };
-    return this.end(turn, words ?? "", words == null && !shownOf(turn).length ? this.words.silent() : undefined);
+    return this.end(turn, await this.checked(turn, words ?? ""), words == null && !shownOf(turn).length ? this.words.silent() : undefined);
   }
 
   // ── The ranking ─────────────────────────────────────────────────────────────
@@ -433,9 +499,15 @@ export class VoiceTurns {
     };
   }
 
+  /** The call as it is run: its names put back as heard (`asHeard`). */
+  private heardCall(call: ModelCall, turn: Running): Promise<ModelCall> {
+    return asHeard(call, this.registry.get(call.name), turn, (text) => this.registry.named(text));
+  }
+
   private async run(call: ModelCall, origin: RunContext["origin"], turn: Running): Promise<ToolResult> {
-    const result = await this.registry.execute(call, this.context(origin, turn));
-    turn.ran.push({ call, result, capability: this.registry.get(call.name) });
+    const given = await this.heardCall(call, turn);
+    const result = await this.registry.execute(given, this.context(origin, turn));
+    turn.ran.push({ call: given, result, capability: this.registry.get(call.name) });
     return result;
   }
 
@@ -448,13 +520,13 @@ export class VoiceTurns {
    * False when that came to nothing — no such thing, or not a call that can be
    * made this way — and a model should read the sentence instead.
    */
-  private async instantly(name: string, turn: Running): Promise<boolean> {
+  private async instantly(name: string, turn: Running, said = turn.said): Promise<boolean> {
     const capability = this.registry.get(name);
     if (!capability) return false;
     const named = Object.entries(capability.args).filter(([, spec]) => !spec.optional);
     // Two things to name in one sentence: which is which is a model's to read.
     if (named.length > 1) return false;
-    const args = Object.fromEntries(named.map(([arg]) => [arg, turn.said]));
+    const args = Object.fromEntries(named.map(([arg]) => [arg, said]));
     const result = await this.registry.execute({ name, arguments: args }, this.context("instant", turn));
     if (result.status === "not_found" || result.status === "refused") return this.local() == null && this.record(turn, name, args, result);
     return this.record(turn, name, args, result);
@@ -477,8 +549,13 @@ export class VoiceTurns {
     const declared = new Set(capabilities.map((c) => c.name));
     // Handing up is offered only when there is somebody to hand up to.
     const offered = (names: readonly string[]) => names.filter((n) => declared.has(n) && (n !== ESCALATE || (turn.taken && this.cloud() != null)));
-    const shown = new Set(offered([...(ranked ? shortlist(ranked, capabilities) : ALWAYS_SHOWN), UNDO]));
     const history: ModelTurn[] = this.memory.recent(this.now()).map(({ said: s, calls, result }) => ({ said: s, calls, result }));
+    // A follow-up ("and Discord too") goes on with what the turn before called, whatever it ranks alone.
+    const carried = (history[history.length - 1]?.calls ?? []).map((call) => call.name);
+    // With no ranking, every capability that takes a kind of thing the sentence names: there are few for each.
+    const kinds = new Set(turn.named.map((n) => n.kind));
+    const taking = capabilities.filter((c) => kindsOf(c).some((kind) => kinds.has(kind))).map((c) => c.name);
+    const shown = new Set(offered([...(ranked ? shortlist(ranked, capabilities, SHORTLIST, [...carried, ...takers(ranked, capabilities, turn.named)]) : [...ALWAYS_SHOWN, ...carried, ...taking]), UNDO]));
     // What cannot be used right now is not offered (no question waits, the chat's field is empty): read again
     // each round, since a call may make another usable — a message prepared can be sent.
     const usable = (name: string) => {
@@ -498,7 +575,7 @@ export class VoiceTurns {
       const all = this.registry.areas();
       const lines = all.map(({ area, names }) => `${area}: ${names.map((name) => name.split("_").join(" ")).join(", ")}`).join("\n");
       // With the app's state: which area a name belongs to is read there (a pill, a session, a setting).
-      const router = [AREAS_FIRST.replace("{areas}", lines), `The app's state now, as JSON:\n${JSON.stringify(snapshot)}`, namedLine(turn.named)].filter(Boolean).join("\n\n");
+      const router = [AREAS_FIRST.replace("{areas}", lines), `The app's state now, as JSON:\n${JSON.stringify(snapshot)}`, namedLine(turn.named, false)].filter(Boolean).join("\n\n");
       const routed = await local(router, said, [aboutTool(all.map(({ area }) => area))], history);
       if (how.wanted && !how.wanted()) return { is: "dropped" };
       if (!routed) return { is: "silent" };
@@ -510,6 +587,12 @@ export class VoiceTurns {
 
     let reply = await local(system, said, tools(), history);
     if (how.wanted && !how.wanted()) return { is: "dropped" };
+    // An empty answer — no call, no words — is a small model's call that did not come out: asked once more.
+    if (reply && !reply.calls.length && !reply.text.trim()) {
+      const offered = tools().map((tool) => (tool as { function: { name: string } }).function.name);
+      reply = await local(`${system}\n\n${EMPTY.replace("{tools}", offered.join(", "))}`, said, tools(), history);
+      if (how.wanted && !how.wanted()) return { is: "dropped" };
+    }
     if (!reply) return { is: "silent" };
 
     const steps: ModelStep[] = [];
@@ -521,8 +604,14 @@ export class VoiceTurns {
         words = looksWritten(reply.text) ? "" : reply.text;
         break;
       }
-      // What it already called it has nothing more to ask of: nothing is done twice for one sentence.
-      const fresh = calls.filter((call) => !turn.ran.some((ran) => same(ran.call, call))).slice(0, MOST_CALLS);
+      // What it already called it has nothing more to ask of: nothing is done twice for one sentence —
+      // compared as run, so that "Stripe" after a no to "Did you mean Stripe?" is not asked again.
+      const fresh: ModelCall[] = [];
+      for (const call of calls) {
+        const given = await this.heardCall(call, turn);
+        if (!turn.ran.some((ran) => same(ran.call, given)) && !fresh.some((other) => same(other, given))) fresh.push(given);
+        if (fresh.length >= MOST_CALLS) break;
+      }
       if (!fresh.length) break;
       // Said without the wake phrase: it was for Coucou once the model asks for something the app does.
       if (!turn.taken && fresh.some((call) => declared.has(call.name) && ![NOTHING, MORE_TOOLS, ESCALATE].includes(call.name))) {
@@ -550,12 +639,49 @@ export class VoiceTurns {
       const line = lineOf(turn);
       if (line) how.working?.(line);
       // Once something was done the model is waited for a little: what it adds is how it is said.
-      const next = await within(local(`${system}\n\n${AFTER_CALLS}`, said, tools(), history, steps), acted(turn) ? Math.min(left, WORDING_MS) : left);
+      // What was only asked for is said in its own line whatever the words (`unfounded`): none are asked for.
+      const after = !shownOf(turn).length ? AFTER_CALLS : shownOf(turn).every((ran) => ran.result.verified) ? AFTER_RAN : AFTER_RAN_DONE;
+      const next = await within(local(`${system}\n\n${after}`, said, tools(), history, steps), acted(turn) ? Math.min(left, WORDING_MS) : left);
       if (how.wanted && !how.wanted()) return { is: "dropped" };
       if (!next) break;
       reply = next;
     }
+    // What only read is said from what was read, and from nothing else.
+    if (shownOf(turn).length && !acted(turn) && shownOf(turn).every((ran) => ran.result.status === "done")) {
+      words = (await this.report(local, turn)) ?? "";
+      if (how.wanted && !how.wanted()) return { is: "dropped" };
+    }
     return { is: "answered", words };
+  }
+
+  /** The reads of this turn in words, by a model given their results alone; null when it did not answer. */
+  private async report(local: LocalModel, turn: Running): Promise<string | null> {
+    const results = shownOf(turn).map((ran) => ({
+      read: ran.capability ? indexText(ran.capability) : ran.call.name,
+      ...(Object.keys(ran.call.arguments ?? {}).length ? { of: ran.call.arguments } : {}),
+      ...forModel(ran.result),
+    }));
+    const left = TURN_BUDGET_MS - (this.now() - turn.started);
+    const reply = await within(local(REPORT.replace("{results}", JSON.stringify(results)), REPORT_ASKED, [], []), Math.max(WORDING_MS, left));
+    const text = reply && !reply.calls.length && !looksWritten(reply.text) ? reply.text.trim() : "";
+    return text || null;
+  }
+
+  // ── Checking the words ──────────────────────────────────────────────────────
+
+  /**
+   * The model's words for what ran, when they hold up against the results;
+   * "" when they do not, and the capabilities' own lines are said instead.
+   * Words with nothing run are an answer about the app's state, and pass.
+   */
+  private async checked(turn: Running, words: string): Promise<string> {
+    const shown = shownOf(turn);
+    const text = words.trim();
+    if (!shown.length || !text || shown.some((ran) => ran.result.status !== "done")) return text;
+    const why = await unfounded(text, shown, (said) => this.registry.named(said));
+    turn.worded = why == null;
+    turn.unworded = why ?? undefined;
+    return why == null ? text : "";
   }
 
   // ── Tier 3 ──────────────────────────────────────────────────────────────────
@@ -618,13 +744,15 @@ export class VoiceTurns {
     // What went wrong is what is shown, in the capability's own line.
     const wrong = shown.find((ran) => ran.result.status !== "done");
     if (wrong) return finish({ outcome: "failure", message: wrong.result.line });
-    // Mochi's words are the model's only for what was seen to work: a read, or
-    // a change that reads back. What was only asked for, or left unchanged
-    // after a click that did not come, is said in the capability's own line.
-    const seen = shown.every((ran) => ran.result.verified);
-    const last = [...shown].reverse().find((ran) => ran.result.line) ?? shown[shown.length - 1];
-    const message = seen ? spoken(words, last.result.line) : last.result.line;
-    return finish(message ? { outcome: "success", message } : null);
+    // What was done is said in the lines of what did it, and in nothing else:
+    // a model's words can name what no capability did ("Stripe removed" when
+    // nothing removed it); a capability's line is what it did. Only what
+    // merely read is put in words (`report`: a model given the results alone).
+    const doing = shown.filter((ran) => ran.capability?.tier !== "read");
+    // `words` were checked against the results (`checked`): "" when they did not hold up.
+    const message = spoken(words, linesOf(doing.length ? doing : shown));
+    const heard = finish(message ? { outcome: "success", message } : null);
+    return turn.worded == null ? heard : { ...heard, worded: turn.worded && words.trim() !== "", ...(turn.unworded ? { unworded: turn.unworded } : {}) };
   }
 }
 
@@ -635,10 +763,94 @@ export class VoiceTurns {
  * nothing of ("spy flight") is said to be perhaps an app the app has. It is
  * still passed on as heard; the executor asks before acting on a near one.
  */
-function namedLine(named: Running["named"]): string {
+function namedLine(named: Running["named"], calling = true): string {
   if (!named.length) return "";
-  const things = named.map((n) => (n.near ? `perhaps ${n.label} (${n.kind}, heard as something close to it)` : `${n.label} (${n.kind})`));
-  return `In what was said, the app finds: ${things.join("; ")}.`;
+  const whole = named.filter((n) => !n.near).map((n) => `${n.label} (${n.kind})`);
+  const near = named.filter((n) => n.near).map((n) => `${n.heard ? `"${n.heard}" is ` : ""}most likely ${n.label} (${n.kind}), misheard`);
+  return [
+    whole.length ? `In what was said, the app finds: ${whole.join("; ")}.` : "",
+    near.length ? `In what was said, ${near.join("; ")}${calling ? ": call with that name; the app asks the user before it acts on it" : ""}.` : "",
+  ].filter(Boolean).join(" ");
+}
+
+/**
+ * For each kind of thing the sentence names, the best-ranked capability that
+ * takes it: "open Discord" names an app, and what opens an app is shown
+ * however near "open" alone is to opening a folder or a conversation.
+ */
+function takers(ranked: readonly Ranked[], capabilities: readonly Capability[], named: Running["named"]): string[] {
+  const kinds = new Map(capabilities.map((c) => [c.name, kindsOf(c)]));
+  const out: string[] = [];
+  for (const kind of new Set(named.map((n) => n.kind))) {
+    const best = ranked.find((r) => kinds.get(r.name)?.includes(kind));
+    if (best && !out.includes(best.name)) out.push(best.name);
+  }
+  return out;
+}
+
+/**
+ * The call with every name the model wrote for a thing the sentence only
+ * nearly holds put back as the user said it: told "perhaps Stripe" of
+ * "remove strife", a model writes "Stripe", and the executor would act on
+ * it without the question an unsure name takes. What it is near is known
+ * for a listed kind (the words it was heard as); for a kind ranked by its
+ * source (the apps), the sentence itself is what is looked up, as tier 1
+ * does. A name the sentence holds whole is left as written; one it does not
+ * hold and that is nothing of its kind ("VS Code", a pill, written for the
+ * app in "launch visual studio code"), where the sentence names one thing of
+ * that kind and the capability takes one argument of it, is that thing.
+ */
+export async function asHeard(
+  call: ModelCall,
+  capability: Capability | undefined,
+  turn: Pick<Running, "said" | "named">,
+  /** What a text names, as Registry.named: to tell a name that is nothing of its kind. */
+  namedIn?: (text: string) => Promise<readonly { kind: string }[]>,
+): Promise<ModelCall> {
+  if (!capability || !turn.named.length) return call;
+  const args = { ...(call.arguments ?? {}) };
+  const sentence = ` ${normalise(turn.said)} `;
+  const specs = Object.entries(capability.args);
+  const back = async (kind: string, value: unknown): Promise<unknown> => {
+    if (typeof value !== "string") return value;
+    const said = normalise(value);
+    const ofKind = turn.named.filter((n) => n.kind === kind);
+    const near = ofKind.find((n) => n.near && (n.id === value || normalise(n.label) === said));
+    if (near && !ofKind.some((n) => !n.near && n.id === near.id)) return near.heard ?? turn.said;
+    // A name the sentence does not hold and that is nothing of its kind, for the one argument of that kind,
+    // where the sentence names one thing of it: that thing.
+    const alone = specs.filter(([, spec]) => (spec.type === "entity" || spec.type === "entities") && spec.kind === kind).length === 1;
+    if (!alone || !said || sentence.includes(` ${said} `) || ofKind.length !== 1 || value === ofKind[0].id) return value;
+    if (!namedIn || (await namedIn(value).catch(() => [{ kind }])).some((n) => n.kind === kind)) return value;
+    return ofKind[0].near ? (ofKind[0].heard ?? turn.said) : ofKind[0].id;
+  };
+  for (const [arg, spec] of specs) {
+    if (!(arg in args)) continue;
+    if (spec.type === "entity") args[arg] = await back(spec.kind, args[arg]);
+    else if (spec.type === "entities") {
+      args[arg] = Array.isArray(args[arg]) ? await Promise.all((args[arg] as unknown[]).map((v) => back(spec.kind, v))) : await back(spec.kind, args[arg]);
+    }
+  }
+  return { ...call, arguments: args };
+}
+
+/**
+ * The capability to ask about a thing the sentence only nearly names, and
+ * the words it was heard as: one that takes that kind of thing and nothing
+ * else it would need a model for, and that no click guards. Ranked, the best
+ * of them; without a ranking, only when one alone takes that kind.
+ */
+export function misheard(ranked: readonly Ranked[] | null, capabilities: readonly Capability[], named: Running["named"]): { name: string; heard: string | undefined } | null {
+  for (const thing of named.filter((n) => n.near)) {
+    const fit = capabilities.filter((c) => {
+      const required = Object.values(c.args).filter((spec) => !spec.optional);
+      const only = required.length === 1 ? required[0] : null;
+      return only != null && (only.type === "entity" || only.type === "entities") && only.kind === thing.kind && typeof c.tier === "string" && c.tier !== "confirm";
+    });
+    const best = ranked ? ranked.find((r) => fit.some((c) => c.name === r.name))?.name : fit.length === 1 ? fit[0].name : undefined;
+    if (best) return { name: best, heard: thing.heard };
+  }
+  return null;
 }
 
 /** The kinds of thing a capability takes as an argument. */
@@ -651,6 +863,63 @@ const shownOf = (turn: Running) => turn.ran.filter((ran) => ![MORE_TOOLS, NOTHIN
 /** Something was changed or shown, not only read. */
 const acted = (turn: Running) =>
   shownOf(turn).some((ran) => ran.result.status === "done" && ran.capability != null && ran.capability.tier !== "read");
+
+/**
+ * Whether words for what ran name only what the results hold. Three checks,
+ * all computed — no word is looked for:
+ *
+ *   seen     every result was seen to work: what was only asked for ("Asked
+ *            Windows to open Spotify"), or left unchanged when the click did
+ *            not come, is said in its own line, whatever the words
+ *   things   each thing of the app the words name (Registry.named, said
+ *            whole) is in the results: an argument, a line, what was read
+ *   numbers  each number in the words is in the results
+ *
+ * Not checked: which action the words say, when they name nothing the app
+ * has ("Coucou is paused" after pause_music). Tried with the embedding
+ * model — one that ran among the three capabilities nearest the words —
+ * and measured: 27 rejections in 114 worded turns, every one of them true
+ * ("Spotify has been opened" is nearest to opening a conversation). Gone.
+ *
+ * Measured with scripts/voice-eval.mjs (the "worded" column).
+ */
+export async function grounded(...args: Parameters<typeof unfounded>): Promise<boolean> {
+  return (await unfounded(...args)) == null;
+}
+
+/** Why words for what ran do not hold up — "unseen", "thing", "number" — or null when they do (`grounded`). `named`: Registry.named. */
+export async function unfounded(
+  words: string,
+  ran: readonly { call: ModelCall; result: ToolResult; capability?: Capability }[],
+  named: (said: string) => Promise<readonly { kind: string; id: string; label: string; near?: boolean }[]>,
+): Promise<"unseen" | "thing" | "number" | null> {
+  if (ran.some(({ result }) => !result.verified)) return "unseen";
+  const facts = ` ${values(ran.map(({ call, result }) => [call.arguments ?? {}, result.line, result.detail ?? "", result.data ?? null])).map(normalise).join(" ")} `;
+  const holds = (text: string) => {
+    const form = normalise(text);
+    return form !== "" && facts.includes(` ${form} `);
+  };
+  const things = (await named(words).catch(() => [])).filter((thing) => !thing.near);
+  if (things.some((thing) => !holds(thing.label) && !holds(thing.id))) return "thing";
+  // Numbers said as numbers, not the digits of a name ("n8n").
+  const numbers = normalise(words).split(" ").filter((word) => /^\d+$/.test(word));
+  return numbers.some((number) => !holds(number)) ? "number" : null;
+}
+
+/** Every string and number a value holds, however deep. */
+function values(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (typeof value === "number" || typeof value === "boolean") return [String(value)];
+  if (Array.isArray(value)) return value.flatMap(values);
+  if (value && typeof value === "object") return Object.values(value).flatMap(values);
+  return [];
+}
+
+/** The lines of what ran, each once, as sentences: "Paused. Stripe removed." */
+function linesOf(ran: readonly Ran[]): string {
+  const lines = [...new Set(ran.map((r) => r.result.line.trim()).filter(Boolean))];
+  return lines.map((line, i) => (i < lines.length - 1 && !/[.!?…]$/.test(line) ? `${line}.` : line)).join(" ");
+}
 
 /** The last line a capability gave, for the card while the model goes on. */
 const lineOf = (turn: Running) => [...shownOf(turn)].reverse().find((ran) => ran.result.line)?.result.line ?? "";
@@ -699,9 +968,9 @@ function answerTool(options: readonly string[]) {
           option: {
             type: "string",
             enum: [...options, "none", "unclear"],
-            description: "The option the user chose. 'none' when they turn every option down or want the question dropped. 'unclear' when what they said does not answer the question.",
+            description: "The option the user chose. 'none' when they turn every option down or want the question dropped. 'unclear' when what they said is not an answer to this question at all: a question or a request of its own.",
           },
-          also_asks: { type: "boolean", description: "True when, besides answering, they ask for something else to be done." },
+          also_asks: { type: "boolean", description: "True when, besides answering, they ask for something else to be done or name something else instead (a no followed by another name)." },
         },
         required: ["option"],
         additionalProperties: false,
@@ -728,6 +997,13 @@ export function written(text: string, known: ReadonlySet<string>): ModelCall[] {
   const body = text.replace(/```[a-z]*\n?|```|<\/?tool_call>/gi, " ").trim();
   if (!body) return [];
   const whole = safeJson(body);
+  // A capability's name alone, or followed by its arguments as JSON: `nothing`, `open_app {"app": "Steam"}`.
+  const bare = whole == null ? /^([a-z][a-z0-9_]*)\s*(?:\(\s*(\{[\s\S]*\})\s*\)|(\{[\s\S]*\}))?\s*$/.exec(body) : null;
+  if (bare && known.has(bare[1])) {
+    const given = bare[2] ?? bare[3];
+    const args = given ? safeJson(given) : {};
+    return args && typeof args === "object" && !Array.isArray(args) ? [{ name: bare[1], arguments: args as Record<string, unknown> }] : [];
+  }
   const calls: ModelCall[] = [];
   for (const item of Array.isArray(whole) ? whole : whole ? [whole] : []) {
     if (!item || typeof item !== "object") continue;
