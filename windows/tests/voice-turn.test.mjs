@@ -543,3 +543,17 @@ test("a name the app only nearly has is told to the model as perhaps that thing,
   assert.match(local.asked[0].system, /the app finds: perhaps Spotify \(app, heard as something close to it\)/);
   assert.doesNotMatch(local.asked[0].system, /Steam/);
 });
+
+test("what cannot be used right now is not offered, and is offered once a call makes it usable", async () => {
+  let draft = "";
+  app.registry.declare(
+    { name: "write_note", area: "music", description: "Writes a note.", args: {}, tier: "free", run: async () => ((draft = "hi"), done("Written", true)) },
+    { name: "send_note", area: "music", description: "Sends the note.", args: {}, tier: "free", available: () => (draft ? true : "There is no note"), run: async () => done("Sent", true) },
+  );
+  const local = scripted(calls(call("write_note")), says("Written."));
+  local.route = ["music", "none", "none"];
+  await turns({ local: local.model }).hear("write a note and send it");
+  assert.ok(local.asked[0].tools.includes("write_note"));
+  assert.ok(!local.asked[0].tools.includes("send_note"));
+  assert.ok(local.asked[1].tools.includes("send_note"));
+});

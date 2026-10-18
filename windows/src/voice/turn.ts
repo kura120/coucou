@@ -479,7 +479,16 @@ export class VoiceTurns {
     const offered = (names: readonly string[]) => names.filter((n) => declared.has(n) && (n !== ESCALATE || (turn.taken && this.cloud() != null)));
     const shown = new Set(offered([...(ranked ? shortlist(ranked, capabilities) : ALWAYS_SHOWN), UNDO]));
     const history: ModelTurn[] = this.memory.recent(this.now()).map(({ said: s, calls, result }) => ({ said: s, calls, result }));
-    const tools = () => [...shown].map((name) => this.registry.schema(name)).filter(Boolean);
+    // What cannot be used right now is not offered (no question waits, the chat's field is empty): read again
+    // each round, since a call may make another usable — a message prepared can be sent.
+    const usable = (name: string) => {
+      try {
+        return (this.registry.get(name)?.available?.() ?? true) === true;
+      } catch {
+        return false;
+      }
+    };
+    const tools = () => [...shown].filter(usable).map((name) => this.registry.schema(name)).filter(Boolean);
 
     const snapshot = await this.registry.snapshot();
 
