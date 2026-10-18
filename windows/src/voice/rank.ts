@@ -46,13 +46,22 @@ export interface Ranked {
 /**
  * Tier 1: how far the best must be ahead of the second. Negation is where
  * embeddings fail: "don't pause the music" lands where "pause the music"
- * does. On the rank session's invented table nothing ran wrongly from 0.10
- * up; on the app's own declarations (2026-10-18, nomic-embed-text) a wrong
- * one ran at every margin up to 0.182 — "don't pause the music" paused it,
- * ahead by 0.182 — and at 0.12 nine ran rightly and two wrongly, both
- * negations. From 0.20 up none ran wrongly; one ran rightly. So tier 1 fires
- * for about one sentence in a hundred: it is a small saving, never the path
- * a command depends on, and it never runs `confirm`.
+ * does. Tier 1 run rightly / wrongly, 2026-10-18 (scripts/voice-rank-eval.mjs):
+ *
+ *                           nomic-embed-text  mxbai-embed-large  bge-m3
+ *   invented table, 0.14        9 / 0             8 / 0           3 / 0
+ *   invented table, widest wrong margin  0.098    0.133           0.087
+ *   app's own, --app, 0.12      9 / 2             8 / 1           7 / 3
+ *   app's own, --app, 0.14      8 / 2             5 / 0           5 / 2
+ *   app's own, --app, 0.16      6 / 1             5 / 0           3 / 0
+ *   app's own, --app, 0.20      2 / 0             3 / 0           1 / 0
+ *   app's own, widest wrong margin  0.182         0.122           0.158
+ *
+ * On the app's own declarations "don't pause the music" paused it, ahead by
+ * 0.182 (nomic). 0.14, safe on the invented table, is not on the real one;
+ * 0.20 is the least with nothing wrong for all three. So tier 1 fires for a
+ * few sentences in a hundred: a small saving, never the path a command
+ * depends on, and it never runs `confirm`.
  */
 export const INSTANT_MARGIN = 0.2;
 
