@@ -69,6 +69,8 @@ export const CLOUD_BUDGET_MS = 90_000;
 export const EMBED_RETRY_MS = 60_000;
 
 const MORE_TOOLS = "more_tools";
+/** Putting the last change back is about the conversation, whatever it was about: shown whatever the sentence is. */
+const UNDO = "undo";
 const NOTHING = "nothing";
 const ESCALATE = "escalate";
 
@@ -161,7 +163,8 @@ const IGNORED: Heard = { result: null, taken: false, rest: false };
 const ROLE = [
   "You are the voice of Coucou, a small desktop app: its user has just said one sentence to it, and you act for them through the app's own capabilities, given to you as tools.",
   "- Do what was asked by calling capabilities. Several things asked are several calls.",
-  "- A name the user said is passed on as they said it: the app works out which thing it names, and asks them when it is not sure.",
+  "- A name the user said is passed on exactly as they said it, also when it looks misheard or cut short: the app works out which thing it names, and asks them when it is not sure. Never put a name from the state in its place.",
+  "- When the user says not to do something, do not do it: call the capability named nothing.",
   "- Some capabilities wait for the user's click before anything happens. That is the app's doing: call them when they are what was asked.",
   "- A question about the app is answered from its state, below, or by a capability that reads.",
   "- When what was heard asks nothing of Coucou, call the capability named nothing.",
@@ -169,13 +172,22 @@ const ROLE = [
   "- When you answer in words: one or two short sentences, plain text, no lists.",
 ].join("\n");
 
+/**
+ * With no embedding model, the areas come first: the model is asked, with
+ * nothing else to do, which part of the app the sentence is about. Each area
+ * is a line of what it holds, written as plain words: given the capabilities'
+ * names as they are called, a small model calls one before it has it.
+ */
 const AREAS_FIRST = [
-  "Only a few capabilities are among your tools now. The app has more, in these areas:",
+  "The user of the desktop app Coucou has just said one sentence to it. Say which parts of the app the sentence is about, by calling the tool named about, once.",
+  "The app's areas, and what each can do:",
   "{areas}",
-  "To use one, first call more_tools with its area: that area's capabilities are then added to your tools, and you call the one that was asked for.",
+  "Give the three areas the sentence is most likely about: the most likely as first, then second and third. When the sentence asks nothing of the app, give none for all three.",
 ].join("\n");
 
 const SHORTLISTED = "Your tools are the capabilities nearest to what was said. When none of them is what was asked, call more_tools with an area to be given that area's.";
+
+const BY_AREA = "Your tools are the capabilities of the areas the sentence is about. When none of them is what was asked, call more_tools with another area to be given that area's.";
 
 const AFTER_CALLS =
   "The results of your calls are above. If what was asked needs another capability, call it now. Otherwise say what happened in one short sentence, from the results alone.";
@@ -187,8 +199,9 @@ const READ_ANSWER = [
   "{options}",
 ].join("\n");
 
-function systemPrompt(snapshot: Record<string, unknown>, areas: string | null): string {
-  return [ROLE, areas == null ? SHORTLISTED : AREAS_FIRST.replace("{areas}", areas), `The app's state now, as JSON:\n${JSON.stringify(snapshot)}`].join("\n\n");
+/** `tools`: how the tools the model is shown were chosen. */
+function systemPrompt(snapshot: Record<string, unknown>, tools: string): string {
+  return [ROLE, tools, `The app's state now, as JSON:\n${JSON.stringify(snapshot)}`].join("\n\n");
 }
 
 // ── The turns ─────────────────────────────────────────────────────────────────
@@ -448,11 +461,27 @@ export class VoiceTurns {
     const declared = new Set(capabilities.map((c) => c.name));
     // Handing up is offered only when there is somebody to hand up to.
     const offered = (names: readonly string[]) => names.filter((n) => declared.has(n) && (n !== ESCALATE || this.cloud() != null));
-    const shown = new Set(offered(ranked ? shortlist(ranked, capabilities) : ALWAYS_SHOWN));
-    const areas = ranked ? null : this.registry.areas().map(({ area, names }) => `${area}: ${names.join(", ")}`).join("\n");
-    const system = systemPrompt(await this.registry.snapshot(), areas);
+    const shown = new Set(offered([...(ranked ? shortlist(ranked, capabilities) : ALWAYS_SHOWN), UNDO]));
     const history: ModelTurn[] = this.memory.recent(this.now()).map(({ said: s, calls, result }) => ({ said: s, calls, result }));
     const tools = () => [...shown].map((name) => this.registry.schema(name)).filter(Boolean);
+
+    const snapshot = await this.registry.snapshot();
+
+    // No ranking: the areas first. The model says which the sentence is about
+    // — one tool, nothing else to do — and is then shown those areas' capabilities.
+    if (!ranked) {
+      const all = this.registry.areas();
+      const lines = all.map(({ area, names }) => `${area}: ${names.map((name) => name.split("_").join(" ")).join(", ")}`).join("\n");
+      // With the app's state: which area a name belongs to is read there (a pill, a session, a setting).
+      const router = `${AREAS_FIRST.replace("{areas}", lines)}\n\nThe app's state now, as JSON:\n${JSON.stringify(snapshot)}`;
+      const routed = await local(router, said, [aboutTool(all.map(({ area }) => area))], history);
+      if (how.wanted && !how.wanted()) return { is: "dropped" };
+      if (!routed) return { is: "silent" };
+      const about = [...routed.calls, ...written(routed.text, new Set(["about"]))].find((call) => call.name === "about")?.arguments ?? {};
+      const picked = [about.first, about.second, about.third];
+      for (const { area, names } of all) if (picked.includes(area)) for (const name of offered(names)) shown.add(name);
+    }
+    const system = systemPrompt(snapshot, ranked ? SHORTLISTED : BY_AREA);
 
     let reply = await local(system, said, tools(), history);
     if (how.wanted && !how.wanted()) return { is: "dropped" };
@@ -509,7 +538,7 @@ export class VoiceTurns {
       this.publish(names.map((name) => this.registry.schema(name)));
       this.published = key;
     }
-    const system = systemPrompt(await this.registry.snapshot(), null).replace(SHORTLISTED, "Your tools are the app's capabilities.");
+    const system = systemPrompt(await this.registry.snapshot(), "Your tools are the app's capabilities.");
     const history: ModelTurn[] = this.memory.recent(this.now()).map(({ said, calls, result }) => ({ said, calls, result }));
     this.cloudTurn = turn;
     try {
@@ -586,6 +615,28 @@ function namesIn(data: unknown): string[] {
   const listed = (data as { capabilities?: unknown } | null)?.capabilities;
   if (!Array.isArray(listed)) return [];
   return listed.map((item) => (item as { name?: unknown } | null)?.name).filter((name): name is string => typeof name === "string");
+}
+
+/** The one tool the model is given when it is asked which areas a sentence is about. */
+function aboutTool(areas: readonly string[]) {
+  return {
+    type: "function",
+    function: {
+      name: "about",
+      description: "Says which areas of the app a sentence is about.",
+      parameters: {
+        type: "object",
+        // Three named places rather than a list: asked for a list, a small model gives one area and stops.
+        properties: {
+          first: { type: "string", enum: [...areas, "none"], description: "The most likely area." },
+          second: { type: "string", enum: [...areas, "none"], description: "The next most likely area." },
+          third: { type: "string", enum: [...areas, "none"], description: "The third most likely area." },
+        },
+        required: ["first", "second", "third"],
+        additionalProperties: false,
+      },
+    },
+  };
 }
 
 /** The one tool the model that reads a spoken answer is given. */

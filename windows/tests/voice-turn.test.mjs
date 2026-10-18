@@ -129,14 +129,28 @@ function embedBy(near) {
 }
 
 /** A model that answers from a script, and notes what it was asked with. */
+/**
+ * A model that answers from a script, and notes what it was asked with. With
+ * no ranking the turn first asks which areas a sentence is about (one tool,
+ * `about`): that is answered by `route` — no area unless a test says — and
+ * noted apart, in `routes`.
+ */
 function scripted(...replies) {
   const asked = [];
-  const model = async (system, said, tools, history, steps) => {
-    asked.push({ system, said, tools: tools.map((t) => t.function.name), history, steps: steps ?? [] });
+  const routes = [];
+  const self = { model: null, asked, routes, route: ["none", "none", "none"] };
+  self.model = async (system, said, tools, history, steps) => {
+    const names = tools.map((t) => t.function.name);
+    if (names.length === 1 && names[0] === "about") {
+      routes.push({ system, said, tools, history });
+      const [first, second, third] = self.route;
+      return calls(call("about", { first, second, third }));
+    }
+    asked.push({ system, said, tools: names, history, steps: steps ?? [] });
     const reply = replies.shift();
     return typeof reply === "function" ? reply(asked[asked.length - 1]) : reply;
   };
-  return { model, asked };
+  return self;
 }
 
 const call = (name, args = {}) => ({ name, arguments: args });
@@ -263,15 +277,28 @@ test("tier 2, ranked: the model is shown the nearest capabilities, its calls run
   assert.match(local.asked[0].system, /"now_playing"/);
 });
 
-test("tier 2, with no embedding model: areas first, and more_tools gives an area's capabilities", async () => {
-  const local = scripted(calls(call("more_tools", { area: "music" })), calls(call("pause_music")), says("Paused."));
+test("tier 2, with no embedding model: the areas first, then those areas' capabilities", async () => {
+  const local = scripted(calls(call("pause_music")), says("Paused."));
+  local.route = ["music", "none", "nonsense"];
   const heard = await turns({ local: local.model }).hear("pause the music");
-  assert.deepEqual(local.asked[0].tools, ["more_tools", "nothing"]);
-  assert.match(local.asked[0].system, /music: now_playing, pause_music, play_music/);
-  assert.deepEqual(local.asked[1].tools, ["more_tools", "nothing", "now_playing", "pause_music", "play_music"]);
-  assert.match(local.asked[1].steps[0].results[0], /Now among your tools: now_playing, pause_music, play_music/);
+  // One tool, the areas as its values, and the app's state to tell what a name belongs to.
+  assert.equal(local.routes.length, 1);
+  assert.deepEqual(local.routes[0].tools[0].function.parameters.properties.first.enum, ["music", "pills", "views", "apps", "coucou", "none"]);
+  assert.match(local.routes[0].system, /music: now playing, pause music, play music/);
+  assert.match(local.routes[0].system, /"now_playing"/);
+  // Then the area's capabilities, with those about the conversation; an area that is none or nothing is no area.
+  assert.deepEqual(local.asked[0].tools, ["more_tools", "nothing", "undo", "now_playing", "pause_music", "play_music"]);
   assert.deepEqual(app.state.log, ["pause"]);
   assert.deepEqual(heard.result, { outcome: "success", message: "Paused." });
+});
+
+test("with no embedding model, more_tools gives another area's capabilities when the first were not the right ones", async () => {
+  const local = scripted(calls(call("more_tools", { area: "pills" })), calls(call("add_pills", { pills: ["vercel"] })), says("Vercel is in."));
+  local.route = ["music", "none", "none"];
+  await turns({ local: local.model }).hear("bring vercel in");
+  assert.ok(local.asked[1].tools.includes("add_pills"));
+  assert.match(local.asked[1].steps[0].results[0], /Now among your tools: list_pills|Now among your tools: add_pills/);
+  assert.deepEqual(app.state.log, ["add:vercel"]);
 });
 
 test("what failed is said in the capability's own line, and what was only asked for is not dressed up", async () => {
