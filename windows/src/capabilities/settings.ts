@@ -46,7 +46,7 @@ const fixed = (...options: [value: string, label: string][]) => () => options.ma
 export const SETTINGS: readonly SettingSpec[] = [
   // ── Done at once ──
   { key: "soundEnabled", label: "Sound effects", about: "Mochi's sounds; off is muted", tier: "reversible", kind: "switch" },
-  { key: "soundVolume", label: "Sound volume", about: "how loud Coucou's own sounds and Mochi's voice are, not the music", tier: "reversible", kind: "number", min: 0, max: 0.2, percent: true },
+  { key: "soundVolume", label: "Sound effects volume", about: "how loud Coucou's own sounds and Mochi's voice are, not the music", tier: "reversible", kind: "number", min: 0, max: 0.2, percent: true },
   { key: "openOnHover", label: "Open on hover", about: "hovering the island opens it all the way", tier: "reversible", kind: "switch" },
   { key: "autoCloseInterval", label: "Auto-close delay", about: "how long the open island stays before it folds", tier: "reversible", kind: "number", min: 5, max: 120, step: 1, unit: "seconds" },
   { key: "showPlanInNotch", label: "Claude plan usage in the island", about: "shows Claude's plan limits in the island's header", tier: "reversible", kind: "switch" },
@@ -171,7 +171,7 @@ export function settings(host: AppHost): Area {
       capability({
         name: "set_setting",
         area: AREA,
-        description: "Changes one of Coucou's settings: its sound effects (muting them) and their volume, the language, the island, how voice listens and speaks. A switch takes 'on'; a level or a delay takes 'number' (a volume from 0 to 100); a choice takes 'option', one of its values. Some are changed at once and can be undone; the others wait for the user's click. Coucou's own sound is the Sound effects switch (off mutes it) and the Sound volume. Not for the pills, the music or Mochi's outfit, which have their own.",
+        description: "Changes one of Coucou's settings: its sound effects (muting them) and their volume, the language, the island, how voice listens and speaks. A switch takes 'on'; a level or a delay takes 'number' (a volume from 0 to 100); a choice takes 'option', one of its values. Some are changed at once and can be undone; the others wait for the user's click. Coucou's own sound is the Sound effects switch (off mutes it) and the Sound effects volume. Not for the pills, the music or Mochi's outfit, which have their own.",
         args: {
           setting: { type: "entity", kind: "setting", description: "The setting to change." },
           on: { type: "boolean", optional: true, description: "For a switch: true for on, false for off." },

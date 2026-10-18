@@ -70,7 +70,7 @@ export function sessions(host: AppHost): Area {
       capability({
         name: "open_session",
         area: AREA,
-        description: "Brings an agent's session and its terminal window to the front, to look at it. Not for starting an application, and not for switching the main workspace tool.",
+        description: "Shows the terminal window of an agent's session, to look at what it is doing. Not for starting an application, and not for switching to another workspace tool (set_main_pill).",
         args: { session: { type: "entity", kind: "session", description: "The session to bring forward." } },
         tier: "free",
         async run(args) {

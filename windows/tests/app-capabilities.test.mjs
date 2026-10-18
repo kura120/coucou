@@ -576,7 +576,7 @@ test("set_setting: its tier is the setting's, and one it does not know takes a c
 test("set_setting: a switch, a level in percent, a delay, a choice by value or by label", async () => {
   const { get, s } = app();
   const set = (args) => get("set_setting").run(args, context());
-  assert.equal((await set({ setting: "soundVolume", number: 50 })).line, "Sound volume: 50 %");
+  assert.equal((await set({ setting: "soundVolume", number: 50 })).line, "Sound effects volume: 50 %");
   assert.equal(s.settings.soundVolume, 0.1);
   assert.equal((await set({ setting: "voice.followUp", number: 12 })).line, "Follow-up time: 12 seconds");
   assert.equal(s.settings.voice.followUp, 12);
@@ -607,7 +607,7 @@ test("set_setting: a value the setting does not take changes nothing, and says w
   assert.equal(await check({ setting: "language", option: "Français" }), null);
   assert.equal((await check({ setting: "nonsense", on: true })).status, "failed");
   // A level asked of a switch: the settings that take one are named.
-  assert.match((await check({ setting: "soundEnabled", number: 30 })).detail, /A level is one of: Sound volume/);
+  assert.match((await check({ setting: "soundEnabled", number: 30 })).detail, /A level is one of: Sound effects volume/);
   assert.deepEqual(log, []);
 });
 
@@ -623,7 +623,7 @@ test("a session is known by its agent's name too, as its card shows it", async (
 test("get_setting reads a value as a person reads it, with a choice's values", async () => {
   const { get } = app();
   const read = async (setting) => (await get("get_setting").run({ setting }, context())).data;
-  assert.deepEqual(await read("soundVolume"), { setting: "Sound volume", value: "60 %" });
+  assert.deepEqual(await read("soundVolume"), { setting: "Sound effects volume", value: "60 %" });
   assert.deepEqual(await read("soundEnabled"), { setting: "Sound effects", value: "on" });
   assert.deepEqual(await read("language"), { setting: "Language", value: "System", options: ["System", "English", "Français"] });
 });

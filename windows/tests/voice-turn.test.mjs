@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { createRegistry } from "../src/core/capabilities/registry.ts";
 import { done, failed } from "../src/voice/result.ts";
 import { FORGOTTEN_AFTER_MS } from "../src/voice/memory.ts";
-import { MOST_MODEL_ROUNDS, VoiceTurns, looksWritten, written } from "../src/voice/turn.ts";
+import { MOST_MODEL_ROUNDS, VoiceTurns, asHeard, looksWritten, written } from "../src/voice/turn.ts";
 
 const WORDS = {
   refused: () => "I can't do that", unavailable: () => "Not possible now", failed: () => "That did not work",
@@ -679,4 +679,13 @@ test("a thing nearly named that the model did nothing with is asked about by the
   other.onAsk = (ask) => ask && asked.push(ask.question);
   await other.hear("don't open spy flight");
   assert.equal(asked.length, 1);
+});
+
+test("a name the sentence does not hold, where it names one thing of that kind, is that thing", () => {
+  const capability = app.registry.get("show_view");
+  const turn = { said: "bring up the wardrobe", named: [{ kind: "view", id: "wardrobe", label: "Wardrobe" }] };
+  assert.deepEqual(asHeard(call("show_view", { view: "Closet" }), capability, turn).arguments, { view: "wardrobe" });
+  // Said as it is, or with nothing of that kind named: as written.
+  assert.deepEqual(asHeard(call("show_view", { view: "wardrobe" }), capability, turn).arguments, { view: "wardrobe" });
+  assert.deepEqual(asHeard(call("show_view", { view: "Chat" }), capability, { said: "show it", named: [] }).arguments, { view: "Chat" });
 });

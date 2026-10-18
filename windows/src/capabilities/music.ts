@@ -133,7 +133,7 @@ export function music(host: AppHost): Area {
       capability({
         name: "set_music_volume",
         area: AREA,
-        description: "Sets the music player's volume, from 0 to 100. Not for muting Coucou, nor for the volume of Coucou's own sounds and Mochi's voice: those are the settings Sound effects and Sound volume.",
+        description: "Sets the music player's volume, from 0 to 100. Not for muting Coucou, nor for the volume of Coucou's own sounds and Mochi's voice: those are the settings Sound effects and Sound effects volume.",
         args: { percent: { type: "number", min: 0, max: 100, description: "The volume, from 0 to 100." } },
         tier: "reversible",
         available,

@@ -181,6 +181,7 @@ const ROLE = [
   "- Names: write each name in the arguments in the user's own words, as it was heard, even when it looks misheard, cut short or unlike anything in the state (\"open st\" is the app \"st\", \"open this squad\" the app \"this squad\"). The app looks it up and asks the user when it is not sure. A name you do not know is never a reason to do nothing. Never write a name or an address the user did not say.",
   "- A sentence that goes on from the turn before (\"and Discord too\", \"what about Steam\") asks for the same again, for what it names now.",
   "- A correction of the turn before (\"no, I meant Resend\", \"take that one off\") is a request: put the last change back with undo, then do what is meant now, if anything.",
+  "- A yes or a no at the start of a sentence may only answer the turn before or clear the way (\"no, decline that\"): what follows it is the request.",
   "- When the user says not to do something, or never to, do not do it: call the capability named nothing.",
   "- Some capabilities wait for the user's click before anything happens. That is the app's doing: call them when they are what was asked.",
   "- A question about the app is answered from its state, below, or by a capability that reads.",
@@ -731,17 +732,23 @@ function takers(ranked: readonly Ranked[], capabilities: readonly Capability[], 
  * it without the question an unsure name takes. What it is near is known
  * for a listed kind (the words it was heard as); for a kind ranked by its
  * source (the apps), the sentence itself is what is looked up, as tier 1
- * does. A name the sentence holds whole is left as written.
+ * does. A name the sentence holds whole is left as written; one it does not
+ * hold at all, where it names one thing of that kind ("VS Code" written for
+ * "launch visual studio code"), is that thing.
  */
 export function asHeard(call: ModelCall, capability: Capability | undefined, turn: Pick<Running, "said" | "named">): ModelCall {
-  if (!capability || !turn.named.some((n) => n.near)) return call;
+  if (!capability || !turn.named.length) return call;
   const args = { ...(call.arguments ?? {}) };
+  const sentence = ` ${normalise(turn.said)} `;
   const back = (kind: string, value: unknown): unknown => {
     if (typeof value !== "string") return value;
     const said = normalise(value);
-    const near = turn.named.find((n) => n.kind === kind && n.near && (n.id === value || normalise(n.label) === said));
-    if (!near || turn.named.some((n) => n.kind === kind && !n.near && n.id === near.id)) return value;
-    return near.heard ?? turn.said;
+    const ofKind = turn.named.filter((n) => n.kind === kind);
+    const near = ofKind.find((n) => n.near && (n.id === value || normalise(n.label) === said));
+    if (near && !ofKind.some((n) => !n.near && n.id === near.id)) return near.heard ?? turn.said;
+    // A name the sentence does not hold, where it names one thing of that kind: the one it names.
+    if (said && !sentence.includes(` ${said} `) && ofKind.length === 1) return ofKind[0].near ? (ofKind[0].heard ?? turn.said) : ofKind[0].id;
+    return value;
   };
   for (const [arg, spec] of Object.entries(capability.args)) {
     if (!(arg in args)) continue;
@@ -834,9 +841,9 @@ function answerTool(options: readonly string[]) {
           option: {
             type: "string",
             enum: [...options, "none", "unclear"],
-            description: "The option the user chose. 'none' when they turn every option down or want the question dropped. 'unclear' when what they said does not answer the question.",
+            description: "The option the user chose. 'none' when they turn every option down or want the question dropped. 'unclear' when what they said is not an answer to this question at all: a question or a request of its own.",
           },
-          also_asks: { type: "boolean", description: "True when, besides answering, they ask for something else to be done." },
+          also_asks: { type: "boolean", description: "True when, besides answering, they ask for something else to be done or name something else instead (a no followed by another name)." },
         },
         required: ["option"],
         additionalProperties: false,

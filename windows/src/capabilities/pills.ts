@@ -171,7 +171,7 @@ export function pills(host: AppHost): Area {
       capability({
         name: "set_main_pill",
         area: AREA,
-        description: "Makes a workspace tool or an agent the main pill, the one always shown: what switching to one means. Not for bringing a session's window to the front: that is open_session.",
+        description: "Switches to another workspace tool or agent as the main pill, the one always shown: what switching to one means. Not for bringing a session's window to the front: that is open_session.",
         args: { pill: { type: "entity", kind: "workspace_pill", description: "The workspace tool to make the main one." } },
         tier: "reversible",
         inverse: (args) => (str(args.pill) === host.pills().main ? null : { name: "set_main_pill", arguments: { pill: host.pills().main } }),
