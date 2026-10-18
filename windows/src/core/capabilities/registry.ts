@@ -3,7 +3,8 @@
 // `execute` is the only way anything runs:
 //
 //   look up → arguments → can it be used now → which things are named →
-//   tier (confirm: a click) → run → remember how to put it back
+//   can it be done with them → tier (confirm: a click) → run → remember how
+//   to put it back
 //
 // The guard is this file's own. It is handed over when the registry is made
 // and kept in a closure: no capability is given it, no schema names it, and
@@ -207,6 +208,10 @@ export function createRegistry(options: RegistryOptions): Registry {
     if ("ended" in resolved) return resolved.ended;
     const args = resolved.args;
 
+    // A click is never asked for what could not be done.
+    const cannot = (await capability.check?.(args)) ?? null;
+    if (cannot) return cannot;
+
     const tier = tierOf(capability, args);
     if (tier === "confirm") {
       // With no model there is nobody to have meant it: the instant tier never reaches a confirmation.
@@ -256,8 +261,8 @@ export function createRegistry(options: RegistryOptions): Registry {
   /** The things of a listed kind a sentence perhaps names, misheard: as near as an app must be (NEAR_NAMED). */
   const nearlyIn = (sentence: string, things: readonly Entity[]) => nearly(sentence, things, 0.8).slice(0, NAMED_NEAR_MOST);
 
-  async function namedIn(sentence: string): Promise<{ kind: string; id: string; label: string; near?: boolean }[]> {
-    const out: { kind: string; id: string; label: string; near?: boolean }[] = [];
+  async function namedIn(sentence: string): Promise<{ kind: string; id: string; label: string; near?: boolean; heard?: string }[]> {
+    const out: { kind: string; id: string; label: string; near?: boolean; heard?: string }[] = [];
     for (const source of sources.values()) {
       try {
         if (!source.near) {
@@ -265,7 +270,7 @@ export function createRegistry(options: RegistryOptions): Registry {
           const whole = contained(sentence, listed);
           for (const thing of whole) out.push({ kind: source.kind, id: thing.id, label: thing.label });
           // Said a letter or a sound away ("strife", "get hub"): perhaps that thing, by the same measure.
-          for (const thing of nearlyIn(sentence, listed.filter((thing) => !whole.includes(thing)))) out.push({ kind: source.kind, id: thing.id, label: thing.label, near: true });
+          for (const thing of nearlyIn(sentence, listed.filter((thing) => !whole.includes(thing)))) out.push({ kind: source.kind, id: thing.id, label: thing.label, near: true, heard: thing.heard });
           continue;
         }
         // A kind too large to list: what its source ranks near the sentence. Said whole, it is named; close, perhaps.

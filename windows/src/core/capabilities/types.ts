@@ -96,6 +96,12 @@ export interface Capability {
   tier: Tier | ((args: Args) => Tier);
   /** False, or why not, when it cannot be used right now (no music app running). Told to the model as it is. */
   available?(): true | string;
+  /**
+   * What ends the call before anything is asked or clicked: arguments it
+   * cannot do (a setting given a value it does not take), as the result the
+   * model is given. Null when they can be done. Called with resolved arguments.
+   */
+  check?(args: Args): ToolResult | null | Promise<ToolResult | null>;
   /** For `confirm`: the exact change, for the toast. Called with resolved arguments, before `run`. */
   describe?(args: Args): Confirm | Promise<Confirm>;
   /**
@@ -162,9 +168,10 @@ export interface Registry {
    * kind — and, for a kind too large to list (the apps), those its source
    * ranks near the sentence (`near`: perhaps misheard). What helps the
    * ranking and the model see past a name they know nothing of. Found by the
-   * matcher and the sources; nothing is resolved or asked.
+   * matcher and the sources; nothing is resolved or asked. `heard`: for a
+   * thing perhaps named, the words of the sentence it is near, when known.
    */
-  named(sentence: string): Promise<readonly { kind: EntityKind; id: string; label: string; near?: boolean }[]>;
+  named(sentence: string): Promise<readonly { kind: EntityKind; id: string; label: string; near?: boolean; heard?: string }[]>;
 
   /**
    * One call, guarded and done: looked up (unknown: refused), its arguments

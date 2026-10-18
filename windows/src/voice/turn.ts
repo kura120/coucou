@@ -25,6 +25,7 @@
 
 import type { Answer, Ask, Capability, Registry, RunContext, ToolResult } from "../core/capabilities/types";
 import { usable } from "./asking";
+import { normalise } from "./entity";
 import { VoiceMemory, type ModelCall, type VoiceTurn } from "./memory";
 import { ALWAYS_SHOWN, CapabilityIndex, indexText, instant, SHORTLIST, shortlist, type Embed, type Ranked } from "./rank";
 import { forModel, spoken, type VoiceResult } from "./result";
@@ -164,7 +165,7 @@ interface Running {
   /** Taken as said to Coucou: by the wake phrase, or by the local model calling something. */
   taken: boolean;
   /** The app's things the sentence names, or perhaps names (Registry.named). */
-  named: readonly { kind: string; id: string; label: string; near?: boolean }[];
+  named: readonly { kind: string; id: string; label: string; near?: boolean; heard?: string }[];
 }
 
 const IGNORED: Heard = { result: null, taken: false, rest: false };
@@ -348,8 +349,9 @@ export class VoiceTurns {
     const local = this.local();
     if (!local) return { is: "unclear" };
 
+    // A choice's options with their place among them, for an answer by place ("the last one").
     const options = ask.kind === "choice"
-      ? ask.options.map((option, i) => ({ value: String(i + 1), label: option.hint ? `${option.label} (${option.hint})` : option.label }))
+      ? ask.options.map((option, i) => ({ value: String(i + 1), label: `${option.label}${option.hint ? ` (${option.hint})` : ""}, option ${i + 1} of ${ask.options.length}` }))
       : [{ value: "yes", label: ask.yes ?? "Yes" }, { value: "no", label: ask.no ?? "No" }];
     const system = READ_ANSWER
       .replace("{question}", ask.question)
@@ -457,7 +459,7 @@ export class VoiceTurns {
   }
 
   private async run(call: ModelCall, origin: RunContext["origin"], turn: Running): Promise<ToolResult> {
-    const result = await this.registry.execute(call, this.context(origin, turn));
+    const result = await this.registry.execute(asHeard(call, this.registry.get(call.name), turn), this.context(origin, turn));
     turn.ran.push({ call, result, capability: this.registry.get(call.name) });
     return result;
   }
@@ -703,6 +705,33 @@ function takers(ranked: readonly Ranked[], capabilities: readonly Capability[], 
     if (best && !out.includes(best.name)) out.push(best.name);
   }
   return out;
+}
+
+/**
+ * The call with every name the model wrote for a thing the sentence only
+ * nearly holds put back as the user said it: told "perhaps Stripe" of
+ * "remove strife", a model writes "Stripe", and the executor would act on
+ * it without the question an unsure name takes. What it is near is known
+ * for a listed kind (the words it was heard as); for a kind ranked by its
+ * source (the apps), the sentence itself is what is looked up, as tier 1
+ * does. A name the sentence holds whole is left as written.
+ */
+export function asHeard(call: ModelCall, capability: Capability | undefined, turn: Pick<Running, "said" | "named">): ModelCall {
+  if (!capability || !turn.named.some((n) => n.near)) return call;
+  const args = { ...(call.arguments ?? {}) };
+  const back = (kind: string, value: unknown): unknown => {
+    if (typeof value !== "string") return value;
+    const said = normalise(value);
+    const near = turn.named.find((n) => n.kind === kind && n.near && (n.id === value || normalise(n.label) === said));
+    if (!near || turn.named.some((n) => n.kind === kind && !n.near && n.id === near.id)) return value;
+    return near.heard ?? turn.said;
+  };
+  for (const [arg, spec] of Object.entries(capability.args)) {
+    if (!(arg in args)) continue;
+    if (spec.type === "entity") args[arg] = back(spec.kind, args[arg]);
+    else if (spec.type === "entities") args[arg] = Array.isArray(args[arg]) ? (args[arg] as unknown[]).map((v) => back(spec.kind, v)) : back(spec.kind, args[arg]);
+  }
+  return { ...call, arguments: args };
 }
 
 /** The kinds of thing a capability takes as an argument. */

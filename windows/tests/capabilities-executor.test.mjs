@@ -97,6 +97,8 @@ function setup({ click = true, answers = [], doubted } = {}) {
       name: "tell_agent", area: "chat", description: "Sends a message to an agent.", tier: "confirm",
       args: { text: { type: "string", description: "The message." } },
       describe: (args) => ({ title: "Send this?", change: args.text, action: "Send" }),
+      // What it cannot send is said before any click.
+      check: (args) => (args.text !== "nothing" ? null : { status: "failed", verified: false, line: "Nothing to send", detail: "The message is empty." }),
       run: async (args) => (ran("tell_agent", args), done("Sent")),
     },
     {
@@ -356,6 +358,14 @@ test("confirm: the exact change is shown, and a click does it", async () => {
     assert.equal(result.line, "Sent");
     assert.deepEqual(log.ran, [{ name: "tell_agent", args: { text: "ship it" } }]);
   }
+});
+
+test("arguments a capability cannot do end the call before any click", async () => {
+  const { call, log } = setup({ click: true });
+  const result = await call("tell_agent", { text: "nothing" });
+  assert.deepEqual([result.status, result.line, result.detail], ["failed", "Nothing to send", "The message is empty."]);
+  assert.deepEqual(log.confirmed, []);
+  assert.deepEqual(log.ran, []);
 });
 
 test("confirm: no click is done-and-unchanged, and nothing ran", async () => {

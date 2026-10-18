@@ -76,9 +76,9 @@ const SPAN_WORDS = 3;
  * stricter for a sentence, where every word is a chance to sound like some
  * name: a run of several words by its letters only, and a word by its sound
  * only when it starts as the name does ("thanks" is not Settings). Nearest
- * first, with how near. Nothing is resolved here: what is said whole is `contained`'s.
+ * first, with how near and the words it was heard as. Nothing is resolved here: what is said whole is `contained`'s.
  */
-export function nearly(said: string, things: readonly Entity[], least: number): (Entity & { score: number })[] {
+export function nearly(said: string, things: readonly Entity[], least: number): (Entity & { score: number; heard: string })[] {
   const words = normalise(said).split(" ").filter(Boolean);
   const spans: string[] = [];
   for (let from = 0; from < words.length; from++) {
@@ -88,7 +88,15 @@ export function nearly(said: string, things: readonly Entity[], least: number): 
     }
   }
   return things
-    .map((thing) => ({ ...thing, score: Math.max(0, ...spans.flatMap((span) => forms(thing).map((form) => heardAs(span, form)))) }))
+    .map((thing) => {
+      // The run of words it is nearest to: what the user said for it.
+      let best = { score: 0, heard: "" };
+      for (const span of spans) for (const form of forms(thing)) {
+        const score = heardAs(span, form);
+        if (score > best.score) best = { score, heard: span };
+      }
+      return { ...thing, ...best };
+    })
     .filter((thing) => thing.score >= least)
     .sort((x, y) => y.score - x.score || x.label.localeCompare(y.label));
 }

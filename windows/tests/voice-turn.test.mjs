@@ -405,7 +405,7 @@ test("a spoken answer to a choice or a yes/no is read by the model, given the qu
   assert.deepEqual(await t.answerSaid("the home one"), { is: "answer" });
   assert.deepEqual(await which, { kind: "choice", id: "home" });
   assert.deepEqual(reader.asked[0].tools, ["answer"]);
-  assert.match(reader.asked[0].system, /Which account\?[\s\S]*1: Work\n2: Home \(a@home\)/);
+  assert.match(reader.asked[0].system, /Which account\?[\s\S]*1: Work, option 1 of 2\n2: Home \(a@home\), option 2 of 2/);
   assert.equal(reader.asked[0].said, "the home one");
   // Not an answer: the question stays.
   const open = t.askUser({ kind: "yes_no", question: "Open Spotify?" });
@@ -613,8 +613,8 @@ test("what only read is said by a model given the results alone; what was done, 
 
 test("a thing of a listed kind said a letter or a sound away is perhaps named; a word that only sounds alike is not", async () => {
   app.registry.entities({ kind: "setting", description: "Settings.", list: () => [{ id: "screen", label: "Screen" }, { id: "settings", label: "Settings" }] });
-  assert.deepEqual(await app.registry.named("remove strife"), [{ kind: "pill", id: "stripe", label: "Stripe", near: true }]);
-  assert.deepEqual(await app.registry.named("ad get hub"), [{ kind: "pill", id: "github", label: "GitHub", near: true }]);
+  assert.deepEqual(await app.registry.named("remove strife"), [{ kind: "pill", id: "stripe", label: "Stripe", near: true, heard: "strife" }]);
+  assert.deepEqual(await app.registry.named("ad get hub"), [{ kind: "pill", id: "github", label: "GitHub", near: true, heard: "get hub" }]);
   // Whole names are named, not perhaps named.
   assert.deepEqual(await app.registry.named("remove stripe"), [{ kind: "pill", id: "stripe", label: "Stripe" }]);
   // Sounds alike, starts otherwise; several words that only sound like a name.
@@ -631,4 +631,23 @@ test("a capability's name written as text, alone or with its arguments, is a cal
   assert.deepEqual(written("Nothing.", known), []);
   assert.deepEqual(written("rm_rf", known), []);
   assert.deepEqual(written("nothing to do here", known), []);
+});
+
+test("a name the model wrote for a thing only nearly said is put back as heard, so the executor asks", async () => {
+  const local = scripted(calls(call("remove_pills", { pills: ["Stripe"] })), says("done"));
+  const t = turns({ local: local.model });
+  const asked = [];
+  t.onAsk = (ask) => {
+    if (!ask) return;
+    asked.push(ask.question);
+    t.answer({ kind: "yes_no", yes: false });
+  };
+  await t.hear("remove strife");
+  assert.deepEqual(asked, ["Did you mean Stripe?"]);
+  assert.deepEqual(app.state.log, []);
+  // Said whole, it is the name: no question.
+  const whole = scripted(calls(call("remove_pills", { pills: ["Stripe"] })), says("done"));
+  await turns({ local: whole.model }).hear("remove stripe");
+  assert.deepEqual(app.state.log, ["remove:stripe"]);
+  assert.deepEqual(asked.length, 1);
 });
