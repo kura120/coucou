@@ -309,6 +309,7 @@ const CASES = [
   { name: "notify", args: { text: "Stand up" }, unverified: true },
   { name: "undo" },
   { name: "nothing" },
+  { name: "ask_user", args: { question: "Open Discord?", option_1: "Discord", option_2: "Steam" } },
   { name: "escalate", args: { reason: "needs a plan" }, unverified: true },
   { name: "more_tools" },
 ];
@@ -424,7 +425,7 @@ test("a capability never throws: what breaks in the app is a failure", async () 
   }
   for (const c of CASES) {
     // These three do not touch the app.
-    if (["undo", "nothing", "escalate", "more_tools"].includes(c.name)) continue;
+    if (["undo", "nothing", "escalate", "more_tools", "ask_user"].includes(c.name)) continue;
     const result = await reg.get(c.name).run(c.args ?? {}, context());
     assert.equal(result.status, "failed", c.name);
     assert.equal(result.verified, false, c.name);

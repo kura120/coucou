@@ -125,12 +125,15 @@ export function createTurns(registry: Registry): VoiceTurns {
   return new VoiceTurns({
     registry,
     embed: async (texts) => (brainChosen() && State.settings.voice.embedModel ? Bridge.voiceEmbed(texts) : null),
+    embedChosen: () => Boolean(State.settings.voice.embedModel),
     local: () => (brainChosen() ? (system, said, tools, history, steps) => Bridge.voiceBrain(system, said, tools, history, steps) : null),
     cloud: () => (State.settings.voice.cloud ? (system, said, history) => Bridge.voiceCloud(system, said, history) : null),
     followUp: () => brainChosen() && brainHere(),
     publish: (tools) => void Bridge.capabilityPublish(tools),
     words: {
       noModel: () => t("Voice needs a model server. Choose one in Settings."),
+      noEmbedding: () => t("Voice needs an embedding model. Choose one in Settings."),
+      embedSilent: () => t("The embedding model did not answer. Say it again in a moment."),
       silent: () => t("The model did not answer."),
       notUnderstood: () => t("Command not recognised"),
       beyond: () => t("That is more than I can do here."),

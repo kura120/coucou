@@ -10,10 +10,10 @@
 // Default: qwen2.5:7b-instruct on http://127.0.0.1:11434 (Ollama). Nothing is
 // pulled: a model the server does not have is skipped.
 //
-// Two paths, as the app has them: "areas" (no embedding model: the local
-// model is shown the areas and asks for one's capabilities) and "ranked" (an
-// embedding model ranks the capabilities: a clear command runs with no model,
-// and the local model is shown the nearest few). The ranked path runs only
+// The ranked path (an embedding model ranks the capabilities: a clear command
+// runs with no model, and the local model is shown the nearest few). Voice
+// requires an embedding model since 2026-10-18; "areas" (none) now only shows
+// that it says so. The ranked path runs only
 // when the server has an embedding model; `--embed` names it. `--only` runs
 // the cases with that text in a step (several: a|b); `--trace` prints each call to the
 // model: the tools it was shown, and what it called or said.
@@ -45,7 +45,8 @@ const MODELS = (ARGS[0] ?? "qwen2.5:7b-instruct").split(",").map((m) => m.trim()
 let MODEL = MODELS[0];
 const SERVER = (ARGS[1] ?? "http://127.0.0.1:11434").replace(/\/$/, "");
 const WORDS = FLAGS.includes("--words");
-const PATH = flag("path") ?? "both";
+// Voice requires an embedding model now: "areas" measures only that it says so.
+const PATH = flag("path") ?? "ranked";
 const ONLY = flag("only");
 const TRACE = FLAGS.includes("--trace");
 
@@ -335,6 +336,7 @@ async function embed(texts) {
 
 const TURN_WORDS = {
   noModel: () => "Voice needs a model server.", silent: () => "The model did not answer.",
+  noEmbedding: () => "Voice needs an embedding model.", embedSilent: () => "The embedding model did not answer.",
   notUnderstood: () => "Command not recognised", beyond: () => "That is more than I can do here.", askingCloud: () => "Asking a bigger model…",
 };
 

@@ -17,6 +17,7 @@ const WORDS = {
 };
 const TURN_WORDS = {
   noModel: () => "Voice needs a model server", silent: () => "The model did not answer",
+  noEmbedding: () => "Voice needs an embedding model", embedSilent: () => "The embedding model did not answer",
   notUnderstood: () => "Not recognised", beyond: () => "More than I can do here", askingCloud: () => "Asking a bigger model…",
 };
 
@@ -157,9 +158,12 @@ const call = (name, args = {}) => ({ name, arguments: args });
 const calls = (...list) => ({ calls: list, text: "" });
 const says = (text) => ({ calls: [], text });
 
-function turns({ embed = async () => null, local = null, cloud = null, publish, followUp = false } = {}) {
+/** An embedding model that finds every capability as near as any other: a test that is not about the ranking. */
+const flat = async (texts) => texts.map(() => [1]);
+
+function turns({ embed = flat, embedChosen = true, local = null, cloud = null, publish, followUp = false } = {}) {
   return new VoiceTurns({
-    registry: app.registry, embed, local: () => local, cloud: () => cloud, publish, followUp: () => followUp, words: TURN_WORDS, now: () => now,
+    registry: app.registry, embed, embedChosen: () => embedChosen, local: () => local, cloud: () => cloud, publish, followUp: () => followUp, words: TURN_WORDS, now: () => now,
   });
 }
 
@@ -283,28 +287,32 @@ test("tier 2, ranked: the model is shown the nearest capabilities, its calls run
   assert.match(local.asked[0].system, /"now_playing"/);
 });
 
-test("tier 2, with no embedding model: the areas first, then those areas' capabilities", async () => {
-  const local = scripted(calls(call("pause_music")), says("Paused."));
-  local.route = ["music", "none", "nonsense"];
-  const heard = await turns({ local: local.model }).hear("pause the music");
-  // One tool, the areas as its values, and the app's state to tell what a name belongs to.
-  assert.equal(local.routes.length, 1);
-  assert.deepEqual(local.routes[0].tools[0].function.parameters.properties.first.enum, ["music", "pills", "views", "apps", "coucou", "none"]);
-  assert.match(local.routes[0].system, /music: now playing, pause music, play music/);
-  assert.match(local.routes[0].system, /"now_playing"/);
-  // Then the area's capabilities, with those about the conversation; an area that is none or nothing is no area.
-  assert.deepEqual(local.asked[0].tools, ["more_tools", "nothing", "undo", "now_playing", "pause_music", "play_music"]);
-  assert.deepEqual(app.state.log, ["pause"]);
-  assert.deepEqual(heard.result, { outcome: "success", message: "Paused." });
+test("with no embedding model voice says it needs one, and with one that does not answer it says so; no model is asked", async () => {
+  const local = scripted(calls(call("pause_music")));
+  const none = await turns({ embed: async () => null, embedChosen: false, local: local.model }).hear("pause the music");
+  assert.deepEqual(none.result, { outcome: "failure", message: "Voice needs an embedding model" });
+  const silent = await turns({ embed: async () => null, local: local.model }).hear("pause the music");
+  assert.deepEqual(silent.result, { outcome: "failure", message: "The embedding model did not answer" });
+  assert.equal(local.asked.length, 0);
+  assert.deepEqual(app.state.log, []);
+  // Without the wake phrase, nothing shows at all.
+  assert.deepEqual(await turns({ embed: async () => null, local: local.model, followUp: true }).hear("pause the music", { wake: false }), { result: null, taken: false, rest: false });
 });
 
-test("with no embedding model, more_tools gives another area's capabilities when the first were not the right ones", async () => {
-  const local = scripted(calls(call("more_tools", { area: "pills" })), calls(call("add_pills", { pills: ["vercel"] })), says("Vercel is in."));
-  local.route = ["music", "none", "none"];
-  await turns({ local: local.model }).hear("bring vercel in");
-  assert.ok(local.asked[1].tools.includes("add_pills"));
-  assert.match(local.asked[1].steps[0].results[0], /Now among your tools: list_pills|Now among your tools: add_pills/);
-  assert.deepEqual(app.state.log, ["add:vercel"]);
+test("the wake phrase gets the embedding model ready, and the sentence after it waits for that, not for a second embedding", async () => {
+  let asked = 0;
+  const embed = async (texts) => {
+    asked += 1;
+    return texts.map(() => [1]);
+  };
+  const local = scripted(calls(call("pause_music")));
+  const t = turns({ embed, local: local.model });
+  t.warm();
+  t.warm();
+  await t.hear("pause the music");
+  // One call for every capability, at the wake phrase; one for the sentence.
+  assert.equal(asked, 2);
+  assert.deepEqual(app.state.log, ["pause"]);
 });
 
 test("what failed is said in the capability's own line, and what was only asked for is not dressed up", async () => {
@@ -548,7 +556,7 @@ test("a name the app only nearly has is told to the model as most likely that th
   assert.deepEqual(await app.registry.named("open spy flight"), [{ kind: "app", id: "Spotify", label: "Spotify", near: true }]);
   const local = scripted(calls(call("nothing")));
   await turns({ local: local.model }).hear("open spy flight");
-  assert.match(local.asked[0].system, /In what was said, most likely Spotify \(app\), misheard: call with that name; the app asks the user before it acts on it\./);
+  assert.match(local.asked[0].system, /In what was said, most likely Spotify \(app\), misheard: call with that name, and the app asks the user before it acts on it; or ask them yourself with ask_user\./);
   assert.doesNotMatch(local.asked[0].system, /In what was said[^\n]*Steam/);
 });
 
@@ -559,8 +567,8 @@ test("what cannot be used right now is not offered, and is offered once a call m
     { name: "send_note", area: "music", description: "Sends the note.", args: {}, tier: "free", available: () => (draft ? true : "There is no note"), run: async () => done("Sent", true) },
   );
   const local = scripted(calls(call("write_note")), says("Written."));
-  local.route = ["music", "none", "none"];
-  await turns({ local: local.model }).hear("write a note and send it");
+  const embed = embedBy({ "write a note and send it": { write_note: 1, send_note: 0.9 } });
+  await turns({ embed, local: local.model }).hear("write a note and send it");
   assert.ok(local.asked[0].tools.includes("write_note"));
   assert.ok(!local.asked[0].tools.includes("send_note"));
   assert.ok(local.asked[1].tools.includes("send_note"));
@@ -780,4 +788,30 @@ test("a thing nearly named, when all the model called failed, is asked about in 
   assert.deepEqual(asked, ["Did you mean Spotify?"]);
   assert.deepEqual(app.state.log, ["open:Nope", "launch:Spotify"]);
   assert.deepEqual(heard.result, { outcome: "success", message: "Spotify opened" });
+});
+
+test("the model may ask the user when it is not sure, is always offered to, and goes on from the answer", async () => {
+  const questions = [];
+  app.registry.declare({
+    name: "ask_user", area: "coucou", description: "Asks the user.", tier: "free",
+    args: { question: { type: "string", description: "The question." }, option_1: { type: "string", optional: true, description: "An answer." }, option_2: { type: "string", optional: true, description: "Another." } },
+    run: async (args, context) => {
+      const answer = await context.ask({ kind: "choice", question: args.question, options: [{ id: "1", label: args.option_1 }, { id: "2", label: args.option_2 }] });
+      questions.push(args.question);
+      return done("", true, { answered: answer.kind === "choice" ? [args.option_1, args.option_2][Number(answer.id) - 1] : null });
+    },
+  });
+  const local = scripted(
+    calls(call("ask_user", { question: "Discord or Steam?", option_1: "Discord", option_2: "Steam" })),
+    (asked) => (/"answered":"Discord"/.test(asked.steps[0].results[0]) ? calls(call("open_app", { app: "Discord" })) : says("?")),
+    says("Opening Discord."),
+  );
+  const t = turns({ local: local.model });
+  t.onAsk = (ask) => {
+    if (ask) queueMicrotask(() => t.answer({ kind: "choice", id: "1" }));
+  };
+  await t.hear("open this cord");
+  assert.ok(local.asked[0].tools.includes("ask_user"));
+  assert.deepEqual(questions, ["Discord or Steam?"]);
+  assert.deepEqual(app.state.log, ["open:Discord"]);
 });

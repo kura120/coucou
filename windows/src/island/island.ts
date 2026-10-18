@@ -618,6 +618,8 @@ export class Island {
     }
     // Whatever was still being worked out is no longer waited for.
     this.voiceTurn += 1;
+    // The embedding model gets ready while the sentence is said.
+    this.turns.warm();
     // Spoken to: he stops talking and listens.
     stopSpeaking();
     State.voice = { text: "", question: "" };
