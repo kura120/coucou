@@ -462,7 +462,7 @@ pub async fn spotify_refresh(app: AppHandle) -> Option<PlayerState> {
     }
 }
 
-/// A control from the card or the pill: `playPause`, `next`, `previous`,
+/// A control from the card or the pill: `playPause`, `play`, `pause`, `next`, `previous`,
 /// `seek` (seconds), `shuffle` / `repeat` (1 on, 0 off), `volume` (0…100).
 #[tauri::command]
 pub async fn spotify_control(app: AppHandle, action: String, value: Option<f64>) -> bool {
@@ -680,6 +680,9 @@ mod smtc {
             }
             "shuffle" => Some(("Shuffle".into(), Value::Bool(v != 0.0))),
             "repeat" => Some(("LoopStatus".into(), Value::Str(if v != 0.0 { "Playlist" } else { "None" }.into()))),
+            // What voice asked for is what it reads back at once: Windows says so a moment later.
+            "play" => Some(("PlaybackStatus".into(), Value::Str("Playing".into()))),
+            "pause" => Some(("PlaybackStatus".into(), Value::Str("Paused".into()))),
             // Not "volume": Windows has no hold on Spotify's.
             _ => None,
         }
@@ -1033,6 +1036,9 @@ mod windows {
             let Some(session) = link.map(|l| &l.session) else { return false };
             let asked = match action {
                 "playPause" => session.TryTogglePlayPauseAsync(),
+                // Play and pause said as such: asked twice, the second changes nothing.
+                "play" => session.TryPlayAsync(),
+                "pause" => session.TryPauseAsync(),
                 "next" => session.TrySkipNextAsync(),
                 "previous" => session.TrySkipPreviousAsync(),
                 "seek" => {
@@ -1543,6 +1549,8 @@ mod linux {
             let p = c.with_proxy(BUS, PATH, CALL);
             match action {
                 "playPause" => p.method_call(PLAYER, "PlayPause", ()),
+                "play" => p.method_call(PLAYER, "Play", ()),
+                "pause" => p.method_call(PLAYER, "Pause", ()),
                 "next" => p.method_call(PLAYER, "Next", ()),
                 "previous" => p.method_call(PLAYER, "Previous", ()),
                 "seek" => {
@@ -1577,6 +1585,8 @@ mod linux {
             "shuffle" => Some(("Shuffle".into(), Value::Bool(v != 0.0))),
             "repeat" => Some(("LoopStatus".into(), Value::Str(if v != 0.0 { "Playlist" } else { "None" }.into()))),
             "volume" => Some(("Volume".into(), Value::Float((v / 100.0).clamp(0.0, 1.0)))),
+            "play" => Some(("PlaybackStatus".into(), Value::Str("Playing".into()))),
+            "pause" => Some(("PlaybackStatus".into(), Value::Str("Paused".into()))),
             _ => None,
         };
         if let Some(prop) = optimistic {

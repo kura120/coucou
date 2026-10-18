@@ -34,7 +34,7 @@ export interface MusicNow {
 }
 
 /** `value`: seconds for seek, 0 or 1 for shuffle and repeat, 0…100 for volume. */
-export type MusicAction = "playPause" | "next" | "previous" | "seek" | "shuffle" | "repeat" | "volume";
+export type MusicAction = "playPause" | "play" | "pause" | "next" | "previous" | "seek" | "shuffle" | "repeat" | "volume";
 
 // ── Pills, sessions, cards ────────────────────────────────────────────────────
 
