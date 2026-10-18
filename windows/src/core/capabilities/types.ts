@@ -157,6 +157,14 @@ export interface Registry {
   schema(name: string): unknown;
   /** What a model is told of the app every time: the `inSnapshot` reads, what is on screen, the entity kinds. */
   snapshot(): Promise<Record<string, unknown>>;
+  /**
+   * The things the app has whose name is said whole in a sentence, of every
+   * kind — and, for a kind too large to list (the apps), those its source
+   * ranks near the sentence (`near`: perhaps misheard). What helps the
+   * ranking and the model see past a name they know nothing of. Found by the
+   * matcher and the sources; nothing is resolved or asked.
+   */
+  named(sentence: string): Promise<readonly { kind: EntityKind; id: string; label: string; near?: boolean }[]>;
 
   /**
    * One call, guarded and done: looked up (unknown: refused), its arguments

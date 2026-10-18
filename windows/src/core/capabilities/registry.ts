@@ -50,6 +50,15 @@ export interface RegistryOptions {
   doubted?(said: string): boolean;
 }
 
+/**
+ * How near a thing of a large kind must be ranked to a sentence to be told to
+ * the model as perhaps named there: apps.rs takes a name by its letters or its
+ * sound from 0.75 ("this squad" for Discord scored 0.8).
+ */
+const NEAR_NAMED = 0.75;
+/** At most this many of them. */
+const NAMED_NEAR_MOST = 3;
+
 /** What `snapshot` may weigh, in characters of JSON: it is read by a model at every turn. */
 export const SNAPSHOT_MOST = 6000;
 /** One read's share of it; a longer one is cut, and marked as cut. */
@@ -242,6 +251,29 @@ export function createRegistry(options: RegistryOptions): Registry {
     return run(inverse, context, true);
   }
 
+  // ── What a sentence names ───────────────────────────────────────────────────
+
+  async function namedIn(sentence: string): Promise<{ kind: string; id: string; label: string; near?: boolean }[]> {
+    const out: { kind: string; id: string; label: string; near?: boolean }[] = [];
+    for (const source of sources.values()) {
+      try {
+        if (!source.near) {
+          for (const thing of contained(sentence, await source.list())) out.push({ kind: source.kind, id: thing.id, label: thing.label });
+          continue;
+        }
+        // A kind too large to list: what its source ranks near the sentence. Said whole, it is named; close, perhaps.
+        const near = await source.near(sentence);
+        const whole = contained(sentence, near);
+        for (const thing of whole) out.push({ kind: source.kind, id: thing.id, label: thing.label });
+        const close = near.filter((thing) => thing.score >= NEAR_NAMED && !whole.includes(thing)).slice(0, NAMED_NEAR_MOST);
+        for (const thing of close) out.push({ kind: source.kind, id: thing.id, label: thing.label, near: true });
+      } catch {
+        // A source that breaks names nothing.
+      }
+    }
+    return out;
+  }
+
   // ── What a model is told every time ─────────────────────────────────────────
 
   async function snapshot(): Promise<Record<string, unknown>> {
@@ -316,6 +348,7 @@ export function createRegistry(options: RegistryOptions): Registry {
       return capability ? schemaOf(capability) : null;
     },
     snapshot,
+    named: namedIn,
     execute: (call, context) => run(call, context, false),
     undo,
   };

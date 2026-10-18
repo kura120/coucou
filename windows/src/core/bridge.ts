@@ -38,7 +38,7 @@ export type VoiceEnginePart = "hearing" | "speaking";
 
 /** src-tauri/src/voice/mod.rs `Status`. */
 export type VoiceStatus =
-  | "off" | "listening" | "shortcut" | "paused" | "noRecogniser" | "microphone" | "unsupported" | "error";
+  | "off" | "listening" | "shortcut" | "paused" | "noRecogniser" | "microphone" | "unsupported" | "noEngine" | "error";
 /** The phone link (src-tauri/src/phone_link): how it is, never its secrets. */
 export interface PhoneLinkStatus {
   enabled: boolean;
@@ -437,9 +437,6 @@ export const Bridge = {
   voiceStatus: () => call<VoiceStatus>("voice_status"),
   /** The island left the listening view itself: the command is not waited for. */
   voiceCancel: () => call<void>("voice_cancel"),
-  /** What the recogniser can hear after the wake phrase (voice/grammar.ts). */
-  voiceGrammar: (commands: string[], slots: Record<string, string[]>) =>
-    call<void>("voice_grammar", { commands, slots }),
   /** What was said without the wake phrase was a command: another may follow it. */
   voiceFollowed: () => call<void>("voice_followed"),
   /**
@@ -449,8 +446,6 @@ export const Bridge = {
    */
   voiceHearingModels: () =>
     call<{ id: string; name: string; downloadBytes: number; installed: boolean; server: boolean }[]>("voice_hearing_models"),
-  /** The installed apps' names, as a recogniser can be given them ("open {app}"). */
-  voiceApps: () => call<string[]>("voice_apps"),
   /** Listens for a command without the wake phrase: the answer to a question. */
   voiceTalk: () => call<void>("voice_talk"),
   /**

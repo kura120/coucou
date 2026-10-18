@@ -31,7 +31,7 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
       capability({
         name: "pause_coucou",
         area: AREA,
-        description: "Pauses Coucou itself, as its tray menu does: the island hides and the services are no longer asked. Not the music.",
+        description: "Pauses the whole Coucou app, as its tray menu does: the island hides and the services are no longer asked. Not the music.",
         args: {},
         tier: "reversible",
         inverse: () => (host.paused() ? null : { name: "resume_coucou", arguments: {} }),
@@ -91,7 +91,7 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
       capability({
         name: "nothing",
         area: AREA,
-        description: "Does nothing. For when the user changed their mind, is done, only thanked, or when what was heard is not a request to Coucou.",
+        description: "Does nothing. For when the user changed their mind, is done, only thanked, said not to do something, or when what was heard was said to someone else and is not a request to Coucou.",
         args: {},
         tier: "free",
         async run() {

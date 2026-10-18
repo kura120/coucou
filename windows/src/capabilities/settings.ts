@@ -11,10 +11,12 @@
 // What is left out is left out on purpose (CLAUDE.md, doc/voice-brain.md):
 // hooks and the status line write the agents' own configuration; addresses,
 // keys and folders are not things to dictate; the phone link is Rust's to
-// switch; shortcuts and colours are set by hand; turning voice on, its model
-// and where it may send what was said are the user's alone.
+// switch; shortcuts and colours are set by hand; turning voice on is the
+// user's alone. Where what was said may go — the model server, the cloud, the
+// web — is here, and each such change waits for the click.
 
 import type { Args, Call, Tier, ToolResult } from "../core/capabilities/types";
+import { SEARCH_ENGINES } from "../core/search";
 import { t } from "../i18n/i18n";
 import { done, failed } from "../voice/result";
 import type { AppHost, Awaitable, Option } from "./host";
@@ -58,10 +60,15 @@ export const SETTINGS: readonly SettingSpec[] = [
   { key: "autostart", label: "Start with the computer", about: "Coucou starts when the session opens", tier: "confirm", kind: "switch" },
   { key: "screen", label: "Screen", about: "the display the island lives on", tier: "confirm", kind: "choice", options: (host) => host.monitors() },
   { key: "voice.wake", label: "Wake phrase", about: "the microphone listens for the wake phrase all the time", tier: "confirm", kind: "switch" },
-  { key: "voice.engine", label: "Speech engine", about: "what writes down what is said", tier: "confirm", kind: "choice", options: fixed(["bundled", "Free speech (downloaded)"], ["system", "The system's recogniser"]) },
   { key: "voice.hearingModel", label: "Speech model", about: "the model the downloaded engine hears with", tier: "confirm", kind: "choice", options: (host) => host.hearingModels() },
   { key: "voice.brain", label: "Voice model server", about: "the model server asked what a sentence means", tier: "confirm", kind: "choice", options: fixed(["", "None"], ["ollama", "Ollama"], ["lmstudio", "LM Studio"], ["custom", "Custom server"]) },
   { key: "claudeCodeMode", label: "Claude Code mode", about: "the permission mode Claude Code runs in from the chat", tier: "confirm", kind: "choice", options: fixed(["default", "Default"], ["plan", "Plan"]) },
+  // Where what was said, or a question, may go: each waits for the click.
+  { key: "voice.embedModel", label: "Voice ranking model", about: "the embedding model, on the voice model server, that ranks what a sentence is about; none turns the instant answers and the follow-up time off", tier: "confirm", kind: "choice", options: (host) => host.embedModels() },
+  { key: "voice.cloud", label: "Cloud model for voice", about: "what the local model cannot do is handed to the provider chosen for the chat, with what was said", tier: "confirm", kind: "switch" },
+  { key: "voice.webAnswers", label: "Web answers", about: "a question asked out loud may be answered from a web search", tier: "confirm", kind: "switch" },
+  { key: "voice.webSearch", label: "Web search service", about: "who answers a web question: Brave Search with the user's key, Anthropic, or nobody (the browser opens)", tier: "confirm", kind: "choice", options: fixed(["browser", "The browser"], ["brave", "Brave Search"], ["anthropic", "Anthropic"]) },
+  { key: "searchEngine", label: "Search engine", about: "the search engine the browser opens a search on", tier: "confirm", kind: "choice", options: () => SEARCH_ENGINES.map(({ id, name }) => ({ value: id, label: name })) },
 ];
 
 export const settingSpec = (key: string): SettingSpec | undefined => SETTINGS.find((s) => s.key === key);

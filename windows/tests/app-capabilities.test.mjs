@@ -11,7 +11,6 @@ import { fileURLToPath } from "node:url";
 import { appAreas, registerApp } from "../src/capabilities/index.ts";
 import { SETTINGS, settingSpec } from "../src/capabilities/settings.ts";
 import { webAddress } from "../src/capabilities/apps.ts";
-import { RULES } from "../src/voice/guard.ts";
 
 const SOURCES = join(dirname(fileURLToPath(import.meta.url)), "../src/capabilities");
 
@@ -140,6 +139,7 @@ function fake(change = {}) {
     languages: () => [{ value: "", label: "System" }, { value: "en", label: "English" }, { value: "fr", label: "Français" }],
     monitors: async () => [{ value: "primary", label: "Primary display" }, { value: "cursor", label: "The display with the pointer" }],
     hearingModels: async () => [{ value: "moonshine-tiny", label: "Moonshine Tiny" }, { value: "parakeet-0.6b", label: "Parakeet 0.6B" }],
+    embedModels: async () => [{ value: "", label: "None" }, { value: "nomic-embed-text", label: "nomic-embed-text" }],
 
     chat: () => ({ ...s.chat }),
     prepareChat: (message) => act("chat:prepare", () => {
@@ -544,10 +544,12 @@ test("no card waits: nothing to show, decline or answer", async () => {
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
-test("the schema: guard.ts's settings and tiers, and none it says never", () => {
-  const expected = RULES.filter((rule) => rule.tier !== "never").map((rule) => [rule.key, rule.tier === "guarded" ? "confirm" : "reversible"]);
-  assert.deepEqual(SETTINGS.map((s) => [s.key, s.tier]), expected);
-  for (const rule of RULES.filter((r) => r.tier === "never")) assert.equal(settingSpec(rule.key), undefined, rule.key);
+test("the schema: each setting with its tier, and none of those left to the user alone", () => {
+  const done = ["soundEnabled", "soundVolume", "openOnHover", "autoCloseInterval", "showPlanInNotch", "showCodexPlanInNotch", "voice.speak", "voice.speaker", "voice.followUp"];
+  // A click first — and always for where what was said may go.
+  const clicked = ["language", "autostart", "screen", "voice.wake", "voice.hearingModel", "voice.brain", "claudeCodeMode", "voice.embedModel", "voice.cloud", "voice.webAnswers", "voice.webSearch", "searchEngine"];
+  assert.deepEqual(SETTINGS.map((s) => [s.key, s.tier]), [...done.map((key) => [key, "reversible"]), ...clicked.map((key) => [key, "confirm"])]);
+  for (const key of ["voice.enabled", "voice.engine", "voice.brainModel", "hooksInstalled", "ollamaUrl", "lmstudioUrl", "customUrl", "claudeCodeDir", "shortcuts", "phoneLink", "phoneRelay", "phoneRelayUrl"]) assert.equal(settingSpec(key), undefined, key);
   for (const spec of SETTINGS) {
     // A plain name and what it is; never the ways it is said.
     assert.deepEqual(Object.keys(spec).filter((key) => !["key", "label", "about", "tier", "kind", "min", "max", "step", "percent", "unit", "options"].includes(key)), []);
@@ -559,10 +561,10 @@ test("set_setting: its tier is the setting's, and one it does not know takes a c
   const { get, log } = app();
   const set = get("set_setting");
   assert.equal(set.tier({ setting: "soundEnabled", on: false }), "reversible");
-  for (const key of ["language", "autostart", "screen", "voice.wake", "voice.engine", "voice.hearingModel", "voice.brain", "claudeCodeMode"]) {
+  for (const key of ["language", "autostart", "screen", "voice.wake", "voice.hearingModel", "voice.brain", "claudeCodeMode", "voice.embedModel", "voice.cloud", "voice.webAnswers", "voice.webSearch", "searchEngine"]) {
     assert.equal(set.tier({ setting: key }), "confirm", key);
   }
-  for (const key of ["hooksInstalled", "ollamaUrl", "voice.enabled", "voice.cloud", "shortcuts", "phoneLink", "nonsense"]) {
+  for (const key of ["hooksInstalled", "ollamaUrl", "voice.enabled", "voice.brainModel", "shortcuts", "phoneLink", "nonsense"]) {
     assert.equal(set.tier({ setting: key, on: true }), "confirm", key);
     assert.equal(set.inverse({ setting: key, on: true }), null, key);
     assert.equal((await set.run({ setting: key, on: true, option: "http://elsewhere" }, context())).status, "failed", key);
