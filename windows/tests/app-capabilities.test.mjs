@@ -805,3 +805,13 @@ test("appAreas gives each area's capabilities under one area name", () => {
   assert.equal(areas.length, 15);
   for (const area of areas) assert.equal(new Set(area.capabilities.map((c) => c.area)).size, 1);
 });
+
+test("replacing a pill that is not shown by one that already is changes nothing, and says so", async () => {
+  const { get, s, log } = app();
+  const shown = s.pills.active.find((id) => id !== s.pills.main);
+  const hidden = "integration_notion" === shown ? "integration_resend" : "integration_notion";
+  const result = await get("replace_pill").run({ remove: hidden, add: shown }, context());
+  assert.equal(result.status, "failed");
+  assert.match(result.detail, /is not shown, and .* already is/);
+  assert.deepEqual(log, []);
+});

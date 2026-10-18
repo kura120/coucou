@@ -142,6 +142,10 @@ export function pills(host: AppHost): Area {
           const next = str(args.add);
           if (!known(old)) return unknownArgument(args, "remove");
           if (!known(next)) return unknownArgument(args, "add");
+          // Nothing to swap: the one to hide is not there and the other already is.
+          if (!host.pills().active.includes(old) && shown(next)) {
+            return failed(t("That did not change"), `${name(old)} is not shown, and ${name(next)} already is.`);
+          }
           if (host.pills().active.includes(old)) host.togglePill(old);
           if (!shown(next) && host.pillFits(next)) host.togglePill(next);
           if (!shown(next)) return failed(t("That did not change"), `${name(next)} could not be shown.`);
