@@ -56,7 +56,7 @@ export const SETTINGS: readonly SettingSpec[] = [
   { key: "voice.followUp", label: "Follow-up time", about: "how long another sentence needs no wake phrase; 0 for none", tier: "reversible", kind: "number", min: 0, max: 30, step: 1, unit: "seconds" },
 
   // ── A click first ──
-  { key: "language", label: "Language", about: "the language of Coucou's interface", tier: "confirm", kind: "choice", options: (host) => host.languages() },
+  { key: "language", label: "Language", about: "the language of Coucou's interface", tier: "confirm", kind: "choice", options: async (host) => (await host.languages()).map(inEnglish) },
   { key: "autostart", label: "Start with the computer", about: "Coucou starts when the session opens", tier: "confirm", kind: "switch" },
   { key: "screen", label: "Screen", about: "the display the island lives on", tier: "confirm", kind: "choice", options: (host) => host.monitors() },
   { key: "voice.wake", label: "Wake phrase", about: "the microphone listens for the wake phrase all the time", tier: "confirm", kind: "switch" },
@@ -72,6 +72,16 @@ export const SETTINGS: readonly SettingSpec[] = [
 ];
 
 export const settingSpec = (key: string): SettingSpec | undefined => SETTINGS.find((s) => s.key === key);
+
+/** A language also by its name in English, as the platform writes it: what voice, English only, hears ("French" for Français). */
+function inEnglish(option: Option): Option {
+  try {
+    const name = option.value ? new Intl.DisplayNames(["en"], { type: "language" }).of(option.value) : undefined;
+    return name && name.toLowerCase() !== option.label.toLowerCase() ? { ...option, spoken: [name] } : option;
+  } catch {
+    return option;
+  }
+}
 
 type Value = boolean | number | string;
 
@@ -119,7 +129,8 @@ function wanted(spec: SettingSpec, args: Args, options: readonly Option[]): { va
       const given = typeof args.option === "string" ? args.option.trim() : null;
       // By its value, or by its label as it is written.
       const option = given == null ? undefined
-        : options.find((o) => o.value === given) ?? options.find((o) => o.label.toLowerCase() === given.toLowerCase());
+        : options.find((o) => o.value === given)
+          ?? options.find((o) => [o.label, ...(o.spoken ?? [])].some((name) => name.toLowerCase() === given.toLowerCase()));
       return option ? { value: option.value } : { why: `${spec.label} takes one of: ${options.map((o) => o.label).join(", ")}.` };
     }
   }

@@ -181,7 +181,6 @@ const ROLE = [
   "- Names: write each name in the arguments in the user's own words, as it was heard, even when it looks misheard, cut short or unlike anything in the state (\"open st\" is the app \"st\", \"open this squad\" the app \"this squad\"). The app looks it up and asks the user when it is not sure. A name you do not know is never a reason to do nothing. Never write a name or an address the user did not say.",
   "- A sentence that goes on from the turn before (\"and Discord too\", \"what about Steam\") asks for the same again, for what it names now.",
   "- A correction of the turn before (\"no, I meant Resend\", \"take that one off\") is a request: put the last change back with undo, then do what is meant now, if anything.",
-  "- A yes or a no at the start of a sentence may only answer the turn before or clear the way (\"no, decline that\"): what follows it is the request.",
   "- When the user says not to do something, or never to, do not do it: call the capability named nothing.",
   "- Some capabilities wait for the user's click before anything happens. That is the app's doing: call them when they are what was asked.",
   "- A question about the app is answered from its state, below, or by a capability that reads.",
@@ -219,7 +218,7 @@ const AFTER_CALLS =
 const EMPTY = "Your last answer was empty. Call the capability that does what was asked, or the one named nothing, or answer in words.";
 
 /** Once the app's capabilities ran, the model only decides what else to call: its words are not what Mochi says. */
-const AFTER_RAN = "The results of your calls are above. If a call failed and can be made right — another value, another setting, another capability — make it now. If what was asked needs another capability, call it now. Otherwise reply with the one word: done.";
+const AFTER_RAN = "The results of your calls are above. If a call failed and can be made right with another value or another setting, make it now. If what was asked needs another capability, call it now. Otherwise reply with the one word: done.";
 
 /**
  * What only read the app is put in words by a model given those results and
@@ -470,7 +469,8 @@ export class VoiceTurns {
   }
 
   private async run(call: ModelCall, origin: RunContext["origin"], turn: Running): Promise<ToolResult> {
-    const result = await this.registry.execute(asHeard(call, this.registry.get(call.name), turn), this.context(origin, turn));
+    const given = await asHeard(call, this.registry.get(call.name), turn, (text) => this.registry.named(text));
+    const result = await this.registry.execute(given, this.context(origin, turn));
     turn.ran.push({ call, result, capability: this.registry.get(call.name) });
     return result;
   }
@@ -733,27 +733,40 @@ function takers(ranked: readonly Ranked[], capabilities: readonly Capability[], 
  * for a listed kind (the words it was heard as); for a kind ranked by its
  * source (the apps), the sentence itself is what is looked up, as tier 1
  * does. A name the sentence holds whole is left as written; one it does not
- * hold at all, where it names one thing of that kind ("VS Code" written for
- * "launch visual studio code"), is that thing.
+ * hold and that is nothing of its kind ("VS Code", a pill, written for the
+ * app in "launch visual studio code"), where the sentence names one thing of
+ * that kind and the capability takes one argument of it, is that thing.
  */
-export function asHeard(call: ModelCall, capability: Capability | undefined, turn: Pick<Running, "said" | "named">): ModelCall {
+export async function asHeard(
+  call: ModelCall,
+  capability: Capability | undefined,
+  turn: Pick<Running, "said" | "named">,
+  /** What a text names, as Registry.named: to tell a name that is nothing of its kind. */
+  namedIn?: (text: string) => Promise<readonly { kind: string }[]>,
+): Promise<ModelCall> {
   if (!capability || !turn.named.length) return call;
   const args = { ...(call.arguments ?? {}) };
   const sentence = ` ${normalise(turn.said)} `;
-  const back = (kind: string, value: unknown): unknown => {
+  const specs = Object.entries(capability.args);
+  const back = async (kind: string, value: unknown): Promise<unknown> => {
     if (typeof value !== "string") return value;
     const said = normalise(value);
     const ofKind = turn.named.filter((n) => n.kind === kind);
     const near = ofKind.find((n) => n.near && (n.id === value || normalise(n.label) === said));
     if (near && !ofKind.some((n) => !n.near && n.id === near.id)) return near.heard ?? turn.said;
-    // A name the sentence does not hold, where it names one thing of that kind: the one it names.
-    if (said && !sentence.includes(` ${said} `) && ofKind.length === 1) return ofKind[0].near ? (ofKind[0].heard ?? turn.said) : ofKind[0].id;
-    return value;
+    // A name the sentence does not hold and that is nothing of its kind, for the one argument of that kind,
+    // where the sentence names one thing of it: that thing.
+    const alone = specs.filter(([, spec]) => (spec.type === "entity" || spec.type === "entities") && spec.kind === kind).length === 1;
+    if (!alone || !said || sentence.includes(` ${said} `) || ofKind.length !== 1 || value === ofKind[0].id) return value;
+    if (!namedIn || (await namedIn(value).catch(() => [{ kind }])).some((n) => n.kind === kind)) return value;
+    return ofKind[0].near ? (ofKind[0].heard ?? turn.said) : ofKind[0].id;
   };
-  for (const [arg, spec] of Object.entries(capability.args)) {
+  for (const [arg, spec] of specs) {
     if (!(arg in args)) continue;
-    if (spec.type === "entity") args[arg] = back(spec.kind, args[arg]);
-    else if (spec.type === "entities") args[arg] = Array.isArray(args[arg]) ? (args[arg] as unknown[]).map((v) => back(spec.kind, v)) : back(spec.kind, args[arg]);
+    if (spec.type === "entity") args[arg] = await back(spec.kind, args[arg]);
+    else if (spec.type === "entities") {
+      args[arg] = Array.isArray(args[arg]) ? await Promise.all((args[arg] as unknown[]).map((v) => back(spec.kind, v))) : await back(spec.kind, args[arg]);
+    }
   }
   return { ...call, arguments: args };
 }

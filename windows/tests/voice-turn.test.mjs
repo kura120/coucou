@@ -681,11 +681,17 @@ test("a thing nearly named that the model did nothing with is asked about by the
   assert.equal(asked.length, 1);
 });
 
-test("a name the sentence does not hold, where it names one thing of that kind, is that thing", () => {
-  const capability = app.registry.get("show_view");
+test("a name the sentence does not hold and that is nothing of its kind is the thing the sentence names", async () => {
+  const named = (text) => app.registry.named(text);
+  const show = app.registry.get("show_view");
   const turn = { said: "bring up the wardrobe", named: [{ kind: "view", id: "wardrobe", label: "Wardrobe" }] };
-  assert.deepEqual(asHeard(call("show_view", { view: "Closet" }), capability, turn).arguments, { view: "wardrobe" });
-  // Said as it is, or with nothing of that kind named: as written.
-  assert.deepEqual(asHeard(call("show_view", { view: "wardrobe" }), capability, turn).arguments, { view: "wardrobe" });
-  assert.deepEqual(asHeard(call("show_view", { view: "Chat" }), capability, { said: "show it", named: [] }).arguments, { view: "Chat" });
+  assert.deepEqual((await asHeard(call("show_view", { view: "Closet" }), show, turn, named)).arguments, { view: "wardrobe" });
+  // Said as it is, a thing of that kind that exists, or nothing of that kind named: as written.
+  assert.deepEqual((await asHeard(call("show_view", { view: "wardrobe" }), show, turn, named)).arguments, { view: "wardrobe" });
+  assert.deepEqual((await asHeard(call("show_view", { view: "Chat" }), show, turn, named)).arguments, { view: "Chat" });
+  assert.deepEqual((await asHeard(call("show_view", { view: "Chat" }), show, { said: "show it", named: [] }, named)).arguments, { view: "Chat" });
+  // A correction names another thing of the kind than the one to put back: left to the model.
+  const remove = app.registry.get("remove_pills");
+  const correction = { said: "no i meant stripe", named: [{ kind: "pill", id: "stripe", label: "Stripe" }] };
+  assert.deepEqual((await asHeard(call("remove_pills", { pills: ["vercel"] }), remove, correction, named)).arguments, { pills: ["vercel"] });
 });

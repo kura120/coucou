@@ -582,6 +582,11 @@ test("set_setting: a switch, a level in percent, a delay, a choice by value or b
   assert.equal(s.settings.voice.followUp, 12);
   assert.equal((await set({ setting: "language", option: "Français" })).line, "Language: Français");
   assert.equal(s.settings.language, "fr");
+  // A language by its name in English too, as the platform writes it.
+  assert.equal((await set({ setting: "language", option: "english" })).line, "Language: English");
+  assert.equal(s.settings.language, "en");
+  await set({ setting: "language", option: "french" });
+  assert.equal(s.settings.language, "fr");
   assert.equal((await set({ setting: "voice.hearingModel", option: "moonshine-tiny" })).status, "done");
   assert.equal((await set({ setting: "screen", option: "cursor" })).status, "done");
   // Already so: said, and nothing is saved again.

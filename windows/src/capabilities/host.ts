@@ -13,6 +13,8 @@ export type Awaitable<T> = T | Promise<T>;
 export interface Option {
   value: string;
   label: string;
+  /** Other names it goes by, when the platform gives some (a language's name in English). */
+  spoken?: readonly string[];
 }
 
 // ── Music ─────────────────────────────────────────────────────────────────────
