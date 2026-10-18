@@ -195,7 +195,7 @@ test("without the wake phrase the local model decides: nothing for what was said
   // Something the app does, asked for: taken once, before it runs.
   const meant = await t.hear("pause it", { wake: false, taken: () => taken++ });
   assert.equal(taken, 1);
-  assert.deepEqual(meant.result, { outcome: "success", message: "Paused." });
+  assert.deepEqual(meant.result, { outcome: "success", message: "Paused" });
   assert.deepEqual(app.state.log, ["pause"]);
 });
 
@@ -264,12 +264,13 @@ test("with no model server, voice says what it needs", async () => {
   assert.deepEqual(app.state.log, []);
 });
 
-test("tier 2, ranked: the model is shown the nearest capabilities, its calls run, and its words are Mochi's", async () => {
+test("tier 2, ranked: the model is shown the nearest capabilities, its calls run, and what they did is said in their own lines", async () => {
   const embed = embedBy({ "could you stop the song and bring in": { pause_music: 0.6, add_pills: 0.55, play_music: 0.5 } });
   const local = scripted(calls(call("pause_music"), call("add_pills", { pills: ["stripe"] })), says("Paused, and Stripe is in."));
   const heard = await turns({ embed, local: local.model }).hear("could you stop the song and bring stripe in");
   assert.deepEqual(app.state.log, ["pause", "add:stripe"]);
-  assert.deepEqual(heard.result, { outcome: "success", message: "Paused, and Stripe is in." });
+  // The model's words are not what Mochi says of what was done: the capabilities' lines are.
+  assert.deepEqual(heard.result, { outcome: "success", message: "Paused. stripe added" });
   // The nearest first — Stripe is a pill, so what takes pills is counted nearer — then the ones always shown, and no handing up with nobody to hand up to.
   assert.deepEqual(local.asked[0].tools.slice(0, 3), ["add_pills", "pause_music", "play_music"]);
   assert.ok(local.asked[0].tools.includes("more_tools") && local.asked[0].tools.includes("nothing"));
@@ -293,7 +294,7 @@ test("tier 2, with no embedding model: the areas first, then those areas' capabi
   // Then the area's capabilities, with those about the conversation; an area that is none or nothing is no area.
   assert.deepEqual(local.asked[0].tools, ["more_tools", "nothing", "undo", "now_playing", "pause_music", "play_music"]);
   assert.deepEqual(app.state.log, ["pause"]);
-  assert.deepEqual(heard.result, { outcome: "success", message: "Paused." });
+  assert.deepEqual(heard.result, { outcome: "success", message: "Paused" });
 });
 
 test("with no embedding model, more_tools gives another area's capabilities when the first were not the right ones", async () => {
@@ -349,8 +350,13 @@ test("an answer in words, with nothing called, is Mochi's answer; asking for not
   });
   const none = scripted(calls(call("nothing")));
   assert.deepEqual(await turns({ local: none.model }).hear("never mind"), { result: null, taken: true, rest: true });
-  const empty = scripted(says(""));
+  // An empty answer is asked for once more; empty again, it was not understood.
+  const empty = scripted(says(""), says(""));
   assert.deepEqual((await turns({ local: empty.model }).hear("mumble")).result, { outcome: "failure", message: "Not recognised" });
+  assert.equal(empty.asked.length, 2);
+  assert.match(empty.asked[1].system, /Your last answer was empty/);
+  const second = scripted(says(""), calls(call("pause_music")));
+  assert.deepEqual((await turns({ local: second.model }).hear("pause")).result, { outcome: "success", message: "Paused" });
 });
 
 test("calls a model wrote out as text are calls, and its plumbing is never said", async () => {
@@ -379,7 +385,7 @@ test("the last turns are given to the model as data, undo is the registry's, and
   await t.hear("add vercel");
   assert.deepEqual(local.asked[0].history, []);
   await t.hear("no wait, put that back");
-  assert.deepEqual(local.asked[2].history, [{ said: "add vercel", calls: [call("add_pills", { pills: ["vercel"] })], result: "Vercel is in." }]);
+  assert.deepEqual(local.asked[2].history, [{ said: "add vercel", calls: [call("add_pills", { pills: ["vercel"] })], result: "vercel added" }]);
   assert.deepEqual(app.state.log, ["add:vercel", "remove:vercel"]);
   now += FORGOTTEN_AFTER_MS;
   await t.hear("and now?");
@@ -493,7 +499,8 @@ test("a local model that does not answer: the cloud model when allowed, else it 
     return { text: "Paused." };
   };
   t = turns({ local: silent, cloud });
-  assert.deepEqual((await t.hear("pause")).result, { outcome: "success", message: "Paused." });
+  // What it did is said in the capability's line, whatever the cloud model's words.
+  assert.deepEqual((await t.hear("pause")).result, { outcome: "success", message: "Paused" });
   assert.deepEqual(app.state.log, ["pause"]);
 });
 
@@ -540,8 +547,8 @@ test("a name the app only nearly has is told to the model as perhaps that thing,
   assert.deepEqual(await app.registry.named("open spy flight"), [{ kind: "app", id: "Spotify", label: "Spotify", near: true }]);
   const local = scripted(calls(call("nothing")));
   await turns({ local: local.model }).hear("open spy flight");
-  assert.match(local.asked[0].system, /the app finds: perhaps Spotify \(app, heard as something close to it\)/);
-  assert.doesNotMatch(local.asked[0].system, /Steam/);
+  assert.match(local.asked[0].system, /the app finds: perhaps Spotify \(app, heard as something close to it\)\./);
+  assert.doesNotMatch(local.asked[0].system, /the app finds:[^\n]*Steam/);
 });
 
 test("what cannot be used right now is not offered, and is offered once a call makes it usable", async () => {
@@ -556,4 +563,72 @@ test("what cannot be used right now is not offered, and is offered once a call m
   assert.ok(local.asked[0].tools.includes("write_note"));
   assert.ok(!local.asked[0].tools.includes("send_note"));
   assert.ok(local.asked[1].tools.includes("send_note"));
+});
+
+// ── Follow-ups, names, and what Mochi says ────────────────────────────────────
+
+test("a follow-up is shown what the turn before called, however it ranks alone", async () => {
+  // "add" is plainly adding pills (tier 1); "and the other one too" is near everything but adding.
+  const others = { now_playing: 0.5, pause_music: 0.5, play_music: 0.5, remove_pills: 0.01, show_view: 0.5, open_app: 0.5, quit_coucou: 0.5, undo: 0.5 };
+  const embed = embedBy({ add: { add_pills: 1 }, "and the other one too": others });
+  const local = scripted(calls(call("nothing")));
+  const t = turns({ embed, local: local.model });
+  await t.hear("add vercel");
+  assert.deepEqual(app.state.log, ["add:vercel"]);
+  await t.hear("and the other one too");
+  assert.ok(local.asked[0].tools.includes("add_pills"));
+  // Alone, it is not shown.
+  const alone = scripted(calls(call("nothing")));
+  await turns({ embed, local: alone.model }).hear("and the other one too");
+  assert.ok(!alone.asked[0].tools.includes("add_pills"));
+});
+
+test("what takes a kind of thing the sentence names is shown, however near the rest of the sentence is to others", async () => {
+  const others = { now_playing: 0.5, pause_music: 0.5, play_music: 0.5, add_pills: 0.5, remove_pills: 0.5, open_app: 0.5, quit_coucou: 0.5, undo: 0.5 };
+  const embed = embedBy({ "bring up the": others });
+  const local = scripted(calls(call("show_view", { view: "wardrobe" })));
+  await turns({ embed, local: local.model }).hear("bring up the wardrobe");
+  assert.equal(local.asked[0].tools[0], "show_view");
+  assert.deepEqual(app.state.log, ["view:wardrobe"]);
+});
+
+test("what only read is said by a model given the results alone; what was done, in the capabilities' lines", async () => {
+  const local = scripted(calls(call("now_playing")), says("done"), says("Song by Artist is playing."));
+  const heard = await turns({ local: local.model }).hear("hey what is this song called");
+  assert.deepEqual(heard.result, { outcome: "success", message: "Song by Artist is playing." });
+  const report = local.asked[2];
+  // Not the sentence, not the turns before, no tools: the results.
+  assert.deepEqual(report.tools, []);
+  assert.deepEqual(report.history, []);
+  assert.equal(report.said, "What did the app read?");
+  assert.doesNotMatch(report.system, /song called/);
+  assert.match(report.system, /"title":"Song"/);
+  // Words that name what nothing did are never said.
+  const claims = scripted(calls(call("pause_music")), says("Paused, and Stripe is gone too."));
+  assert.deepEqual((await turns({ local: claims.model }).hear("pause and remove stripe")).result, { outcome: "success", message: "Paused" });
+  // A report that does not come: the reads' own lines.
+  const mute = scripted(calls(call("now_playing")), says("done"));
+  assert.deepEqual((await turns({ local: mute.model }).hear("what is playing")).result, { outcome: "success", message: "Song — Artist" });
+});
+
+test("a thing of a listed kind said a letter or a sound away is perhaps named; a word that only sounds alike is not", async () => {
+  app.registry.entities({ kind: "setting", description: "Settings.", list: () => [{ id: "screen", label: "Screen" }, { id: "settings", label: "Settings" }] });
+  assert.deepEqual(await app.registry.named("remove strife"), [{ kind: "pill", id: "stripe", label: "Stripe", near: true }]);
+  assert.deepEqual(await app.registry.named("ad get hub"), [{ kind: "pill", id: "github", label: "GitHub", near: true }]);
+  // Whole names are named, not perhaps named.
+  assert.deepEqual(await app.registry.named("remove stripe"), [{ kind: "pill", id: "stripe", label: "Stripe" }]);
+  // Sounds alike, starts otherwise; several words that only sound like a name.
+  assert.deepEqual(await app.registry.named("that's better thanks"), []);
+  assert.deepEqual(await app.registry.named("is the ci green"), []);
+});
+
+test("a capability's name written as text, alone or with its arguments, is a call", () => {
+  const known = new Set(["nothing", "read_session_output"]);
+  assert.deepEqual(written("nothing", known), [call("nothing")]);
+  assert.deepEqual(written('read_session_output {"lines": 8, "session": "VS Code"}', known), [call("read_session_output", { lines: 8, session: "VS Code" })]);
+  assert.deepEqual(written('read_session_output({"session": "Codex"})', known), [call("read_session_output", { session: "Codex" })]);
+  // Not a capability's name, or words: no call.
+  assert.deepEqual(written("Nothing.", known), []);
+  assert.deepEqual(written("rm_rf", known), []);
+  assert.deepEqual(written("nothing to do here", known), []);
 });

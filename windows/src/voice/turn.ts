@@ -26,7 +26,7 @@
 import type { Answer, Ask, Capability, Registry, RunContext, ToolResult } from "../core/capabilities/types";
 import { usable } from "./asking";
 import { VoiceMemory, type ModelCall, type VoiceTurn } from "./memory";
-import { ALWAYS_SHOWN, CapabilityIndex, indexText, instant, shortlist, type Embed, type Ranked } from "./rank";
+import { ALWAYS_SHOWN, CapabilityIndex, indexText, instant, SHORTLIST, shortlist, type Embed, type Ranked } from "./rank";
 import { forModel, spoken, type VoiceResult } from "./result";
 
 export type { ModelCall } from "./memory";
@@ -177,11 +177,14 @@ const INTRO = "You are the voice of Coucou, a small desktop app: its user has ju
 const ROLE = [
   "How to act:",
   "- Do what was asked by calling capabilities. Several things asked are several calls.",
-  "- Names: write each name in the arguments in the user's own words, as it was heard, even when it looks misheard, cut short or unlike anything in the state (\"open st\" is the app \"st\"). The app looks it up and asks the user when it is not sure. Never write a name the user did not say.",
-  "- When the user says not to do something, do not do it: call the capability named nothing.",
+  "- Names: write each name in the arguments in the user's own words, as it was heard, even when it looks misheard, cut short or unlike anything in the state (\"open st\" is the app \"st\", \"open this squad\" the app \"this squad\"). The app looks it up and asks the user when it is not sure. A name you do not know is never a reason to do nothing. Never write a name or an address the user did not say.",
+  "- A sentence that goes on from the turn before (\"and Discord too\", \"what about Steam\") asks for the same again, for what it names now.",
+  "- A correction of the turn before (\"no, I meant Resend\", \"take that one off\") is a request: put the last change back with undo, then do what is meant now, if anything.",
+  "- When the user says not to do something, or never to, do not do it: call the capability named nothing.",
   "- Some capabilities wait for the user's click before anything happens. That is the app's doing: call them when they are what was asked.",
   "- A question about the app is answered from its state, below, or by a capability that reads.",
   "- When what was heard asks nothing of Coucou, call the capability named nothing.",
+  "- When no capability does what was asked, say so in words. Never call one that does something else instead.",
   "- Never say something was done unless a capability's result says so.",
   "- When you answer in words: one or two short sentences, plain text, no lists.",
 ].join("\n");
@@ -209,6 +212,26 @@ const ASIDE =
 
 const AFTER_CALLS =
   "The results of your calls are above. If what was asked needs another capability, call it now. Otherwise say what happened in one short sentence, from the results alone.";
+
+/** Said when the model answered with nothing at all. */
+const EMPTY = "Your last answer was empty. Call the capability that does what was asked, or the one named nothing, or answer in words.";
+
+/** Once the app's capabilities ran, the model only decides what else to call: its words are not what Mochi says. */
+const AFTER_RAN = "The results of your calls are above. If what was asked needs another capability, call it now. Otherwise reply with the one word: done.";
+
+/**
+ * What only read the app is put in words by a model given those results and
+ * nothing else — not the sentence, not the turns before, no tools — so that
+ * it has nothing to say but what they hold.
+ */
+const REPORT = [
+  "An assistant has just read parts of a desktop app's state for its user, through the app's own capabilities. What each read gave back is below, as JSON.",
+  "{results}",
+  "Tell the user what they hold, as if you had looked yourself: one or two short sentences of plain text that keep every fact, a state such as passing or failing above all. Only what is in the results: add nothing, guess nothing, offer nothing, ask nothing. Do not mention the app, the reads or the results.",
+].join("\n\n");
+
+/** The user's message of that call: the results are in the system's. */
+const REPORT_ASKED = "What did the app read?";
 
 const READ_ANSWER = [
   "The user of a desktop app was asked a question on screen and has just answered out loud. Read their answer and call the tool named answer, once.",
@@ -477,8 +500,10 @@ export class VoiceTurns {
     const declared = new Set(capabilities.map((c) => c.name));
     // Handing up is offered only when there is somebody to hand up to.
     const offered = (names: readonly string[]) => names.filter((n) => declared.has(n) && (n !== ESCALATE || (turn.taken && this.cloud() != null)));
-    const shown = new Set(offered([...(ranked ? shortlist(ranked, capabilities) : ALWAYS_SHOWN), UNDO]));
     const history: ModelTurn[] = this.memory.recent(this.now()).map(({ said: s, calls, result }) => ({ said: s, calls, result }));
+    // A follow-up ("and Discord too") goes on with what the turn before called, whatever it ranks alone.
+    const carried = (history[history.length - 1]?.calls ?? []).map((call) => call.name);
+    const shown = new Set(offered([...(ranked ? shortlist(ranked, capabilities, SHORTLIST, [...carried, ...takers(ranked, capabilities, turn.named)]) : [...ALWAYS_SHOWN, ...carried]), UNDO]));
     // What cannot be used right now is not offered (no question waits, the chat's field is empty): read again
     // each round, since a call may make another usable — a message prepared can be sent.
     const usable = (name: string) => {
@@ -510,6 +535,11 @@ export class VoiceTurns {
 
     let reply = await local(system, said, tools(), history);
     if (how.wanted && !how.wanted()) return { is: "dropped" };
+    // An empty answer — no call, no words — is a small model's call that did not come out: asked once more.
+    if (reply && !reply.calls.length && !reply.text.trim()) {
+      reply = await local(`${system}\n\n${EMPTY}`, said, tools(), history);
+      if (how.wanted && !how.wanted()) return { is: "dropped" };
+    }
     if (!reply) return { is: "silent" };
 
     const steps: ModelStep[] = [];
@@ -550,12 +580,31 @@ export class VoiceTurns {
       const line = lineOf(turn);
       if (line) how.working?.(line);
       // Once something was done the model is waited for a little: what it adds is how it is said.
-      const next = await within(local(`${system}\n\n${AFTER_CALLS}`, said, tools(), history, steps), acted(turn) ? Math.min(left, WORDING_MS) : left);
+      const after = shownOf(turn).length ? AFTER_RAN : AFTER_CALLS;
+      const next = await within(local(`${system}\n\n${after}`, said, tools(), history, steps), acted(turn) ? Math.min(left, WORDING_MS) : left);
       if (how.wanted && !how.wanted()) return { is: "dropped" };
       if (!next) break;
       reply = next;
     }
+    // What only read is said from what was read, and from nothing else.
+    if (shownOf(turn).length && !acted(turn) && shownOf(turn).every((ran) => ran.result.status === "done")) {
+      words = (await this.report(local, turn)) ?? "";
+      if (how.wanted && !how.wanted()) return { is: "dropped" };
+    }
     return { is: "answered", words };
+  }
+
+  /** The reads of this turn in words, by a model given their results alone; null when it did not answer. */
+  private async report(local: LocalModel, turn: Running): Promise<string | null> {
+    const results = shownOf(turn).map((ran) => ({
+      read: ran.capability ? indexText(ran.capability) : ran.call.name,
+      ...(Object.keys(ran.call.arguments ?? {}).length ? { of: ran.call.arguments } : {}),
+      ...forModel(ran.result),
+    }));
+    const left = TURN_BUDGET_MS - (this.now() - turn.started);
+    const reply = await within(local(REPORT.replace("{results}", JSON.stringify(results)), REPORT_ASKED, [], []), Math.max(WORDING_MS, left));
+    const text = reply && !reply.calls.length && !looksWritten(reply.text) ? reply.text.trim() : "";
+    return text || null;
   }
 
   // ── Tier 3 ──────────────────────────────────────────────────────────────────
@@ -618,12 +667,12 @@ export class VoiceTurns {
     // What went wrong is what is shown, in the capability's own line.
     const wrong = shown.find((ran) => ran.result.status !== "done");
     if (wrong) return finish({ outcome: "failure", message: wrong.result.line });
-    // Mochi's words are the model's only for what was seen to work: a read, or
-    // a change that reads back. What was only asked for, or left unchanged
-    // after a click that did not come, is said in the capability's own line.
-    const seen = shown.every((ran) => ran.result.verified);
-    const last = [...shown].reverse().find((ran) => ran.result.line) ?? shown[shown.length - 1];
-    const message = seen ? spoken(words, last.result.line) : last.result.line;
+    // What was done is said in the lines of what did it, and in nothing else:
+    // a model's words can name what no capability did ("Stripe removed" when
+    // nothing removed it); a capability's line is what it did. Only what
+    // merely read is put in words (`report`: a model given the results alone).
+    const doing = shown.filter((ran) => ran.capability?.tier !== "read");
+    const message = doing.length ? linesOf(doing) : spoken(words, linesOf(shown));
     return finish(message ? { outcome: "success", message } : null);
   }
 }
@@ -641,6 +690,21 @@ function namedLine(named: Running["named"]): string {
   return `In what was said, the app finds: ${things.join("; ")}.`;
 }
 
+/**
+ * For each kind of thing the sentence names, the best-ranked capability that
+ * takes it: "open Discord" names an app, and what opens an app is shown
+ * however near "open" alone is to opening a folder or a conversation.
+ */
+function takers(ranked: readonly Ranked[], capabilities: readonly Capability[], named: Running["named"]): string[] {
+  const kinds = new Map(capabilities.map((c) => [c.name, kindsOf(c)]));
+  const out: string[] = [];
+  for (const kind of new Set(named.map((n) => n.kind))) {
+    const best = ranked.find((r) => kinds.get(r.name)?.includes(kind));
+    if (best && !out.includes(best.name)) out.push(best.name);
+  }
+  return out;
+}
+
 /** The kinds of thing a capability takes as an argument. */
 export const kindsOf = (capability: Capability): string[] =>
   Object.values(capability.args).flatMap((spec) => (spec.type === "entity" || spec.type === "entities" ? [spec.kind] : []));
@@ -651,6 +715,12 @@ const shownOf = (turn: Running) => turn.ran.filter((ran) => ![MORE_TOOLS, NOTHIN
 /** Something was changed or shown, not only read. */
 const acted = (turn: Running) =>
   shownOf(turn).some((ran) => ran.result.status === "done" && ran.capability != null && ran.capability.tier !== "read");
+
+/** The lines of what ran, each once, as sentences: "Paused. Stripe removed." */
+function linesOf(ran: readonly Ran[]): string {
+  const lines = [...new Set(ran.map((r) => r.result.line.trim()).filter(Boolean))];
+  return lines.map((line, i) => (i < lines.length - 1 && !/[.!?…]$/.test(line) ? `${line}.` : line)).join(" ");
+}
 
 /** The last line a capability gave, for the card while the model goes on. */
 const lineOf = (turn: Running) => [...shownOf(turn)].reverse().find((ran) => ran.result.line)?.result.line ?? "";
@@ -728,6 +798,13 @@ export function written(text: string, known: ReadonlySet<string>): ModelCall[] {
   const body = text.replace(/```[a-z]*\n?|```|<\/?tool_call>/gi, " ").trim();
   if (!body) return [];
   const whole = safeJson(body);
+  // A capability's name alone, or followed by its arguments as JSON: `nothing`, `open_app {"app": "Steam"}`.
+  const bare = whole == null ? /^([a-z][a-z0-9_]*)\s*(?:\(\s*(\{[\s\S]*\})\s*\)|(\{[\s\S]*\}))?\s*$/.exec(body) : null;
+  if (bare && known.has(bare[1])) {
+    const given = bare[2] ?? bare[3];
+    const args = given ? safeJson(given) : {};
+    return args && typeof args === "object" && !Array.isArray(args) ? [{ name: bare[1], arguments: args as Record<string, unknown> }] : [];
+  }
   const calls: ModelCall[] = [];
   for (const item of Array.isArray(whole) ? whole : whole ? [whole] : []) {
     if (!item || typeof item !== "object") continue;

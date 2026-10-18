@@ -358,12 +358,14 @@ export function directed(ranked: readonly Ranked[] | null, heard: { sure?: reado
 /**
  * The capabilities a model is shown: the best few, then those always shown,
  * when they are declared. With no ranking, none: the caller shows areas.
+ * `first`: shown whatever their rank, within the same number — what the turn
+ * before called, what takes a thing the sentence names.
  */
-export function shortlist(ranked: readonly Ranked[] | null, capabilities: readonly Capability[], most: number = SHORTLIST): string[] {
+export function shortlist(ranked: readonly Ranked[] | null, capabilities: readonly Capability[], most: number = SHORTLIST, first: readonly string[] = []): string[] {
   if (!ranked) return [];
   const declared = new Set(capabilities.map((c) => c.name));
   const names: string[] = [];
-  for (const { name } of ranked) {
+  for (const { name } of [...first.map((name) => ({ name })), ...ranked]) {
     if (names.length >= most) break;
     if (declared.has(name) && !ALWAYS_SHOWN.includes(name) && !names.includes(name)) names.push(name);
   }
