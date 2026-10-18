@@ -8,10 +8,11 @@
 //             used until another is chosen; 38 MB with the smallest)
 //   speaking  the library and a model that says a sentence out loud (129 MB)
 //
-// Archives from the projects' own releases on GitHub, each checked against the
-// SHA-256 written here before anything in it is used, then unpacked with the
-// system's tar. Only the files that are needed are kept. What is already here
-// is not fetched again.
+// Archives from the projects' own releases on GitHub — or, for a model that is
+// only published file by file, its files at one pinned revision — each checked
+// against the SHA-256 written here before anything in it is used, then
+// unpacked with the system's tar. Only the files that are needed are kept.
+// What is already here is not fetched again.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -26,7 +27,7 @@ use super::sherpa::VERSION;
 const RELEASES: &str = "https://github.com/k2-fsa/sherpa-onnx/releases/download";
 
 struct Archive {
-    /// Path under RELEASES.
+    /// Path under RELEASES, or a whole https address pinned to one revision.
     url: &'static str,
     sha256: &'static str,
     size: u64,
@@ -42,6 +43,18 @@ impl Archive {
     fn packed(&self) -> bool {
         self.url.ends_with(".tar.bz2")
     }
+
+    fn address(&self) -> String {
+        if self.url.starts_with("https://") { self.url.to_string() } else { format!("{RELEASES}/{}", self.url) }
+    }
+}
+
+/// A file of Parakeet 0.6b v3, which is published file by file (the k2-fsa
+/// project's own copy on Hugging Face), at the revision upstream Coucou pins too.
+macro_rules! parakeet_v3 {
+    ($file:literal) => {
+        concat!("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/", $file)
+    };
 }
 
 /// The library, with speech recognition and synthesis both.
@@ -63,13 +76,14 @@ pub enum Family {
     Transducer,
 }
 
-/// A model that writes down what is said. English, all of them.
+/// A model that writes down what is said. English, all but Parakeet v3.
 pub struct Hearing {
     /// What the settings file says: never renamed.
     pub id: &'static str,
     pub name: &'static str,
     pub family: Family,
-    archive: Archive,
+    /// What is downloaded for it: one archive, or its files one by one. All go to the same folder.
+    files: &'static [Archive],
 }
 
 /// The models the user may choose from, the smallest and fastest first.
@@ -91,41 +105,83 @@ pub const HEARING_MODELS: &[Hearing] = &[
         id: "moonshine-tiny",
         name: "Moonshine tiny",
         family: Family::Moonshine,
-        archive: Archive {
+        files: &[Archive {
             url: "asr-models/sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27.tar.bz2",
             sha256: "9ec31b342d8fa3240c3b81b8f82e1cf7e3ac467c93ca5a999b741d5887164f8d",
             size: 29_858_559,
             folder: "sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27",
             keep: &["encoder_model.ort", "decoder_model_merged.ort", "tokens.txt", "LICENSE"],
             into: "moonshine-tiny-en",
-        },
+        }],
     },
     // NVIDIA's, CC BY 4.0; quantised.
     Hearing {
         id: "parakeet-110m",
         name: "Parakeet 110m",
         family: Family::Transducer,
-        archive: Archive {
+        files: &[Archive {
             url: "asr-models/sherpa-onnx-nemo-parakeet_tdt_transducer_110m-en-36000-int8.tar.bz2",
             sha256: "f628312e9fdf8686374cb01a69425c41732529d540860311f16f37cbc32cfe9b",
             size: 108_035_095,
             folder: "sherpa-onnx-nemo-parakeet_tdt_transducer_110m-en-36000-int8",
             keep: &["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"],
             into: "parakeet-110m-en",
-        },
+        }],
     },
     Hearing {
         id: "parakeet-0.6b",
         name: "Parakeet 0.6b",
         family: Family::Transducer,
-        archive: Archive {
+        files: &[Archive {
             url: "asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
             sha256: "157c157bc51155e03e37d2466522a3a737dd9c72bb25f36eb18912964161e1ad",
             size: 482_468_385,
             folder: "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8",
             keep: &["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"],
             into: "parakeet-0.6b-v2-en",
-        },
+        }],
+    },
+    // The same model trained on 25 European languages, which it tells apart
+    // by itself. Not measured here yet. Published as separate files, pinned
+    // to one revision with each file's SHA-256 (as upstream Coucou's speech/mod.rs).
+    Hearing {
+        id: "parakeet-0.6b-v3",
+        name: "Parakeet 0.6b v3 (25 languages)",
+        family: Family::Transducer,
+        files: &[
+            Archive {
+                url: parakeet_v3!("encoder.int8.onnx"),
+                sha256: "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+                size: 652_184_281,
+                folder: "",
+                keep: &["encoder.int8.onnx"],
+                into: "parakeet-0.6b-v3",
+            },
+            Archive {
+                url: parakeet_v3!("decoder.int8.onnx"),
+                sha256: "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+                size: 11_845_275,
+                folder: "",
+                keep: &["decoder.int8.onnx"],
+                into: "parakeet-0.6b-v3",
+            },
+            Archive {
+                url: parakeet_v3!("joiner.int8.onnx"),
+                sha256: "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+                size: 6_355_277,
+                folder: "",
+                keep: &["joiner.int8.onnx"],
+                into: "parakeet-0.6b-v3",
+            },
+            Archive {
+                url: parakeet_v3!("tokens.txt"),
+                sha256: "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
+                size: 93_939,
+                folder: "",
+                keep: &["tokens.txt"],
+                into: "parakeet-0.6b-v3",
+            },
+        ],
     },
 ];
 
@@ -162,11 +218,11 @@ pub fn hearing() -> &'static Hearing {
 
 impl Hearing {
     pub fn installed(&self) -> bool {
-        present(&self.archive)
+        self.files.iter().all(present)
     }
 
     pub fn download_bytes(&self) -> u64 {
-        self.archive.size
+        self.files.iter().map(|file| file.size).sum()
     }
 }
 
@@ -211,19 +267,22 @@ pub enum Part {
 }
 
 impl Part {
-    fn model(self) -> &'static Archive {
+    /// The model's downloads: one archive, or a model's files one by one, all into one folder.
+    fn model(self) -> &'static [Archive] {
         match self {
-            Part::Hearing => &hearing().archive,
-            Part::Speaking => &SPEAKING,
+            Part::Hearing => hearing().files,
+            Part::Speaking => std::slice::from_ref(&SPEAKING),
         }
     }
 
     /// Everything this part is made of, the library first.
     fn archives(self) -> Vec<&'static Archive> {
-        match self {
-            Part::Hearing => vec![&RUNTIME, self.model(), &DETECTOR],
-            Part::Speaking => vec![&RUNTIME, self.model()],
+        let mut all = vec![&RUNTIME];
+        all.extend(self.model());
+        if self == Part::Hearing {
+            all.push(&DETECTOR);
         }
+        all
     }
 }
 
@@ -237,7 +296,7 @@ pub fn runtime_dir() -> PathBuf {
 }
 
 pub fn model_dir(part: Part) -> PathBuf {
-    dir().join(part.model().into)
+    dir().join(part.model()[0].into)
 }
 
 pub fn detector_file() -> PathBuf {
@@ -315,7 +374,7 @@ fn unpack(archive: &Path, into: &Path) -> Result<(), String> {
 #[cfg(windows)]
 async fn fetch(app: &AppHandle, part: Part, archive: &Archive, to: &Path, before: u64, total: u64) -> Result<(), String> {
     use tokio::io::AsyncWriteExt;
-    let url = reqwest::Url::parse(&format!("{RELEASES}/{}", archive.url)).map_err(|e| e.to_string())?;
+    let url = reqwest::Url::parse(&archive.address()).map_err(|e| e.to_string())?;
     // A quarter of an hour for what is small, an hour for the largest model.
     let patience = Duration::from_secs(if archive.size > 200_000_000 { 3600 } else { 900 });
     let mut reply = crate::net::client(&url, patience)?.get(url).send().await.map_err(|e| e.to_string())?;
@@ -453,13 +512,13 @@ pub async fn install(app: &AppHandle, part: Part) -> Result<(), String> {
 pub fn remove(part: Part) {
     let mut archives = part.archives();
     if part == Part::Hearing {
-        archives.extend(HEARING_MODELS.iter().map(|model| &model.archive));
+        archives.extend(HEARING_MODELS.iter().flat_map(|model| model.files));
     }
     for archive in archives.iter().filter(|archive| archive.into != RUNTIME.into) {
         let _ = std::fs::remove_dir_all(dir().join(archive.into));
     }
     let other = if part == Part::Hearing { Part::Speaking } else { Part::Hearing };
-    if !present(other.model()) {
+    if !other.model().iter().all(present) {
         let _ = std::fs::remove_dir_all(dir());
     }
 }
@@ -483,7 +542,7 @@ mod tests {
 
     #[test]
     fn what_is_downloaded_is_pinned() {
-        let models = HEARING_MODELS.iter().map(|model| &model.archive);
+        let models = HEARING_MODELS.iter().flat_map(|model| model.files);
         for archive in [&RUNTIME, &DETECTOR, &SPEAKING].into_iter().chain(models) {
             assert_eq!(archive.sha256.len(), 64);
             assert!(archive.sha256.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
@@ -495,7 +554,7 @@ mod tests {
         // The library is the version whose header sherpa.rs was written from.
         assert!(RUNTIME.url.contains(&format!("v{VERSION}")));
         // The smallest stays small, for whoever would rather have that.
-        assert!(RUNTIME.size + HEARING_MODELS[0].archive.size + DETECTOR.size < 40 * 1024 * 1024);
+        assert!(RUNTIME.size + HEARING_MODELS[0].download_bytes() + DETECTOR.size < 40 * 1024 * 1024);
         // The model nobody chose is one of the list, and the settings start with it.
         assert_eq!(HEARING_MODELS[default_at()].id, DEFAULT_HEARING);
         assert_eq!(crate::settings::VoicePref::default().hearing_model, DEFAULT_HEARING);
@@ -504,8 +563,13 @@ mod tests {
         // Each model has its own name and folder, and the settings' names are plain.
         for (i, model) in HEARING_MODELS.iter().enumerate() {
             assert!(model.id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '.'));
-            assert!(HEARING_MODELS[..i].iter().all(|other| other.id != model.id && other.archive.into != model.archive.into));
-            assert!(model.archive.keep.contains(&"tokens.txt"));
+            assert!(HEARING_MODELS[..i].iter().all(|other| other.id != model.id && other.files[0].into != model.files[0].into));
+            // A model's files all go to its one folder, and its tokens are among them.
+            assert!(model.files.iter().all(|file| file.into == model.files[0].into));
+            assert!(model.files.iter().any(|file| file.keep.contains(&"tokens.txt")));
+            // Its files are fetched only over https, from the release page or one pinned revision.
+            assert!(model.files.iter().all(|file| file.address().starts_with("https://")));
+            assert!(model.files.iter().all(|file| !file.url.starts_with("https://") || file.url.contains("/resolve/") && !file.url.contains("/resolve/main/")));
             // "server" is the model server's name in the settings (hear.rs).
             assert_ne!(model.id, super::super::hear::ID);
         }
@@ -524,7 +588,7 @@ mod tests {
         let folder = PathBuf::from(std::env::var("COUCOU_VOICE_ARCHIVES").expect("COUCOU_VOICE_ARCHIVES"));
         let work = std::env::temp_dir().join(format!("coucou-voice-test-{}", std::process::id()));
         for (archive, file) in
-            [(&RUNTIME, "runtime-lib.tar.bz2"), (&HEARING_MODELS[0].archive, "moontiny.tar.bz2"), (&SPEAKING, "supertonic.tar.bz2")]
+            [(&RUNTIME, "runtime-lib.tar.bz2"), (&HEARING_MODELS[0].files[0], "moontiny.tar.bz2"), (&SPEAKING, "supertonic.tar.bz2")]
         {
             let path = folder.join(file);
             assert_eq!(std::fs::metadata(&path).unwrap().len(), archive.size, "{file}");
@@ -538,18 +602,19 @@ mod tests {
         }
         let _ = std::fs::remove_dir_all(&work);
         // The larger hearing models, when they are there too, under their own names.
-        for model in &HEARING_MODELS[1..] {
-            let path = folder.join(Path::new(model.archive.url).file_name().unwrap());
+        for model in HEARING_MODELS[1..].iter().filter(|model| model.files.len() == 1) {
+            let archive = &model.files[0];
+            let path = folder.join(Path::new(archive.url).file_name().unwrap());
             if !path.is_file() {
                 continue;
             }
-            assert_eq!(std::fs::metadata(&path).unwrap().len(), model.archive.size, "{}", model.id);
-            assert_eq!(sha256(&path).unwrap(), model.archive.sha256, "{}", model.id);
+            assert_eq!(std::fs::metadata(&path).unwrap().len(), archive.size, "{}", model.id);
+            assert_eq!(sha256(&path).unwrap(), archive.sha256, "{}", model.id);
             let _ = std::fs::remove_dir_all(&work);
             std::fs::create_dir_all(&work).unwrap();
             unpack(&path, &work).unwrap();
-            for name in model.archive.keep {
-                assert!(work.join(model.archive.folder).join(name).is_file(), "{}: {name}", model.id);
+            for name in archive.keep {
+                assert!(work.join(archive.folder).join(name).is_file(), "{}: {name}", model.id);
             }
             let _ = std::fs::remove_dir_all(&work);
         }
