@@ -15,7 +15,7 @@
 // embedding model ranks the capabilities: a clear command runs with no model,
 // and the local model is shown the nearest few). The ranked path runs only
 // when the server has an embedding model; `--embed` names it. `--only` runs
-// the cases with that text in a step; `--trace` prints each call to the
+// the cases with that text in a step (several: a|b); `--trace` prints each call to the
 // model: the tools it was shown, and what it called or said.
 //
 // A case is steps and what must have happened. A step is a sentence said
@@ -336,7 +336,8 @@ const TURN_WORDS = {
 
 async function run(steps) {
   const { log, s, registry } = setup();
-  const turns = new VoiceTurns({ registry, embed, local: () => local, cloud: () => null, words: TURN_WORDS });
+  // The model server here is this computer: a sentence without the wake phrase may be given to it.
+  const turns = new VoiceTurns({ registry, embed, local: () => local, cloud: () => null, followUp: () => true, words: TURN_WORDS });
   /** The turn that waits on a question, and who is told when one goes up. */
   let turn = null;
   let up = () => {};
@@ -546,9 +547,9 @@ const NEGATIONS = [
   [["don't switch to codex"], "nothing"],
 ];
 
-// Said without the wake phrase. For nobody: ignored on both paths. For
-// Coucou: acted on when there is a ranking to judge by; without one the
-// follow-up time is off, and it is ignored too.
+// Said without the wake phrase, after a turn or not: the local model decides
+// whether it was for Coucou. For nobody: ignored, nothing shown. For Coucou:
+// done, on both paths.
 const NOBODY = [
   [[{ again: "see you at four then" }], "ignored"],
   [[{ again: "the cat sat on it" }], "ignored"],
@@ -560,9 +561,9 @@ const NOBODY = [
   [[{ again: "could you pass me the salt" }], "ignored"],
   [["pause", { again: "that's better thanks" }], ["pause"]],
   [["add notion", { again: "anyway as I was saying" }], ["+notion"]],
-  [["pause", { again: "skip this song" }], { ranked: ["pause", "next"], areas: ["pause"] }],
-  [["add notion", { again: "and resend too" }], { ranked: ["+notion", "+resend"], areas: ["+notion"] }],
-  [["open spotify", { again: "pause the music" }], { ranked: ["app:spotify", "pause"], areas: ["app:spotify"] }],
+  [["pause", { again: "skip this song" }], ["pause", "next"]],
+  [["add notion", { again: "and resend too" }], ["+notion", "+resend"]],
+  [["open spotify", { again: "pause the music" }], ["app:spotify", "pause"]],
 ];
 
 const PARTS = [
@@ -612,7 +613,7 @@ for (const model of MODELS) {
     for (const [, cases] of PARTS) {
       let ok = 0;
       for (const [steps, wanted] of cases) {
-        if (ONLY && !steps.some((step) => JSON.stringify(step).includes(ONLY))) continue;
+        if (ONLY && !ONLY.split("|").some((only) => steps.some((step) => JSON.stringify(step).includes(only)))) continue;
         const expected = wanted && typeof wanted === "object" && !Array.isArray(wanted) && !wanted.any ? wanted[path] : wanted;
         const came = await run(steps);
         for (const turn of came.taken) {

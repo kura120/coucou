@@ -163,16 +163,21 @@ interface Running {
   started: number;
   /** Taken as said to Coucou: by the wake phrase, or by the local model calling something. */
   taken: boolean;
+  /** The app's things the sentence names, or perhaps names (Registry.named). */
+  named: readonly { kind: string; id: string; label: string; near?: boolean }[];
 }
 
 const IGNORED: Heard = { result: null, taken: false, rest: false };
 
 // ── What a model is told ──────────────────────────────────────────────────────
 
+const INTRO = "You are the voice of Coucou, a small desktop app: its user has just said one sentence to it, and you act for them through the app's own capabilities, given to you as tools.";
+
+/** Said after the app's state: a small model follows best what it read last. */
 const ROLE = [
-  "You are the voice of Coucou, a small desktop app: its user has just said one sentence to it, and you act for them through the app's own capabilities, given to you as tools.",
+  "How to act:",
   "- Do what was asked by calling capabilities. Several things asked are several calls.",
-  "- A name the user said is passed on exactly as they said it, also when it looks misheard or cut short: the app works out which thing it names, and asks them when it is not sure. Never put a name from the state in its place.",
+  "- Names: write each name in the arguments in the user's own words, as it was heard, even when it looks misheard, cut short or unlike anything in the state (\"open st\" is the app \"st\"). The app looks it up and asks the user when it is not sure. Never write a name the user did not say.",
   "- When the user says not to do something, do not do it: call the capability named nothing.",
   "- Some capabilities wait for the user's click before anything happens. That is the app's doing: call them when they are what was asked.",
   "- A question about the app is answered from its state, below, or by a capability that reads.",
@@ -214,7 +219,7 @@ const READ_ANSWER = [
 
 /** `tools`: how the tools the model is shown were chosen. */
 function systemPrompt(snapshot: Record<string, unknown>, tools: string): string {
-  return [ROLE, tools, `The app's state now, as JSON:\n${JSON.stringify(snapshot)}`].join("\n\n");
+  return [INTRO, `The app's state now, as JSON:\n${JSON.stringify(snapshot)}`, ROLE, tools].join("\n\n");
 }
 
 // ── The turns ─────────────────────────────────────────────────────────────────
@@ -352,10 +357,11 @@ export class VoiceTurns {
     const wake = how.wake ?? true;
     // Without the wake phrase: only a model on this computer is given it, and with no model it is for nobody.
     if (!wake && (!this.followUp() || !this.local())) return IGNORED;
-    const turn: Running = { said: sentence, how, ran: [], started: this.now(), taken: wake };
+    const turn: Running = { said: sentence, how, ran: [], started: this.now(), taken: wake, named: [] };
     if (wake) how.taken?.();
     const before = this.memory.recent(this.now());
-    const ranked = await this.ranked(sentence, before[before.length - 1]?.said);
+    turn.named = await this.registry.named(sentence);
+    const ranked = await this.ranked(turn, before[before.length - 1]?.said);
 
     const heard = await this.understand(turn, ranked);
     if (!turn.taken) return IGNORED;
@@ -394,7 +400,8 @@ export class VoiceTurns {
   // ── The ranking ─────────────────────────────────────────────────────────────
 
   /** The capabilities by how near the sentence is to each; null with no embedding model. */
-  private async ranked(sentence: string, previous?: string): Promise<Ranked[] | null> {
+  private async ranked(turn: Running, previous?: string): Promise<Ranked[] | null> {
+    const sentence = turn.said;
     const capabilities = this.registry.all().map((c) => ({ name: c.name, text: indexText(c), kinds: kindsOf(c) }));
     const key = capabilities.map((c) => `${c.name}\n${c.text}`).join("\n\n");
     if (key !== this.indexed) {
@@ -407,8 +414,8 @@ export class VoiceTurns {
       this.indexed = key;
     }
     // The names the app has that the sentence holds: they are not embedded, and what takes their kind is nearer.
-    const named = await this.registry.named(sentence);
-    return this.index.rank(sentence, previous, { kinds: [...new Set(named.map((n) => n.kind))], labels: named.map((n) => n.label) });
+    const named = turn.named;
+    return this.index.rank(sentence, previous, { kinds: [...new Set(named.map((n) => n.kind))], labels: named.filter((n) => !n.near).map((n) => n.label) });
   }
 
   // ── Running a capability ────────────────────────────────────────────────────
@@ -482,7 +489,7 @@ export class VoiceTurns {
       const all = this.registry.areas();
       const lines = all.map(({ area, names }) => `${area}: ${names.map((name) => name.split("_").join(" ")).join(", ")}`).join("\n");
       // With the app's state: which area a name belongs to is read there (a pill, a session, a setting).
-      const router = `${AREAS_FIRST.replace("{areas}", lines)}\n\nThe app's state now, as JSON:\n${JSON.stringify(snapshot)}`;
+      const router = [AREAS_FIRST.replace("{areas}", lines), `The app's state now, as JSON:\n${JSON.stringify(snapshot)}`, namedLine(turn.named)].filter(Boolean).join("\n\n");
       const routed = await local(router, said, [aboutTool(all.map(({ area }) => area))], history);
       if (how.wanted && !how.wanted()) return { is: "dropped" };
       if (!routed) return { is: "silent" };
@@ -490,7 +497,7 @@ export class VoiceTurns {
       const picked = [about.first, about.second, about.third];
       for (const { area, names } of all) if (picked.includes(area)) for (const name of offered(names)) shown.add(name);
     }
-    const system = `${systemPrompt(snapshot, ranked ? SHORTLISTED : BY_AREA)}${turn.taken ? "" : `\n\n${ASIDE}`}`;
+    const system = [systemPrompt(snapshot, ranked ? SHORTLISTED : BY_AREA), namedLine(turn.named), turn.taken ? "" : ASIDE].filter(Boolean).join("\n\n");
 
     let reply = await local(system, said, tools(), history);
     if (how.wanted && !how.wanted()) return { is: "dropped" };
@@ -613,6 +620,17 @@ export class VoiceTurns {
 }
 
 // ── Small things ──────────────────────────────────────────────────────────────
+
+/**
+ * What the app found the sentence names, for the model: a name it knows
+ * nothing of ("spy flight") is said to be perhaps an app the app has. It is
+ * still passed on as heard; the executor asks before acting on a near one.
+ */
+function namedLine(named: Running["named"]): string {
+  if (!named.length) return "";
+  const things = named.map((n) => (n.near ? `perhaps ${n.label} (${n.kind}, heard as something close to it)` : `${n.label} (${n.kind})`));
+  return `In what was said, the app finds: ${things.join("; ")}.`;
+}
 
 /** The kinds of thing a capability takes as an argument. */
 export const kindsOf = (capability: Capability): string[] =>

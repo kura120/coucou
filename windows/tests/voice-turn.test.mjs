@@ -528,3 +528,18 @@ test("a name the app has is not embedded, and what takes its kind is ranked near
   // Stripe is a pill: remove_pills and add_pills, which take pills, come before undo.
   assert.deepEqual(local.asked[0].tools.slice(0, 3), ["remove_pills", "add_pills", "undo"]);
 });
+
+test("a name the app only nearly has is told to the model as perhaps that thing, and counted in the ranking", async () => {
+  // A kind too large to list: its source ranks what is near the sentence (as Rust ranks the installed apps).
+  app.registry.entities({
+    kind: "app",
+    description: "The installed apps.",
+    list: () => [],
+    near: async (said) => (/spy flight/.test(said) ? [{ id: "Spotify", label: "Spotify", score: 0.8 }, { id: "Steam", label: "Steam", score: 0.3 }] : []),
+  });
+  assert.deepEqual(await app.registry.named("open spy flight"), [{ kind: "app", id: "Spotify", label: "Spotify", near: true }]);
+  const local = scripted(calls(call("nothing")));
+  await turns({ local: local.model }).hear("open spy flight");
+  assert.match(local.asked[0].system, /the app finds: perhaps Spotify \(app, heard as something close to it\)/);
+  assert.doesNotMatch(local.asked[0].system, /Steam/);
+});
