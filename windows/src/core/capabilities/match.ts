@@ -11,7 +11,7 @@
 // live (voice/resolve.ts, voice/entity.ts); the thresholds were set on speech
 // models' own spellings, and the apps' are Rust's (apps.rs).
 
-import { normalise, soundKey } from "../../voice/entity";
+import { levenshtein, normalise, soundKey } from "../../voice/entity";
 import { likeness } from "../../voice/resolve";
 import type { Entity } from "./types";
 
@@ -64,6 +64,46 @@ export function contained(said: string, things: readonly Entity[]): Entity[] {
   return found
     .filter((one) => !found.some((other) => other.form !== one.form && ` ${other.form} `.includes(` ${one.form} `)))
     .map((one) => one.thing);
+}
+
+/** The longest run of words of a sentence compared with a name: names are one to three words. */
+const SPAN_WORDS = 3;
+
+/**
+ * The things a sentence perhaps names: a run of its words that is a name
+ * misheard, a letter or a sound away ("strife" for Stripe, "cortex" for
+ * Codex, "get hub" for GitHub) — the measures `among` asks about, made
+ * stricter for a sentence, where every word is a chance to sound like some
+ * name: a run of several words by its letters only, and a word by its sound
+ * only when it starts as the name does ("thanks" is not Settings). Nearest
+ * first, with how near. Nothing is resolved here: what is said whole is `contained`'s.
+ */
+export function nearly(said: string, things: readonly Entity[], least: number): (Entity & { score: number })[] {
+  const words = normalise(said).split(" ").filter(Boolean);
+  const spans: string[] = [];
+  for (let from = 0; from < words.length; from++) {
+    for (let to = from + 1; to <= Math.min(words.length, from + SPAN_WORDS); to++) {
+      const span = words.slice(from, to).join(" ");
+      if (span.replace(/ /g, "").length >= SHORTEST_NAME) spans.push(span);
+    }
+  }
+  return things
+    .map((thing) => ({ ...thing, score: Math.max(0, ...spans.flatMap((span) => forms(thing).map((form) => heardAs(span, form)))) }))
+    .filter((thing) => thing.score >= least)
+    .sort((x, y) => y.score - x.score || x.label.localeCompare(y.label));
+}
+
+/** How near a run of words of a sentence is to a name, by `nearly`'s rules. */
+function heardAs(span: string, form: string): number {
+  if (span.includes(" ") || span[0] !== form[0]) return letters(span, form);
+  return likeness(span, form);
+}
+
+/** How alike two names are by their letters alone, spaces aside, 0…1. */
+function letters(a: string, b: string): number {
+  const x = a.replace(/ /g, "");
+  const y = b.replace(/ /g, "");
+  return x && y ? 1 - levenshtein(x, y) / Math.max(x.length, y.length) : 0;
 }
 
 /** One thing among several by a name or an id. */

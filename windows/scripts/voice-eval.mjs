@@ -341,7 +341,10 @@ async function run(steps) {
   /** The turn that waits on a question, and who is told when one goes up. */
   let turn = null;
   let up = () => {};
-  turns.onAsk = (ask) => ask && up(ask);
+  turns.onAsk = (ask) => {
+    if (TRACE) console.log(`    asks ${ask ? JSON.stringify(ask.question) : "no more"}`);
+    if (ask) up(ask);
+  };
   /** The turn's end, or the question it stopped on. */
   const shown = async () => {
     const question = new Promise((resolve) => (up = resolve));
@@ -588,6 +591,17 @@ function right(expected, { log, last }) {
 
 const median = (list) => (list.length ? [...list].sort((a, b) => a - b)[Math.floor(list.length / 2)] : 0);
 const seconds = (ms) => `${(ms / 1000).toFixed(2)} s`;
+
+// `--named`: what the app finds named in each sentence, with no model at all.
+if (FLAGS.includes("--named")) {
+  const { registry } = setup();
+  const sentences = new Set(PARTS.flatMap(([, cases]) => cases.flatMap(([steps]) => steps.map((step) => (typeof step === "string" ? step : (step.said ?? step.again))).filter(Boolean))));
+  for (const said of sentences) {
+    const named = await registry.named(said);
+    console.log(`${JSON.stringify(said)}: ${named.map((n) => `${n.near ? "~" : ""}${n.label} (${n.kind})`).join(", ")}`);
+  }
+  process.exit(0);
+}
 
 const tags = await fetch(`${SERVER}/api/tags`).then((r) => r.json()).then((list) => list.models ?? []).catch(() => []);
 const installed = tags.length ? tags.map((m) => m.name) : await fetch(`${SERVER}/v1/models`).then((r) => r.json()).then((l) => (l.data ?? []).map((m) => m.id)).catch(() => []);

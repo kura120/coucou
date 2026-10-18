@@ -14,7 +14,7 @@
 
 import { done, failed, notFoundResult, refused } from "../../voice/result";
 import { sureOf, UNSURE_WORD } from "../../voice/resolve";
-import { among, contained, type Resolved } from "./match";
+import { among, contained, nearly, type Resolved } from "./match";
 import { schemaOf } from "./schema";
 import type { Answer, ArgSpec, Args, Ask, Call, Capability, Entity, EntitySource, GuardHost, Registry, RunContext, ScreenContext, Tier, ToolResult } from "./types";
 import { check } from "./validate";
@@ -253,12 +253,19 @@ export function createRegistry(options: RegistryOptions): Registry {
 
   // ── What a sentence names ───────────────────────────────────────────────────
 
+  /** The things of a listed kind a sentence perhaps names, misheard: as near as an app must be (NEAR_NAMED). */
+  const nearlyIn = (sentence: string, things: readonly Entity[]) => nearly(sentence, things, 0.8).slice(0, NAMED_NEAR_MOST);
+
   async function namedIn(sentence: string): Promise<{ kind: string; id: string; label: string; near?: boolean }[]> {
     const out: { kind: string; id: string; label: string; near?: boolean }[] = [];
     for (const source of sources.values()) {
       try {
         if (!source.near) {
-          for (const thing of contained(sentence, await source.list())) out.push({ kind: source.kind, id: thing.id, label: thing.label });
+          const listed = await source.list();
+          const whole = contained(sentence, listed);
+          for (const thing of whole) out.push({ kind: source.kind, id: thing.id, label: thing.label });
+          // Said a letter or a sound away ("strife", "get hub"): perhaps that thing, by the same measure.
+          for (const thing of nearlyIn(sentence, listed.filter((thing) => !whole.includes(thing)))) out.push({ kind: source.kind, id: thing.id, label: thing.label, near: true });
           continue;
         }
         // A kind too large to list: what its source ranks near the sentence. Said whole, it is named; close, perhaps.
