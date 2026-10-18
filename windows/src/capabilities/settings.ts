@@ -60,7 +60,6 @@ export const SETTINGS: readonly SettingSpec[] = [
   { key: "autostart", label: "Start with the computer", about: "Coucou starts when the session opens", tier: "confirm", kind: "switch" },
   { key: "screen", label: "Screen", about: "the display the island lives on", tier: "confirm", kind: "choice", options: (host) => host.monitors() },
   { key: "voice.wake", label: "Wake phrase", about: "the microphone listens for the wake phrase all the time", tier: "confirm", kind: "switch" },
-  { key: "voice.engine", label: "Speech engine", about: "what writes down what is said", tier: "confirm", kind: "choice", options: fixed(["bundled", "Free speech (downloaded)"], ["system", "The system's recogniser"]) },
   { key: "voice.hearingModel", label: "Speech model", about: "the model the downloaded engine hears with", tier: "confirm", kind: "choice", options: (host) => host.hearingModels() },
   { key: "voice.brain", label: "Voice model server", about: "the model server asked what a sentence means", tier: "confirm", kind: "choice", options: fixed(["", "None"], ["ollama", "Ollama"], ["lmstudio", "LM Studio"], ["custom", "Custom server"]) },
   { key: "claudeCodeMode", label: "Claude Code mode", about: "the permission mode Claude Code runs in from the chat", tier: "confirm", kind: "choice", options: fixed(["default", "Default"], ["plan", "Plan"]) },

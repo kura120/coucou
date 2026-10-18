@@ -93,6 +93,28 @@ export function applyVoice(island: VoiceHost, event: VoiceEvent) {
 /** A model server and a model are chosen for voice in Settings. */
 export const brainChosen = () => Boolean(State.settings.voice.brain && State.settings.voice.brainModel);
 
+/** The address of the model server chosen for voice; "" is its usual one, on this computer. */
+function brainUrl(): string {
+  const { voice, ollamaUrl, lmstudioUrl, customUrl } = State.settings;
+  return ({ ollama: ollamaUrl, lmstudio: lmstudioUrl, custom: customUrl } as Record<string, string>)[voice.brain] ?? "";
+}
+
+/**
+ * The model server chosen for voice is this computer. Only then is a
+ * sentence said without the wake phrase given to it: what may have been said
+ * to someone else in the room does not leave the machine.
+ */
+export function brainHere(url = brainUrl(), brain = State.settings.voice.brain): boolean {
+  const address = url.trim();
+  if (!address) return brain === "ollama" || brain === "lmstudio";
+  try {
+    const host = new URL(address.includes("://") ? address : `http://${address}`).hostname;
+    return host === "localhost" || host === "[::1]" || /^127(\.\d{1,3}){3}$/.test(host);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * What a sentence means and what is done for it, over the app's registry.
  * The embedding model and the local model are those of the server chosen in
@@ -105,9 +127,9 @@ export function createTurns(registry: Registry): VoiceTurns {
     embed: async (texts) => (brainChosen() && State.settings.voice.embedModel ? Bridge.voiceEmbed(texts) : null),
     local: () => (brainChosen() ? (system, said, tools, history, steps) => Bridge.voiceBrain(system, said, tools, history, steps) : null),
     cloud: () => (State.settings.voice.cloud ? (system, said, history) => Bridge.voiceCloud(system, said, history) : null),
+    followUp: () => brainChosen() && brainHere(),
     publish: (tools) => void Bridge.capabilityPublish(tools),
     words: {
-      forMe: () => t("Was that for me?"),
       noModel: () => t("Voice needs a model server. Choose one in Settings."),
       silent: () => t("The model did not answer."),
       notUnderstood: () => t("Command not recognised"),

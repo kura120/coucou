@@ -888,10 +888,13 @@ export class Island {
       this.voicePatience = wait;
       wait.resume();
     };
+    /** The longest wait a step asked for: once the cloud model works, every step after it is waited for as long. */
+    let longest = VOICE_PATIENCE_MS;
     const showing = (line: string | undefined, ms?: number) => {
       if (!here()) return;
-      // Each step is waited for in its own right.
-      wait.resume(ms);
+      // Each step is waited for in its own right — and a cloud turn is not cut short by a capability it runs.
+      longest = Math.max(longest, ms ?? 0);
+      wait.resume(longest);
       if (State.voice.thinking && State.voice.working === line) return;
       State.voice = { ...State.voice, thinking: true, working: line };
       State.notify();

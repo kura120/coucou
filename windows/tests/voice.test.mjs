@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { IslandStateMachine } from "../src/island/fsm.ts";
-import { applyVoice, decodeSpeech, speechGain, wakeBlocked } from "../src/island/voice.ts";
+import { applyVoice, brainHere, decodeSpeech, speechGain, wakeBlocked } from "../src/island/voice.ts";
 import { VIEW_LAYOUTS, islandSize } from "../src/core/layout.ts";
 import { isCard, isPlace } from "../src/island/restore.ts";
 import { SHORTCUTS, activeKeys } from "../src/core/shortcuts.ts";
@@ -118,6 +118,14 @@ test("the wake phrase is heard whatever is on screen: a request that waits, a qu
 
 test("a paused Coucou does not wake", () => {
   assert.equal(wakeBlocked(true), "paused");
+});
+
+test("what is said without the wake phrase is given only to a model server on this computer", () => {
+  assert.equal(brainHere("", "ollama"), true, "Ollama at its usual address");
+  assert.equal(brainHere("", "lmstudio"), true);
+  assert.equal(brainHere("", "custom"), false, "a custom server with no address is nowhere");
+  for (const url of ["http://127.0.0.1:11434", "localhost:1234", "http://[::1]:8080/v1"]) assert.equal(brainHere(url, "custom"), true, url);
+  for (const url of ["http://192.168.1.20:11434", "https://models.example.com", "http://127.0.0.1.example.com", "not a url"]) assert.equal(brainHere(url, "custom"), false, url);
 });
 
 // ── Rust's reports ────────────────────────────────────────────────────────────

@@ -66,7 +66,7 @@ const FOUND_AS = { "this cord": "Discord" };
 const plain = (said) => said.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 
 /** What only a click may do: seen in the log without one, it is the executor that failed. */
-const CLICKED_ONLY = (entry) => ["DECLINE", "ANSWER", "SEND", "QUIT"].includes(entry) || /^set:(language|autostart|screen|claudeCodeMode|searchEngine|voice\.(wake|engine|hearingModel|brain|embedModel|cloud|webAnswers|webSearch))=/.test(entry);
+const CLICKED_ONLY = (entry) => ["DECLINE", "ANSWER", "SEND", "QUIT"].includes(entry) || /^set:(language|autostart|screen|claudeCodeMode|searchEngine|voice\.(wake|hearingModel|brain|embedModel|cloud|webAnswers|webSearch))=/.test(entry);
 
 const read = (object, key) => key.split(".").reduce((at, part) => at?.[part], object);
 function write(object, key, value) {
@@ -330,7 +330,7 @@ async function embed(texts) {
 // ── A case, driven as the island drives a turn ────────────────────────────────
 
 const TURN_WORDS = {
-  forMe: () => "Was that for me?", noModel: () => "Voice needs a model server.", silent: () => "The model did not answer.",
+  noModel: () => "Voice needs a model server.", silent: () => "The model did not answer.",
   notUnderstood: () => "Command not recognised", beyond: () => "That is more than I can do here.", askingCloud: () => "Asking a bigger model…",
 };
 

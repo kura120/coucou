@@ -5603,17 +5603,6 @@
    "ru": "Вы имели в виду {0}?",
    "id": "Maksud Anda {0}?"
   },
-  "Was that for me?": {
-   "zh-Hans": "这是对我说的吗？",
-   "hi": "क्या यह मेरे लिए था?",
-   "es": "¿Eso era para mí?",
-   "ar": "هل كان ذلك موجهاً لي؟",
-   "fr": "C'était pour moi ?",
-   "bn": "এটা কি আমাকে বলা হয়েছিল?",
-   "pt-BR": "Isso era para mim?",
-   "ru": "Это было мне?",
-   "id": "Apakah itu untuk saya?"
-  },
   "Voice needs a model server. Choose one in Settings.": {
    "zh-Hans": "语音需要模型服务器。请在设置中选择一个。",
    "hi": "आवाज़ के लिए एक मॉडल सर्वर चाहिए। सेटिंग्स में एक चुनें।",

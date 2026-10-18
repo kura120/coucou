@@ -16,7 +16,7 @@ const WORDS = {
   one: (label) => `Did you mean ${label}?`, which: (labels) => `${labels.join(" or ")}?`,
 };
 const TURN_WORDS = {
-  forMe: () => "Was that for me?", noModel: () => "Voice needs a model server", silent: () => "The model did not answer",
+  noModel: () => "Voice needs a model server", silent: () => "The model did not answer",
   notUnderstood: () => "Not recognised", beyond: () => "More than I can do here", askingCloud: () => "Asking a bigger model…",
 };
 
@@ -157,9 +157,9 @@ const call = (name, args = {}) => ({ name, arguments: args });
 const calls = (...list) => ({ calls: list, text: "" });
 const says = (text) => ({ calls: [], text });
 
-function turns({ embed = async () => null, local = null, cloud = null, publish } = {}) {
+function turns({ embed = async () => null, local = null, cloud = null, publish, followUp = false } = {}) {
   return new VoiceTurns({
-    registry: app.registry, embed, local: () => local, cloud: () => cloud, publish, words: TURN_WORDS, now: () => now,
+    registry: app.registry, embed, local: () => local, cloud: () => cloud, publish, followUp: () => followUp, words: TURN_WORDS, now: () => now,
   });
 }
 
@@ -171,45 +171,49 @@ beforeEach(() => {
 
 // ── Was it said to Coucou? ────────────────────────────────────────────────────
 
-test("without the wake phrase and with no ranking, a sentence is for nobody: nothing runs, no model is asked", async () => {
+test("without the wake phrase, a sentence goes to a model only when it is on this computer", async () => {
   const local = scripted(calls(call("pause_music")));
-  const heard = await turns({ local: local.model }).hear("pause the music", { wake: false });
-  assert.deepEqual(heard, { result: null, taken: false, rest: false });
+  // A model server elsewhere: the sentence is for nobody, and nobody is asked.
+  assert.deepEqual(await turns({ local: local.model }).hear("pause the music", { wake: false }), { result: null, taken: false, rest: false });
+  // No model at all: the same.
+  assert.equal((await turns({ followUp: true }).hear("pause the music", { wake: false })).taken, false);
   assert.equal(local.asked.length, 0);
   assert.deepEqual(app.state.log, []);
 });
 
-test("without the wake phrase the ranking decides: far from everything is ignored, near is acted on, between is asked about", async () => {
-  const embed = embedBy({
-    "see you at four then": "far",
-    "pause it": { pause_music: 1 },
-    "maybe stop that": { pause_music: 1, play_music: 0.9, now_playing: 0.9, add_pills: 0.9, remove_pills: 0.55 },
-  });
-  const local = scripted(calls(call("pause_music")), says("Paused."));
-  const t = turns({ embed, local: local.model });
+test("without the wake phrase the local model decides: nothing for what was said to someone else, and nothing shows", async () => {
+  const local = scripted(calls(call("nothing")), calls(call("pause_music")), says("Paused."));
+  const t = turns({ local: local.model, followUp: true });
   let taken = 0;
-  // Near nothing the app does: nothing shows, and the sentence goes to no model.
-  assert.equal((await t.hear("see you at four then", { wake: false, taken: () => taken++ })).taken, false);
+  const stray = await t.hear("see you at four then", { wake: false, taken: () => taken++ });
+  assert.deepEqual(stray, { result: null, taken: false, rest: false });
   assert.equal(taken, 0);
-  assert.equal(local.asked.length, 0);
-  // Clearly a command: done, with no model (tier 1).
-  const acted = await t.hear("pause it", { wake: false, taken: () => taken++ });
-  assert.deepEqual(acted.result, { outcome: "success", message: "Paused" });
+  // It is told the sentence may not be for Coucou.
+  assert.match(local.asked[0].system, /may have been said to someone else/);
+  // Not a turn: nothing is remembered of it.
+  assert.deepEqual(t.memory.recent(now), []);
+  // Something the app does, asked for: taken once, before it runs.
+  const meant = await t.hear("pause it", { wake: false, taken: () => taken++ });
   assert.equal(taken, 1);
-  // In between: Coucou asks on screen, and a no leaves it at that.
-  const asks = [];
-  t.onAsk = (ask) => {
-    if (!ask) return;
-    asks.push(ask);
-    queueMicrotask(() => t.answer({ kind: "yes_no", yes: false }));
-  };
-  const asked = await t.hear("maybe stop that", { wake: false });
-  assert.deepEqual(asks.map((a) => [a.kind, a.question]), [["yes_no", "Was that for me?"]]);
-  assert.equal(asked.taken, false);
-  assert.equal(local.asked.length, 0);
+  assert.deepEqual(meant.result, { outcome: "success", message: "Paused." });
+  assert.deepEqual(app.state.log, ["pause"]);
 });
 
-// ── Tier 1 ────────────────────────────────────────────────────────────────────
+test("without the wake phrase: words alone show nothing, tier 1 does not run, and the cloud is never asked", async () => {
+  let clouded = 0;
+  const cloud = async () => ((clouded += 1), { text: "" });
+  // Ranked far ahead, a clear command for tier 1 — which waits for the wake phrase.
+  const embed = embedBy({ "pause the music": { pause_music: 1 } });
+  const local = scripted(says("Sure, four works."), calls(call("escalate")), null);
+  const t = turns({ embed, local: local.model, cloud, followUp: true });
+  assert.equal((await t.hear("pause the music", { wake: false })).taken, false);
+  assert.deepEqual(app.state.log, []);
+  // Handing up is not even offered for it, and a model that does not answer is not replaced by the cloud.
+  assert.ok(!local.asked[0].tools.includes("escalate"));
+  assert.equal((await t.hear("work out my week", { wake: false })).taken, false);
+  assert.equal((await t.hear("hmm", { wake: false })).taken, false);
+  assert.equal(clouded, 0);
+});
 
 test("tier 1: a clear command runs with no model call, and the thing it names is found in the sentence", async () => {
   const embed = embedBy({ "pause the music": { pause_music: 1 }, "add": { add_pills: 1 }, "show me the": { show_view: 1 } });
@@ -471,7 +475,7 @@ test("tier 3: handed up only when the user allowed a cloud model, which reaches 
   // The cloud is given every capability but the two that speak to the local model.
   assert.equal(published.length, 1);
   assert.ok(published[0].includes("pause_music") && !published[0].includes("escalate") && !published[0].includes("more_tools"));
-  assert.deepEqual(waits[waits.length - 1], ["Asking a bigger model…", 90_000]);
+  assert.deepEqual(waits[waits.length - 1], ["Asking a bigger model…", 150_000]);
 });
 
 test("a capability asked for when no turn is with the cloud model is for nobody: refused", async () => {

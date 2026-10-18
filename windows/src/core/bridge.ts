@@ -38,7 +38,7 @@ export type VoiceEnginePart = "hearing" | "speaking";
 
 /** src-tauri/src/voice/mod.rs `Status`. */
 export type VoiceStatus =
-  | "off" | "listening" | "shortcut" | "paused" | "noRecogniser" | "microphone" | "unsupported" | "error";
+  | "off" | "listening" | "shortcut" | "paused" | "noRecogniser" | "microphone" | "unsupported" | "noEngine" | "error";
 /** The phone link (src-tauri/src/phone_link): how it is, never its secrets. */
 export interface PhoneLinkStatus {
   enabled: boolean;

@@ -11,8 +11,11 @@
 //            could not answer goes to the provider chosen for the chat
 //
 // Before any of them: was the sentence said to Coucou? The wake phrase settles
-// it; without it the ranking decides, on this computer, and a sentence it
-// rejects goes nowhere.
+// it. Without it — the few seconds after a turn — the local model decides,
+// and only one on this computer: it is given the sentence with the turn
+// before, and calls `nothing` for what was said to someone else. Nothing
+// shows unless it calls something else, and such a sentence never reaches
+// the cloud. (The ranking cannot tell: voice/rank.ts `directed`.)
 //
 // Nothing here reads a word of what was said. A sentence is embedded whole or
 // handed to a model whole; what it means is theirs to work out, and what may
@@ -23,7 +26,7 @@
 import type { Answer, Ask, Capability, Registry, RunContext, ToolResult } from "../core/capabilities/types";
 import { usable } from "./asking";
 import { VoiceMemory, type ModelCall, type VoiceTurn } from "./memory";
-import { ALWAYS_SHOWN, CapabilityIndex, directed, indexText, instant, shortlist, type Embed, type Ranked } from "./rank";
+import { ALWAYS_SHOWN, CapabilityIndex, indexText, instant, shortlist, type Embed, type Ranked } from "./rank";
 import { forModel, spoken, type VoiceResult } from "./result";
 
 export type { ModelCall } from "./memory";
@@ -63,8 +66,8 @@ export const TURN_BUDGET_MS = 8000;
 export const WORDING_MS = 2500;
 /** How long the model that reads a spoken answer is waited for. */
 export const ANSWER_MS = 4000;
-/** How long the cloud tier may take: it is for what is worth waiting for. */
-export const CLOUD_BUDGET_MS = 90_000;
+/** How long the cloud tier may take, as Rust allows it (voice_cloud): it is for what is worth waiting for. */
+export const CLOUD_BUDGET_MS = 150_000;
 /** After the embedding model did not answer, it is not asked again for this long. */
 export const EMBED_RETRY_MS = 60_000;
 
@@ -76,8 +79,6 @@ const ESCALATE = "escalate";
 
 /** The lines the turn itself shows, worded and translated by its maker. */
 export interface TurnWords {
-  /** A sentence without the wake phrase that may have been for Coucou: "Was that for me?" */
-  forMe(): string;
   /** No model server is chosen for voice. */
   noModel(): string;
   /** The model was asked and did not answer. */
@@ -98,6 +99,12 @@ export interface TurnOptions {
   local: () => LocalModel | null;
   /** The cloud model, or null unless the user turned it on. */
   cloud: () => CloudModel | null;
+  /**
+   * Whether a sentence said without the wake phrase may be given to the local
+   * model, to decide whether it was meant for Coucou: only when the model
+   * server is this computer. False: such a sentence is for nobody.
+   */
+  followUp?: () => boolean;
   /** Gives the cloud model's endpoint the capabilities it may ask for. */
   publish?: (tools: unknown[]) => void;
   words: TurnWords;
@@ -105,7 +112,7 @@ export interface TurnOptions {
 }
 
 export interface Hearing {
-  /** False for a sentence said without the wake phrase: the ranking decides whether it was for Coucou. */
+  /** False for a sentence said without the wake phrase: the local model decides whether it was for Coucou. */
   wake?: boolean;
   /** How sure the speech model was of each word, when it says. */
   sure?: readonly number[];
@@ -154,6 +161,8 @@ interface Running {
   ran: Ran[];
   /** When the time a turn may take started; set again after the user answered a question. */
   started: number;
+  /** Taken as said to Coucou: by the wake phrase, or by the local model calling something. */
+  taken: boolean;
 }
 
 const IGNORED: Heard = { result: null, taken: false, rest: false };
@@ -189,6 +198,10 @@ const SHORTLISTED = "Your tools are the capabilities nearest to what was said. W
 
 const BY_AREA = "Your tools are the capabilities of the areas the sentence is about. When none of them is what was asked, call more_tools with another area to be given that area's.";
 
+/** Told to the model of a sentence said without the wake phrase. */
+const ASIDE =
+  "This sentence was said without Coucou's name, a few seconds after the turn above: it may have been said to someone else in the room. Unless it plainly asks Coucou for something, call the capability named nothing.";
+
 const AFTER_CALLS =
   "The results of your calls are above. If what was asked needs another capability, call it now. Otherwise say what happened in one short sentence, from the results alone.";
 
@@ -215,6 +228,7 @@ export class VoiceTurns {
   private local: () => LocalModel | null;
   private cloud: () => CloudModel | null;
   private publish: (tools: unknown[]) => void;
+  private followUp: () => boolean;
   private words: TurnWords;
   private now: () => number;
 
@@ -236,6 +250,7 @@ export class VoiceTurns {
     this.local = options.local;
     this.cloud = options.cloud;
     this.publish = options.publish ?? (() => {});
+    this.followUp = options.followUp ?? (() => false);
     this.words = options.words;
     this.now = options.now ?? (() => Date.now());
   }
@@ -335,33 +350,23 @@ export class VoiceTurns {
     const sentence = said.trim();
     if (!sentence) return IGNORED;
     const wake = how.wake ?? true;
-    const turn: Running = { said: sentence, how, ran: [], started: this.now() };
+    // Without the wake phrase: only a model on this computer is given it, and with no model it is for nobody.
+    if (!wake && (!this.followUp() || !this.local())) return IGNORED;
+    const turn: Running = { said: sentence, how, ran: [], started: this.now(), taken: wake };
+    if (wake) how.taken?.();
     const before = this.memory.recent(this.now());
     const ranked = await this.ranked(sentence, before[before.length - 1]?.said);
 
-    // Was it said to Coucou? Without the wake phrase, the ranking says; with no ranking, it was not.
-    if (!wake) {
-      const meant = directed(ranked, { sure: how.sure, followsTurn: before.length > 0 });
-      if (meant === "ignore") return IGNORED;
-      how.taken?.();
-      if (meant === "ask") {
-        const answer = await this.askUser({ kind: "yes_no", question: this.words.forMe() });
-        if (answer.kind !== "yes_no" || !answer.yes) return IGNORED;
-        turn.started = this.now();
-      }
-    } else {
-      how.taken?.();
-    }
-
     const heard = await this.understand(turn, ranked);
+    if (!turn.taken) return IGNORED;
     const next = this.nextSaid;
     this.nextSaid = null;
     return next ? { ...heard, next } : heard;
   }
 
   private async understand(turn: Running, ranked: Ranked[] | null): Promise<Heard> {
-    // Tier 1: the ranking names one capability, clearly. No model is asked.
-    const name = ranked ? instant(ranked, this.registry.all()) : null;
+    // Tier 1: the ranking names one capability, clearly. No model is asked — and not for a sentence that may be for nobody.
+    const name = ranked && turn.taken ? instant(ranked, this.registry.all()) : null;
     if (name) {
       const done = await this.instantly(name, turn);
       if (done) return this.end(turn, "");
@@ -374,6 +379,8 @@ export class VoiceTurns {
     const came = await this.locally(local, turn, ranked);
     if (came.is === "dropped") return { result: null, taken: true, rest: false };
     if (came.is === "answered") return this.end(turn, came.words);
+    // What may have been said to someone else never goes further than this computer.
+    if (!turn.taken) return IGNORED;
 
     // Tier 3: handed up, or the local model did not answer — when the user allowed a cloud model.
     const cloud = this.cloud();
@@ -462,7 +469,7 @@ export class VoiceTurns {
     const capabilities = this.registry.all();
     const declared = new Set(capabilities.map((c) => c.name));
     // Handing up is offered only when there is somebody to hand up to.
-    const offered = (names: readonly string[]) => names.filter((n) => declared.has(n) && (n !== ESCALATE || this.cloud() != null));
+    const offered = (names: readonly string[]) => names.filter((n) => declared.has(n) && (n !== ESCALATE || (turn.taken && this.cloud() != null)));
     const shown = new Set(offered([...(ranked ? shortlist(ranked, capabilities) : ALWAYS_SHOWN), UNDO]));
     const history: ModelTurn[] = this.memory.recent(this.now()).map(({ said: s, calls, result }) => ({ said: s, calls, result }));
     const tools = () => [...shown].map((name) => this.registry.schema(name)).filter(Boolean);
@@ -483,7 +490,7 @@ export class VoiceTurns {
       const picked = [about.first, about.second, about.third];
       for (const { area, names } of all) if (picked.includes(area)) for (const name of offered(names)) shown.add(name);
     }
-    const system = systemPrompt(snapshot, ranked ? SHORTLISTED : BY_AREA);
+    const system = `${systemPrompt(snapshot, ranked ? SHORTLISTED : BY_AREA)}${turn.taken ? "" : `\n\n${ASIDE}`}`;
 
     let reply = await local(system, said, tools(), history);
     if (how.wanted && !how.wanted()) return { is: "dropped" };
@@ -501,6 +508,11 @@ export class VoiceTurns {
       // What it already called it has nothing more to ask of: nothing is done twice for one sentence.
       const fresh = calls.filter((call) => !turn.ran.some((ran) => same(ran.call, call))).slice(0, MOST_CALLS);
       if (!fresh.length) break;
+      // Said without the wake phrase: it was for Coucou once the model asks for something the app does.
+      if (!turn.taken && fresh.some((call) => declared.has(call.name) && ![NOTHING, MORE_TOOLS, ESCALATE].includes(call.name))) {
+        turn.taken = true;
+        how.taken?.();
+      }
 
       const step: ModelStep = { calls: [], results: [] };
       for (const call of fresh) {
@@ -571,6 +583,8 @@ export class VoiceTurns {
    * words. `failure`: the turn's own line when nothing could be done at all.
    */
   private end(turn: Running, words: string, failure?: string): Heard {
+    // Not taken as said to Coucou: nothing is shown, and nothing is remembered.
+    if (!turn.taken) return IGNORED;
     const shown = shownOf(turn);
     const calls = turn.ran.map((ran) => ran.call);
     const finish = (result: VoiceResult | null, rest = false): Heard => {
