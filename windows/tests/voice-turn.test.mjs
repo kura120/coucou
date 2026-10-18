@@ -709,3 +709,18 @@ test("a no that names another thing of the kind asked about is what was meant in
     assert.deepEqual(app.state.log, []);
   }
 });
+
+test("after a no to a name, the same call written with the name itself is not asked again", async () => {
+  const local = scripted(calls(call("remove_pills", { pills: ["strife"] })), calls(call("remove_pills", { pills: ["Stripe"] })), says("done"));
+  const t = turns({ local: local.model });
+  const asked = [];
+  t.onAsk = (ask) => {
+    if (!ask) return;
+    asked.push(ask.question);
+    queueMicrotask(() => t.answer({ kind: "yes_no", yes: false }));
+  };
+  const heard = await t.hear("remove strife");
+  assert.deepEqual(asked, ["Did you mean Stripe?"]);
+  assert.deepEqual(app.state.log, []);
+  assert.deepEqual(heard.result, { outcome: "success", message: "Leaving it as is" });
+});

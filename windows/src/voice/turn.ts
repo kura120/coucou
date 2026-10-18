@@ -21,7 +21,11 @@
 // handed to a model whole; what it means is theirs to work out, and what may
 // be done is the executor's to decide (the capability's tier, a click for
 // `confirm`). The texts below are instructions to a model, not rules about
-// wording. Nothing said is written to disk or logged.
+// wording. The one comparison with the sentence is of names: whether it
+// holds a name a model wrote (`asHeard`), by the matcher's own normalising.
+// What Mochi says of what was done is the capabilities' own lines; a model
+// words only what was read, given nothing but the results (`report`).
+// Nothing said is written to disk or logged.
 
 import type { Answer, Ask, Capability, Registry, RunContext, ToolResult } from "../core/capabilities/types";
 import { usable } from "./asking";
@@ -474,10 +478,15 @@ export class VoiceTurns {
     };
   }
 
+  /** The call as it is run: its names put back as heard (`asHeard`). */
+  private heardCall(call: ModelCall, turn: Running): Promise<ModelCall> {
+    return asHeard(call, this.registry.get(call.name), turn, (text) => this.registry.named(text));
+  }
+
   private async run(call: ModelCall, origin: RunContext["origin"], turn: Running): Promise<ToolResult> {
-    const given = await asHeard(call, this.registry.get(call.name), turn, (text) => this.registry.named(text));
+    const given = await this.heardCall(call, turn);
     const result = await this.registry.execute(given, this.context(origin, turn));
-    turn.ran.push({ call, result, capability: this.registry.get(call.name) });
+    turn.ran.push({ call: given, result, capability: this.registry.get(call.name) });
     return result;
   }
 
@@ -574,8 +583,14 @@ export class VoiceTurns {
         words = looksWritten(reply.text) ? "" : reply.text;
         break;
       }
-      // What it already called it has nothing more to ask of: nothing is done twice for one sentence.
-      const fresh = calls.filter((call) => !turn.ran.some((ran) => same(ran.call, call))).slice(0, MOST_CALLS);
+      // What it already called it has nothing more to ask of: nothing is done twice for one sentence —
+      // compared as run, so that "Stripe" after a no to "Did you mean Stripe?" is not asked again.
+      const fresh: ModelCall[] = [];
+      for (const call of calls) {
+        const given = await this.heardCall(call, turn);
+        if (!turn.ran.some((ran) => same(ran.call, given)) && !fresh.some((other) => same(other, given))) fresh.push(given);
+        if (fresh.length >= MOST_CALLS) break;
+      }
       if (!fresh.length) break;
       // Said without the wake phrase: it was for Coucou once the model asks for something the app does.
       if (!turn.taken && fresh.some((call) => declared.has(call.name) && ![NOTHING, MORE_TOOLS, ESCALATE].includes(call.name))) {

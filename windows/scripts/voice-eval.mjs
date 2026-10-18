@@ -343,9 +343,12 @@ async function run(steps) {
   /** The turn that waits on a question, and who is told when one goes up. */
   let turn = null;
   let up = () => {};
+  /** Once the steps are over, a question that still goes up is for nobody: dropped, as when the island closes. */
+  let over = false;
   turns.onAsk = (ask) => {
     if (TRACE) console.log(`    asks ${ask ? JSON.stringify(ask.question) : "no more"}`);
-    if (ask) up(ask);
+    if (ask && over) queueMicrotask(() => turns.answer({ kind: "dropped" }));
+    else if (ask) up(ask);
   };
   /** The turn's end, or the question it stopped on. */
   const shown = async () => {
@@ -388,6 +391,7 @@ async function run(steps) {
   }
   // A question nobody answered is dropped, as when the island closes.
   if (turn) {
+    over = true;
     turns.answer({ kind: "dropped" });
     await turn;
   }
