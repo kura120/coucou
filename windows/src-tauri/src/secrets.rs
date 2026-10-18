@@ -21,6 +21,7 @@ pub const KNOWN_KEYS: &[&str] = &[
     "resend-api-key",
     "notion-api-key",
     "calcom-api-key",
+    "brave-search-api-key",
 ];
 
 fn entry(key: &str) -> Option<Entry> {
@@ -117,6 +118,12 @@ mod tests {
         }
         // And the other way round: a key of the island is not an internal one.
         assert!(set_internal("github-token", "x").is_err());
+    }
+
+    #[test]
+    fn the_web_search_key_is_one_the_island_may_store() {
+        assert!(KNOWN_KEYS.contains(&crate::web_search::KEY));
+        assert!(!is_internal(crate::web_search::KEY));
     }
 
     /// Windows Credential Manager caps a secret's size. The phone link stores its certificate (about

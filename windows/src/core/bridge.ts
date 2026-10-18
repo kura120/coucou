@@ -469,6 +469,20 @@ export const Bridge = {
     call<{ calls: { name: string; arguments: Record<string, unknown> }[]; text: string }>(
       "voice_brain", { system, said, tools, history, steps },
     ),
+  /**
+   * Each text as a vector, from the embedding model (`voice.embedModel`) of the
+   * server chosen for voice, in the texts' order. Null when there is no such
+   * model, it did not answer, or more than 256 texts were given at once.
+   */
+  voiceEmbed: (texts: string[]) => call<number[][] | null>("voice_embed", { texts }),
+  /** The embedding models the server chosen for voice has, by name (Settings). */
+  voiceEmbedModels: () => call<string[]>("voice_embed_models"),
+  /**
+   * Searches the web with Brave Search and the user's key: eight results at
+   * most, as plain text. Throws what went wrong, in words to show; and always
+   * unless `voice.webSearch` is "brave".
+   */
+  webSearch: (query: string) => callOrThrow<WebResult[]>("web_search", { query }),
   /** Whether a part of the bundled engine is on this machine, and what getting it costs. */
   voiceEngineStatus: (part: VoiceEnginePart) =>
     call<{ installed: boolean; downloadBytes: number; available: boolean; downloading: boolean }>("voice_engine_status", { part }),
@@ -586,6 +600,16 @@ export interface LocalServer {
   /** The address is this machine. */
   loopback: boolean;
 }
+
+/** One web search result (src-tauri/src/web_search.rs): text only, the address http(s). */
+export interface WebResult {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+/** Credential store entry of the user's Brave Search key, for `secretSet` / `secretPresent`. */
+export const BRAVE_SEARCH_KEY = "brave-search-api-key";
 
 export interface DroppedFile {
   name: string;

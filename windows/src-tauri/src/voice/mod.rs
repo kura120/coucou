@@ -64,6 +64,7 @@ use crate::settings::{Settings, VoicePref};
 mod apps;
 pub mod ask_keys;
 pub mod brain;
+pub mod embed;
 #[cfg(windows)]
 mod capture;
 pub mod engine;
