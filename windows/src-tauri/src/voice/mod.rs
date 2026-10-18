@@ -11,9 +11,10 @@
 //   (hear.rs refuses any other address, and the bundled model hears instead).
 //   There is no cloud recogniser to fall back on: where there is no local
 //   one, Settings says so and nothing listens.
-// - The words, once written down, stay here too, with one exception the user
-//   sets up: a sentence the parser does not know is put, as text, to the model
-//   server chosen for voice (brain.rs), wherever the user pointed it.
+// - The words, once written down, go as text where the user set voice up to
+//   reason and nowhere else: the model server chosen for voice (brain.rs,
+//   embed.rs), wherever the user pointed it, and — behind its own switch, off
+//   by default — the provider chosen for chat (cloud.rs).
 // - Nothing is recorded. The log says that something was recognised, never what.
 // - Off by default. Off means no thread and a closed microphone.
 // - Voice never approves a permission and never sends anything.
@@ -21,14 +22,18 @@
 // One thread owns the recogniser, like the Spotify listener (spotify.rs):
 // `sync` starts and stops it on every settings save, and a generation number
 // makes an old listener quit. What is heard goes through a `Session`
-// (session.rs), which knows nothing of the engine behind it; Windows' own
-// recogniser is the one engine for now (sapi.rs), English only. Linux has no
-// system recogniser: it waits for the bundled engine.
+// (session.rs), which knows nothing of the engines behind it. English only.
+// Linux has no system recogniser: nothing listens there yet.
 //
-// With the bundled engine installed and chosen (engine.rs, sherpa.rs), the
-// wake phrase is still Windows' — it hears "coucou" where the free engine does
-// not — and the command after it is free speech: the microphone is read here
-// (capture.rs), a sentence is cut out of it (vad.rs) and written down. For a
+// Two engines, each for what it is good at. The wake phrase is Windows' own
+// recogniser's (sapi.rs): it hears "coucou" where a free engine writes it a
+// different way each time. It is given the wake phrases and nothing else — a
+// fixed grammar can only hear the sentences it was given, and no list of
+// sentences is kept for voice. The command after it is always free speech,
+// by the bundled engine (engine.rs, sherpa.rs): the microphone is read here
+// (capture.rs), a sentence is cut out of it (vad.rs) and written down. Where
+// that engine's hearing part is not installed, and the model server may not
+// hear in its place, nothing listens and the status says why (`noEngine`). For a
 // few seconds after a command, another may follow without the wake phrase:
 // whatever is said then is handed to the island, which shows something only
 // when it is a command, and says so (`voice_followed`).
@@ -39,9 +44,8 @@
 // says when in the sentence the wake phrase ended, and what the microphone
 // gave after that moment is written down.
 //
-// A fixed-grammar recogniser hears only what it was given. The commands come
-// from the island (`voice_grammar`), which writes them next to the parser
-// that understands them: nothing listens until it has sent them.
+// The listener starts from the settings alone: the island sends it nothing to
+// listen for.
 //
 // The island is told with one event, `voice`: { phase, text }, phase being
 // "woke", "partial", "final", "missed" or "cancelled" — and "following" /
@@ -50,9 +54,8 @@
 // While the bundled engine listens for a command, `voice-level` says how loud
 // the microphone hears (0…1), for the glow under the island.
 
-use std::collections::BTreeMap;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -64,12 +67,13 @@ use crate::settings::{Settings, VoicePref};
 mod apps;
 pub mod ask_keys;
 pub mod brain;
+pub mod cloud;
 pub mod embed;
 #[cfg(windows)]
 mod capture;
 pub mod engine;
-mod grammar;
 mod hear;
+pub mod mcp;
 #[cfg(windows)]
 mod sapi;
 mod sherpa;
@@ -79,7 +83,6 @@ mod session;
 
 #[cfg(windows)]
 use sapi::Recogniser;
-use grammar::Grammar;
 use session::{Heard, Listen, Raw, Rule, Session};
 
 const EVENT: &str = "voice";
@@ -100,6 +103,11 @@ pub enum Unavailable {
     NoRecogniser,
     /// No microphone, or Windows refuses it to desktop apps.
     Microphone,
+    /// Nothing here can write a command down: the bundled engine's hearing
+    /// part is not installed (or will not load), and the model server may
+    /// not hear in its place.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    NoEngine,
     /// No recogniser for this system in this version.
     #[cfg_attr(windows, allow(dead_code))]
     Unsupported,
@@ -126,6 +134,9 @@ pub enum Status {
     Paused,
     NoRecogniser,
     Microphone,
+    /// The speech engine is needed: a command is free speech, and its hearing
+    /// part is not on this machine. Settings → Voice offers the download.
+    NoEngine,
     Unsupported,
     Error,
 }
@@ -147,8 +158,6 @@ enum Control {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Plan {
     wake: bool,
-    /// The bundled engine writes down the command, when it is installed.
-    free: bool,
     /// Which hearing model it does so with (engine.rs): a new one is a new listener.
     hearing: usize,
     /// The model server is asked to write the command down (hear.rs), and
@@ -165,18 +174,52 @@ struct Shared {
     generation: u64,
     /// The plan, when voice is on in Settings.
     want: Option<Plan>,
-    /// What the island said can be heard; None until it has.
-    grammar: Option<Arc<Grammar>>,
     tx: Option<Sender<Control>>,
     paused: bool,
     status: Status,
 }
 
-static SHARED: Mutex<Shared> =
-    Mutex::new(Shared { generation: 0, want: None, grammar: None, tx: None, paused: false, status: Status::Off });
+static SHARED: Mutex<Shared> = Mutex::new(Shared { generation: 0, want: None, tx: None, paused: false, status: Status::Off });
 
 fn shared() -> MutexGuard<'static, Shared> {
     SHARED.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// How the listener runs, or None when voice is off. The settings say all of
+/// it: nothing comes from the island. `engine` in the settings (the older
+/// "Hear free speech" switch) no longer chooses anything — a command is
+/// always free speech.
+fn plan(settings: &Settings) -> Option<Plan> {
+    let pref = &settings.voice;
+    let server = pref.hearing_model == hear::ID;
+    pref.enabled.then(|| Plan {
+        wake: pref.wake,
+        hearing: engine::choose(&pref.hearing_model),
+        server,
+        server_here: server && hear::ear(settings).is_ok(),
+        follow_up: pref.follow_up.min(MAX_FOLLOW_UP),
+    })
+}
+
+/// What writes a command down.
+#[cfg_attr(not(windows), allow(dead_code))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Ears {
+    /// The bundled model: alone, or behind the model server for the
+    /// sentences that server does not answer for in time.
+    bundled: bool,
+    /// The model server is asked first (hear.rs).
+    server: bool,
+}
+
+/// Who hears the command under this plan, `installed` saying whether the
+/// bundled engine's hearing part is on this machine. None when nobody can:
+/// voice then does not listen at all, the wake phrase included — waking for a
+/// command that cannot be heard would be a promise not kept.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn ears(plan: Plan, installed: bool) -> Option<Ears> {
+    let ears = Ears { bundled: installed, server: plan.server_here };
+    (ears.bundled || ears.server).then_some(ears)
 }
 
 /// Starts, stops or restarts the listener to match the settings. Called at
@@ -186,16 +229,7 @@ pub fn sync(app: &AppHandle, settings: &Settings) {
     if !(pref.enabled && pref.speak) {
         speak::unload();
     }
-    let hearing = engine::choose(&pref.hearing_model);
-    let server = pref.hearing_model == hear::ID;
-    let want = pref.enabled.then(|| Plan {
-        wake: pref.wake,
-        free: pref.engine == "bundled",
-        hearing,
-        server,
-        server_here: server && hear::ear(settings).is_ok(),
-        follow_up: pref.follow_up.min(MAX_FOLLOW_UP),
-    });
+    let want = plan(settings);
     let mut s = shared();
     if s.want == want {
         return;
@@ -204,30 +238,13 @@ pub fn sync(app: &AppHandle, settings: &Settings) {
     restart(app, s);
 }
 
-/// The commands that can be heard, from the island. A listener already
-/// running starts again with them.
-#[tauri::command]
-pub fn voice_grammar(app: AppHandle, commands: Vec<String>, slots: BTreeMap<String, Vec<String>>) {
-    let grammar = match Grammar::parse(&commands, &slots) {
-        Ok(grammar) => grammar,
-        Err(why) => return crate::log::line(format!("voice: grammar refused: {why}")),
-    };
-    let mut s = shared();
-    if s.grammar.as_deref() == Some(&grammar) {
-        return;
-    }
-    s.grammar = Some(Arc::new(grammar));
-    restart(&app, s);
-}
-
-/// Stops the listener, and starts one when voice is on and there is something
-/// to listen for.
+/// Stops the listener, and starts one when voice is on.
 fn restart(app: &AppHandle, mut s: MutexGuard<'static, Shared>) {
     s.generation += 1;
     if let Some(tx) = s.tx.take() {
         let _ = tx.send(Control::Stop);
     }
-    let (Some(plan), Some(grammar)) = (s.want, s.grammar.clone()) else {
+    let Some(plan) = s.want else {
         drop(s);
         set_status(app, None, Status::Off);
         return;
@@ -242,7 +259,7 @@ fn restart(app: &AppHandle, mut s: MutexGuard<'static, Shared>) {
     let app = app.clone();
     let spawned = std::thread::Builder::new()
         .name("voice".into())
-        .spawn(move || listen(&app, generation, plan, &grammar, &rx));
+        .spawn(move || listen(&app, generation, plan, &rx));
     if let Err(err) = spawned {
         crate::log::line(format!("voice: no thread: {err}"));
     }
@@ -401,11 +418,11 @@ pub fn voice_apps_near(said: String) -> NearApps {
     }
 }
 
-/// The installed apps' names, for a recogniser that only hears what it was
-/// given ("open {app}").
+/// The user's own folders voice may open, by the names `voice_open_folder`
+/// takes: those that exist on this machine.
 #[tauri::command]
-pub fn voice_apps() -> Vec<String> {
-    apps::sayable(&apps::installed())
+pub fn voice_folders() -> Vec<String> {
+    apps::folders()
 }
 
 /// "Open my downloads": one of the user's own folders, and which.
@@ -509,9 +526,11 @@ pub fn voice_engine_remove(app: AppHandle, part: engine::Part) {
 }
 
 /// The island left the listening view by itself (Escape, a card coming up).
+/// A turn put to the cloud model is stopped with it (cloud.rs).
 #[tauri::command]
 pub fn voice_cancel() {
     send(&shared(), Control::Cancel);
+    cloud::cancel();
 }
 
 /// The sentence said without the wake phrase was a command, and is done:
@@ -596,7 +615,7 @@ struct Free {
     /// Set when the model server is asked first (hear.rs): where the settings
     /// are, which say at every sentence whether it still may be.
     server: Option<AppHandle>,
-    /// The names it is told may be said: the pills and the installed apps.
+    /// The names the model server is told may be said: the installed apps'.
     names: Vec<String>,
     capture: Option<capture::Capture>,
     sentences: vad::Sentences,
@@ -618,19 +637,19 @@ const SAME_BREATH: Duration = Duration::from_millis(1500);
 
 #[cfg(windows)]
 impl Free {
-    /// None when the engine is not installed or will not load, and the model
-    /// server is not there to hear instead: the grammar recogniser then hears
-    /// commands as before.
-    fn load(app: &AppHandle, plan: Plan, grammar: &Grammar) -> Option<Self> {
+    /// `NoEngine` when the engine is not installed or will not load, and the
+    /// model server is not there to hear instead: nothing can write a command
+    /// down, and Windows' recogniser is not asked to.
+    fn load(app: &AppHandle, plan: Plan) -> Result<Self, Unavailable> {
         if plan.server && !plan.server_here {
             crate::log::line("voice: the model server may not hear (not on this computer, or no model): the bundled model does");
         }
-        let server = plan.server_here.then(|| app.clone());
-        let bundled = engine::installed(engine::Part::Hearing);
-        if !bundled && server.is_none() {
-            crate::log::line("voice: the bundled engine is chosen but not installed");
-            return None;
-        }
+        let Some(ears) = ears(plan, engine::installed(engine::Part::Hearing)) else {
+            crate::log::line("voice: the speech engine is needed: its hearing part is not installed");
+            return Err(Unavailable::NoEngine);
+        };
+        let server = ears.server.then(|| app.clone());
+        let bundled = ears.bundled;
         // Moonshine fails from ten seconds of sound; a Parakeet or a model server takes a long sentence.
         vad::takes_long_sentences(server.is_some() || engine::hearing().family != engine::Family::Moonshine);
         // A keyboard is as loud as a voice: the detector is what tells them apart.
@@ -645,12 +664,12 @@ impl Free {
             .then(|| sherpa::Engine::load(&engine::runtime_dir(), &engine::model_dir(engine::Part::Hearing), engine::hearing().family))
             .and_then(|loaded| loaded.map_err(|why| crate::log::line(format!("voice: bundled engine: {why}"))).ok());
         if engine.is_none() && server.is_none() {
-            return None;
+            return Err(Unavailable::NoEngine);
         }
-        let names = if server.is_some() { hear::names(&grammar.slots) } else { Vec::new() };
+        let names = if server.is_some() { hear::names(apps::installed_lately().iter().map(|app| app.name.as_str())) } else { Vec::new() };
         let free = Self { engine, server, names, capture: None, sentences, buffer: Vec::new(), recent: None, after_wake: None, peak: 0.0 };
         free.warm();
-        Some(free)
+        Ok(free)
     }
 
     /// The settings as they are now, when the model server is asked to hear.
@@ -793,8 +812,8 @@ struct Free;
 
 #[cfg(not(windows))]
 impl Free {
-    fn load(_app: &AppHandle, _plan: Plan, _grammar: &Grammar) -> Option<Self> {
-        None
+    fn load(_app: &AppHandle, _plan: Plan) -> Result<Self, Unavailable> {
+        Err(Unavailable::Unsupported)
     }
 
     fn open(&mut self, _on: bool) -> Result<(), Unavailable> {
@@ -824,18 +843,20 @@ impl Free {
     }
 }
 
-fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &Receiver<Control>) {
+fn listen(app: &AppHandle, generation: u64, plan: Plan, rx: &Receiver<Control>) {
     let wake = plan.wake;
-    let mut free = if plan.free { Free::load(app, plan, grammar) } else { None };
-    // One breath only where the rest of the sentence can be written down.
-    let mut recogniser = match Recogniser::open(grammar, free.is_some()) {
+    // What writes the command down comes first: without it nothing listens,
+    // not even for the wake phrase.
+    let mut free = match Free::load(app, plan) {
+        Ok(free) => free,
+        Err(why) => return give_up(app, generation, why),
+    };
+    let mut recogniser = match Recogniser::open() {
         Ok(recogniser) => recogniser,
         Err(why) => return give_up(app, generation, why),
     };
-    crate::log::line(if free.is_some() { "voice: on, free speech" } else { "voice: on" });
-    // Another command without the wake phrase only where any sentence can be heard.
-    let follow_up = if free.is_some() { Duration::from_secs(u64::from(plan.follow_up)) } else { Duration::ZERO };
-    let mut session = Session::new(wake, follow_up);
+    crate::log::line("voice: on");
+    let mut session = Session::new(wake, Duration::from_secs(u64::from(plan.follow_up)));
     let mut paused = false;
     let mut ear = Listen::Nothing;
     let mut held_checked: Option<Instant> = None;
@@ -875,11 +896,10 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
 
         let want = session.listen();
         if want != ear {
-            // With the free engine, Windows' recogniser only ever hears the wake phrase.
-            let freely = free.is_some() && matches!(want, Listen::Command | Listen::FollowUp);
-            let system = if freely { Listen::Nothing } else { want };
-            let mut turned = recogniser.listen(system);
-            if let (Ok(()), Some(free)) = (&turned, free.as_mut()) {
+            // Windows' recogniser only ever hears the wake phrase: it is off
+            // through a command and the time another may follow.
+            let mut turned = recogniser.listen(want);
+            if turned.is_ok() {
                 // The microphone stays open through the wake phrase too, so the
                 // room is known and a command's first sound is not lost.
                 turned = free.open(want != Listen::Nothing);
@@ -933,11 +953,11 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
                 }
             }
         } else {
-            let freely = free.is_some() && matches!(ear, Listen::Command | Listen::FollowUp);
+            let freely = matches!(ear, Listen::Command | Listen::FollowUp);
             // Windows' recogniser when it is the one listening; else a short nap
             // is the microphone's wait below.
             let mut raw = if freely { None } else { recogniser.next(POLL) };
-            if let Some(free) = free.as_mut() {
+            {
                 let wait = if freely { POLL } else { Duration::ZERO };
                 match free.next(wait, freely) {
                     Ok(sentence) => raw = raw.or(sentence),
@@ -974,12 +994,10 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, grammar: &Grammar, rx: &
             // "OK Coucou, next track": the sentence the wake phrase was in may
             // go on, and what follows it is the command.
             if woke {
-                if let Some(free) = free.as_mut() {
-                    same_breath = true;
-                    if let Some(command) = free.same_breath(recogniser.wake_length()) {
-                        if let Some(heard) = session.heard(command, Instant::now()) {
-                            tell(app, heard);
-                        }
+                same_breath = true;
+                if let Some(command) = free.same_breath(recogniser.wake_length()) {
+                    if let Some(heard) = session.heard(command, Instant::now()) {
+                        tell(app, heard);
                     }
                 }
             }
@@ -1026,6 +1044,7 @@ fn give_up(app: &AppHandle, generation: u64, why: Unavailable) {
     let (status, detail) = match why {
         Unavailable::NoRecogniser => (Status::NoRecogniser, "no English recogniser".to_string()),
         Unavailable::Microphone => (Status::Microphone, "no microphone".to_string()),
+        Unavailable::NoEngine => (Status::NoEngine, "the speech engine is needed".to_string()),
         Unavailable::Unsupported => (Status::Unsupported, "not on this system".to_string()),
         Unavailable::Error(code) => (Status::Error, code),
     };
@@ -1066,7 +1085,7 @@ struct Recogniser;
 
 #[cfg(not(windows))]
 impl Recogniser {
-    fn open(_commands: &Grammar, _tails: bool) -> Result<Self, Unavailable> {
+    fn open() -> Result<Self, Unavailable> {
         Err(Unavailable::Unsupported)
     }
 
@@ -1081,6 +1100,73 @@ impl Recogniser {
     fn next(&mut self, wait: Duration) -> Option<session::Raw> {
         std::thread::sleep(wait);
         None
+    }
+}
+
+#[cfg(test)]
+mod plan_tests {
+    use super::*;
+
+    fn settings(change: impl FnOnce(&mut VoicePref)) -> Settings {
+        let mut settings = Settings::default();
+        settings.voice.enabled = true;
+        change(&mut settings.voice);
+        settings
+    }
+
+    #[test]
+    fn the_listener_is_planned_from_the_settings_alone() {
+        // Off is no listener at all.
+        assert_eq!(plan(&Settings::default()), None);
+        // On is a listener at once: nothing is waited for from the island.
+        let on = plan(&settings(|_| {})).expect("a plan");
+        assert!(on.wake);
+        assert!(!on.server && !on.server_here);
+        assert_eq!(on.follow_up, Settings::default().voice.follow_up);
+        // The older "Hear free speech" switch chooses nothing any more: a
+        // command is free speech with it and without it.
+        let chosen = plan(&settings(|voice| voice.engine = "bundled".into()));
+        let not_chosen = plan(&settings(|voice| voice.engine = String::new()));
+        assert_eq!(chosen, not_chosen);
+        // Only the shortcut wakes, and the follow-up time has a ceiling.
+        let quiet = plan(&settings(|voice| {
+            voice.wake = false;
+            voice.follow_up = 600;
+        }))
+        .unwrap();
+        assert!(!quiet.wake);
+        assert_eq!(quiet.follow_up, MAX_FOLLOW_UP);
+    }
+
+    #[test]
+    fn a_model_server_hears_only_when_it_is_on_this_computer() {
+        // Chosen as the speech model, but no server is set up: it may not hear.
+        let alone = plan(&settings(|voice| voice.hearing_model = hear::ID.into())).unwrap();
+        assert!(alone.server && !alone.server_here);
+        // The bundled model then hears, when it is installed; else nobody does.
+        assert_eq!(ears(alone, true), Some(Ears { bundled: true, server: false }));
+        assert_eq!(ears(alone, false), None);
+    }
+
+    #[test]
+    fn without_something_to_write_a_command_down_nothing_listens() {
+        let on = plan(&settings(|_| {})).unwrap();
+        // The hearing part is not installed: no ears, and the status is the engine's.
+        assert_eq!(ears(on, false), None);
+        assert_eq!(ears(on, true), Some(Ears { bundled: true, server: false }));
+        // A model server on this computer hears without the download, and
+        // with the bundled model behind it when that is there too.
+        let served = Plan { server: true, server_here: true, ..on };
+        assert_eq!(ears(served, false), Some(Ears { bundled: false, server: true }));
+        assert_eq!(ears(served, true), Some(Ears { bundled: true, server: true }));
+    }
+
+    #[test]
+    fn the_status_names_the_missing_engine_for_settings() {
+        assert_eq!(serde_json::to_value(Status::NoEngine).unwrap(), "noEngine");
+        // The ones Settings already knows keep their names.
+        assert_eq!(serde_json::to_value(Status::NoRecogniser).unwrap(), "noRecogniser");
+        assert_eq!(serde_json::to_value(Status::Listening).unwrap(), "listening");
     }
 }
 
@@ -1118,13 +1204,11 @@ mod tests {
     fn a_command_said_in_the_same_breath_as_the_wake_phrase_is_written_down() {
         let var = |name: &str| std::path::PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set")));
         let engine = sherpa::Engine::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_MODEL"), sherpa::test_family()).expect("engine");
-        let commands: Vec<String> = vec!["next track".into()];
-        let grammar = Grammar::parse(&commands, &BTreeMap::new()).expect("grammar");
 
         let after_wake = |file: &str| -> Option<String> {
             let path = var("COUCOU_VOICE_CLIPS").join(file);
             // Windows' recogniser: is it the wake phrase, and when did it end?
-            let mut recogniser = Recogniser::open_on(&grammar, true, Some(&path)).expect("recogniser");
+            let mut recogniser = Recogniser::open_on(Some(&path)).expect("recogniser");
             recogniser.listen(Listen::Wake).expect("listen");
             let started = Instant::now();
             let mut woke = false;

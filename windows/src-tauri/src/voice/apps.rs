@@ -379,44 +379,37 @@ pub fn installed_lately() -> std::sync::Arc<Vec<App>> {
     }
 }
 
-/// The most names a recogniser that only hears what it was given is given.
-const MOST_SAID: usize = 200;
-
-/// The apps' names as they can be said to such a recogniser: plain lowercase
-/// words, a few of them, each name once.
-pub fn sayable(apps: &[App]) -> Vec<String> {
-    let mut names: Vec<String> = apps
-        .iter()
-        .map(|app| normalise(&app.name))
-        .filter(|name| {
-            let words: Vec<&str> = name.split(' ').collect();
-            !name.is_empty() && words.len() <= 4 && words.iter().all(|w| w.len() <= 24 && w.is_ascii())
-        })
-        .collect();
-    names.sort();
-    names.dedup();
-    names.truncate(MOST_SAID);
-    names
-}
-
 #[cfg(not(windows))]
 pub fn installed() -> Vec<App> {
     Vec::new()
 }
 
-/// One of the user's folders by its everyday name, when it exists.
-pub fn folder(said: &str) -> Option<(String, PathBuf)> {
-    let wanted = normalise(said);
-    let name = ["Downloads", "Desktop", "Documents", "Pictures", "Music", "Videos"].into_iter().find(|name| {
-        let lower = name.to_lowercase();
-        wanted.split(' ').any(|w| w == lower || format!("{w}s") == lower)
-    })?;
+/// The user's own folders voice may open: these, under their home, and no other.
+const FOLDERS: [&str; 6] = ["Downloads", "Desktop", "Documents", "Pictures", "Music", "Videos"];
+
+/// Where one of those folders is, when it exists.
+fn folder_path(name: &str) -> Option<PathBuf> {
     #[cfg(windows)]
     let home = std::env::var_os("USERPROFILE")?;
     #[cfg(not(windows))]
     let home = std::env::var_os("HOME")?;
     let path = PathBuf::from(home).join(name);
-    path.is_dir().then(|| (name.to_string(), path))
+    path.is_dir().then_some(path)
+}
+
+/// One of the user's folders by its everyday name, when it exists.
+pub fn folder(said: &str) -> Option<(String, PathBuf)> {
+    let wanted = normalise(said);
+    let name = FOLDERS.into_iter().find(|name| {
+        let lower = name.to_lowercase();
+        wanted.split(' ').any(|w| w == lower || format!("{w}s") == lower)
+    })?;
+    folder_path(name).map(|path| (name.to_string(), path))
+}
+
+/// The names `folder` takes, for those that exist on this machine.
+pub fn folders() -> Vec<String> {
+    FOLDERS.into_iter().filter(|name| folder_path(name).is_some()).map(str::to_string).collect()
 }
 
 #[cfg(test)]
@@ -515,14 +508,6 @@ mod tests {
         assert_eq!(edits("figma", "figma"), 0);
     }
 
-    #[test]
-    fn names_for_a_recogniser_are_plain_words_each_once() {
-        let list = apps(&["Figma", "figma", "Visual Studio Code", "Caf\u{e9} Notes", "A Very Long Name Of Five Words", "7-Zip File Manager", "…"]);
-        assert_eq!(sayable(&list), ["7 zip file manager", "figma", "visual studio code"]);
-        let many: Vec<App> = (0..500).map(|i| App { name: format!("App {i}"), path: PathBuf::new() }).collect();
-        assert_eq!(sayable(&many).len(), MOST_SAID);
-    }
-
     /// What this machine lists, without the names: how many apps, how long the
     /// listing takes, and whether `COUCOU_VOICE_APP` (names as they might be
     /// heard, separated by `;`) finds one, or which are near.
@@ -535,7 +520,7 @@ mod tests {
         let listed = listed().expect("the Applications folder");
         let took = started.elapsed();
         let store = listed.iter().filter(|app| app.path.to_string_lossy().contains('!')).count();
-        println!("{} apps listed in {took:?}, {store} of them from the Store, {} sayable", listed.len(), sayable(&listed).len());
+        println!("{} apps listed in {took:?}, {store} of them from the Store", listed.len());
         assert!(listed.len() > 10);
         assert!(listed.iter().all(|app| app.path.to_string_lossy().starts_with("shell:AppsFolder\\")));
         for said in std::env::var("COUCOU_VOICE_APP").unwrap_or_default().split(';').filter(|said| !said.trim().is_empty()) {
@@ -652,6 +637,16 @@ mod tests {
         }
         if let Some((name, _)) = folder("the document folder") {
             assert_eq!(name, "Documents");
+        }
+    }
+
+    #[test]
+    fn the_folders_listed_are_the_ones_that_can_be_opened() {
+        let listed = folders();
+        assert!(listed.iter().all(|name| FOLDERS.contains(&name.as_str())));
+        // Each name listed is taken back as it is, and none that is missing is listed.
+        for name in FOLDERS {
+            assert_eq!(folder(name).map(|(found, _)| found), listed.iter().find(|l| *l == name).cloned(), "{name}");
         }
     }
 }

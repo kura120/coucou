@@ -24,6 +24,12 @@
 // Claude Code edited on the way goes to the island as a `chat-edit` event —
 // the tool's own input, once the tool has succeeded — which the chat shows as
 // a pill with its diff.
+//
+// A third way, for voice and not for the chat: one turn of "OK Coucou" that
+// the local model handed up (voice/cloud.rs). Claude Code then has no tool of
+// its own at all — only the app's capabilities, through Coucou's MCP endpoint
+// (voice/mcp.rs) — reads no settings, saves nothing, and is stopped when its
+// time is up. `voice_args` is its command line.
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -102,6 +108,17 @@ pub(crate) fn edit_stub(tool: &str, input: &Value) -> Value {
 const AGENT_PROMPT: &str = "You are answering as Mochi, in Coucou's small chat window at the top of the user's screen. \
 Respond in the user's language. Keep answers short and use light Markdown: short paragraphs, bullet lists, \
 **bold**, `inline code` and fenced code blocks. Avoid tables and big headings.";
+
+/// The one instruction a voice turn's Claude Code starts from. One line and no
+/// quotes: an npm install is a `.cmd`, which takes neither a line break nor
+/// much else in an argument. What the app is and can do comes in the message
+/// (voice/cloud.rs), written by the island.
+const VOICE_PROMPT: &str = "You are the reasoning behind Coucou, a small desktop companion, for one spoken request. \
+The message starts with the briefing Coucou wrote for you: follow it. You act only by calling the coucou tools; \
+you have no other tool, no files and no shell. Finish with one or two short plain sentences that can be said out loud.";
+/// The most back-and-forth one voice turn gets: a backstop behind the
+/// endpoint's own count of calls and the turn's time limit.
+const VOICE_ROUNDS: &str = "16";
 
 /// Bumped by `stop`: a running turn that sees it change ends there.
 static STOPS: AtomicU64 = AtomicU64::new(0);
@@ -184,6 +201,62 @@ fn args(model: &str, options: &Options, resume: Option<&str>) -> Vec<String> {
         ]);
     }
     args
+}
+
+/// The command line of a voice turn. `mcp_config` is the one MCP server it may
+/// use (voice/cloud.rs `mcp_config`), `server` that server's name.
+///
+/// What each part is for:
+/// * `--tools ""` — none of Claude Code's own tools: no file, shell or web tool.
+/// * `--mcp-config` with `--strict-mcp-config` — Coucou's server and no other:
+///   not the user's, not a project's, not a plugin's.
+/// * `--allowedTools mcp__<server>` — that server's tools run without a
+///   prompt. Nothing else is allowed, and `--permission-prompts none` denies
+///   whatever would have asked.
+/// * `--setting-sources ""` — no user, project or local settings: Coucou's own
+///   hooks do not fire for this turn, and no permission rule of the user's applies.
+/// * `--no-session-persistence` — nothing of the turn is written to disk.
+pub(crate) fn voice_args(model: &str, mcp_config: &str, server: &str) -> Vec<String> {
+    let allowed = format!("mcp__{server}");
+    [
+        "-p",
+        "--input-format", "stream-json",
+        "--output-format", "stream-json",
+        "--verbose",
+        "--model", model,
+        "--permission-prompts", "none",
+        "--system-prompt", VOICE_PROMPT,
+        "--tools", "",
+        "--mcp-config", mcp_config,
+        "--strict-mcp-config",
+        "--allowedTools", &allowed,
+        "--setting-sources", "",
+        "--no-session-persistence",
+        "--disable-slash-commands",
+        "--max-turns", VOICE_ROUNDS,
+    ]
+    .iter()
+    .map(|arg| arg.to_string())
+    .collect()
+}
+
+/// Where Claude Code is, for a voice turn; None when it is not installed.
+pub(crate) fn installed() -> Option<PathBuf> {
+    platform::claude_candidates().into_iter().next()
+}
+
+/// The one line a voice turn's Claude Code reads: these texts, in order, as
+/// one user message.
+pub(crate) fn voice_line(texts: &[String]) -> String {
+    let blocks: Vec<Value> = texts.iter().map(|text| json!({ "type": "text", "text": text })).collect();
+    input_line(&[], &blocks)
+}
+
+/// One voice turn: Claude Code is started in a folder of nobody's, given the
+/// line, and read until its last words. Ended, with everything it started,
+/// when `limits` say so. Blocking.
+pub(crate) fn voice_turn(exe: &Path, args: &[String], line: &str, quiet: Duration, limits: Limits) -> Result<String, String> {
+    run(exe, args, &std::env::temp_dir(), line, quiet, limits, |_| {}).map(|answer| answer.text)
 }
 
 /// The Claude Code session the conversation lives in, when its last turn was
@@ -334,7 +407,10 @@ pub async fn send(
 
     let island = app.clone();
     let answer = tauri::async_runtime::spawn_blocking(move || {
-        run(&exe, &args, &cwd, &line, quiet, |update| {
+        // "Stop" in the chat view ends it; a chat turn has no other limit than silence.
+        let stops = STOPS.load(Ordering::Relaxed);
+        let limits = Limits { stopped: &|| STOPS.load(Ordering::Relaxed) != stops, deadline: None };
+        run(&exe, &args, &cwd, &line, quiet, limits, |update| {
             let _ = match update {
                 Update::Session(session) => island.emit_to(WINDOW_LABEL, "chat-session", session),
                 Update::Text(visible) => island.emit_to(WINDOW_LABEL, "chat-delta", visible),
@@ -381,6 +457,14 @@ enum Update {
     Edit { tool: String, input: Value },
 }
 
+/// What ends a running turn from outside.
+pub(crate) struct Limits<'a> {
+    /// Looked at every `TICK`: true ends the turn there.
+    pub stopped: &'a dyn Fn() -> bool,
+    /// The turn is over by then, however busy it still is.
+    pub deadline: Option<Instant>,
+}
+
 /// Starts Claude Code in `cwd`, hands it the question and reads its answer.
 /// `on_update` gets the visible text at most 15 times a second, and each file
 /// edit once its tool has succeeded. Blocking.
@@ -390,10 +474,10 @@ fn run(
     cwd: &Path,
     input: &str,
     quiet: Duration,
+    limits: Limits,
     mut on_update: impl FnMut(Update),
 ) -> Result<Answer, String> {
     let no_answer = || t("Claude Code gave no answer. Run claude in a terminal to check that it is signed in.");
-    let stops = STOPS.load(Ordering::Relaxed);
 
     let mut cmd = Command::new(exe);
     cmd.args(args).current_dir(cwd).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
@@ -435,9 +519,12 @@ fn run(
     let mut heard = Instant::now();
     let mut last = Instant::now().checked_sub(DELTA_INTERVAL).unwrap_or_else(Instant::now);
     let outcome = loop {
-        if STOPS.load(Ordering::Relaxed) != stops {
+        if (limits.stopped)() {
             stopped = true;
             break Ok(String::new());
+        }
+        if limits.deadline.is_some_and(|deadline| Instant::now() >= deadline) {
+            break Err(t("Claude Code took too long to answer."));
         }
         let event = match rx.recv_timeout(TICK) {
             Ok(Ok(event)) => event,
@@ -576,6 +663,50 @@ mod tests {
         assert!(a.contains(&"--strict-mcp-config".to_string()));
         assert_eq!(after(&a, "--effort"), None);
         assert_eq!(after(&a, "--permission-mode"), None);
+    }
+
+    #[test]
+    fn a_voice_turn_has_coucous_tools_and_nothing_else_of_claude_code() {
+        let config = r#"{"mcpServers":{"coucou":{"type":"stdio","command":"C:/x/coucou-hook.exe","args":["--mcp"]}}}"#;
+        let a = voice_args("claude-sonnet-5-5", config, "coucou");
+        assert_eq!(a[0], "-p");
+        assert_eq!(after(&a, "--model"), Some("claude-sonnet-5-5"));
+        // No tool of Claude Code's own: no file, shell or web tool.
+        assert_eq!(after(&a, "--tools"), Some(""));
+        // Coucou's server, and no other configuration's.
+        assert_eq!(after(&a, "--mcp-config"), Some(config));
+        assert!(a.contains(&"--strict-mcp-config".to_string()));
+        // Only that server's tools run without a prompt; whatever else would ask is denied.
+        assert_eq!(after(&a, "--allowedTools"), Some("mcp__coucou"));
+        assert_eq!(after(&a, "--permission-prompts"), Some("none"));
+        // No settings file: Coucou's own hooks do not fire, and nothing is saved.
+        assert_eq!(after(&a, "--setting-sources"), Some(""));
+        assert!(a.contains(&"--no-session-persistence".to_string()));
+        assert!(a.contains(&"--disable-slash-commands".to_string()));
+        assert_eq!(after(&a, "--max-turns"), Some(VOICE_ROUNDS));
+        // A flag that takes several values is followed by one, then by a flag.
+        for flag in ["--mcp-config", "--allowedTools", "--tools"] {
+            let at = a.iter().position(|x| x == flag).unwrap();
+            assert!(a[at + 2].starts_with("--"), "{flag}");
+        }
+        // Never a way around permissions, a folder's settings, a session, or the web.
+        for never in ["--permission-mode", "--resume", "--continue", "--add-dir", "--append-system-prompt", "--settings", "--effort"] {
+            assert_eq!(after(&a, never), None, "{never}");
+        }
+        assert!(a.iter().all(|x| !x.to_lowercase().contains("bypass") && !x.contains("dangerously") && !x.contains("WebSearch")));
+        // The prompt goes through a `.cmd` on an npm install: one line, no quotes.
+        assert!(!VOICE_PROMPT.contains(['\n', '\r', '"', '%']));
+        assert_eq!(after(&a, "--system-prompt"), Some(VOICE_PROMPT));
+    }
+
+    #[test]
+    fn a_voice_turns_message_is_one_line_of_its_texts_in_order() {
+        let line = voice_line(&["briefing\nin two lines".to_string(), "pause the music".to_string()]);
+        assert!(!line.contains('\n'));
+        let sent: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(sent["type"], "user");
+        let blocks = sent["message"]["content"].as_array().unwrap();
+        assert_eq!(blocks.iter().map(|b| b["text"].as_str().unwrap()).collect::<Vec<_>>(), ["briefing\nin two lines", "pause the music"]);
     }
 
     #[test]

@@ -6,6 +6,10 @@
 // that keeps its connection open: it waits for the island's decision and writes
 // it back on the same connection, which is how approving from the island works.
 //
+// One other kind of line comes in: `{"coucou_mcp":…}`, from the relay's MCP
+// mode during a voice turn put to the cloud model. It is answered here by
+// voice/mcp.rs and is never a hook event.
+//
 // Claude Code is never blocked by us. Three things guarantee it:
 //   * coucou-hook gives the connection 300 ms and exits cleanly if we are closed;
 //   * we only wait for a human once the island has *confirmed* the card is on
@@ -44,6 +48,8 @@ const DECISION_TIMEOUT: Duration = Duration::from_secs(108);
 /// see for nearly two minutes.
 const ACK_TIMEOUT: Duration = Duration::from_millis(800);
 const MAX_PAYLOAD: usize = 1 << 20;
+/// How long the relay's MCP mode gets to read its answer and hang up.
+const HANG_UP: Duration = Duration::from_secs(2);
 
 /// What the island can say about a permission request.
 pub enum Reply {
@@ -203,6 +209,21 @@ async fn handle(app: AppHandle, mut pipe: impl Relay) {
     };
     let Ok(mut payload) = serde_json::from_slice::<Value>(line) else { return };
     if !payload.is_object() {
+        return;
+    }
+
+    // Not a hook event: the relay in its MCP mode, carrying a message of the
+    // voice turn's cloud model (voice/mcp.rs). It is answered on this
+    // connection and goes nowhere else — not to the island as a hook, not to
+    // the recap, not to the log.
+    if let Some(asked) = payload.get(crate::voice::mcp::PIPE_KEY) {
+        let reply = crate::voice::mcp::over_pipe(&app, asked).await;
+        let _ = pipe.write_all(format!("{reply}\n").as_bytes()).await;
+        let _ = pipe.flush().await;
+        // The relay hangs up once it has read the line: closing first could
+        // take the answer away from under it.
+        let _ = tokio::time::timeout(HANG_UP, pipe.read(&mut chunk)).await;
+        pipe.finish();
         return;
     }
 
