@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { createRegistry } from "../src/core/capabilities/registry.ts";
 import { done, failed } from "../src/voice/result.ts";
 import { FORGOTTEN_AFTER_MS } from "../src/voice/memory.ts";
-import { MOST_MODEL_ROUNDS, VoiceTurns, asHeard, looksWritten, written } from "../src/voice/turn.ts";
+import { MOST_MODEL_ROUNDS, VoiceTurns, asHeard, grounded, looksWritten, written } from "../src/voice/turn.ts";
 
 const WORDS = {
   refused: () => "I can't do that", unavailable: () => "Not possible now", failed: () => "That did not work",
@@ -195,7 +195,7 @@ test("without the wake phrase the local model decides: nothing for what was said
   // Something the app does, asked for: taken once, before it runs.
   const meant = await t.hear("pause it", { wake: false, taken: () => taken++ });
   assert.equal(taken, 1);
-  assert.deepEqual(meant.result, { outcome: "success", message: "Paused" });
+  assert.deepEqual(meant.result, { outcome: "success", message: "Paused." });
   assert.deepEqual(app.state.log, ["pause"]);
 });
 
@@ -294,7 +294,7 @@ test("tier 2, with no embedding model: the areas first, then those areas' capabi
   // Then the area's capabilities, with those about the conversation; an area that is none or nothing is no area.
   assert.deepEqual(local.asked[0].tools, ["more_tools", "nothing", "undo", "now_playing", "pause_music", "play_music"]);
   assert.deepEqual(app.state.log, ["pause"]);
-  assert.deepEqual(heard.result, { outcome: "success", message: "Paused" });
+  assert.deepEqual(heard.result, { outcome: "success", message: "Paused." });
 });
 
 test("with no embedding model, more_tools gives another area's capabilities when the first were not the right ones", async () => {
@@ -385,7 +385,7 @@ test("the last turns are given to the model as data, undo is the registry's, and
   await t.hear("add vercel");
   assert.deepEqual(local.asked[0].history, []);
   await t.hear("no wait, put that back");
-  assert.deepEqual(local.asked[2].history, [{ said: "add vercel", calls: [call("add_pills", { pills: ["vercel"] })], result: "vercel added" }]);
+  assert.deepEqual(local.asked[2].history, [{ said: "add vercel", calls: [call("add_pills", { pills: ["vercel"] })], result: "Vercel is in." }]);
   assert.deepEqual(app.state.log, ["add:vercel", "remove:vercel"]);
   now += FORGOTTEN_AFTER_MS;
   await t.hear("and now?");
@@ -499,8 +499,8 @@ test("a local model that does not answer: the cloud model when allowed, else it 
     return { text: "Paused." };
   };
   t = turns({ local: silent, cloud });
-  // What it did is said in the capability's line, whatever the cloud model's words.
-  assert.deepEqual((await t.hear("pause")).result, { outcome: "success", message: "Paused" });
+  // The cloud model's words, checked against what ran like the local model's.
+  assert.deepEqual((await t.hear("pause")).result, { outcome: "success", message: "Paused." });
   assert.deepEqual(app.state.log, ["pause"]);
 });
 
@@ -603,9 +603,16 @@ test("what only read is said by a model given the results alone; what was done, 
   assert.equal(report.said, "What did the app read?");
   assert.doesNotMatch(report.system, /song called/);
   assert.match(report.system, /"title":"Song"/);
-  // Words that name what nothing did are never said.
+  // Words that name what nothing did are never said: the lines are.
   const claims = scripted(calls(call("pause_music")), says("Paused, and Stripe is gone too."));
-  assert.deepEqual((await turns({ local: claims.model }).hear("pause and remove stripe")).result, { outcome: "success", message: "Paused" });
+  const claimed = await turns({ local: claims.model }).hear("pause and remove stripe");
+  assert.deepEqual(claimed.result, { outcome: "success", message: "Paused" });
+  assert.equal(claimed.worded, false);
+  // Words that hold up are Mochi's.
+  const fine = scripted(calls(call("pause_music")), says("The music is paused."));
+  const kept = await turns({ local: fine.model }).hear("pause");
+  assert.deepEqual(kept.result, { outcome: "success", message: "The music is paused." });
+  assert.equal(kept.worded, true);
   // A report that does not come: the reads' own lines.
   const mute = scripted(calls(call("now_playing")), says("done"));
   assert.deepEqual((await turns({ local: mute.model }).hear("what is playing")).result, { outcome: "success", message: "Song — Artist" });
@@ -723,4 +730,23 @@ test("after a no to a name, the same call written with the name itself is not as
   assert.deepEqual(asked, ["Did you mean Stripe?"]);
   assert.deepEqual(app.state.log, []);
   assert.deepEqual(heard.result, { outcome: "success", message: "Leaving it as is" });
+});
+
+test("words are checked against the results: things, numbers, what was seen, and with a ranking the action", async () => {
+  const named = (said) => app.registry.named(said);
+  const ran = (name, args, result) => ({ call: call(name, args), result });
+  const removed = [ran("remove_pills", { pills: ["stripe"] }, done("Stripe removed", true))];
+  assert.equal(await grounded("Stripe is off the island.", removed, { named }), true);
+  // A thing the results do not hold.
+  assert.equal(await grounded("Stripe and Vercel are gone.", removed, { named }), false);
+  // A number the results do not hold.
+  const volume = [ran("set_music_volume", { percent: 30 }, done("Volume 30%", true))];
+  assert.equal(await grounded("The volume is at 30 now.", volume, { named }), true);
+  assert.equal(await grounded("The volume is at 40 now.", volume, { named }), false);
+  // Only asked for, not seen.
+  assert.equal(await grounded("Spotify is open.", [ran("open_app", { app: "Spotify" }, done("Asked Windows to open Spotify", false))], { named }), false);
+  // Nearest to a capability that did not run.
+  const paused = [ran("pause_music", {}, done("Paused", true))];
+  assert.equal(await grounded("Coucou is paused.", paused, { named, nearest: async () => "quit_coucou" }), false);
+  assert.equal(await grounded("The music is paused.", paused, { named, nearest: async () => "pause_music" }), true);
 });

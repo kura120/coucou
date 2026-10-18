@@ -270,6 +270,8 @@ function messages(system, history, said, steps = []) {
   return list;
 }
 
+/** For each turn where something ran and a model worded it: whether the words held up (voice/turn.ts `grounded`). */
+const worded = [];
 /** How many times the model was asked, and how long each took. */
 const rounds = [];
 let refusedBySize = 0;
@@ -357,6 +359,8 @@ async function run(steps) {
     const came = await Promise.race([turn.then((heard) => ({ heard })), question.then((ask) => ({ ask }))]);
     if ("ask" in came) return { asks: came.ask.question };
     turn = null;
+    // Whether the model's words for what ran held up against the results.
+    if (came.heard.worded != null) worded.push(came.heard.worded);
     // Said in place of an answer, and a request of its own: heard at once, as the island does.
     if (came.heard.next) {
       turn = turns.hear(came.heard.next);
@@ -630,6 +634,7 @@ for (const model of MODELS) {
     console.log(`\n${model} · ${path}${EMBED ? ` (${EMBED})` : ""}`);
     const row = { name: `${model} · ${path}`, parts: [], wrong: 0, dangerous: 0, instant: [], modelled: [], asked: [] };
     rounds.length = 0;
+    worded.length = 0;
     for (const [, cases] of PARTS) {
       let ok = 0;
       for (const [steps, wanted] of cases) {
@@ -654,6 +659,7 @@ for (const model of MODELS) {
       row.parts.push(`${ok}/${cases.length}`);
     }
     row.rounds = [...rounds];
+    row.worded = [...worded];
     report.push(row);
   }
 }
@@ -661,7 +667,7 @@ for (const model of MODELS) {
 const total = PARTS.reduce((n, [, cases]) => n + cases.length, 0);
 console.log(`\n${total} cases · ${PARTS.map(([part, cases]) => `${part} ${cases.length}`).join(", ")}`);
 if (refusedBySize) console.log(`${refusedBySize} requests were larger than Rust allows and were not sent.`);
-console.log(`model · path | ${PARTS.map(([part]) => part).join(" | ")} | wrong | dangerous | turns with no model | a turn with the model | model calls a turn | one model call`);
+console.log(`model · path | ${PARTS.map(([part]) => part).join(" | ")} | wrong | dangerous | turns with no model | a turn with the model | model calls a turn | one model call | words that held up`);
 for (const row of report) {
   console.log(
     [
@@ -670,6 +676,7 @@ for (const row of report) {
       `${seconds(median(row.modelled))} median, ${seconds(Math.max(0, ...row.modelled))} longest (${row.modelled.length})`,
       `${median(row.asked)} median, ${Math.max(0, ...row.asked)} most`,
       `${seconds(median(row.rounds))} median, ${seconds(Math.max(0, ...row.rounds))} longest (${row.rounds.length})`,
+      `${row.worded.filter(Boolean).length} of ${row.worded.length}`,
     ].join(" | "),
   );
 }

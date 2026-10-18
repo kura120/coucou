@@ -141,6 +141,12 @@ export interface Heard {
   rest: boolean;
   /** Said in place of an answer to a question, and a request of its own: to be heard as the next turn. */
   next?: string;
+  /**
+   * Something ran: true when the model's words for it were said, false when
+   * they did not hold up against the results and the capabilities' lines were
+   * said instead. Absent when nothing ran, or no model put it in words.
+   */
+  worded?: boolean;
 }
 
 /** What a sentence said while a question is on screen does to it. */
@@ -168,6 +174,8 @@ interface Running {
   started: number;
   /** Taken as said to Coucou: by the wake phrase, or by the local model calling something. */
   taken: boolean;
+  /** Whether the model's words for what ran held up against the results (`checked`). */
+  worded?: boolean;
   /** The app's things the sentence names, or perhaps names (Registry.named). */
   named: readonly { kind: string; id: string; label: string; near?: boolean; heard?: string }[];
 }
@@ -226,7 +234,7 @@ const AFTER_CALLS =
 const EMPTY = "Your last answer called a capability that does not exist here, and nothing was done. Call one of your tools — {tools} — the one nearest to what was asked, or answer in words.";
 
 /** Once the app's capabilities ran, the model only decides what else to call: its words are not what Mochi says. */
-const AFTER_RAN = "The results of your calls are above. If a call failed and can be made right with another value or another setting, make it now. If what was asked needs another capability, call it now. Otherwise reply with the one word: done.";
+const AFTER_RAN = "The results of your calls are above. If a call failed and can be made right with another value or another setting, make it now. If what was asked needs another capability, call it now. Otherwise tell the user, in one short sentence, what the results say was done — only that.";
 
 /**
  * What only read the app is put in words by a model given those results and
@@ -428,7 +436,7 @@ export class VoiceTurns {
       // asks the user whether it is that thing. A question, never an act on a guess.
       const near = turn.taken && !shownOf(turn).length && !turn.ran.some((ran) => ran.call.name === NOTHING) ? misheard(ranked, this.registry.all(), turn.named) : null;
       if (near && (await this.instantly(near.name, turn, near.heard))) return this.end(turn, "");
-      return this.end(turn, came.words);
+      return this.end(turn, await this.checked(turn, came.words, ranked != null));
     }
     // What may have been said to someone else never goes further than this computer.
     if (!turn.taken) return IGNORED;
@@ -439,7 +447,7 @@ export class VoiceTurns {
     turn.how.waiting?.(this.words.askingCloud(), CLOUD_BUDGET_MS);
     const words = await this.cloudly(cloud, turn);
     if (turn.how.wanted && !turn.how.wanted()) return { result: null, taken: true, rest: false };
-    return this.end(turn, words ?? "", words == null && !shownOf(turn).length ? this.words.silent() : undefined);
+    return this.end(turn, await this.checked(turn, words ?? "", false), words == null && !shownOf(turn).length ? this.words.silent() : undefined);
   }
 
   // ── The ranking ─────────────────────────────────────────────────────────────
@@ -645,6 +653,26 @@ export class VoiceTurns {
     return text || null;
   }
 
+  // ── Checking the words ──────────────────────────────────────────────────────
+
+  /**
+   * The model's words for what ran, when they hold up against the results;
+   * "" when they do not, and the capabilities' own lines are said instead.
+   * Words with nothing run are an answer about the app's state, and pass.
+   */
+  private async checked(turn: Running, words: string, ranked: boolean): Promise<string> {
+    const shown = shownOf(turn);
+    const text = words.trim();
+    if (!shown.length || !text || shown.some((ran) => ran.result.status !== "done")) return text;
+    const ok = await grounded(text, shown, {
+      named: (said) => this.registry.named(said),
+      // What the words are nearest among the capabilities, when there is a ranking: what they say was done.
+      nearest: ranked && acted(turn) ? async (said, labels) => (await this.index.rank(said, undefined, { kinds: [], labels }))?.find((r) => !ALWAYS_SHOWN.includes(r.name) && r.name !== UNDO)?.name ?? null : undefined,
+    });
+    turn.worded = ok;
+    return ok ? text : "";
+  }
+
   // ── Tier 3 ──────────────────────────────────────────────────────────────────
 
   private async cloudly(cloud: CloudModel, turn: Running): Promise<string | null> {
@@ -710,8 +738,10 @@ export class VoiceTurns {
     // nothing removed it); a capability's line is what it did. Only what
     // merely read is put in words (`report`: a model given the results alone).
     const doing = shown.filter((ran) => ran.capability?.tier !== "read");
-    const message = doing.length ? linesOf(doing) : spoken(words, linesOf(shown));
-    return finish(message ? { outcome: "success", message } : null);
+    // `words` were checked against the results (`checked`): "" when they did not hold up.
+    const message = spoken(words, linesOf(doing.length ? doing : shown));
+    const heard = finish(message ? { outcome: "success", message } : null);
+    return turn.worded == null ? heard : { ...heard, worded: turn.worded && words.trim() !== "" };
   }
 }
 
@@ -822,6 +852,53 @@ const shownOf = (turn: Running) => turn.ran.filter((ran) => ![MORE_TOOLS, NOTHIN
 /** Something was changed or shown, not only read. */
 const acted = (turn: Running) =>
   shownOf(turn).some((ran) => ran.result.status === "done" && ran.capability != null && ran.capability.tier !== "read");
+
+/**
+ * Whether words for what ran name only what the results hold. Four checks,
+ * all computed — no word is looked for:
+ *
+ *   seen     every result was seen to work: what was only asked for ("Asked
+ *            Windows to open Spotify"), or left unchanged when the click did
+ *            not come, is said in its own line, whatever the words
+ *   things   each thing of the app the words name (Registry.named, said
+ *            whole) is in the results: an argument, a line, what was read
+ *   numbers  each number in the words is in the results
+ *   action   with a ranking, the capability the words are nearest to is one
+ *            that ran: "Coucou is paused" after pause_music is pause_coucou's
+ *
+ * Measured with scripts/voice-eval.mjs (the "worded" column).
+ */
+export async function grounded(
+  words: string,
+  ran: readonly { call: ModelCall; result: ToolResult; capability?: Capability }[],
+  look: {
+    named: (said: string) => Promise<readonly { kind: string; id: string; label: string; near?: boolean }[]>;
+    nearest?: (said: string, labels: readonly string[]) => Promise<string | null>;
+  },
+): Promise<boolean> {
+  if (ran.some(({ result }) => !result.verified)) return false;
+  const facts = ` ${values(ran.map(({ call, result }) => [call.arguments ?? {}, result.line, result.detail ?? "", result.data ?? null])).map(normalise).join(" ")} `;
+  const holds = (text: string) => {
+    const form = normalise(text);
+    return form !== "" && facts.includes(` ${form} `);
+  };
+  const things = (await look.named(words).catch(() => [])).filter((thing) => !thing.near);
+  if (things.some((thing) => !holds(thing.label) && !holds(thing.id))) return false;
+  const numbers = words.match(/\d+(?:[.,]\d+)?/g) ?? [];
+  if (numbers.some((number) => !holds(number))) return false;
+  if (!look.nearest) return true;
+  const nearest = await look.nearest(words, things.map((thing) => thing.label)).catch(() => null);
+  return nearest == null || ran.some((r) => r.call.name === nearest);
+}
+
+/** Every string and number a value holds, however deep. */
+function values(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (typeof value === "number" || typeof value === "boolean") return [String(value)];
+  if (Array.isArray(value)) return value.flatMap(values);
+  if (value && typeof value === "object") return Object.values(value).flatMap(values);
+  return [];
+}
 
 /** The lines of what ran, each once, as sentences: "Paused. Stripe removed." */
 function linesOf(ran: readonly Ran[]): string {
