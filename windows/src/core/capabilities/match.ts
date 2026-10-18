@@ -41,6 +41,13 @@ export interface MatchOptions {
 /** Under this many letters, a sound key or a name is too short to tell a thing by. */
 const SHORTEST_KEY = 4;
 const SHORTEST_NAME = 4;
+/**
+ * A shorter sound key is enough when the letters agree as well: "get hub"
+ * and GitHub are three sounds and one letter apart. Two measures that agree
+ * are taken where one alone is too short to tell.
+ */
+const SHORT_KEY = 3;
+const SHORT_KEY_LETTERS = 0.8;
 /** How much nearer the first must be than the next to be asked about alone (apps.rs `AHEAD`). */
 const AHEAD = 0.15;
 /** A word of what was said, against a whole name, counts for a little less than the whole of it. */
@@ -140,14 +147,16 @@ export function among(said: string, things: readonly Entity[], options: MatchOpt
   const scored = things
     .map((thing) => ({ thing, score: given ? (given.get(thing.id) ?? 0) : ranked(thing) }))
     .filter((c) => c.score > 0)
-    .sort((x, y) => y.score - x.score || x.thing.label.length - y.thing.label.length || x.thing.label.localeCompare(y.thing.label));
+    // Equal scores: a source that ranked them keeps its own order; else the shorter name, then the alphabet.
+    .sort((x, y) => y.score - x.score || (given ? 0 : x.thing.label.length - y.thing.label.length || x.thing.label.localeCompare(y.thing.label)));
   // A source that ranked them itself has already judged short names.
   if (!scored.length || (!given && q.replace(/ /g, "").length < SHORTEST_NAME)) return { is: "none", near: loosely(q, things) };
 
   // The same sounds in other letters, and nothing else as near: that name.
   const best = scored[0];
   const key = soundKey(q);
-  const same = key.length >= SHORTEST_KEY && forms(best.thing).some((form) => soundKey(form) === key);
+  const long = key.length >= SHORTEST_KEY || (key.length >= SHORT_KEY && best.score >= SHORT_KEY_LETTERS);
+  const same = long && forms(best.thing).some((form) => soundKey(form) === key);
   if (same && (scored.length === 1 || scored[1].score < best.score) && !options.doubted?.(said)) return sure(best.thing);
   return unsure(scored);
 }

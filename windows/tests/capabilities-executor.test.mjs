@@ -3,6 +3,7 @@
 // of the app runs, nothing is asked of a model.
 
 import { test } from "node:test";
+import { among } from "../src/core/capabilities/match.ts";
 import assert from "node:assert/strict";
 import { createRegistry } from "../src/core/capabilities/registry.ts";
 import { done } from "../src/voice/result.ts";
@@ -495,4 +496,13 @@ test("putting back goes through the same guard", async () => {
   await registry.execute({ name: "bad", arguments: {} }, context());
   assert.equal((await registry.undo(context())).status, "refused");
   assert.equal(app.volume, 40);
+});
+
+test("a short sound key is enough when the letters agree too; one measure alone is not", () => {
+  const things = [{ id: "github", label: "GitHub" }, { id: "stripe", label: "Stripe" }, { id: "codex", label: "Codex" }];
+  // Three sounds alike and one letter apart: that thing.
+  assert.deepEqual(among("get hub", things), { is: "sure", id: "github", label: "GitHub" });
+  // A letter apart and other sounds, or alike in sound and not in letters: asked about.
+  assert.equal(among("strife", things).is, "unsure");
+  assert.equal(among("cortex", things).is, "unsure");
 });

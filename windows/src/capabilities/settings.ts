@@ -106,7 +106,8 @@ function wanted(spec: SettingSpec, args: Args, options: readonly Option[]): { va
     case "switch":
       if (typeof args.on === "boolean") return { value: args.on };
       // A level asked of a switch: the settings that take one are named.
-      return { why: `${spec.label} is ${shape(spec)}.${typeof args.number === "number" ? ` A level is one of: ${SETTINGS.filter((s) => s.kind === "number").map((s) => s.label).join(", ")}.` : ""}` };
+      // A switch given no on or off may have been meant as a level: the settings that take one are named.
+      return { why: `${spec.label} is ${shape(spec)}. A level is one of: ${SETTINGS.filter((s) => s.kind === "number").map((s) => `${s.label} (${shape(s)})`).join(", ")}.` };
     case "number": {
       const given = args.number;
       if (typeof given !== "number" || !Number.isFinite(given)) return { why: `${spec.label} takes ${shape(spec)}.` };

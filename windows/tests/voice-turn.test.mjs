@@ -405,7 +405,7 @@ test("a spoken answer to a choice or a yes/no is read by the model, given the qu
   assert.deepEqual(await t.answerSaid("the home one"), { is: "answer" });
   assert.deepEqual(await which, { kind: "choice", id: "home" });
   assert.deepEqual(reader.asked[0].tools, ["answer"]);
-  assert.match(reader.asked[0].system, /Which account\?[\s\S]*1: Work, option 1 of 2\n2: Home \(a@home\), option 2 of 2/);
+  assert.match(reader.asked[0].system, /Which account\?[\s\S]*1: Work, option 1 of 2, the first\n2: Home \(a@home\), option 2 of 2, the last/);
   assert.equal(reader.asked[0].said, "the home one");
   // Not an answer: the question stays.
   const open = t.askUser({ kind: "yes_no", question: "Open Spotify?" });
@@ -536,7 +536,7 @@ test("a name the app has is not embedded, and what takes its kind is ranked near
   assert.deepEqual(local.asked[0].tools.slice(0, 3), ["remove_pills", "add_pills", "undo"]);
 });
 
-test("a name the app only nearly has is told to the model as perhaps that thing, and counted in the ranking", async () => {
+test("a name the app only nearly has is told to the model as most likely that thing, and counted in the ranking", async () => {
   // A kind too large to list: its source ranks what is near the sentence (as Rust ranks the installed apps).
   app.registry.entities({
     kind: "app",
@@ -547,8 +547,8 @@ test("a name the app only nearly has is told to the model as perhaps that thing,
   assert.deepEqual(await app.registry.named("open spy flight"), [{ kind: "app", id: "Spotify", label: "Spotify", near: true }]);
   const local = scripted(calls(call("nothing")));
   await turns({ local: local.model }).hear("open spy flight");
-  assert.match(local.asked[0].system, /the app finds: perhaps Spotify \(app, heard as something close to it\)\./);
-  assert.doesNotMatch(local.asked[0].system, /the app finds:[^\n]*Steam/);
+  assert.match(local.asked[0].system, /In what was said, most likely Spotify \(app\), misheard: call with that name; the app asks the user before it acts on it\./);
+  assert.doesNotMatch(local.asked[0].system, /In what was said[^\n]*Steam/);
 });
 
 test("what cannot be used right now is not offered, and is offered once a call makes it usable", async () => {
@@ -650,4 +650,33 @@ test("a name the model wrote for a thing only nearly said is put back as heard, 
   await turns({ local: whole.model }).hear("remove stripe");
   assert.deepEqual(app.state.log, ["remove:stripe"]);
   assert.deepEqual(asked.length, 1);
+});
+
+test("a thing nearly named that the model did nothing with is asked about by the app, never acted on", async () => {
+  app.registry.declare({
+    name: "launch", area: "apps", description: "Opens an installed app.", tier: "free",
+    args: { app: { type: "entity", kind: "app", description: "The app." } },
+    run: async (args) => (app.state.log.push(`launch:${args.app}`), done(`${args.app} opened`, true)),
+  });
+  app.registry.entities({
+    kind: "app", description: "The installed apps.", list: () => [],
+    near: async (said) => (/spy flight/.test(said) ? [{ id: "Spotify", label: "Spotify", score: 0.8 }] : []),
+  });
+  const asked = [];
+  const words = scripted(says("I don't know what spy flight is."));
+  const t = turns({ local: words.model });
+  t.onAsk = (ask) => {
+    if (!ask) return;
+    asked.push(ask.question);
+    t.answer({ kind: "yes_no", yes: true });
+  };
+  await t.hear("open spy flight");
+  assert.deepEqual(asked, ["Did you mean Spotify?"]);
+  assert.deepEqual(app.state.log, ["launch:Spotify"]);
+  // Told not to: the model's nothing stands.
+  const no = scripted(calls(call("nothing")));
+  const other = turns({ local: no.model });
+  other.onAsk = (ask) => ask && asked.push(ask.question);
+  await other.hear("don't open spy flight");
+  assert.equal(asked.length, 1);
 });

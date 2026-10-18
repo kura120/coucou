@@ -218,7 +218,7 @@ const AFTER_CALLS =
 const EMPTY = "Your last answer was empty. Call the capability that does what was asked, or the one named nothing, or answer in words.";
 
 /** Once the app's capabilities ran, the model only decides what else to call: its words are not what Mochi says. */
-const AFTER_RAN = "The results of your calls are above. If what was asked needs another capability, call it now. Otherwise reply with the one word: done.";
+const AFTER_RAN = "The results of your calls are above. If a call failed and can be made right — another value, another setting, another capability — make it now. If what was asked needs another capability, call it now. Otherwise reply with the one word: done.";
 
 /**
  * What only read the app is put in words by a model given those results and
@@ -351,7 +351,10 @@ export class VoiceTurns {
 
     // A choice's options with their place among them, for an answer by place ("the last one").
     const options = ask.kind === "choice"
-      ? ask.options.map((option, i) => ({ value: String(i + 1), label: `${option.label}${option.hint ? ` (${option.hint})` : ""}, option ${i + 1} of ${ask.options.length}` }))
+      ? ask.options.map((option, i, all) => ({
+        value: String(i + 1),
+        label: `${option.label}${option.hint ? ` (${option.hint})` : ""}, option ${i + 1} of ${all.length}${i === 0 ? ", the first" : i === all.length - 1 ? ", the last" : ""}`,
+      }))
       : [{ value: "yes", label: ask.yes ?? "Yes" }, { value: "no", label: ask.no ?? "No" }];
     const system = READ_ANSWER
       .replace("{question}", ask.question)
@@ -409,7 +412,14 @@ export class VoiceTurns {
     turn.how.waiting?.();
     const came = await this.locally(local, turn, ranked);
     if (came.is === "dropped") return { result: null, taken: true, rest: false };
-    if (came.is === "answered") return this.end(turn, came.words);
+    if (came.is === "answered") {
+      // The sentence nearly names a thing and the model did nothing with it ("open spy flight" taken for
+      // nonsense): the capability that takes such a thing is called with it as heard, and the executor
+      // asks the user whether it is that thing. A question, never an act on a guess.
+      const near = turn.taken && !shownOf(turn).length && !turn.ran.some((ran) => ran.call.name === NOTHING) ? misheard(ranked, this.registry.all(), turn.named) : null;
+      if (near && (await this.instantly(near.name, turn, near.heard))) return this.end(turn, "");
+      return this.end(turn, came.words);
+    }
     // What may have been said to someone else never goes further than this computer.
     if (!turn.taken) return IGNORED;
 
@@ -473,13 +483,13 @@ export class VoiceTurns {
    * False when that came to nothing — no such thing, or not a call that can be
    * made this way — and a model should read the sentence instead.
    */
-  private async instantly(name: string, turn: Running): Promise<boolean> {
+  private async instantly(name: string, turn: Running, said = turn.said): Promise<boolean> {
     const capability = this.registry.get(name);
     if (!capability) return false;
     const named = Object.entries(capability.args).filter(([, spec]) => !spec.optional);
     // Two things to name in one sentence: which is which is a model's to read.
     if (named.length > 1) return false;
-    const args = Object.fromEntries(named.map(([arg]) => [arg, turn.said]));
+    const args = Object.fromEntries(named.map(([arg]) => [arg, said]));
     const result = await this.registry.execute({ name, arguments: args }, this.context("instant", turn));
     if (result.status === "not_found" || result.status === "refused") return this.local() == null && this.record(turn, name, args, result);
     return this.record(turn, name, args, result);
@@ -505,7 +515,10 @@ export class VoiceTurns {
     const history: ModelTurn[] = this.memory.recent(this.now()).map(({ said: s, calls, result }) => ({ said: s, calls, result }));
     // A follow-up ("and Discord too") goes on with what the turn before called, whatever it ranks alone.
     const carried = (history[history.length - 1]?.calls ?? []).map((call) => call.name);
-    const shown = new Set(offered([...(ranked ? shortlist(ranked, capabilities, SHORTLIST, [...carried, ...takers(ranked, capabilities, turn.named)]) : [...ALWAYS_SHOWN, ...carried]), UNDO]));
+    // With no ranking, every capability that takes a kind of thing the sentence names: there are few for each.
+    const kinds = new Set(turn.named.map((n) => n.kind));
+    const taking = capabilities.filter((c) => kindsOf(c).some((kind) => kinds.has(kind))).map((c) => c.name);
+    const shown = new Set(offered([...(ranked ? shortlist(ranked, capabilities, SHORTLIST, [...carried, ...takers(ranked, capabilities, turn.named)]) : [...ALWAYS_SHOWN, ...carried, ...taking]), UNDO]));
     // What cannot be used right now is not offered (no question waits, the chat's field is empty): read again
     // each round, since a call may make another usable — a message prepared can be sent.
     const usable = (name: string) => {
@@ -525,7 +538,7 @@ export class VoiceTurns {
       const all = this.registry.areas();
       const lines = all.map(({ area, names }) => `${area}: ${names.map((name) => name.split("_").join(" ")).join(", ")}`).join("\n");
       // With the app's state: which area a name belongs to is read there (a pill, a session, a setting).
-      const router = [AREAS_FIRST.replace("{areas}", lines), `The app's state now, as JSON:\n${JSON.stringify(snapshot)}`, namedLine(turn.named)].filter(Boolean).join("\n\n");
+      const router = [AREAS_FIRST.replace("{areas}", lines), `The app's state now, as JSON:\n${JSON.stringify(snapshot)}`, namedLine(turn.named, false)].filter(Boolean).join("\n\n");
       const routed = await local(router, said, [aboutTool(all.map(({ area }) => area))], history);
       if (how.wanted && !how.wanted()) return { is: "dropped" };
       if (!routed) return { is: "silent" };
@@ -686,10 +699,14 @@ export class VoiceTurns {
  * nothing of ("spy flight") is said to be perhaps an app the app has. It is
  * still passed on as heard; the executor asks before acting on a near one.
  */
-function namedLine(named: Running["named"]): string {
+function namedLine(named: Running["named"], calling = true): string {
   if (!named.length) return "";
-  const things = named.map((n) => (n.near ? `perhaps ${n.label} (${n.kind}, heard as something close to it)` : `${n.label} (${n.kind})`));
-  return `In what was said, the app finds: ${things.join("; ")}.`;
+  const whole = named.filter((n) => !n.near).map((n) => `${n.label} (${n.kind})`);
+  const near = named.filter((n) => n.near).map((n) => `${n.heard ? `"${n.heard}" is ` : ""}most likely ${n.label} (${n.kind}), misheard`);
+  return [
+    whole.length ? `In what was said, the app finds: ${whole.join("; ")}.` : "",
+    near.length ? `In what was said, ${near.join("; ")}${calling ? ": call with that name; the app asks the user before it acts on it" : ""}.` : "",
+  ].filter(Boolean).join(" ");
 }
 
 /**
@@ -732,6 +749,25 @@ export function asHeard(call: ModelCall, capability: Capability | undefined, tur
     else if (spec.type === "entities") args[arg] = Array.isArray(args[arg]) ? (args[arg] as unknown[]).map((v) => back(spec.kind, v)) : back(spec.kind, args[arg]);
   }
   return { ...call, arguments: args };
+}
+
+/**
+ * The capability to ask about a thing the sentence only nearly names, and
+ * the words it was heard as: one that takes that kind of thing and nothing
+ * else it would need a model for, and that no click guards. Ranked, the best
+ * of them; without a ranking, only when one alone takes that kind.
+ */
+export function misheard(ranked: readonly Ranked[] | null, capabilities: readonly Capability[], named: Running["named"]): { name: string; heard: string | undefined } | null {
+  for (const thing of named.filter((n) => n.near)) {
+    const fit = capabilities.filter((c) => {
+      const required = Object.values(c.args).filter((spec) => !spec.optional);
+      const only = required.length === 1 ? required[0] : null;
+      return only != null && (only.type === "entity" || only.type === "entities") && only.kind === thing.kind && typeof c.tier === "string" && c.tier !== "confirm";
+    });
+    const best = ranked ? ranked.find((r) => fit.some((c) => c.name === r.name))?.name : fit.length === 1 ? fit[0].name : undefined;
+    if (best) return { name: best, heard: thing.heard };
+  }
+  return null;
 }
 
 /** The kinds of thing a capability takes as an argument. */
