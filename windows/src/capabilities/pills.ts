@@ -62,7 +62,7 @@ export function pills(host: AppHost): Area {
       capability({
         name: "add_pills",
         area: AREA,
-        description: "Shows pills in the island, beside those already there. To show these and hide all the others, it is keep_only_pills; to open an application of the same name, it is open_app.",
+        description: "Adds pills to the island, beside those already there. To show these and hide all the others, it is keep_only_pills; to open an application of the same name, it is open_app.",
         args: { pills: { type: "entities", kind: "pill", max: 6, description: "The pills to show." } },
         tier: "reversible",
         inverse: (args) => {
@@ -151,7 +151,7 @@ export function pills(host: AppHost): Area {
       capability({
         name: "keep_only_pills",
         area: AREA,
-        description: "Shows these pills and hides every other one, the main pill aside. Only when all the others are meant to go: to add to what is there, it is add_pills.",
+        description: "Keeps only these pills in the island and hides every other one, the main pill aside. Only when all the others are meant to go: to add to what is there, it is add_pills.",
         args: { pills: { type: "entities", kind: "pill", max: 7, description: "The pills that stay." } },
         tier: "reversible",
         inverse: backToNow,

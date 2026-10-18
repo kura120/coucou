@@ -1,12 +1,17 @@
-// What a tool gives back, and how Mochi asks. Every tool — the parser's own
-// and the ones a model calls — returns a ToolResult: what really happened, in
-// a line for the card and in words a model can reason on. Nothing here does
-// anything; voice/loop.ts runs the tools and island/voice.ts shows the states.
+// What a capability gives back, and how Mochi asks. Every capability returns
+// a ToolResult: what really happened, in a line for the card and in words a
+// model can reason on. Nothing here does anything; the executor runs the
+// capabilities (core/capabilities/registry.ts) and island/voice.ts shows the
+// states.
 //
-// The old VoiceResult (voice/runner.ts) is what a whole turn ends in; a
-// ToolResult is what each step of it returns.
+// A VoiceResult is what a whole turn ends in (voice/turn.ts); a ToolResult is
+// what each step of it returns.
 
-import type { VoiceResult } from "./runner";
+/** What a turn ends in, for its card: green and a tick, or red and a cross. */
+export interface VoiceResult {
+  outcome: "success" | "failure";
+  message: string;
+}
 
 export type ToolStatus =
   /** Done and checked (`verified`), or done and not checkable. */
@@ -71,38 +76,12 @@ export interface ToolResult {
   confirm?: Confirm;
 }
 
-/** How long an action may take to show its effect before it is "done, unconfirmed". */
-export const VERIFY_MS = 2000;
-
 export const done = (line: string, verified = true, data?: unknown): ToolResult =>
   ({ status: "done", verified, line, ...(data === undefined ? {} : { data }) });
 export const failed = (line: string, detail?: string): ToolResult => ({ status: "failed", verified: false, line, detail: detail ?? line });
 export const notFoundResult = (line: string, near: string[] = []): ToolResult =>
   ({ status: "not_found", verified: false, line, ...(near.length ? { near } : {}) });
 export const refused = (line: string, detail: string): ToolResult => ({ status: "refused", verified: false, line, detail });
-export const asks = (ask: Ask): ToolResult => ({ status: "ask", verified: false, line: ask.question, ask });
-export const confirms = (confirm: Confirm): ToolResult => ({ status: "confirm", verified: false, line: confirm.title, confirm });
-
-/** The turn's end as the card shows it, from the last thing a tool said. */
-export function asVoiceResult(result: ToolResult): VoiceResult {
-  switch (result.status) {
-    case "done":
-      return { outcome: "success", message: result.line };
-    case "ask":
-    case "confirm":
-      return { outcome: "question", message: result.line };
-    default:
-      return { outcome: "failure", message: result.line };
-  }
-}
-
-/** A step that ended the old way, as a tool's result: done or failed, unverified unless said. */
-export function fromVoiceResult(result: VoiceResult, verified = false): ToolResult {
-  if (result.outcome === "success") return done(result.message, verified);
-  if (result.outcome === "question") return asks({ kind: "text", question: result.message });
-  return failed(result.message);
-}
-
 /**
  * What a model is given back for a tool call: the status first, then only
  * what helps it decide the next step. Never the card's wording alone — a model

@@ -8,17 +8,27 @@
 //   directed   a sentence said without the wake phrase: was it for Coucou?
 //
 // Numbers and vectors only. Nothing here reads a word of the sentence: it is
-// embedded whole, and every decision below is a comparison of scores. The
-// three names at the end are capabilities' names, not things said.
+// embedded whole — less the names of the app's own things the registry found
+// in it — and every decision below is a comparison of scores. The three names
+// at the end are capabilities' names, not things said.
 //
-// Without an embedding model `rank` is null: there is no tier 1, the
-// follow-up window is off, and the model is shown areas first.
+// Without an embedding model `rank` is null: there is no tier 1, and the
+// model is shown areas first.
 //
-// THE THRESHOLDS ARE PROVISIONAL. On 2026-10-11 the model server on the
-// development machine (Ollama) had seven chat models and no embedding model,
-// and one may not be pulled without the user's yes. Nothing below was
-// measured. `scripts/voice-rank-eval.mjs` prints where each one should sit
-// for the model in use; set them from it and put its numbers here.
+// Measured 2026-10-18 with nomic-embed-text on Ollama, on the app's own 64
+// declarations (`scripts/voice-rank-eval.mjs --app`, 105 sentences meant for
+// Coucou, 14 negations, 12 for nobody). Before: whole descriptions embedded,
+// names left in — top-1 43 %, top-3 63 %, in the shortlist 77 %. Now: the
+// first sentence of each description (`indexText`), the twins reworded, the
+// names taken out and NAMED_BOOST — top-1 55 %, top-3 75 %, shortlist 85 %.
+// The local model is the normal path; tier 1 is a small saving.
+//
+// `directed` is NOT used to decide alone whether a sentence said without the
+// wake phrase was for Coucou: on those measurements sentences for nobody
+// score 0.48 to 0.64 and sentences for Coucou 0.50 to 0.94, so no band drops
+// strays without dropping real commands (ignoring every stray would ignore
+// 46 % of those). The local model decides instead (voice/turn.ts). It stays
+// here, measured, for when an embedding model separates them.
 
 import type { Capability } from "../core/capabilities/types";
 
@@ -34,19 +44,26 @@ export interface Ranked {
 // ── Thresholds ────────────────────────────────────────────────────────────────
 
 /**
- * Tier 1: how far the best must be ahead of the second. PROVISIONAL, not
- * measured. Set wide on purpose: neighbours such as pause and resume, or add
- * and remove a pill, are described in nearly the same words and sit close
- * together, and a sentence between two of them is the model's to read.
+ * Tier 1: how far the best must be ahead of the second. Negation is where
+ * embeddings fail: "don't pause the music" lands where "pause the music"
+ * does. Tier 1 run rightly / wrongly, 2026-10-18 (scripts/voice-rank-eval.mjs):
  *
- * Negation is where embeddings fail: "don't pause" lands almost where "pause"
- * does, so no margin tells them apart by itself. What the margin can do is
- * leave room for `nothing`, whose description such a sentence is also near:
- * when it comes second and close, tier 1 stands aside. The eval script counts
- * the negations that would still run at each margin; until that count is read
- * for a real model, what protects is that tier 1 never runs `confirm`.
+ *                           nomic-embed-text  mxbai-embed-large  bge-m3
+ *   invented table, 0.14        9 / 0             8 / 0           3 / 0
+ *   invented table, widest wrong margin  0.098    0.133           0.087
+ *   app's own, --app, 0.12      9 / 2             8 / 1           7 / 3
+ *   app's own, --app, 0.14      8 / 2             5 / 0           5 / 2
+ *   app's own, --app, 0.16      6 / 1             5 / 0           3 / 0
+ *   app's own, --app, 0.20      2 / 0             3 / 0           1 / 0
+ *   app's own, widest wrong margin  0.182         0.122           0.158
+ *
+ * On the app's own declarations "don't pause the music" paused it, ahead by
+ * 0.182 (nomic). 0.14, safe on the invented table, is not on the real one;
+ * 0.20 is the least with nothing wrong for all three. So tier 1 fires for a
+ * few sentences in a hundred: a small saving, never the path a command
+ * depends on, and it never runs `confirm`.
  */
-export const INSTANT_MARGIN = 0.15;
+export const INSTANT_MARGIN = 0.2;
 
 /**
  * Tier 1: the least the best may score. A margin alone would let a sentence
@@ -92,6 +109,17 @@ export const CONTEXT_SHARE = 0.5;
  * (doc/voice.md, 7.3 and D32). Eight leaves room for the three below.
  */
 export const SHORTLIST = 8;
+
+/**
+ * How much nearer a capability is counted when the sentence names a thing of
+ * a kind it takes ("remove Stripe": Stripe is a pill, and remove_pills takes
+ * pills). An embedding model knows nothing of most names, and a name it does
+ * not know drowns the verb: "remove Stripe" ranked undo first. Measured on
+ * the app's declarations (names taken out, then the boost): top-1 50 % at 0,
+ * 51 % at 0.03, 53 % at 0.05, 55 % at 0.08 and at 0.10; in the shortlist 81,
+ * 84, 85, 85, 85 %. The least that gives the most.
+ */
+export const NAMED_BOOST = 0.08;
 
 /** The way out when the right capability was not ranked. */
 const MORE_TOOLS = "more_tools";
@@ -143,6 +171,34 @@ function dot(a: Float64Array, b: Float64Array): number {
 interface Entry {
   key: string;
   vector: Float64Array;
+  /** The kinds of thing it takes as an argument. */
+  kinds: readonly string[];
+}
+
+/** What a sentence names, as the app's registry found it: the kinds, and the names as they are written. */
+export interface Named {
+  kinds: readonly string[];
+  labels: readonly string[];
+}
+
+/**
+ * The sentence with the names it holds taken out, so that what is embedded is
+ * what is asked: "remove Stripe" is embedded as "remove". The names are the
+ * app's own (the registry found them in the sentence); nothing here knows a
+ * word. When nothing is left, the sentence stays as it was.
+ */
+export function withoutNames(sentence: string, labels: readonly string[]): string {
+  let out = ` ${sentence} `;
+  for (const label of [...labels].sort((a, b) => b.length - a.length)) {
+    const at = out.toLowerCase().indexOf(` ${label.toLowerCase()}`);
+    if (at < 0) continue;
+    const end = at + label.length + 1;
+    // Whole words only: "Claude" is not taken out of "Claudette".
+    if (/[\p{L}\p{N}]/u.test(out[end] ?? "")) continue;
+    out = `${out.slice(0, at)}${out.slice(end)}`;
+  }
+  const left = out.replace(/\s+/g, " ").trim();
+  return /[\p{L}\p{N}]/u.test(left) ? left : sentence.trim();
 }
 
 /** The capabilities' descriptions as vectors, kept between sentences. */
@@ -165,18 +221,18 @@ export class CapabilityIndex {
    * area and description. False when the embedding model did not answer:
    * `rank` is then null until a `sync` goes through.
    */
-  sync(capabilities: readonly { name: string; text: string }[]): Promise<boolean> {
+  sync(capabilities: readonly { name: string; text: string; kinds?: readonly string[] }[]): Promise<boolean> {
     const done = this.syncing.then(() => this.syncNow(capabilities));
     this.syncing = done.catch(() => undefined);
     return done;
   }
 
-  private async syncNow(capabilities: readonly { name: string; text: string }[]): Promise<boolean> {
-    const wanted = capabilities.map((c) => ({ name: c.name, text: c.text, key: keyOf(c.text) }));
+  private async syncNow(capabilities: readonly { name: string; text: string; kinds?: readonly string[] }[]): Promise<boolean> {
+    const wanted = capabilities.map((c) => ({ name: c.name, text: c.text, key: keyOf(c.text), kinds: c.kinds ?? [] }));
     const kept = new Map<string, Entry>();
     for (const w of wanted) {
       const entry = this.entries.get(w.name);
-      if (entry?.key === w.key) kept.set(w.name, entry);
+      if (entry?.key === w.key) kept.set(w.name, { ...entry, kinds: w.kinds });
     }
     let fresh = wanted.filter((w) => !kept.has(w.name));
     let vectors = fresh.length > 0 ? await this.embedded(fresh.map((w) => w.text)) : [];
@@ -194,7 +250,7 @@ export class CapabilityIndex {
       this.whole = false;
       return false;
     }
-    const made = new Map(fresh.map((w, i) => [w.name, { key: w.key, vector: vectors[i] }]));
+    const made = new Map(fresh.map((w, i) => [w.name, { key: w.key, vector: vectors[i], kinds: w.kinds }]));
     this.entries = new Map();
     for (const w of wanted) {
       const entry = made.get(w.name) ?? kept.get(w.name);
@@ -209,9 +265,11 @@ export class CapabilityIndex {
    * turn, scored with the sentence (a short follow-up says little alone).
    * One call to the embedding model. Null when there is no ranking to trust:
    * no model, no answer, an index that is not whole, an empty sentence.
+   * `named`: what the registry found named in the sentence — those names are
+   * not embedded, and what takes their kind is counted nearer.
    */
-  async rank(sentence: string, context?: string): Promise<Ranked[] | null> {
-    const said = sentence.trim();
+  async rank(sentence: string, context?: string, named?: Named): Promise<Ranked[] | null> {
+    const said = named?.labels.length ? withoutNames(sentence, named.labels) : sentence.trim();
     if (!this.whole || this.entries.size === 0 || !said) return null;
     const before = context?.trim();
     const vectors = await this.embedded(before ? [said, `${before}\n${said}`] : [said]);
@@ -228,6 +286,7 @@ export class CapabilityIndex {
     for (const [name, entry] of this.entries) {
       let score = dot(alone, entry.vector);
       if (joined) score += CONTEXT_SHARE * Math.max(0, dot(joined, entry.vector) - score);
+      if (named?.kinds.some((kind) => entry.kinds.includes(kind))) score += NAMED_BOOST;
       ranked.push({ name, score });
     }
     // Stable: equal scores stay in the order the capabilities were declared.
@@ -309,4 +368,18 @@ export function shortlist(ranked: readonly Ranked[] | null, capabilities: readon
     if (declared.has(name) && !ALWAYS_SHOWN.includes(name) && !names.includes(name)) names.push(name);
   }
   return [...names, ...ALWAYS_SHOWN.filter((name) => declared.has(name))];
+}
+
+/**
+ * What a capability is embedded as: its area, and the first sentence of its
+ * description — what it does. The sentences after it are for a model ("Not
+ * for pausing Coucou itself", "to add, it is add_pills"); an embedding knows
+ * no "not", and those words pull the vector towards the very capability they
+ * point away from. Measured on the app's declarations with
+ * scripts/voice-rank-eval.mjs --app (see NAMED_BOOST).
+ */
+export function indexText(capability: Pick<Capability, "area" | "description">): string {
+  const description = capability.description.trim();
+  const end = description.search(/[.!?](\s|$)/);
+  return `${capability.area}: ${end < 0 ? description : description.slice(0, end + 1)}`;
 }

@@ -66,7 +66,7 @@ export function permissions(host: AppHost): Area {
       capability({
         name: "show_waiting_card",
         area: AREA,
-        description: "Brings up the card that waits for the user — a permission request or an agent's question — so they can read it and answer it themselves. The right one when they ask to approve or allow a request: approving takes their click on the card.",
+        description: "Brings up the card that waits for the user — a permission request or an agent's question — for them to read, and to allow, approve or answer it with their own click. The right one when they ask to approve or allow a request: approving takes their click on the card.",
         args: {},
         tier: "free",
         available: () => (host.permission() || host.agentQuestion() ? true : t("No request is waiting")),

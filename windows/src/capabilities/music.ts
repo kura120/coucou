@@ -32,7 +32,7 @@ export function music(host: AppHost): Area {
       capability({
         name: "now_playing",
         area: AREA,
-        description: "Reads what the music player is on: the track, the artist, whether it plays, shuffle, repeat and the volume.",
+        description: "Says what is playing now: the track, the artist, whether it plays, shuffle, repeat and the volume.",
         args: {},
         tier: "read",
         inSnapshot: true,
@@ -49,7 +49,7 @@ export function music(host: AppHost): Area {
       capability({
         name: "play_music",
         area: AREA,
-        description: "Starts or resumes the music in Spotify, starting Spotify when it is not running. It cannot pick a track, an artist or a playlist.",
+        description: "Plays the music: starts or resumes it in Spotify, starting Spotify when it is not running. It cannot pick a track, an artist or a playlist.",
         args: {},
         tier: "reversible",
         available: () => off() ?? true,

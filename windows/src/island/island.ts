@@ -32,16 +32,18 @@ import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
 import { interruptedAfter, isPlace } from "./restore";
 import {
-  RESULT_SHOWN_MS, VOICE_PATIENCE_MS, brainChosen, createConversation, createWorld, followUpKind, sayResult, stopSpeaking,
-  voicePills, voiceRunner, wakeBlocked,
-  SPEECH_WAITED_MS, saysDone, willSpeak,
+  RESULT_SHOWN_MS, SPEECH_WAITED_MS, VOICE_PATIENCE_MS, createTurns, sayResult, stopSpeaking, wakeBlocked, willSpeak,
 } from "./voice";
-import type { VoiceResult } from "../voice/runner";
-import { keyAnswer, keysFor, readSaid } from "../voice/asking";
-import type { Answer, Ask } from "../voice/result";
+import { keyAnswer, keysFor } from "../voice/asking";
+import type { Answer, Ask, VoiceResult } from "../voice/result";
+import type { Heard } from "../voice/turn";
 import { askRoom, resultRoom } from "../views/ask";
-import type { AppView } from "../voice/tools-app";
+import { firstSentence, showWebAnswer } from "../views/voice-cards";
+import type { WebFound } from "../views/websearch";
 import { installContextMenu, type ContextMenu, type Rect } from "../views/menu";
+import { createAppRegistry } from "./app";
+import type { ScreenContext } from "../core/capabilities/types";
+import type { OutfitSelection } from "../mochi/wardrobe";
 
 const BOT_OVERHANG = 40;
 const CLAUDE_DESKTOP_ID = "agent_claude-desktop";
@@ -134,16 +136,35 @@ export class Island {
 
   private confusedRecovery: number | null = null;
   private voiceTimer: number | null = null;
-  private conversation = createConversation(
-    createWorld({
-      showWaitingCard: () => this.showWaitingCard(),
-      declineWaiting: () => this.declineWaiting(),
-      showView: (view) => this.voiceShowView(view),
-      prepareChat: (message) => this.voicePrepareChat(message),
-      settingsChanged: () => this.onVoiceSettings?.(),
-      pause: () => this.onVoicePause?.(),
-    }),
-  );
+  /**
+   * Everything Coucou lets its assistant see and do, declared on this island
+   * (island/app.ts): made once, and the only way anything it asks for runs.
+   */
+  readonly registry = createAppRegistry({
+    desktop: () => this.desktop,
+    place: () => this.voicePlace(),
+    goTo: (view, after) => this.voiceGoTo(view, after),
+    showWaitingCard: () => this.showWaitingCard(),
+    declineWaiting: () => this.declineWaiting(),
+    answerWaiting: (answers) => this.answerWaiting(answers),
+    prefillChat: (message) => {
+      const chat = this.views.get("prompt");
+      chat?.prefill?.(message);
+      return chat?.prefill != null;
+    },
+    wearOutfit: (selection) => this.wearOutfit(selection),
+    settingsChanged: () => this.onVoiceSettings?.(),
+    setPaused: (paused) => this.onPause?.(paused),
+    screen: () => this.voiceScreen(),
+    webSearched: (query, results) => {
+      // Kept for the card of the turn that searched; a search nobody asked out loud has its own card.
+      if (this.voiceBusy) this.voiceWeb = { query, results };
+    },
+  });
+  /** What a sentence means and what is done for it, in three tiers (voice/turn.ts). */
+  private turns = createTurns(this.registry);
+  /** The embedding model the capabilities were last ranked with. */
+  private voiceRankedWith = "";
   /** Counts the sentences being understood: an answer that comes for an earlier one is dropped. */
   private voiceTurn = 0;
   private prevViewBeforeConfused: IslandViewName = "overview";
@@ -231,8 +252,8 @@ export class Island {
   // ── DOM ─────────────────────────────────────────────────────────────────────
 
   private build() {
-    // A question from the conversation goes up in the listening view, and comes down when answered.
-    this.conversation.onAsk = (ask) => this.voiceAsked(ask);
+    // A question from a turn goes up in the listening view, and comes down when answered.
+    this.turns.onAsk = (ask) => this.voiceAsked(ask);
     const actions: ViewActions = {
       setView: (v) => this.setView(v),
       voiceAnswer: (answer) => this.voiceAnswer(answer),
@@ -323,14 +344,9 @@ export class Island {
       },
       openSettingsWindow: () => void Bridge.openSettingsWindow(),
       blip: () => Sound.play("blip"),
-      chooseOutfit: (selection) => {
-        if (parseOutfit(State.settings.mochiOutfit) === selection) return;
-        State.settings.mochiOutfit = selection;
-        void Bridge.saveSettings(State.settings);
-        Sound.play("pop");
-        this.engine.triggerEmote("proud");
-        State.notify();
-      },
+      chooseOutfit: (selection) => this.wearOutfit(selection),
+      // A card's own button is the user's click: nothing is asked, nothing is confirmed twice.
+      capability: (call) => this.registry.execute(call, { origin: "ui", ask: async () => ({ kind: "dropped" }), working: () => {} }),
       previewOutfit: (outfit) => {
         State.wardrobePreview = outfit;
         State.notify();
@@ -587,7 +603,7 @@ export class Island {
 
   /** The wake phrase, or the "Talk to Coucou" shortcut. */
   voiceWoke() {
-    if (wakeBlocked(State.view, State.mode, State.pendingApproval != null, State.paused)) {
+    if (wakeBlocked(State.paused)) {
       void Bridge.voiceCancel();
       return;
     }
@@ -604,36 +620,39 @@ export class Island {
     this.voiceTurn += 1;
     // Spoken to: he stops talking and listens.
     stopSpeaking();
-    // The wake phrase, or the answer to a question Mochi just asked.
-    State.voice = { text: "", question: voiceRunner.asking ? State.voice.question : "" };
+    State.voice = { text: "", question: "" };
     this.engine.listeningHasWords = false;
     if (this.fsm.state === "listening") {
       // Said again over a result: the card gives way (VoiceWakeFilter).
       if (State.view !== "listening") this.setView("listening");
       this.engine.enterListening();
     } else {
+      // What was on screen, for "this" and "that one": a card that waits stays where it is, under the listening view.
+      const open = State.mode === "expanded";
+      this.voiceFrom = { view: open ? State.view : State.resumeView(), open };
       this.fsm.voiceWoke();
     }
     State.notify();
   }
 
-  /** Words so far, or the whole command (`final`), which is then acted on. */
+  /** Words so far, or the whole sentence (`final`), which is then acted on. */
   voiceHeard(text: string, final: boolean) {
     if (this.fsm.state !== "listening" || State.view !== "listening") return;
     State.voice = { ...State.voice, text };
     this.engine.listeningHasWords = text !== "";
     State.notify();
-    if (final) this.voiceCommand(text);
+    if (!final) return;
+    // The answer to a question on screen is not a new turn: the one that asked goes on.
+    if (State.voice.ask) void this.voiceAskHeard(text);
+    else void this.voiceUnderstand(text);
   }
 
-  /** Something was said and it was no command. */
+  /** Something was heard and it was not words. */
   voiceMissed() {
     if (this.fsm.state !== "listening" || State.view !== "listening") return;
-    // Not words: the question on screen is still there, and still listened for.
+    // The question on screen is still there, and still listened for.
     if (State.voice.ask) return void Bridge.voiceTalk();
-    // Not words: no answer to what Mochi asked, and the question is dropped.
-    if (voiceRunner.asking) void this.voiceUnderstand("");
-    else this.voiceResult(voiceRunner.run({ kind: "unknown" }));
+    this.voiceResult({ outcome: "failure", message: t("Command not recognised") });
   }
 
   /**
@@ -653,40 +672,14 @@ export class Island {
 
   /**
    * A sentence said in that time. Typing, a cough or a word to someone else is
-   * cut out as a sentence too: the island opens only when it is a command.
+   * cut out as a sentence too: whether it was for Coucou is decided on this
+   * computer (voice/rank.ts `directed`), and nothing shows unless it was.
    */
-  voiceAgain(said: string) {
-    if (wakeBlocked(State.view, State.mode, State.pendingApproval != null, State.paused)) return;
-    switch (followUpKind(said, voicePills(), brainChosen(), this.conversation.last())) {
-      case "command":
-        void Bridge.voiceFollowed();
-        this.voiceWoke();
-        this.voiceHeard(said, true);
-        break;
-      case "ask":
-        void this.voiceAskQuietly(said);
-        break;
-      case "nothing":
-        break;
-    }
-  }
-
-  /** Looked up, or the model asked, without a word on screen; only what came of the sentence is shown. */
-  private async voiceAskQuietly(said: string) {
-    const result = await this.conversation.hear(said, { spokenTo: false });
-    if (!result) return;
-    // The wake phrase was said meanwhile: that command is the one being heard.
-    const taken = this.fsm.state === "listening" && State.view === "listening";
-    if (taken || wakeBlocked(State.view, State.mode, State.pendingApproval != null, State.paused)) {
-      // A question nobody will hear is not left waiting for an answer.
-      if (result.outcome === "question" && !taken) voiceRunner.reset();
-      return;
-    }
-    void Bridge.voiceFollowed();
-    this.voiceWoke();
-    if (this.fsm.state !== "listening") return;
-    State.voice = { ...State.voice, text: said };
-    this.voiceResult(result);
+  voiceAgain(said: string, sure?: readonly number[]) {
+    if (wakeBlocked(State.paused)) return;
+    // The wake phrase was said meanwhile: that sentence is the one being heard.
+    if (this.fsm.state === "listening") return;
+    void this.voiceUnderstand(said, { wake: false, sure });
   }
 
   /** How loud the microphone hears, 0…1: the glow under the island moves with it. */
@@ -695,32 +688,67 @@ export class Island {
     this.listenGlow.style.setProperty("--level", String(Math.max(0, Math.min(1, level || 0))));
   }
 
-  // ── The app's own tools (voice/tools-app.ts) ─────────────────────────────────
+  /** A cloud model asked for a capability through its endpoint (voice/turn.ts `cloudCall`). */
+  voiceCapabilityCall(name: string, args: unknown): Promise<string> {
+    return this.turns.cloudCall(name, args);
+  }
+
+  // ── What the app's capabilities need of the island (island/app.ts) ──────────
 
   /** Set by main.ts: applies a settings change the way one from the Settings window is applied. */
   onVoiceSettings: (() => void) | null = null;
-  /** Set by main.ts: the tray's Pause. */
-  onVoicePause: (() => void) | null = null;
+  /** Set by main.ts: the tray's Pause (the island hides), and its way back. */
+  onPause: ((paused: boolean) => void) | null = null;
 
-  /** "Show the chat", "open settings": the view comes up as its own button or shortcut brings it. */
-  private voiceShowView(view: AppView): boolean {
-    if (State.paused || State.pendingApproval) return false;
-    // After the result card has had its turn: the listening view closes first.
-    window.setTimeout(() => {
-      if (view === "settings") return void Bridge.openSettingsWindow();
-      if (view === "wardrobe") return this.wardrobeAnywhere();
-      this.alert(view === "chat" ? "prompt" : view === "recap" ? "recap" : State.defaultView());
-    }, 0);
-    return true;
+  /** A turn is being worked out: what it asks to show waits for its end. */
+  private voiceBusy = false;
+  /** The view a turn asked for, shown when it ends. */
+  private voiceNext: { view: IslandViewName; after?: () => void } | null = null;
+  /** Where the island was when it started listening. */
+  private voiceFrom: { view: IslandViewName; open: boolean } | null = null;
+  /** The web search a turn made, for its card. */
+  private voiceWeb: { query: string; results: readonly WebFound[] } | null = null;
+
+  /** The view under the listening one — or the one a turn has just asked for — and whether the island is open on it. */
+  private voicePlace(): { view: IslandViewName; open: boolean } {
+    if (this.voiceNext) return { view: this.voiceNext.view, open: true };
+    if (this.fsm.state === "listening" && this.voiceFrom) return this.voiceFrom;
+    return { view: State.view, open: State.mode === "expanded" };
   }
 
-  /** "Tell the agent …": the chat opens with the words in its field; sending them is the user's. */
-  private voicePrepareChat(message: string): boolean {
-    if (State.paused || State.pendingApproval) return false;
-    window.setTimeout(() => {
-      this.alert("prompt");
-      this.views.get("prompt")?.prefill?.(message);
-    }, 0);
+  /** Opens the island on a view: when the turn that asked ends, or at once when none runs. */
+  private voiceGoTo(view: IslandViewName, after?: () => void) {
+    if (this.voiceBusy) {
+      this.voiceNext = { view, after };
+      return;
+    }
+    this.alert(view);
+    after?.();
+  }
+
+  /** What the view under the listening one shows, as it says itself (island/screen.ts). */
+  private voiceScreen(): ScreenContext | null {
+    const { view } = this.voicePlace();
+    return { view, subjects: [], ...this.views.get(view)?.screen?.() };
+  }
+
+  /** Keeps an outfit, as a click in the wardrobe does. */
+  private wearOutfit(selection: OutfitSelection) {
+    if (parseOutfit(State.settings.mochiOutfit) === selection) return;
+    State.settings.mochiOutfit = selection;
+    void Bridge.saveSettings(State.settings);
+    Sound.play("pop");
+    this.engine.triggerEmote("proud");
+    State.notify();
+  }
+
+  /** Answers the waiting question, as a click on its card does. */
+  private answerWaiting(answers: Record<string, string | string[]>): boolean {
+    const pending = State.pendingApproval;
+    if (!pending?.questions) return false;
+    Sound.play("approve");
+    void Bridge.approvalAnswer(pending.requestId, answers);
+    this.closeApproval();
     return true;
   }
 
@@ -730,9 +758,9 @@ export class Island {
   private static readonly ASK_WAITS_MS = 45_000;
   private voiceAskTimer: number | null = null;
   /** Arms or stops the wait for the turn's answer (`voiceUnderstand`). */
-  private voicePatience: { pause(): void; resume(): void } | null = null;
+  private voicePatience: { pause(): void; resume(ms?: number): void } | null = null;
 
-  /** The conversation put a question up (`ask`), or it was answered or dropped (null). */
+  /** A turn put a question up (`ask`), or it was answered or dropped (null). */
   private voiceAsked(ask: Ask | null) {
     if (this.voiceAskTimer != null) window.clearTimeout(this.voiceAskTimer);
     this.voiceAskTimer = null;
@@ -749,13 +777,13 @@ export class Island {
     }
     if (this.fsm.state !== "listening" || State.view !== "listening") {
       // Nobody is looking at a listening island: the question is for nobody.
-      this.conversation.answer({ kind: "dropped" });
+      this.turns.answer({ kind: "dropped" });
       return;
     }
     this.voicePatience?.pause();
     State.voice = { text: "", question: ask.question, thinking: false, ask, draft: ask.kind === "text" ? (ask.value ?? "") : "" };
     this.engine.listeningHasWords = false;
-    sayResult({ outcome: "question", message: ask.question });
+    sayResult({ outcome: "success", message: ask.question });
     // Listened for without the wake phrase; a click or its key answers as well.
     void Bridge.voiceTalk();
     this.voiceAskTimer = window.setTimeout(() => this.voiceAnswer({ kind: "dropped" }), Island.ASK_WAITS_MS);
@@ -764,9 +792,9 @@ export class Island {
     this.ensureRunning();
   }
 
-  /** The answer to the question on screen, however it was given. */
+  /** The answer to the question on screen, by a click or a key. */
   voiceAnswer(answer: Answer) {
-    this.conversation.answer(answer);
+    this.turns.answer(answer);
   }
 
   /** Ctrl+Shift+number, or Ctrl+Shift+Enter for the text field. */
@@ -777,14 +805,17 @@ export class Island {
     if (answer) this.voiceAnswer(answer);
   }
 
-  /** What was said while a question is on screen: its answer, words for its field, or neither. */
-  private voiceAskHeard(ask: Ask, said: string) {
-    // A question about a name takes more for an answer: the name itself, another one, a command (hook: conversation.ts).
-    if (this.conversation.saidWhileAsked(said)) return;
-    const heard = readSaid(ask, said, State.voice.draft ?? "");
-    if (heard.is === "answer") return this.voiceAnswer(heard.answer);
-    if (heard.is === "draft") State.voice = { ...State.voice, draft: heard.value, text: "" };
-    else State.voice = { ...State.voice, text: "" };
+  /**
+   * What was said while a question is on screen: words for its field, taken
+   * as they are, or — for a choice or a yes/no — whatever the local model
+   * reads of it (voice/turn.ts `answerSaid`). Never a guard's click.
+   */
+  private async voiceAskHeard(said: string) {
+    const ask = State.voice.ask;
+    const heard = await this.turns.answerSaid(said, State.voice.draft ?? "");
+    // Answered, by this or by a click meanwhile: the question is gone.
+    if (heard.is === "answer" || State.voice.ask !== ask) return;
+    State.voice = { ...State.voice, text: "", ...(heard.is === "draft" ? { draft: heard.value } : {}) };
     State.notify();
     // Still asked: still listened for.
     void Bridge.voiceTalk();
@@ -793,10 +824,10 @@ export class Island {
   /** For the browser preview (main.ts `coucouAsk`): a question with no turn behind it. */
   voicePreviewAsk(ask: Ask) {
     this.voiceWoke();
-    void this.conversation.askUser(ask).then((answer) => {
+    void this.turns.askUser(ask).then((answer) => {
       console.log("[coucou] answered", answer);
       // Another question asked over this one dropped it: that one is on screen now.
-      if (this.fsm.state === "listening" && !this.conversation.asked) this.fsm.voiceFinished();
+      if (this.fsm.state === "listening" && !this.turns.asked) this.fsm.voiceFinished();
     });
   }
 
@@ -811,26 +842,18 @@ export class Island {
   voiceCancelled() {
     // A question on screen waits on: it is answered by a click or a key as well, and listened for again.
     if (State.voice.ask && this.fsm.state === "listening" && State.view === "listening") return void Bridge.voiceTalk();
-    voiceRunner.reset();
     this.fsm.voiceFinished();
   }
 
-  /** Understands what was said and does it; the card says what happened. */
-  private voiceCommand(said: string) {
-    // The answer to a question on screen is not a new turn: the one that asked goes on.
-    const ask = State.voice.ask;
-    if (ask) return this.voiceAskHeard(ask, said);
-    void this.voiceUnderstand(said);
-  }
-
   /**
-   * One sentence through the conversation (voice/conversation.ts): the parser,
-   * the last turns, the installed apps, a model. Whatever has to be waited for
-   * shows "Thinking…" at once, and is waited for a few seconds at most: then
-   * the card says so, and whatever answer comes later is for nobody.
+   * One sentence through the three tiers (voice/turn.ts). Whatever has to be
+   * waited for shows "Thinking…" at once, and is waited for a few seconds at
+   * most: then the card says so, and whatever answer comes later is for
+   * nobody. A sentence said without the wake phrase shows nothing until it is
+   * taken as said to Coucou.
    */
-  private async voiceUnderstand(said: string) {
-    const turn = ++this.voiceTurn;
+  private async voiceUnderstand(said: string, heard: { wake: boolean; sure?: readonly number[] } = { wake: true }) {
+    let turn = heard.wake ? ++this.voiceTurn : -1;
     const here = () => turn === this.voiceTurn && this.fsm.state === "listening" && State.view === "listening";
     let late = false;
     let patience: number | null = null;
@@ -840,79 +863,109 @@ export class Island {
         if (patience != null) window.clearTimeout(patience);
         patience = null;
       },
-      resume: () => {
+      resume: (ms = VOICE_PATIENCE_MS) => {
         wait.pause();
         patience = window.setTimeout(() => {
           if (!here()) return;
           late = true;
-          voiceRunner.reset();
           State.voice = { ...State.voice, thinking: false };
           this.voiceResult({ outcome: "failure", message: t("That took too long. Say it again.") });
-        }, VOICE_PATIENCE_MS);
+        }, ms);
       },
     };
-    wait.resume();
-    this.voicePatience = wait;
-    let result: VoiceResult | null = null;
+    const taken = () => {
+      if (!heard.wake) {
+        // Without the wake phrase: the island opens on it now, and another sentence may follow.
+        void Bridge.voiceFollowed();
+        this.voiceWoke();
+        if (this.fsm.state !== "listening") return;
+        turn = this.voiceTurn;
+        State.voice = { ...State.voice, text: said };
+      }
+      this.voiceBusy = true;
+      this.voiceNext = null;
+      this.voiceWeb = null;
+      this.voicePatience = wait;
+      wait.resume();
+    };
+    /** The longest wait a step asked for: once the cloud model works, every step after it is waited for as long. */
+    let longest = VOICE_PATIENCE_MS;
+    const showing = (line: string | undefined, ms?: number) => {
+      if (!here()) return;
+      // Each step is waited for in its own right — and a cloud turn is not cut short by a capability it runs.
+      longest = Math.max(longest, ms ?? 0);
+      wait.resume(longest);
+      if (State.voice.thinking && State.voice.working === line) return;
+      State.voice = { ...State.voice, thinking: true, working: line };
+      State.notify();
+    };
+    let came: Heard | null = null;
     try {
-      result = await this.conversation.hear(said, {
-        waiting: (line) => {
-          if (!here() || (State.voice.thinking && State.voice.working === line)) return;
-          State.voice = { ...State.voice, thinking: true, working: line };
-          State.notify();
-        },
-        working: (line) => {
-          if (!here()) return;
-          State.voice = { ...State.voice, thinking: true, working: line };
-          State.notify();
-        },
-        wanted: () => !late && here(),
-      });
+      came = await this.turns.hear(said, { wake: heard.wake, sure: heard.sure, taken, waiting: showing, working: showing, wanted: () => !late && here() });
     } finally {
       wait.pause();
       if (this.voicePatience === wait) this.voicePatience = null;
+      if (turn === this.voiceTurn) this.voiceBusy = false;
     }
-    // The island moved on meanwhile: the answer is for nobody.
-    if (late || !here()) {
-      if (result?.outcome === "question" && turn === this.voiceTurn) voiceRunner.reset();
+    const next = this.voiceNext;
+    const web = this.voiceWeb;
+    if (turn === this.voiceTurn) {
+      this.voiceNext = null;
+      this.voiceWeb = null;
+    }
+    // Not for Coucou, or the island moved on meanwhile: the answer is for nobody.
+    if (!came?.taken || late || !here()) return;
+    State.voice = { ...State.voice, thinking: false };
+    const result = came.result;
+    // Said in place of an answer, and a request of its own: heard now, as one.
+    if (came.next) {
+      State.voice = { ...State.voice, text: came.next };
+      State.notify();
+      return void this.voiceUnderstand(came.next);
+    }
+    // A view was asked for: it comes up now, in place of the result card.
+    if (next && result?.outcome !== "failure") {
+      if (result) sayResult(result);
+      this.alert(next.view);
+      next.after?.();
       return;
     }
-    State.voice = { ...State.voice, thinking: false };
+    // A web search that was read: its card, with where the answer comes from.
+    if (web && web.results.length && result?.outcome === "success") {
+      sayResult({ outcome: "success", message: firstSentence(result.message) });
+      this.alert("webAnswer");
+      showWebAnswer(web.query, web.results, result.message);
+      return;
+    }
     if (result) return this.voiceResult(result);
-    // "Ok done", "never mind", "thanks": the view closes, and nothing more is listened for.
-    if (saysDone(said, voicePills())) void Bridge.voiceRest();
+    // Asked for nothing: the view closes, and nothing more is listened for.
+    if (came.rest) void Bridge.voiceRest();
     this.fsm.voiceFinished();
   }
 
-  /** The waiting permission card, up and unanswered (voice: "what is the request?"). */
-  private showWaitingCard() {
+  /** The waiting card, up and unanswered. */
+  private showWaitingCard(): boolean {
     const pending = State.pendingApproval;
-    if (!pending) return;
+    if (!pending) return false;
     State.setFocus(pending.pillId);
-    this.alert(pending.questions ? "question" : "approval");
+    this.voiceGoTo(pending.questions ? "question" : "approval");
+    return true;
   }
 
   /** Declines the waiting permission, as a click on Deny does. Never a question, never an Allow. */
-  private declineWaiting() {
+  private declineWaiting(): boolean {
     const pending = State.pendingApproval;
-    if (!pending || pending.questions) return;
+    if (!pending || pending.questions) return false;
     void Bridge.log(`decide deny (voice) req=${pending.requestId}`);
     Sound.play("blip");
     void Bridge.approvalDecision(pending.requestId, "deny");
     State.endApproval();
     this.fsm.pinned = false;
+    return true;
   }
 
   private voiceResult(result: VoiceResult) {
     sayResult(result);
-    if (result.outcome === "question") {
-      // Mochi asks and listens again, without the wake phrase.
-      State.voice = { text: "", question: result.message };
-      this.engine.listeningHasWords = false;
-      void Bridge.voiceTalk();
-      State.notify();
-      return;
-    }
     State.voiceResult = result;
     if (!State.voiceFollowing) this.engine.exitListening();
     this.engine.triggerEmote(result.outcome === "success" ? "happy" : "surprised");
@@ -946,8 +999,7 @@ export class Island {
   private leftListening() {
     this.clearVoiceTimer();
     // A question nobody can see any more is dropped, and its keys let go of.
-    this.conversation.answer({ kind: "dropped" });
-    voiceRunner.reset();
+    this.turns.answer({ kind: "dropped" });
     if (!State.voiceFollowing) this.engine.exitListening();
     // Rust stops waiting for a command; it has nothing to stop when it ended this itself.
     void Bridge.voiceCancel();
@@ -1837,7 +1889,13 @@ export class Island {
     this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
     this.fsm.openOnHover = State.settings.openOnHover;
     // Voice turned off: what was said is not kept for when it comes back on.
-    if (!State.settings.voice.enabled) this.conversation.forget();
+    if (!State.settings.voice.enabled) this.turns.forget();
+    // Another embedding model: the capabilities are ranked again, with it.
+    const { brain, embedModel } = State.settings.voice;
+    if (`${brain}\n${embedModel}` !== this.voiceRankedWith) {
+      this.voiceRankedWith = `${brain}\n${embedModel}`;
+      this.turns.resync();
+    }
     State.notify();
   }
 

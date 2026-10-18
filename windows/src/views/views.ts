@@ -9,7 +9,7 @@ import { State, type AgentTask } from "../core/state";
 import { washRGBA, type IslandViewName, type Wash } from "../core/layout";
 import { createMiniBot, pruneMiniBots } from "../mochi/minibots";
 import { buildAsk } from "./ask";
-import type { Answer } from "../voice/result";
+import type { Answer, ToolResult } from "../voice/result";
 import { buildPrompt } from "./chat";
 import { buildChoose, buildUpload, buildUploading } from "./upload";
 import { renderIntegrationCard, type IntegrationCardHooks } from "./integrations";
@@ -30,6 +30,7 @@ import type { Outfit, OutfitSelection } from "../mochi/wardrobe";
 import { language, t, tl, type Msg } from "../i18n/i18n";
 import type { ViewCommand } from "../island/shortcuts";
 import { registerVoiceCards } from "./voice-cards";
+import { VIEW_SCREENS, type Shown } from "../island/screen";
 
 export interface ViewActions {
   setView(v: IslandViewName): void;
@@ -65,6 +66,8 @@ export interface ViewActions {
   setAutoClose(seconds: number): void;
   openSettingsWindow(): void;
   blip(): void;
+  /** One of the app's capabilities, asked for by a card's own button: the interface's own call (core/capabilities). */
+  capability(call: { name: string; arguments: Record<string, unknown> }): Promise<ToolResult>;
   /** Wardrobe click: keeps the outfit ("auto" and "none" included). */
   chooseOutfit(selection: OutfitSelection): void;
   /** Wardrobe hover: shows an outfit on Mochi without keeping it; null ends it. */
@@ -80,6 +83,8 @@ export interface ViewHost {
   prefill?(text: string): void;
   /** Called every frame while the view is on screen. True = needs another frame. */
   tick?(nowMs: number): boolean | void;
+  /** What the view shows, for the assistant (island/screen.ts). */
+  screen?(): Shown;
   /** Ctrl+O / Ctrl+E while the view is on screen (island/shortcuts.ts). */
   command?(command: ViewCommand): void;
 }
@@ -946,7 +951,12 @@ export function buildViews(
   map.set("mail", buildPlaceholder(tl("Sending by email isn't in this version."), ""));
   map.set("searching", buildPlaceholder(tl("Claude is searching…"), ""));
   map.set("result", buildPlaceholder(tl("Result"), ""));
-  // The web answer and email cards, on sample data for now (views/voice-cards.ts).
+  // The web answer card, and the email cards for when email is built (views/voice-cards.ts).
   registerVoiceCards(map, actions);
+  // Each view says what it shows (island/screen.ts).
+  for (const [name, shown] of Object.entries(VIEW_SCREENS)) {
+    const view = map.get(name as IslandViewName);
+    if (view) view.screen = shown;
+  }
   return map;
 }

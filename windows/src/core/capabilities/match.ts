@@ -6,9 +6,10 @@
 //   unsure  near one, or as near two or three: the executor asks
 //   none    nothing by that name; `near` holds what it might have been
 //
-// The algorithm is `among` and `unsure` of voice/resolve.ts, which does not
-// export them, copied here with its thresholds; `likeness`, `soundKey` and
-// `normalise` are imported from where they live.
+// This is the one matcher: every name a capability is given goes through
+// `among`. `likeness`, `soundKey` and `normalise` are imported from where they
+// live (voice/resolve.ts, voice/entity.ts); the thresholds were set on speech
+// models' own spellings, and the apps' are Rust's (apps.rs).
 
 import { normalise, soundKey } from "../../voice/entity";
 import { likeness } from "../../voice/resolve";
@@ -37,12 +38,12 @@ export interface MatchOptions {
   scores?: ReadonlyMap<string, number>;
 }
 
-/** Under this many letters, a sound key or a name is too short to tell a thing by (resolve.ts). */
+/** Under this many letters, a sound key or a name is too short to tell a thing by. */
 const SHORTEST_KEY = 4;
 const SHORTEST_NAME = 4;
-/** How much nearer the first must be than the next to be asked about alone (resolve.ts, apps.rs `AHEAD`). */
+/** How much nearer the first must be than the next to be asked about alone (apps.rs `AHEAD`). */
 const AHEAD = 0.15;
-/** A word of what was said, against a whole name, counts for a little less than the whole of it (resolve.ts). */
+/** A word of what was said, against a whole name, counts for a little less than the whole of it. */
 const ONE_WORD = 0.9;
 /** For `near` of a name that is nothing: letters in common, with no sound key. Half of them at least. */
 const LOOSELY = 0.5;
