@@ -147,6 +147,8 @@ export interface Heard {
    * said instead. Absent when nothing ran, or no model put it in words.
    */
   worded?: boolean;
+  /** Why they did not: "unseen", "thing", "number" or "action" (`unfounded`). */
+  unworded?: string;
 }
 
 /** What a sentence said while a question is on screen does to it. */
@@ -174,8 +176,9 @@ interface Running {
   started: number;
   /** Taken as said to Coucou: by the wake phrase, or by the local model calling something. */
   taken: boolean;
-  /** Whether the model's words for what ran held up against the results (`checked`). */
+  /** Whether the model's words for what ran held up against the results (`checked`), and if not, why. */
   worded?: boolean;
+  unworded?: string;
   /** The app's things the sentence names, or perhaps names (Registry.named). */
   named: readonly { kind: string; id: string; label: string; near?: boolean; heard?: string }[];
 }
@@ -235,6 +238,9 @@ const EMPTY = "Your last answer called a capability that does not exist here, an
 
 /** Once the app's capabilities ran, the model only decides what else to call: its words are not what Mochi says. */
 const AFTER_RAN = "The results of your calls are above. If a call failed and can be made right with another value or another setting, make it now. If what was asked needs another capability, call it now. Otherwise tell the user, in one short sentence, what the results say was done — only that.";
+
+/** After what was only asked for, not seen: the model only decides what else to call. */
+const AFTER_RAN_DONE = "The results of your calls are above. If a call failed and can be made right with another value or another setting, make it now. If what was asked needs another capability, call it now. Otherwise reply with the one word: done.";
 
 /**
  * What only read the app is put in words by a model given those results and
@@ -626,7 +632,8 @@ export class VoiceTurns {
       const line = lineOf(turn);
       if (line) how.working?.(line);
       // Once something was done the model is waited for a little: what it adds is how it is said.
-      const after = shownOf(turn).length ? AFTER_RAN : AFTER_CALLS;
+      // What was only asked for is said in its own line whatever the words (`unfounded`): none are asked for.
+      const after = !shownOf(turn).length ? AFTER_CALLS : shownOf(turn).every((ran) => ran.result.verified) ? AFTER_RAN : AFTER_RAN_DONE;
       const next = await within(local(`${system}\n\n${after}`, said, tools(), history, steps), acted(turn) ? Math.min(left, WORDING_MS) : left);
       if (how.wanted && !how.wanted()) return { is: "dropped" };
       if (!next) break;
@@ -664,7 +671,7 @@ export class VoiceTurns {
     const shown = shownOf(turn);
     const text = words.trim();
     if (!shown.length || !text || shown.some((ran) => ran.result.status !== "done")) return text;
-    const ok = await grounded(text, shown, {
+    const why = await unfounded(text, shown, {
       named: (said) => this.registry.named(said),
       // What the words are nearest among the capabilities, when there is a ranking: what they say was done.
       // Not after undo: its words are about what it put back, which is another capability's doing.
@@ -672,8 +679,9 @@ export class VoiceTurns {
         ? async (said, labels) => (await this.index.rank(said, undefined, { kinds: [], labels }))?.filter((r) => !ALWAYS_SHOWN.includes(r.name) && r.name !== UNDO).slice(0, NEAREST).map((r) => r.name) ?? null
         : undefined,
     });
-    turn.worded = ok;
-    return ok ? text : "";
+    turn.worded = why == null;
+    turn.unworded = why ?? undefined;
+    return why == null ? text : "";
   }
 
   // ── Tier 3 ──────────────────────────────────────────────────────────────────
@@ -744,7 +752,7 @@ export class VoiceTurns {
     // `words` were checked against the results (`checked`): "" when they did not hold up.
     const message = spoken(words, linesOf(doing.length ? doing : shown));
     const heard = finish(message ? { outcome: "success", message } : null);
-    return turn.worded == null ? heard : { ...heard, worded: turn.worded && words.trim() !== "" };
+    return turn.worded == null ? heard : { ...heard, worded: turn.worded && words.trim() !== "", ...(turn.unworded ? { unworded: turn.unworded } : {}) };
   }
 }
 
@@ -873,28 +881,33 @@ const acted = (turn: Running) =>
  *
  * Measured with scripts/voice-eval.mjs (the "worded" column).
  */
-export async function grounded(
+export async function grounded(...args: Parameters<typeof unfounded>): Promise<boolean> {
+  return (await unfounded(...args)) == null;
+}
+
+/** Why words for what ran do not hold up — "unseen", "thing", "number", "action" — or null when they do (`grounded`). */
+export async function unfounded(
   words: string,
   ran: readonly { call: ModelCall; result: ToolResult; capability?: Capability }[],
   look: {
     named: (said: string) => Promise<readonly { kind: string; id: string; label: string; near?: boolean }[]>;
     nearest?: (said: string, labels: readonly string[]) => Promise<readonly string[] | null>;
   },
-): Promise<boolean> {
-  if (ran.some(({ result }) => !result.verified)) return false;
+): Promise<"unseen" | "thing" | "number" | "action" | null> {
+  if (ran.some(({ result }) => !result.verified)) return "unseen";
   const facts = ` ${values(ran.map(({ call, result }) => [call.arguments ?? {}, result.line, result.detail ?? "", result.data ?? null])).map(normalise).join(" ")} `;
   const holds = (text: string) => {
     const form = normalise(text);
     return form !== "" && facts.includes(` ${form} `);
   };
   const things = (await look.named(words).catch(() => [])).filter((thing) => !thing.near);
-  if (things.some((thing) => !holds(thing.label) && !holds(thing.id))) return false;
+  if (things.some((thing) => !holds(thing.label) && !holds(thing.id))) return "thing";
   // Numbers said as numbers, not the digits of a name ("n8n").
   const numbers = normalise(words).split(" ").filter((word) => /^\d+$/.test(word));
-  if (numbers.some((number) => !holds(number))) return false;
-  if (!look.nearest) return true;
+  if (numbers.some((number) => !holds(number))) return "number";
+  if (!look.nearest) return null;
   const nearest = await look.nearest(words, things.map((thing) => thing.label)).catch(() => null);
-  return nearest == null || ran.some((r) => nearest.includes(r.call.name));
+  return nearest == null || ran.some((r) => nearest.includes(r.call.name)) ? null : "action";
 }
 
 /** Every string and number a value holds, however deep. */

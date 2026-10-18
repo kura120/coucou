@@ -360,7 +360,7 @@ async function run(steps) {
     if ("ask" in came) return { asks: came.ask.question };
     turn = null;
     // Whether the model's words for what ran held up against the results.
-    if (came.heard.worded != null) worded.push(came.heard.worded);
+    if (came.heard.worded != null) worded.push(came.heard.worded || came.heard.unworded || "empty");
     // Said in place of an answer, and a request of its own: heard at once, as the island does.
     if (came.heard.next) {
       turn = turns.hear(came.heard.next);
@@ -676,7 +676,7 @@ for (const row of report) {
       `${seconds(median(row.modelled))} median, ${seconds(Math.max(0, ...row.modelled))} longest (${row.modelled.length})`,
       `${median(row.asked)} median, ${Math.max(0, ...row.asked)} most`,
       `${seconds(median(row.rounds))} median, ${seconds(Math.max(0, ...row.rounds))} longest (${row.rounds.length})`,
-      `${row.worded.filter(Boolean).length} of ${row.worded.length}`,
+      `${row.worded.filter((w) => w === true).length} of ${row.worded.length} (not: ${["unseen", "thing", "number", "action", "empty"].map((why) => `${why} ${row.worded.filter((w) => w === why).length}`).join(", ")})`,
     ].join(" | "),
   );
 }

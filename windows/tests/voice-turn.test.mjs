@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { createRegistry } from "../src/core/capabilities/registry.ts";
 import { done, failed } from "../src/voice/result.ts";
 import { FORGOTTEN_AFTER_MS } from "../src/voice/memory.ts";
-import { MOST_MODEL_ROUNDS, VoiceTurns, asHeard, grounded, looksWritten, written } from "../src/voice/turn.ts";
+import { MOST_MODEL_ROUNDS, VoiceTurns, asHeard, grounded, looksWritten, unfounded, written } from "../src/voice/turn.ts";
 
 const WORDS = {
   refused: () => "I can't do that", unavailable: () => "Not possible now", failed: () => "That did not work",
@@ -750,4 +750,15 @@ test("words are checked against the results: things, numbers, what was seen, and
   const paused = [ran("pause_music", {}, done("Paused", true))];
   assert.equal(await grounded("Coucou is paused.", paused, { named, nearest: async () => ["quit_coucou", "pause_coucou", "stop_listening"] }), false);
   assert.equal(await grounded("The music is paused.", paused, { named, nearest: async () => ["pause_coucou", "pause_music"] }), true);
+});
+
+test("why words do not hold up is said: unseen, a thing, a number, the action", async () => {
+  const named = (said) => app.registry.named(said);
+  const ran = (name, args, result) => ({ call: call(name, args), result });
+  const removed = [ran("remove_pills", { pills: ["stripe"] }, done("Stripe removed", true))];
+  assert.equal(await unfounded("Stripe is gone.", removed, { named }), null);
+  assert.equal(await unfounded("Stripe is gone.", [ran("remove_pills", {}, done("Asked", false))], { named }), "unseen");
+  assert.equal(await unfounded("Stripe and Vercel are gone.", removed, { named }), "thing");
+  assert.equal(await unfounded("Stripe is gone, 2 left.", removed, { named }), "number");
+  assert.equal(await unfounded("Stripe is gone.", removed, { named, nearest: async () => ["quit_coucou"] }), "action");
 });
