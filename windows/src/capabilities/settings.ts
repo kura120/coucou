@@ -104,7 +104,9 @@ function shape(spec: SettingSpec): string {
 function wanted(spec: SettingSpec, args: Args, options: readonly Option[]): { value: Value } | { why: string } {
   switch (spec.kind) {
     case "switch":
-      return typeof args.on === "boolean" ? { value: args.on } : { why: `${spec.label} is ${shape(spec)}.` };
+      if (typeof args.on === "boolean") return { value: args.on };
+      // A level asked of a switch: the settings that take one are named.
+      return { why: `${spec.label} is ${shape(spec)}.${typeof args.number === "number" ? ` A level is one of: ${SETTINGS.filter((s) => s.kind === "number").map((s) => s.label).join(", ")}.` : ""}` };
     case "number": {
       const given = args.number;
       if (typeof given !== "number" || !Number.isFinite(given)) return { why: `${spec.label} takes ${shape(spec)}.` };
@@ -168,15 +170,23 @@ export function settings(host: AppHost): Area {
       capability({
         name: "set_setting",
         area: AREA,
-        description: "Changes one of Coucou's settings. A switch takes 'on'; a level or a delay takes 'number' (a volume from 0 to 100); a choice takes 'option', one of its values. Some are changed at once and can be undone; the others wait for the user's click. Not for the pills, the music or Mochi's outfit, which have their own.",
+        description: "Changes one of Coucou's settings: its sound effects (muting them) and their volume, the language, the island, how voice listens and speaks. A switch takes 'on'; a level or a delay takes 'number' (a volume from 0 to 100); a choice takes 'option', one of its values. Some are changed at once and can be undone; the others wait for the user's click. Coucou's own sound is the Sound effects switch (off mutes it) and the Sound volume. Not for the pills, the music or Mochi's outfit, which have their own.",
         args: {
           setting: { type: "entity", kind: "setting", description: "The setting to change." },
           on: { type: "boolean", optional: true, description: "For a switch: true for on, false for off." },
           number: { type: "number", optional: true, description: "For a level or a delay: the number, in the setting's own unit." },
           option: { type: "string", optional: true, maxLength: 80, description: "For a choice: the value to pick, as get_setting lists them." },
         },
-        // A setting the schema does not know is refused in `run`; until then it is treated with the most care.
+        // A setting the schema does not know is refused in `check`; until then it is treated with the most care.
         tier: (args) => settingSpec(str(args.setting))?.tier ?? "confirm",
+        // Before the click: a value the setting does not take is said, with the values it does.
+        async check(args) {
+          const spec = settingSpec(str(args.setting));
+          if (!spec) return unknown(args);
+          const options = await optionsOf(spec);
+          const next = wanted(spec, args, options);
+          return "why" in next ? { ...failed(t("That did not change"), next.why), ...(options.length ? { near: options.map((o) => o.label) } : {}) } : null;
+        },
         async describe(args) {
           const spec = settingSpec(str(args.setting));
           if (!spec) return { title: t("Change a setting?"), change: cut(str(args.setting), 80), action: t("Change") };

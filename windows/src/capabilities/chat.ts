@@ -45,7 +45,7 @@ export function chat(host: AppHost): Area {
       capability({
         name: "prepare_chat_message",
         area: AREA,
-        description: "Opens the chat with a message in its field, for the user to read, change and send themselves. Nothing is sent. The way to get an instruction ready for an agent.",
+        description: "Writes a message in the chat's field, for the user to read, change and send themselves; nothing is sent. The way to tell an agent to do anything — run, fix, change, explain: the instruction is written here, in the words it should be sent with.",
         args: { message: { type: "string", maxLength: 1000, description: "The message, in the words it should be sent with." } },
         tier: "free",
         async run(args) {

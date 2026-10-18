@@ -42,7 +42,7 @@ export function apps(host: AppHost): Area {
       capability({
         name: "open_app",
         area: AREA,
-        description: "Opens an application installed on this computer, even when a pill has the same name. Not for one of Coucou's own views, and not for an agent's session.",
+        description: "Opens an application installed on this computer, even when a pill has the same name. Only opens it: not for installing anything or doing something inside it. Not for one of Coucou's own views, and not for an agent's session.",
         args: { app: { type: "entity", kind: "app", description: "The application, by its name." } },
         tier: "free",
         async run(args, context) {
@@ -72,7 +72,7 @@ export function apps(host: AppHost): Area {
       capability({
         name: "open_url",
         area: AREA,
-        description: "Opens a web address in the browser. Only http and https addresses. To look something up without an address, it is a web search.",
+        description: "Opens a web address in the browser, when the user said one with its dot and ending, such as github.com. Only http and https. Never for a name said without an address: an application is open_app, a pill add_pills; to look something up, it is a web search.",
         args: { url: { type: "string", maxLength: 2000, description: "The address: 'github.com', 'https://example.org/page'." } },
         tier: "free",
         async run(args) {

@@ -601,7 +601,23 @@ test("set_setting: a value the setting does not take changes nothing, and says w
     assert.equal((await set(args)).status, "failed", JSON.stringify(args));
   }
   assert.deepEqual((await set({ setting: "language", option: "Klingon" })).near, ["System", "English", "Français"]);
+  // The same is said by check, before the click a setting may take: none is asked for what cannot be done.
+  const check = (args) => get("set_setting").check(args);
+  assert.deepEqual((await check({ setting: "language", option: "Klingon" })).near, ["System", "English", "Français"]);
+  assert.equal(await check({ setting: "language", option: "Français" }), null);
+  assert.equal((await check({ setting: "nonsense", on: true })).status, "failed");
+  // A level asked of a switch: the settings that take one are named.
+  assert.match((await check({ setting: "soundEnabled", number: 30 })).detail, /A level is one of: Sound volume/);
   assert.deepEqual(log, []);
+});
+
+test("a session is known by its agent's name too, as its card shows it", async () => {
+  const { registry } = app();
+  const sessions = await registry.sources.find((source) => source.kind === "session").list();
+  const claude = sessions.find((session) => session.id === "integration_claude");
+  assert.deepEqual(claude.spoken, ["Claude Code"]);
+  const listed = await registry.get("list_sessions").run({}, context());
+  for (const session of listed.data) if (session.agent) assert.notEqual(session.agent, session.name);
 });
 
 test("get_setting reads a value as a person reads it, with a choice's values", async () => {
