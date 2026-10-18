@@ -667,7 +667,10 @@ export class VoiceTurns {
     const ok = await grounded(text, shown, {
       named: (said) => this.registry.named(said),
       // What the words are nearest among the capabilities, when there is a ranking: what they say was done.
-      nearest: ranked && acted(turn) ? async (said, labels) => (await this.index.rank(said, undefined, { kinds: [], labels }))?.find((r) => !ALWAYS_SHOWN.includes(r.name) && r.name !== UNDO)?.name ?? null : undefined,
+      // Not after undo: its words are about what it put back, which is another capability's doing.
+      nearest: ranked && acted(turn) && !shown.some((ran) => ran.call.name === UNDO)
+        ? async (said, labels) => (await this.index.rank(said, undefined, { kinds: [], labels }))?.filter((r) => !ALWAYS_SHOWN.includes(r.name) && r.name !== UNDO).slice(0, NEAREST).map((r) => r.name) ?? null
+        : undefined,
     });
     turn.worded = ok;
     return ok ? text : "";
@@ -863,8 +866,10 @@ const acted = (turn: Running) =>
  *   things   each thing of the app the words name (Registry.named, said
  *            whole) is in the results: an argument, a line, what was read
  *   numbers  each number in the words is in the results
- *   action   with a ranking, the capability the words are nearest to is one
- *            that ran: "Coucou is paused" after pause_music is pause_coucou's
+ *   action   with a ranking, one that ran is among the NEAREST capabilities
+ *            to the words: "Coucou is paused" after pause_music is
+ *            pause_coucou's. Measured: the nearest alone missed "Figma has
+ *            been opened" (open_conversation came first) 26 times in 117.
  *
  * Measured with scripts/voice-eval.mjs (the "worded" column).
  */
@@ -873,7 +878,7 @@ export async function grounded(
   ran: readonly { call: ModelCall; result: ToolResult; capability?: Capability }[],
   look: {
     named: (said: string) => Promise<readonly { kind: string; id: string; label: string; near?: boolean }[]>;
-    nearest?: (said: string, labels: readonly string[]) => Promise<string | null>;
+    nearest?: (said: string, labels: readonly string[]) => Promise<readonly string[] | null>;
   },
 ): Promise<boolean> {
   if (ran.some(({ result }) => !result.verified)) return false;
@@ -884,11 +889,12 @@ export async function grounded(
   };
   const things = (await look.named(words).catch(() => [])).filter((thing) => !thing.near);
   if (things.some((thing) => !holds(thing.label) && !holds(thing.id))) return false;
-  const numbers = words.match(/\d+(?:[.,]\d+)?/g) ?? [];
+  // Numbers said as numbers, not the digits of a name ("n8n").
+  const numbers = normalise(words).split(" ").filter((word) => /^\d+$/.test(word));
   if (numbers.some((number) => !holds(number))) return false;
   if (!look.nearest) return true;
   const nearest = await look.nearest(words, things.map((thing) => thing.label)).catch(() => null);
-  return nearest == null || ran.some((r) => r.call.name === nearest);
+  return nearest == null || ran.some((r) => nearest.includes(r.call.name));
 }
 
 /** Every string and number a value holds, however deep. */
@@ -899,6 +905,9 @@ function values(value: unknown): string[] {
   if (value && typeof value === "object") return Object.values(value).flatMap(values);
   return [];
 }
+
+/** How many of the capabilities nearest the words are looked at for one that ran (`grounded`). */
+const NEAREST = 3;
 
 /** The lines of what ran, each once, as sentences: "Paused. Stripe removed." */
 function linesOf(ran: readonly Ran[]): string {

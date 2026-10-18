@@ -264,13 +264,14 @@ test("with no model server, voice says what it needs", async () => {
   assert.deepEqual(app.state.log, []);
 });
 
-test("tier 2, ranked: the model is shown the nearest capabilities, its calls run, and what they did is said in their own lines", async () => {
+test("tier 2, ranked: the model is shown the nearest capabilities, its calls run, and its words are checked against what they did", async () => {
   const embed = embedBy({ "could you stop the song and bring in": { pause_music: 0.6, add_pills: 0.55, play_music: 0.5 } });
   const local = scripted(calls(call("pause_music"), call("add_pills", { pills: ["stripe"] })), says("Paused, and Stripe is in."));
   const heard = await turns({ embed, local: local.model }).hear("could you stop the song and bring stripe in");
   assert.deepEqual(app.state.log, ["pause", "add:stripe"]);
-  // The model's words are not what Mochi says of what was done: the capabilities' lines are.
-  assert.deepEqual(heard.result, { outcome: "success", message: "Paused. stripe added" });
+  // The model's words, which name only what ran.
+  assert.deepEqual(heard.result, { outcome: "success", message: "Paused, and Stripe is in." });
+  assert.equal(heard.worded, true);
   // The nearest first — Stripe is a pill, so what takes pills is counted nearer — then the ones always shown, and no handing up with nobody to hand up to.
   assert.deepEqual(local.asked[0].tools.slice(0, 3), ["add_pills", "pause_music", "play_music"]);
   assert.ok(local.asked[0].tools.includes("more_tools") && local.asked[0].tools.includes("nothing"));
@@ -747,6 +748,6 @@ test("words are checked against the results: things, numbers, what was seen, and
   assert.equal(await grounded("Spotify is open.", [ran("open_app", { app: "Spotify" }, done("Asked Windows to open Spotify", false))], { named }), false);
   // Nearest to a capability that did not run.
   const paused = [ran("pause_music", {}, done("Paused", true))];
-  assert.equal(await grounded("Coucou is paused.", paused, { named, nearest: async () => "quit_coucou" }), false);
-  assert.equal(await grounded("The music is paused.", paused, { named, nearest: async () => "pause_music" }), true);
+  assert.equal(await grounded("Coucou is paused.", paused, { named, nearest: async () => ["quit_coucou", "pause_coucou", "stop_listening"] }), false);
+  assert.equal(await grounded("The music is paused.", paused, { named, nearest: async () => ["pause_coucou", "pause_music"] }), true);
 });
