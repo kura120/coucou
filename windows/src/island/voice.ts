@@ -121,16 +121,36 @@ export function brainHere(url = brainUrl(), brain = State.settings.voice.brain):
  * Settings → Voice; the cloud model is asked only when the user turned it on.
  * One that cannot be asked answers nothing.
  */
+/** Lines for the voice debug log, sent together once the turn's step is over. */
+let debugLines: string[] = [];
+
+/** One line for voice-debug.log, only while the user has the debug log on. */
+function debugTrace(line: string) {
+  if (!State.settings.voice.debugLog) return;
+  if (!debugLines.length) {
+    queueMicrotask(() => {
+      const lines = debugLines;
+      debugLines = [];
+      void Bridge.voiceDebugLog(lines);
+    });
+  }
+  debugLines.push(line);
+}
+
 export function createTurns(registry: Registry): VoiceTurns {
   return new VoiceTurns({
+    trace: debugTrace,
     registry,
     embed: async (texts) => (brainChosen() && State.settings.voice.embedModel ? Bridge.voiceEmbed(texts) : null),
+    embedChosen: () => Boolean(State.settings.voice.embedModel),
     local: () => (brainChosen() ? (system, said, tools, history, steps) => Bridge.voiceBrain(system, said, tools, history, steps) : null),
     cloud: () => (State.settings.voice.cloud ? (system, said, history) => Bridge.voiceCloud(system, said, history) : null),
     followUp: () => brainChosen() && brainHere(),
     publish: (tools) => void Bridge.capabilityPublish(tools),
     words: {
       noModel: () => t("Voice needs a model server. Choose one in Settings."),
+      noEmbedding: () => t("Voice needs an embedding model. Choose one in Settings."),
+      embedSilent: () => t("The embedding model did not answer. Say it again in a moment."),
       silent: () => t("The model did not answer."),
       notUnderstood: () => t("Command not recognised"),
       beyond: () => t("That is more than I can do here."),

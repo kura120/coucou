@@ -16,6 +16,8 @@
 //   embed.rs), wherever the user pointed it, and — behind its own switch, off
 //   by default — the provider chosen for chat (cloud.rs).
 // - Nothing is recorded. The log says that something was recognised, never what.
+//   The one exception is the user's to make: the opt-in debug log (debug.rs),
+//   while it is on, and in a file of its own.
 // - Off by default. Off means no thread and a closed microphone.
 // - Voice never approves a permission and never sends anything.
 //
@@ -68,6 +70,7 @@ mod apps;
 pub mod ask_keys;
 pub mod brain;
 pub mod cloud;
+pub mod debug;
 pub mod embed;
 #[cfg(windows)]
 mod capture;

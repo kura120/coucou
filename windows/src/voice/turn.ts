@@ -31,7 +31,7 @@ import type { Answer, Ask, Capability, Registry, RunContext, ToolResult } from "
 import { usable } from "./asking";
 import { normalise } from "./entity";
 import { VoiceMemory, type ModelCall, type VoiceTurn } from "./memory";
-import { ALWAYS_SHOWN, CapabilityIndex, indexText, instant, SHORTLIST, shortlist, type Embed, type Ranked } from "./rank";
+import { CapabilityIndex, indexText, instant, SHORTLIST, shortlist, type Embed, type Ranked } from "./rank";
 import { forModel, spoken, type VoiceResult } from "./result";
 
 export type { ModelCall } from "./memory";
@@ -74,18 +74,23 @@ export const ANSWER_MS = 4000;
 /** How long the cloud tier may take, as Rust allows it (voice_cloud): it is for what is worth waiting for. */
 export const CLOUD_BUDGET_MS = 150_000;
 /** After the embedding model did not answer, it is not asked again for this long. */
-export const EMBED_RETRY_MS = 60_000;
+export const EMBED_RETRY_MS = 10_000;
 
 const MORE_TOOLS = "more_tools";
 /** Putting the last change back is about the conversation, whatever it was about: shown whatever the sentence is. */
 const UNDO = "undo";
 const NOTHING = "nothing";
 const ESCALATE = "escalate";
+const ASK_USER = "ask_user";
 
 /** The lines the turn itself shows, worded and translated by its maker. */
 export interface TurnWords {
   /** No model server is chosen for voice. */
   noModel(): string;
+  /** No embedding model is chosen for voice: it is what finds the capabilities a sentence is about. */
+  noEmbedding(): string;
+  /** The embedding model was asked and did not answer. */
+  embedSilent(): string;
   /** The model was asked and did not answer. */
   silent(): string;
   /** The model answered and nothing came of it. */
@@ -100,6 +105,8 @@ export interface TurnOptions {
   registry: Registry;
   /** The embedding model; answers null when there is none. */
   embed: Embed;
+  /** Whether one is chosen at all: without one, voice says so rather than guess. */
+  embedChosen?: () => boolean;
   /** The model server chosen for voice, or null when none is. */
   local: () => LocalModel | null;
   /** The cloud model, or null unless the user turned it on. */
@@ -112,6 +119,13 @@ export interface TurnOptions {
   followUp?: () => boolean;
   /** Gives the cloud model's endpoint the capabilities it may ask for. */
   publish?: (tools: unknown[]) => void;
+  /**
+   * The debug log, when the user turned it on (voice/debug.rs): told each
+   * step of a turn in a line — what was heard and ranked, what the models
+   * were asked and answered, what ran and what came of it. Absent: nothing is
+   * written anywhere.
+   */
+  trace?: (line: string) => void;
   words: TurnWords;
   now?: () => number;
 }
@@ -194,6 +208,7 @@ const ROLE = [
   "How to act:",
   "- Do what was asked by calling capabilities. Several things asked are several calls.",
   "- Names: write each name in the arguments in the user's own words, as it was heard, even when it looks misheard, cut short or unlike anything in the state (\"open st\" is the app \"st\", \"open this squad\" the app \"this squad\"). The app looks it up and asks the user when it is not sure. A name you do not know is never a reason to do nothing. Never write a name or an address the user did not say.",
+  "- When you are not sure what the user meant — a name that may be misheard, two things it could be — ask them with ask_user, giving the likely answers as options, then do what they answer. Asking is never wrong; doing nothing with a request is.",
   "- A sentence that goes on from the turn before (\"and Discord too\", \"what about Steam\") asks for the same again, for what it names now.",
   "- A correction of the turn before (\"no, I meant Resend\", \"take that one off\") is a request: put the last change back with undo, then do what is meant now, if anything.",
   "- Some capabilities wait for the user's click before anything happens. That is the app's doing: call them when they are what was asked.",
@@ -205,22 +220,7 @@ const ROLE = [
   "- Last, and above all: when the sentence says not to do something, or never to do it, nothing is done. Call the capability named nothing.",
 ].join("\n");
 
-/**
- * With no embedding model, the areas come first: the model is asked, with
- * nothing else to do, which part of the app the sentence is about. Each area
- * is a line of what it holds, written as plain words: given the capabilities'
- * names as they are called, a small model calls one before it has it.
- */
-const AREAS_FIRST = [
-  "The user of the desktop app Coucou has just said one sentence to it. Say which parts of the app the sentence is about, by calling the tool named about, once.",
-  "The app's areas, and what each can do:",
-  "{areas}",
-  "Give the three areas the sentence is most likely about: the most likely as first, then second and third. When the sentence asks nothing of the app, give none for all three.",
-].join("\n");
-
 const SHORTLISTED = "Your tools are the capabilities nearest to what was said. When none of them is what was asked, call more_tools with an area to be given that area's.";
-
-const BY_AREA = "Your tools are the capabilities of the areas the sentence is about. When none of them is what was asked, call more_tools with another area to be given that area's.";
 
 /** Told to the model of a sentence said without the wake phrase. */
 const ASIDE =
@@ -276,12 +276,16 @@ export class VoiceTurns {
   private registry: Registry;
   private index: CapabilityIndex;
   private embed: Embed;
+  private embedChosen: () => boolean;
+  /** The capabilities being embedded since the wake phrase, waited for by the sentence after it. */
+  private warming: Promise<void> | null = null;
   private local: () => LocalModel | null;
   private cloud: () => CloudModel | null;
   private publish: (tools: unknown[]) => void;
   private followUp: () => boolean;
   private words: TurnWords;
   private now: () => number;
+  private trace: (line: string) => void;
 
   /** What the index was last given, to see that the capabilities changed. */
   private indexed = "";
@@ -297,6 +301,7 @@ export class VoiceTurns {
   constructor(options: TurnOptions) {
     this.registry = options.registry;
     this.embed = options.embed;
+    this.embedChosen = options.embedChosen ?? (() => true);
     this.index = new CapabilityIndex(options.embed);
     this.local = options.local;
     this.cloud = options.cloud;
@@ -304,6 +309,22 @@ export class VoiceTurns {
     this.followUp = options.followUp ?? (() => false);
     this.words = options.words;
     this.now = options.now ?? (() => Date.now());
+    this.trace = options.trace ?? (() => {});
+  }
+
+  /** The model, with each question to it and its answer told to the debug log. */
+  private traced(local: LocalModel | null, label = "model"): LocalModel | null {
+    if (!local) return null;
+    return async (system, said, tools, history, steps) => {
+      const names = tools.map((tool) => (tool as { function?: { name?: string } }).function?.name ?? "?");
+      this.trace(`${label} asked${steps?.length ? ` (round ${steps.length + 1})` : ""}: ${JSON.stringify(said)} · tools: ${names.join(", ") || "none"} · turns before: ${history.length}`);
+      if (!steps?.length) this.trace(`${label} instructions: ${system}`);
+      const started = this.now();
+      const reply = await local(system, said, tools, history, steps);
+      const took = `${Math.round(this.now() - started)} ms`;
+      this.trace(reply ? `${label} answered in ${took}: calls ${JSON.stringify(reply.calls)} · words ${JSON.stringify(reply.text)}` : `${label} did not answer (${took})`);
+      return reply;
+    };
   }
 
   /** Voice was turned off, or the conversation is over: nothing is remembered. */
@@ -368,8 +389,9 @@ export class VoiceTurns {
     const sentence = said.trim();
     if (!ask || !sentence) return { is: "unclear" };
     if (ask.kind === "text") return { is: "draft", value: draft.trim() ? `${draft.trim()} ${sentence}` : sentence };
-    const local = this.local();
+    const local = this.traced(this.local(), "answer reader");
     if (!local) return { is: "unclear" };
+    this.trace(`answer said to "${ask.question}": ${JSON.stringify(sentence)}`);
 
     // A choice's options with their place among them, for an answer by place ("the last one").
     const options = ask.kind === "choice"
@@ -390,6 +412,7 @@ export class VoiceTurns {
       chosen === "none" ? { kind: "dropped" }
       : ask.kind === "yes_no" ? (chosen === "yes" || chosen === "no" ? { kind: "yes_no", yes: chosen === "yes" } : null)
       : ask.options[Number(chosen) - 1] ? { kind: "choice", id: ask.options[Number(chosen) - 1].id } : null;
+    this.trace(`answer read as: ${given ? JSON.stringify(given) : "unclear"}`);
     if (!given) return { is: "unclear" };
     // "No, Discord": no to this, and a request of its own, heard once this turn is over.
     const refusal = given.kind === "dropped" || (given.kind === "yes_no" && !given.yes);
@@ -410,28 +433,41 @@ export class VoiceTurns {
     // Without the wake phrase: only a model on this computer is given it, and with no model it is for nobody.
     if (!wake && (!this.followUp() || !this.local())) return IGNORED;
     const turn: Running = { said: sentence, how, ran: [], started: this.now(), taken: wake, named: [] };
+    this.trace(`── heard${wake ? "" : " without the wake phrase"}: ${JSON.stringify(sentence)}${how.sure?.length ? ` · sure ${how.sure.map((x) => x.toFixed(2)).join(" ")}` : ""}`);
     if (wake) how.taken?.();
     const before = this.memory.recent(this.now());
     turn.named = await this.registry.named(sentence);
+    if (turn.named.length) this.trace(`names found: ${turn.named.map((n) => `${n.near ? "~" : ""}${n.label} (${n.kind}${n.heard ? `, heard "${n.heard}"` : ""})`).join("; ")}`);
     const ranked = await this.ranked(turn, before[before.length - 1]?.said);
+    this.trace(ranked ? `ranked: ${ranked.slice(0, 8).map((r) => `${r.name} ${r.score.toFixed(3)}`).join(", ")}` : "ranked: no embedding model answered");
 
     const heard = await this.understand(turn, ranked);
-    if (!turn.taken) return IGNORED;
+    if (!turn.taken) {
+      this.trace("ignored: not taken as said to Coucou");
+      return IGNORED;
+    }
+    this.trace(`card: ${heard.result ? `${heard.result.outcome} ${JSON.stringify(heard.result.message)}` : "nothing shown"}${heard.worded === false ? ` · the model's words did not hold up (${heard.unworded})` : ""}${heard.rest ? " · done talking" : ""}`);
     const next = this.nextSaid;
     this.nextSaid = null;
     return next ? { ...heard, next } : heard;
   }
 
   private async understand(turn: Running, ranked: Ranked[] | null): Promise<Heard> {
+    // No ranking, no guess: the embedding model is what finds which capabilities a sentence is about.
+    if (!ranked) {
+      if (!this.local()) return this.end(turn, "", this.words.noModel());
+      return this.end(turn, "", this.embedChosen() ? this.words.embedSilent() : this.words.noEmbedding());
+    }
     // Tier 1: the ranking names one capability, clearly. No model is asked — and not for a sentence that may be for nobody.
     const name = ranked && turn.taken ? instant(ranked, this.registry.all()) : null;
+    if (ranked) this.trace(`instant: ${name ?? "none"}`);
     if (name) {
       const done = await this.instantly(name, turn);
       if (done) return this.end(turn, "");
     }
 
     // Tier 2: the local model.
-    const local = this.local();
+    const local = this.traced(this.local());
     if (!local) return this.end(turn, "", this.words.noModel());
     turn.how.waiting?.();
     const came = await this.locally(local, turn, ranked);
@@ -458,18 +494,45 @@ export class VoiceTurns {
     const cloud = this.cloud();
     if (!cloud) return this.end(turn, "", came.is === "escalated" ? this.words.beyond() : this.words.silent());
     turn.how.waiting?.(this.words.askingCloud(), CLOUD_BUDGET_MS);
+    this.trace(`cloud asked (${came.is})`);
     const words = await this.cloudly(cloud, turn);
+    this.trace(words == null ? "cloud did not answer" : `cloud answered: ${JSON.stringify(words)}`);
     if (turn.how.wanted && !turn.how.wanted()) return { result: null, taken: true, rest: false };
     return this.end(turn, await this.checked(turn, words ?? ""), words == null && !shownOf(turn).length ? this.words.silent() : undefined);
   }
 
   // ── The ranking ─────────────────────────────────────────────────────────────
 
-  /** The capabilities by how near the sentence is to each; null with no embedding model. */
+  /** What the index is given: each capability's text, and the key that says it changed. */
+  private indexInput(): { capabilities: { name: string; text: string; kinds: string[] }[]; key: string } {
+    const capabilities = this.registry.all().map((c) => ({ name: c.name, text: indexText(c), kinds: kindsOf(c) }));
+    return { capabilities, key: capabilities.map((c) => `${c.name}\n${c.text}`).join("\n\n") };
+  }
+
+  /**
+   * "OK Coucou" was heard: the embedding model is got ready while the
+   * sentence is said — the capabilities embedded when they changed, else one
+   * word, so that a server that let the model go has it back in memory. A
+   * failure here is not held against it: the sentence asks again.
+   */
+  warm(): void {
+    if (!this.embedChosen() || this.warming) return;
+    const { capabilities, key } = this.indexInput();
+    const work: Promise<unknown> = key === this.indexed
+      ? this.embed(["ok"])
+      : this.index.sync(capabilities).then((ok) => {
+        if (ok) this.indexed = key;
+      });
+    this.warming = work.then(() => {}, () => {}).finally(() => {
+      this.warming = null;
+    });
+  }
+
+  /** The capabilities by how near the sentence is to each; null with no embedding model, or one that did not answer. */
   private async ranked(turn: Running, previous?: string): Promise<Ranked[] | null> {
     const sentence = turn.said;
-    const capabilities = this.registry.all().map((c) => ({ name: c.name, text: indexText(c), kinds: kindsOf(c) }));
-    const key = capabilities.map((c) => `${c.name}\n${c.text}`).join("\n\n");
+    if (this.warming) await this.warming;
+    const { capabilities, key } = this.indexInput();
     if (key !== this.indexed) {
       // An embedding model that is not there is not asked at every sentence.
       if (this.now() - this.embedFailedAt < EMBED_RETRY_MS) return null;
@@ -508,6 +571,7 @@ export class VoiceTurns {
     const given = await this.heardCall(call, turn);
     const result = await this.registry.execute(given, this.context(origin, turn));
     turn.ran.push({ call: given, result, capability: this.registry.get(call.name) });
+    this.traceRan(origin, given, result);
     return result;
   }
 
@@ -534,7 +598,12 @@ export class VoiceTurns {
 
   private record(turn: Running, name: string, args: Record<string, unknown>, result: ToolResult): true {
     turn.ran.push({ call: { name, arguments: args }, result, capability: this.registry.get(name) });
+    this.traceRan("instant", { name, arguments: args }, result);
     return true;
+  }
+
+  private traceRan(origin: string, call: ModelCall, result: ToolResult) {
+    this.trace(`ran (${origin}): ${call.name} ${JSON.stringify(call.arguments ?? {})} → ${result.status}${result.status === "done" ? (result.verified ? ", seen" : ", not seen") : ""} · ${JSON.stringify(result.line)}${result.detail && result.detail !== result.line ? ` · ${JSON.stringify(result.detail)}` : ""}${result.data !== undefined ? ` · data ${JSON.stringify(result.data)}` : ""}`);
   }
 
   // ── Tier 2 ──────────────────────────────────────────────────────────────────
@@ -542,7 +611,7 @@ export class VoiceTurns {
   private async locally(
     local: LocalModel,
     turn: Running,
-    ranked: Ranked[] | null,
+    ranked: Ranked[],
   ): Promise<{ is: "answered"; words: string } | { is: "escalated" } | { is: "silent" } | { is: "dropped" }> {
     const { how, said } = turn;
     const capabilities = this.registry.all();
@@ -552,10 +621,8 @@ export class VoiceTurns {
     const history: ModelTurn[] = this.memory.recent(this.now()).map(({ said: s, calls, result }) => ({ said: s, calls, result }));
     // A follow-up ("and Discord too") goes on with what the turn before called, whatever it ranks alone.
     const carried = (history[history.length - 1]?.calls ?? []).map((call) => call.name);
-    // With no ranking, every capability that takes a kind of thing the sentence names: there are few for each.
-    const kinds = new Set(turn.named.map((n) => n.kind));
-    const taking = capabilities.filter((c) => kindsOf(c).some((kind) => kinds.has(kind))).map((c) => c.name);
-    const shown = new Set(offered([...(ranked ? shortlist(ranked, capabilities, SHORTLIST, [...carried, ...takers(ranked, capabilities, turn.named)]) : [...ALWAYS_SHOWN, ...carried, ...taking]), UNDO]));
+    // Asking the user is always offered: a name the model is not sure of is asked about, not guessed or dropped.
+    const shown = new Set(offered([...shortlist(ranked, capabilities, SHORTLIST, [...carried, ...takers(ranked, capabilities, turn.named)]), UNDO, ASK_USER]));
     // What cannot be used right now is not offered (no question waits, the chat's field is empty): read again
     // each round, since a call may make another usable — a message prepared can be sent.
     const usable = (name: string) => {
@@ -569,21 +636,7 @@ export class VoiceTurns {
 
     const snapshot = await this.registry.snapshot();
 
-    // No ranking: the areas first. The model says which the sentence is about
-    // — one tool, nothing else to do — and is then shown those areas' capabilities.
-    if (!ranked) {
-      const all = this.registry.areas();
-      const lines = all.map(({ area, names }) => `${area}: ${names.map((name) => name.split("_").join(" ")).join(", ")}`).join("\n");
-      // With the app's state: which area a name belongs to is read there (a pill, a session, a setting).
-      const router = [AREAS_FIRST.replace("{areas}", lines), `The app's state now, as JSON:\n${JSON.stringify(snapshot)}`, namedLine(turn.named, false)].filter(Boolean).join("\n\n");
-      const routed = await local(router, said, [aboutTool(all.map(({ area }) => area))], history);
-      if (how.wanted && !how.wanted()) return { is: "dropped" };
-      if (!routed) return { is: "silent" };
-      const about = [...routed.calls, ...written(routed.text, new Set(["about"]))].find((call) => call.name === "about")?.arguments ?? {};
-      const picked = [about.first, about.second, about.third];
-      for (const { area, names } of all) if (picked.includes(area)) for (const name of offered(names)) shown.add(name);
-    }
-    const system = [systemPrompt(snapshot, ranked ? SHORTLISTED : BY_AREA), namedLine(turn.named), turn.taken ? "" : ASIDE].filter(Boolean).join("\n\n");
+    const system = [systemPrompt(snapshot, SHORTLISTED), namedLine(turn.named), turn.taken ? "" : ASIDE].filter(Boolean).join("\n\n");
 
     let reply = await local(system, said, tools(), history);
     if (how.wanted && !how.wanted()) return { is: "dropped" };
@@ -648,7 +701,7 @@ export class VoiceTurns {
     }
     // What only read is said from what was read, and from nothing else.
     if (shownOf(turn).length && !acted(turn) && shownOf(turn).every((ran) => ran.result.status === "done")) {
-      words = (await this.report(local, turn)) ?? "";
+      words = (await this.report(this.traced(this.local(), "reporter") ?? local, turn)) ?? "";
       if (how.wanted && !how.wanted()) return { is: "dropped" };
     }
     return { is: "answered", words };
@@ -769,7 +822,7 @@ function namedLine(named: Running["named"], calling = true): string {
   const near = named.filter((n) => n.near).map((n) => `${n.heard ? `"${n.heard}" is ` : ""}most likely ${n.label} (${n.kind}), misheard`);
   return [
     whole.length ? `In what was said, the app finds: ${whole.join("; ")}.` : "",
-    near.length ? `In what was said, ${near.join("; ")}${calling ? ": call with that name; the app asks the user before it acts on it" : ""}.` : "",
+    near.length ? `In what was said, ${near.join("; ")}${calling ? ": call with that name, and the app asks the user before it acts on it; or ask them yourself with ask_user" : ""}.` : "",
   ].filter(Boolean).join(" ");
 }
 
@@ -931,28 +984,6 @@ function namesIn(data: unknown): string[] {
   const listed = (data as { capabilities?: unknown } | null)?.capabilities;
   if (!Array.isArray(listed)) return [];
   return listed.map((item) => (item as { name?: unknown } | null)?.name).filter((name): name is string => typeof name === "string");
-}
-
-/** The one tool the model is given when it is asked which areas a sentence is about. */
-function aboutTool(areas: readonly string[]) {
-  return {
-    type: "function",
-    function: {
-      name: "about",
-      description: "Says which areas of the app a sentence is about.",
-      parameters: {
-        type: "object",
-        // Three named places rather than a list: asked for a list, a small model gives one area and stops.
-        properties: {
-          first: { type: "string", enum: [...areas, "none"], description: "The most likely area." },
-          second: { type: "string", enum: [...areas, "none"], description: "The next most likely area." },
-          third: { type: "string", enum: [...areas, "none"], description: "The third most likely area." },
-        },
-        required: ["first", "second", "third"],
-        additionalProperties: false,
-      },
-    },
-  };
 }
 
 /** The one tool the model that reads a spoken answer is given. */

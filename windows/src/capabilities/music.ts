@@ -18,6 +18,19 @@ export function music(host: AppHost): Area {
     return why === true ? null : failed(why);
   };
 
+  /**
+   * Whether the player came to what was asked, read again for a moment: the
+   * player says so a little after it was asked, and what was read at once was
+   * taken for a failure (a model then asked for the opposite: "pause" played).
+   */
+  async function seen(check: () => boolean, ms = 1500): Promise<boolean> {
+    for (let waited = 0; !check(); waited += 100) {
+      if (waited >= ms) return false;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return true;
+  }
+
   /** One switch of the player (shuffle, repeat): set, then read back. */
   async function switchTo(action: "shuffle" | "repeat", on: boolean, line: string): Promise<ToolResult> {
     const stopped = refusedNow();
@@ -64,8 +77,9 @@ export function music(host: AppHost): Area {
             // Starting the player is all that can be asked: whether it then plays is its own.
             return (await host.openMusic()) ? done(t("Open Spotify"), false) : failed(t("Spotify not installed"));
           }
-          if (!host.music().playing && !(await host.musicControl("playPause"))) return failed(t("That did not change"), "The player did not take it.");
-          return done(t("Playing"), host.music().playing);
+          // Play said as such, never a toggle: what the app last read of the player may be late.
+          if (!(await host.musicControl("play"))) return failed(t("That did not change"), "The player did not take it.");
+          return done(t("Playing"), await seen(() => host.music().playing));
         },
       }),
       capability({
@@ -79,8 +93,9 @@ export function music(host: AppHost): Area {
         async run() {
           const stopped = refusedNow();
           if (stopped) return stopped;
-          if (host.music().playing && !(await host.musicControl("playPause"))) return failed(t("That did not change"), "The player did not take it.");
-          return done(t("Paused"), !host.music().playing);
+          // Pause said as such, never a toggle: a toggle on a late reading started the music instead.
+          if (!(await host.musicControl("pause"))) return failed(t("That did not change"), "The player did not take it.");
+          return done(t("Paused"), await seen(() => !host.music().playing));
         },
       }),
       capability({

@@ -20,7 +20,7 @@ use crate::settings::Settings;
 /// A sentence is ranked before anything is done about it: a loaded model
 /// answers in a few hundredths of a second, and one the server has to load
 /// first (a second or two for an embedding model) still makes it.
-const TIMEOUT: Duration = Duration::from_secs(6);
+const TIMEOUT: Duration = Duration::from_secs(12);
 /// The most texts one request carries: every capability the app declares, at
 /// once, with room. More is not cut — a list cut short would no longer line up
 /// with what was asked — it is refused.

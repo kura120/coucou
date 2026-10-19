@@ -87,6 +87,8 @@ function fake(change = {}) {
     music: () => ({ ...s.music }),
     musicControl: async (action, value) => act(`music:${action}`, () => {
       if (action === "playPause") s.music.playing = !s.music.playing;
+      if (action === "play") s.music.playing = true;
+      if (action === "pause") s.music.playing = false;
       if (action === "shuffle") s.music.shuffle = value === 1;
       if (action === "repeat") s.music.repeat = value === 1;
       if (action === "volume") s.music.volume = value;
@@ -309,6 +311,7 @@ const CASES = [
   { name: "notify", args: { text: "Stand up" }, unverified: true },
   { name: "undo" },
   { name: "nothing" },
+  { name: "ask_user", args: { question: "Open Discord?", option_1: "Discord", option_2: "Steam" } },
   { name: "escalate", args: { reason: "needs a plan" }, unverified: true },
   { name: "more_tools" },
 ];
@@ -424,7 +427,7 @@ test("a capability never throws: what breaks in the app is a failure", async () 
   }
   for (const c of CASES) {
     // These three do not touch the app.
-    if (["undo", "nothing", "escalate", "more_tools"].includes(c.name)) continue;
+    if (["undo", "nothing", "escalate", "more_tools", "ask_user"].includes(c.name)) continue;
     const result = await reg.get(c.name).run(c.args ?? {}, context());
     assert.equal(result.status, "failed", c.name);
     assert.equal(result.verified, false, c.name);
@@ -814,4 +817,19 @@ test("replacing a pill that is not shown by one that already is changes nothing,
   assert.equal(result.status, "failed");
   assert.match(result.detail, /is not shown, and .* already is/);
   assert.deepEqual(log, []);
+});
+
+test("pause and play are said as such, never as a toggle: a late reading of the player does not start the music", async () => {
+  // The app last read the player as paused while it plays: a toggle would have started nothing — or the opposite.
+  const { get, s, log } = app();
+  s.music.running = true;
+  s.music.playing = false;
+  const paused = await get("pause_music").run({}, context());
+  assert.equal(paused.status, "done");
+  assert.ok(log.includes("music:pause") && !log.includes("music:playPause"));
+  assert.equal(s.music.playing, false);
+  const played = await get("play_music").run({}, context());
+  assert.ok(log.includes("music:play"));
+  assert.equal(played.verified, true);
+  assert.equal(s.music.playing, true);
 });

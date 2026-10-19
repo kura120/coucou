@@ -496,6 +496,12 @@ export const Bridge = {
     said: string,
     history: { said: string; calls: { name: string; arguments: Record<string, unknown> }[]; result: string }[] = [],
   ) => call<{ text: string }>("voice_cloud", { system, said, history }),
+  /** A turn's lines for voice-debug.log; written only while `voice.debugLog` is on (src-tauri/src/voice/debug.rs). */
+  voiceDebugLog: (lines: string[]) => call<void>("voice_debug_log", { lines }),
+  /** Deletes the voice debug log. */
+  voiceDebugClear: () => call<void>("voice_debug_clear"),
+  /** Opens the folder that holds the voice debug log. */
+  voiceDebugReveal: () => call<void>("voice_debug_reveal"),
   /** The user's own folders voice may open, by name (src-tauri/src/voice/apps.rs `folder`). */
   voiceFolders: () => call<string[]>("voice_folders"),
   /** Whether a part of the bundled engine is on this machine, and what getting it costs. */
@@ -520,7 +526,7 @@ export const Bridge = {
   voiceOpenFolder: (name: string) => call<string | null>("voice_open_folder", { name }),
 };
 
-export type SpotifyAction = "playPause" | "next" | "previous" | "seek" | "shuffle" | "repeat" | "volume";
+export type SpotifyAction = "playPause" | "play" | "pause" | "next" | "previous" | "seek" | "shuffle" | "repeat" | "volume";
 
 export type ShortcutStatus =
   | "active" | "off" | "inUse" | "duplicate" | "invalid"

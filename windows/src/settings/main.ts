@@ -1056,7 +1056,7 @@ function voiceSection(): HTMLElement {
   voiceListener = show;
 
   // What voice needs to understand a command: a line, and a notice while the
-  // model server, its model or the speech engine is missing.
+  // model server, its model, its embedding model or the speech engine is missing.
   const needs = h("div", { class: "hint" });
   /** Whether the hearing part is on this machine, once Rust has said. */
   let engineHere = false;
@@ -1065,12 +1065,15 @@ function voiceSection(): HTMLElement {
     if (!server.value || !settings.voice.brainModel) {
       missing.push(t("No model server and model are chosen yet: see “{row}” below.", { row: t("Understand free speech with") }));
     }
+    if (server.value && settings.voice.brainModel && !settings.voice.embedModel) {
+      missing.push(t("No embedding model is chosen yet: see “{row}” below.", { row: t("Embedding model") }));
+    }
     if (!engineHere || settings.voice.engine !== "bundled") {
       missing.push(t("The speech engine is not downloaded or not turned on yet: see “{row}” below.", { row: t("Hear free speech") }));
     }
     needs.className = missing.length ? "notice warn" : "hint";
     needs.textContent = [
-      t("To understand a command, voice needs a model server with a model, and the downloaded speech engine."),
+      t("To understand a command, voice needs a model server with a model and an embedding model, and the downloaded speech engine."),
       ...missing,
     ].join(" ");
   };
@@ -1120,7 +1123,7 @@ function voiceSection(): HTMLElement {
   const embedRow = h("div", { class: "row" }, h("label", { text: t("Embedding model") }), embed);
   const embedAbout = h("div", { class: "hint", text: t("Finds which of Coucou's commands a sentence is closest to, before any model is asked. It runs on the server chosen above.") });
   const embedNone = h("div", { class: "hint", text: t("This server has no embedding model. You install one on your server yourself: Coucou downloads nothing here.") });
-  const embedWithout = h("div", { class: "hint", text: t("Without an embedding model, voice still works but takes longer to choose, and every command needs « OK Coucou »: listening after a command is off.") });
+  const embedWithout = h("div", { class: "hint", text: t("Voice needs an embedding model: it is what finds which of Coucou's commands a sentence is about. mxbai-embed-large chose best in our measurements.") });
   const fillEmbed = async () => {
     const chosen = server.value !== "";
     for (const el of [embedRow, embedAbout, embedNone, embedWithout]) el.style.display = "none";
@@ -1431,6 +1434,17 @@ function voiceSection(): HTMLElement {
     h("div", { class: "hint", text: t("A question alone is answered from the web, without being asked to search. Off: the web is used only when you ask for a search.") }),
     h("div", { class: "row" }, h("label", { text: t("Search engine") }), engine),
     h("div", { class: "hint", text: t("Where your browser opens when a search is opened in it.") }),
+    h("div", { class: "subhead", text: t("Debugging") }),
+    h("div", { class: "row" },
+      h("label", { text: t("Keep a voice debug log") }),
+      toggle(settings.voice.debugLog, (v) => {
+        // Off deletes what was written: what was said is kept only while this is on.
+        if (!v) void Bridge.voiceDebugClear();
+        return change({ debugLog: v });
+      }),
+    ),
+    h("div", { class: "hint", text: t("Writes what you say and everything voice does with it — what it ranked, what the models were asked and answered, what ran — to voice-debug.log on this computer, to find what went wrong. Nothing is sent anywhere. Turning it off deletes the file.") }),
+    h("div", { class: "row" }, h("button", { text: t("Open the log's folder"), onclick: () => void Bridge.voiceDebugReveal() })),
   );
 }
 

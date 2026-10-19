@@ -99,6 +99,36 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
         },
       }),
       capability({
+        name: "ask_user",
+        area: AREA,
+        description: "Asks the user a short question on screen and waits for the answer: for when what they meant is not sure — a name that may be misheard, two things it could be. Give the likely answers as options (two to four), or none for a yes or no. What they answer comes back; then do what it says.",
+        args: {
+          question: { type: "string", maxLength: 160, description: "The question, short, as Coucou asks it." },
+          option_1: { type: "string", maxLength: 60, optional: true, description: "A likely answer." },
+          option_2: { type: "string", maxLength: 60, optional: true, description: "Another likely answer." },
+          option_3: { type: "string", maxLength: 60, optional: true, description: "Another." },
+          option_4: { type: "string", maxLength: 60, optional: true, description: "Another." },
+        },
+        tier: "free",
+        async run(args, context) {
+          const question = cut(str(args.question), 160);
+          if (!question) return failed(t("Command not recognised"), "A question is needed.");
+          const options = [...new Set([args.option_1, args.option_2, args.option_3, args.option_4].map((o) => cut(str(o), 60)).filter(Boolean))];
+          const answer = await context.ask(
+            options.length >= 2
+              ? { kind: "choice", question, options: options.map((label, i) => ({ id: String(i + 1), label })) }
+              : { kind: "yes_no", question },
+          );
+          // The answer is for the model, which goes on from it; the card shows nothing of its own for asking.
+          const said =
+            answer.kind === "choice" ? options[Number(answer.id) - 1] ?? ""
+            : answer.kind === "yes_no" ? (answer.yes ? "yes" : "no")
+            : answer.kind === "text" ? answer.value
+            : "";
+          return said ? done("", true, { asked: question, answered: said }) : done("", true, { asked: question, answered: null, note: "The user did not answer: do nothing more." });
+        },
+      }),
+      capability({
         name: "escalate",
         area: AREA,
         description: "Hands the request to a stronger model, when it needs more reasoning, more steps or more knowledge than can be given here. Not for what a capability here already does.",

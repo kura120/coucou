@@ -212,7 +212,7 @@ test("voice is off by default, with the wake phrase ready for when it is turned 
     enabled: false, wake: true, brain: "", brainModel: "", engine: "system", hearingModel: "parakeet-0.6b", followUp: 8,
     speak: false, speaker: "female",
     // Nothing that sends what was said anywhere new is on, and no model is asked to rank.
-    embedModel: "", cloud: false, webAnswers: false, webSearch: "browser",
+    embedModel: "", cloud: false, webAnswers: false, webSearch: "browser", debugLog: false,
   });
   assert.equal(DEFAULT_SETTINGS.searchEngine, "google");
 });
