@@ -296,7 +296,8 @@ async function local(system, said, tools, history = [], steps = []) {
     fetch(`${SERVER}/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: MODEL, temperature: 0, stream: false, tools, messages: messages(system, history, said, steps) }),
+      // No thinking, as the app asks (src-tauri/src/voice/brain.rs).
+      body: JSON.stringify({ model: MODEL, temperature: 0, stream: false, reasoning_effort: "none", tools, messages: messages(system, history, said, steps) }),
     });
   // A server that is being restarted, or is busy with another session's model: once more, a little later.
   const reply = await request().catch(() => new Promise((resolve) => setTimeout(resolve, 5000)).then(request));

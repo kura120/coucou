@@ -153,6 +153,11 @@ pub async fn ask(
         "tools": tools,
         "temperature": 0,
         "stream": false,
+        // A model that thinks before it answers (qwen3) wrote some 150 tokens of
+        // it for every call, a voice command waiting on each: measured, qwen3:8b
+        // writes 2 tokens for a one-word answer with this and 138 without. As
+        // hear.rs asks; a server that does not think ignores it.
+        "reasoning_effort": "none",
     });
     let answer = local_chat::complete(&server, &body, TIMEOUT).await?;
     Ok(read(&answer))
