@@ -129,6 +129,13 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
           const back = await registry.undo(context);
           if (back.status !== "done") return back;
           const [arg, spec] = named;
+          // What was meant is what was just put back ("can you add it back" after GitHub was removed): it is only put back.
+          const kind = spec.type === "entity" || spec.type === "entities" ? spec.kind : "";
+          const before = change.call.arguments[arg];
+          const originals = Array.isArray(before) ? before : [before];
+          const meantIds = (await registry.named(meant)).filter((thing) => !thing.near && thing.kind === kind).map((thing) => thing.id);
+          // Given as a name, or as the id a model read in last_change.
+          if (originals.includes(meant) || meantIds.some((id) => originals.includes(id))) return { ...back, data: { put_back: change.call, note: "What was meant is what was put back: it is only put back." } };
           const again = await registry.execute({ name: change.call.name, arguments: { ...change.call.arguments, [arg]: spec.type === "entities" ? [meant] : meant } }, context);
           // Both said: what was put back, and what was done in its place.
           return again.status === "done" ? { ...again, line: [back.line, again.line].filter(Boolean).join(". "), data: { put_back: change.call, then: again.data ?? again.line } } : again;

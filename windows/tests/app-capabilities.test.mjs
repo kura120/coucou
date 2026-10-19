@@ -205,12 +205,13 @@ function registry() {
     schema: () => null,
     snapshot: async () => ({}),
     execute: async (call) => (self.executed.push(call), { status: "done", verified: true, line: `${call.name} done` }),
-    undo: async () => ({ status: "done", verified: true, line: "Put back" }),
+    undo: async () => (self.undone += 1, { status: "done", verified: true, line: "Put back" }),
     // The last change, as the real registry keeps it: GitHub added.
     lastChange: () => ({ call: { name: "add_pills", arguments: { pills: ["integration_github"] } }, inverse: { name: "remove_pills", arguments: { pills: ["integration_github"] } } }),
     executed: [],
-    // GitHub, one thing with two faces: a pill and a service.
-    named: async () => [{ kind: "pill", id: "integration_github", label: "GitHub" }, { kind: "service", id: "integration_github", label: "GitHub" }],
+    undone: 0,
+    // GitHub, one thing with two faces: a pill and a service; a sentence without it names nothing.
+    named: async (sentence) => (/github/i.test(sentence) ? [{ kind: "pill", id: "integration_github", label: "GitHub" }, { kind: "service", id: "integration_github", label: "GitHub" }] : []),
     sources,
   };
   return self;
@@ -869,6 +870,22 @@ test("instead puts the last change back and does it again with what was meant", 
   assert.equal(result.status, "done");
   assert.deepEqual(reg.executed, [{ name: "add_pills", arguments: { pills: ["Vercel"] } }]);
   assert.match(result.line, /Put back/);
+});
+
+test("instead with what was just put back only puts it back: it is not done again", async () => {
+  // The last change is GitHub added; what is meant is GitHub, so the undo (GitHub taken off again) is all.
+  const { get, registry: reg } = app();
+  const result = await get("instead").run({ meant: "GitHub" }, context());
+  assert.equal(reg.undone, 1);
+  assert.deepEqual(reg.executed, []);
+  assert.equal(result.status, "done");
+  assert.match(result.line, /Put back/);
+  assert.deepEqual(result.data.put_back, { name: "add_pills", arguments: { pills: ["integration_github"] } });
+  // Given as the id a model read in last_change: the same.
+  const byId = app();
+  await byId.get("instead").run({ meant: "integration_github" }, context());
+  assert.equal(byId.registry.undone, 1);
+  assert.deepEqual(byId.registry.executed, []);
 });
 
 test("find says one thing once, with each of its faces and what takes it", async () => {
