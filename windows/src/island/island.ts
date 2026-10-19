@@ -638,7 +638,7 @@ export class Island {
   }
 
   /** Words so far, or the whole sentence (`final`), which is then acted on. */
-  voiceHeard(text: string, final: boolean) {
+  voiceHeard(text: string, final: boolean, sure?: readonly number[]) {
     if (this.fsm.state !== "listening" || State.view !== "listening") return;
     State.voice = { ...State.voice, text };
     this.engine.listeningHasWords = text !== "";
@@ -646,7 +646,7 @@ export class Island {
     if (!final) return;
     // The answer to a question on screen is not a new turn: the one that asked goes on.
     if (State.voice.ask) void this.voiceAskHeard(text);
-    else void this.voiceUnderstand(text);
+    else void this.voiceUnderstand(text, { wake: true, sure });
   }
 
   /** Something was heard and it was not words. */

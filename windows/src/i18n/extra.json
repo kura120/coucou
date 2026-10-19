@@ -5834,6 +5834,17 @@
    "ru": "Это больше, чем я могу сделать здесь.",
    "id": "Itu lebih dari yang bisa saya lakukan di sini."
   },
+  "Sorry, I didn't catch that. Say it again?": {
+   "zh-Hans": "抱歉，没听清。能再说一遍吗？",
+   "hi": "माफ़ करना, समझ नहीं आया। फिर से बोलोगे?",
+   "es": "Perdona, no te he entendido. ¿Me lo repites?",
+   "ar": "عذرًا، لم أفهم ذلك. هل تعيده؟",
+   "fr": "Désolé, je n'ai pas compris. Tu peux répéter ?",
+   "bn": "দুঃখিত, বুঝতে পারিনি। আবার বলবে?",
+   "pt-BR": "Desculpa, não entendi. Pode repetir?",
+   "ru": "Извини, не расслышал. Повторишь?",
+   "id": "Maaf, saya tidak menangkapnya. Bisa ulangi?"
+  },
   "Asking a bigger model…": {
    "zh-Hans": "正在询问更强的模型…",
    "hi": "बड़े मॉडल से पूछ रहा हूँ…",

@@ -134,7 +134,7 @@ test("each report reaches the island as what it is", () => {
   const calls = [];
   const island = {
     voiceWoke: () => calls.push("woke"),
-    voiceHeard: (text, final) => calls.push(`${final ? "final" : "partial"}:${text}`),
+    voiceHeard: (text, final, sure) => calls.push(`${final ? "final" : "partial"}:${text}${sure ? `:${sure.join(",")}` : ""}`),
     voiceMissed: () => calls.push("missed"),
     voiceCancelled: () => calls.push("cancelled"),
     voiceFollowing: (on) => calls.push(on ? "following" : "rested"),
@@ -157,6 +157,10 @@ test("each report reaches the island as what it is", () => {
   // A phase a later build might add is ignored, not an error.
   applyVoice(island, { phase: "something-new", text: "" });
   assert.equal(calls.length, 8);
+  // A final sentence goes with how sure the speech model was of each word; a partial one does not.
+  applyVoice(island, { phase: "final", text: "uh place it", sure: [0.9, 0.3, 0.2] });
+  applyVoice(island, { phase: "partial", text: "uh", sure: [0.9] });
+  assert.deepEqual(calls.slice(8), ["final:uh place it:0.9,0.3,0.2", "partial:uh"]);
 });
 
 // ── Mochi's voice ─────────────────────────────────────────────────────────────

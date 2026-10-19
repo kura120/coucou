@@ -341,6 +341,7 @@ const TURN_WORDS = {
   noModel: () => "Voice needs a model server.", silent: () => "The model did not answer.",
   noEmbedding: () => "Voice needs an embedding model.", embedSilent: () => "The embedding model did not answer.",
   notUnderstood: () => "Command not recognised", beyond: () => "That is more than I can do here.", askingCloud: () => "Asking a bigger model…",
+  pardon: () => "Sorry, I didn't catch that. Say it again?",
 };
 
 async function run(steps) {
