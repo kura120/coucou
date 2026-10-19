@@ -415,7 +415,10 @@ const SETTING = "confirm:Change a setting?";
 // order (a confirmation toast counts: "confirm:…"); "nothing" (no effect, no
 // toast); "answer" (words, no effect) or "answer:word|word" (the answer has
 // one of them); "ask:Name" (a question is on screen, about that); "ignored"
-// (not taken as said to Coucou). `any(…)`: one of several is right.
+// (a sentence said to someone else did nothing: no effect, no toast, no
+// question — since 2026-10-18 such a sentence is taken as said to Coucou and
+// may be answered in words, which is not counted against it). `any(…)`: one
+// of several is right.
 const ONE = [
   [["put on some music"], "nothing"], // already playing: no toggle
   [["hold the music for a sec"], ["pause"]],
@@ -562,9 +565,9 @@ const NEGATIONS = [
   [["don't switch to codex"], "nothing"],
 ];
 
-// Said without the wake phrase, after a turn or not: the local model decides
-// whether it was for Coucou. For nobody: ignored, nothing shown. For Coucou:
-// done, on both paths.
+// Said without the wake phrase, after a turn or not: taken as said to Coucou,
+// and the local model calls nothing for what plainly was not. For nobody:
+// nothing done ("ignored"). For Coucou: done.
 const NOBODY = [
   [[{ again: "see you at four then" }], "ignored"],
   [[{ again: "the cat sat on it" }], "ignored"],
@@ -592,7 +595,7 @@ const PARTS = [
 function right(expected, { log, last }) {
   if (expected && typeof expected === "object" && !Array.isArray(expected)) return expected.any.some((way) => right(way, { log, last }));
   if (Array.isArray(expected)) return JSON.stringify(log) === JSON.stringify(expected);
-  if (expected === "ignored") return log.length === 0 && last?.taken === false;
+  if (expected === "ignored") return log.length === 0 && !last?.asks;
   if (expected === "nothing") return log.length === 0 && !last?.asks;
   if (log.length) return false;
   if (expected.startsWith("ask:")) return Boolean(last?.asks?.includes(expected.slice("ask:".length)));
