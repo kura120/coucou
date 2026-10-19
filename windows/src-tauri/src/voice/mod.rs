@@ -52,6 +52,7 @@
 // The island is told with one event, `voice`: { phase, text }, phase being
 // "woke", "partial", "final", "missed" or "cancelled" — and "following" /
 // "rested" around the time another command may follow without the wake phrase,
+// "hearing" when a voice starts in that time (the island shows it listens),
 // "again" being a sentence said in that time. Settings follows `voice-status`.
 // While the bundled engine listens for a command, `voice-level` says how loud
 // the microphone hears (0…1), for the glow under the island.
@@ -866,6 +867,8 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, rx: &Receiver<Control>) 
     let mut hush_until: Option<Instant> = None;
     // The command is the rest of the sentence that woke Coucou: not to be forgotten.
     let mut same_breath = false;
+    // A voice was heard in the follow-up time: told once, until that sentence ends.
+    let mut follow_heard = false;
     let mut level = vad::Level::default();
     let mut level_told = Instant::now();
 
@@ -975,6 +978,14 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, rx: &Receiver<Control>) 
                     free.start_over();
                 } else if freely && free.speaking() {
                     session.speaking(Instant::now());
+                    // Someone speaks in the follow-up time: the island shows it is listening, before the words are in.
+                    if ear == Listen::FollowUp && !follow_heard {
+                        follow_heard = true;
+                        note(app, "hearing");
+                    }
+                }
+                if !free.speaking() {
+                    follow_heard = false;
                 }
                 // The glow under the island moves with the voice, not with Mochi's.
                 if freely && level_told.elapsed() >= LEVEL_EVERY {

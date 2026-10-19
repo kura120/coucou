@@ -668,8 +668,27 @@ export class Island {
       if (State.mode === "hidden") this.revealSilently();
     } else if (this.fsm.state !== "listening") {
       this.engine.exitListening();
+    } else if (this.voiceHeardFollow && !this.voiceBusy && State.view === "listening" && !State.voice.text) {
+      // The listening view came back for a voice that was no sentence after all: it closes again.
+      this.fsm.voiceFinished();
     }
+    this.voiceHeardFollow = false;
     State.notify();
+  }
+
+  /** The listening view came back for a voice in the follow-up time, and its sentence is still to come. */
+  private voiceHeardFollow = false;
+
+  /**
+   * A voice started in the follow-up time: the listening view comes back at
+   * once, so it is plain that Coucou hears and is writing it down — not only
+   * once the sentence is in and the model has answered.
+   */
+  voiceHearing() {
+    if (wakeBlocked(State.paused) || this.voiceBusy) return;
+    if (this.fsm.state === "listening" && State.view === "listening") return;
+    this.voiceWoke();
+    this.voiceHeardFollow = this.fsm.state === "listening";
   }
 
   /**
@@ -679,8 +698,10 @@ export class Island {
    */
   voiceAgain(said: string, sure?: readonly number[]) {
     if (wakeBlocked(State.paused)) return;
-    // The wake phrase was said meanwhile: that sentence is the one being heard.
-    if (this.fsm.state === "listening") return;
+    // The wake phrase was said meanwhile: that sentence is the one being heard —
+    // unless the listening view only came back for this very sentence (`voiceHearing`).
+    if (this.fsm.state === "listening" && !this.voiceHeardFollow) return;
+    this.voiceHeardFollow = false;
     void this.voiceUnderstand(said, { wake: false, sure });
   }
 

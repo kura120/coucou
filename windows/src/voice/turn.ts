@@ -11,11 +11,11 @@
 //            could not answer goes to the provider chosen for the chat
 //
 // Before any of them: was the sentence said to Coucou? The wake phrase settles
-// it. Without it — the few seconds after a turn — the local model decides,
-// and only one on this computer: it is given the sentence with the turn
-// before, and calls `nothing` for what was said to someone else. Nothing
-// shows unless it calls something else, and such a sentence never reaches
-// the cloud. (The ranking cannot tell: voice/rank.ts `directed`.)
+// it. Without it — the few seconds after a turn — it is taken as said to
+// Coucou too (the user's choice: better answer a remark than ignore a
+// request), given only to a model on this computer, with the turn before;
+// the model calls `nothing` for what plainly was for someone else, and the
+// island then closes again. Such a sentence never reaches the cloud.
 //
 // Nothing here reads a word of what was said. A sentence is embedded whole or
 // handed to a model whole; what it means is theirs to work out, and what may
@@ -65,6 +65,8 @@ export type CloudModel = (system: string, said: string, history: ModelTurn[]) =>
 export const MOST_MODEL_ROUNDS = 5;
 /** At most this many calls are run for one round. */
 export const MOST_CALLS = 4;
+/** A free action done again on purpose ("skip twice") runs this many times at most in one turn. */
+export const MOST_REPEATS = 3;
 /** Past this, a turn says what it has with the capabilities' own lines. */
 export const TURN_BUDGET_MS = 8000;
 /** How long the model is waited for once something was done: its words are a nicety. */
@@ -188,8 +190,10 @@ interface Running {
   ran: Ran[];
   /** When the time a turn may take started; set again after the user answered a question. */
   started: number;
-  /** Taken as said to Coucou: by the wake phrase, or by the local model calling something. */
+  /** Taken as said to Coucou: always, now; false only for a turn that ends ignored. */
   taken: boolean;
+  /** Said after the wake phrase. Without it, the sentence never reaches the cloud. */
+  wake: boolean;
   /** Whether the model's words for what ran held up against the results (`checked`), and if not, why. */
   worded?: boolean;
   unworded?: string;
@@ -224,7 +228,7 @@ const SHORTLISTED = "Your tools are the capabilities nearest to what was said. W
 
 /** Told to the model of a sentence said without the wake phrase. */
 const ASIDE =
-  "This sentence was said without Coucou's name, a few seconds after the turn above: it may have been said to someone else in the room. Unless it plainly asks Coucou for one of the things its capabilities do, call the capability named nothing: a remark, a plan, a time or a question a person in the room could be asked is for them.";
+  "This sentence was said without Coucou's name, a few seconds after the turn above. Take it as said to Coucou, as a request or a follow-up of the turn above, and act on it. Call the capability named nothing only when it is plainly said to someone else in the room: a remark to a person, a plan or a time that is not for Coucou.";
 
 const AFTER_CALLS =
   "The results of your calls are above. If what was asked needs another capability, call it now. Otherwise say what happened in one short sentence, from the results alone.";
@@ -432,9 +436,10 @@ export class VoiceTurns {
     const wake = how.wake ?? true;
     // Without the wake phrase: only a model on this computer is given it, and with no model it is for nobody.
     if (!wake && (!this.followUp() || !this.local())) return IGNORED;
-    const turn: Running = { said: sentence, how, ran: [], started: this.now(), taken: wake, named: [] };
+    const turn: Running = { said: sentence, how, ran: [], started: this.now(), taken: true, wake, named: [] };
     this.trace(`── heard${wake ? "" : " without the wake phrase"}: ${JSON.stringify(sentence)}${how.sure?.length ? ` · sure ${how.sure.map((x) => x.toFixed(2)).join(" ")}` : ""}`);
-    if (wake) how.taken?.();
+    // Taken at once, with the wake phrase or without: the island shows it is working on it.
+    how.taken?.();
     const before = this.memory.recent(this.now());
     turn.named = await this.registry.named(sentence);
     if (turn.named.length) this.trace(`names found: ${turn.named.map((n) => `${n.near ? "~" : ""}${n.label} (${n.kind}${n.heard ? `, heard "${n.heard}"` : ""})`).join("; ")}`);
@@ -488,7 +493,7 @@ export class VoiceTurns {
       return this.end(turn, await this.checked(turn, came.words));
     }
     // What may have been said to someone else never goes further than this computer.
-    if (!turn.taken) return IGNORED;
+    if (!turn.wake) return this.end(turn, "", came.is === "escalated" ? this.words.beyond() : this.words.silent());
 
     // Tier 3: handed up, or the local model did not answer — when the user allowed a cloud model.
     const cloud = this.cloud();
@@ -617,7 +622,7 @@ export class VoiceTurns {
     const capabilities = this.registry.all();
     const declared = new Set(capabilities.map((c) => c.name));
     // Handing up is offered only when there is somebody to hand up to.
-    const offered = (names: readonly string[]) => names.filter((n) => declared.has(n) && (n !== ESCALATE || (turn.taken && this.cloud() != null)));
+    const offered = (names: readonly string[]) => names.filter((n) => declared.has(n) && (n !== ESCALATE || (turn.wake && this.cloud() != null)));
     const history: ModelTurn[] = this.memory.recent(this.now()).map(({ said: s, calls, result }) => ({ said: s, calls, result }));
     // A follow-up ("and Discord too") goes on with what the turn before called, whatever it ranks alone.
     const carried = (history[history.length - 1]?.calls ?? []).map((call) => call.name);
@@ -636,7 +641,7 @@ export class VoiceTurns {
 
     const snapshot = await this.registry.snapshot();
 
-    const system = [systemPrompt(snapshot, SHORTLISTED), namedLine(turn.named), turn.taken ? "" : ASIDE].filter(Boolean).join("\n\n");
+    const system = [systemPrompt(snapshot, SHORTLISTED), namedLine(turn.named), turn.wake ? "" : ASIDE].filter(Boolean).join("\n\n");
 
     let reply = await local(system, said, tools(), history);
     if (gone(turn)) return { is: "dropped" };
@@ -662,15 +667,15 @@ export class VoiceTurns {
       const fresh: ModelCall[] = [];
       for (const call of calls) {
         const given = await this.heardCall(call, turn);
-        if (!turn.ran.some((ran) => same(ran.call, given)) && !fresh.some((other) => same(other, given))) fresh.push(given);
+        // Except what is done again on purpose ("skip twice"): a free action that worked may run again, a few times at most.
+        const before = turn.ran.filter((ran) => same(ran.call, given));
+        const times = before.length + fresh.filter((other) => same(other, given)).length;
+        const again = times < MOST_REPEATS && before.every((ran) => ran.result.status === "done")
+          && this.registry.get(given.name)?.tier === "free" && ![NOTHING, ASK_USER, UNDO].includes(given.name);
+        if (times === 0 || again) fresh.push(given);
         if (fresh.length >= MOST_CALLS) break;
       }
       if (!fresh.length) break;
-      // Said without the wake phrase: it was for Coucou once the model asks for something the app does.
-      if (!turn.taken && fresh.some((call) => declared.has(call.name) && ![NOTHING, MORE_TOOLS, ESCALATE].includes(call.name))) {
-        turn.taken = true;
-        how.taken?.();
-      }
 
       const step: ModelStep = { calls: [], results: [] };
       for (const call of fresh) {

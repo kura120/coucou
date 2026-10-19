@@ -185,37 +185,37 @@ test("without the wake phrase, a sentence goes to a model only when it is on thi
   assert.deepEqual(app.state.log, []);
 });
 
-test("without the wake phrase the local model decides: nothing for what was said to someone else, and nothing shows", async () => {
+test("without the wake phrase a sentence is taken as said to Coucou; the model calls nothing for what plainly was not", async () => {
   const local = scripted(calls(call("nothing")), calls(call("pause_music")), says("Paused."));
   const t = turns({ local: local.model, followUp: true });
   let taken = 0;
+  // Taken at once, so the island shows it is working on it.
   const stray = await t.hear("see you at four then", { wake: false, taken: () => taken++ });
-  assert.deepEqual(stray, { result: null, taken: false, rest: false });
-  assert.equal(taken, 0);
-  // It is told the sentence may not be for Coucou.
-  assert.match(local.asked[0].system, /may have been said to someone else/);
-  // Not a turn: nothing is remembered of it.
-  assert.deepEqual(t.memory.recent(now), []);
-  // Something the app does, asked for: taken once, before it runs.
-  const meant = await t.hear("pause it", { wake: false, taken: () => taken++ });
   assert.equal(taken, 1);
+  assert.deepEqual(stray, { result: null, taken: true, rest: true });
+  // It is told to take the sentence as said to Coucou, and when not to.
+  assert.match(local.asked[0].system, /Take it as said to Coucou/);
+  const meant = await t.hear("pause it", { wake: false, taken: () => taken++ });
+  assert.equal(taken, 2);
   assert.deepEqual(meant.result, { outcome: "success", message: "Paused." });
   assert.deepEqual(app.state.log, ["pause"]);
 });
 
-test("without the wake phrase: words alone show nothing, tier 1 does not run, and the cloud is never asked", async () => {
+test("without the wake phrase: an answer in words shows, tier 1 runs, and the cloud is never asked", async () => {
   let clouded = 0;
   const cloud = async () => ((clouded += 1), { text: "" });
-  // Ranked far ahead, a clear command for tier 1 — which waits for the wake phrase.
   const embed = embedBy({ "pause the music": { pause_music: 1 } });
+  const t = turns({ embed, local: scripted(says("Sure, four works."), calls(call("escalate")), null).model, cloud, followUp: true });
+  // A clear command runs with no model call, as after the wake phrase.
+  assert.equal((await t.hear("pause the music", { wake: false })).taken, true);
+  assert.deepEqual(app.state.log, ["pause"]);
   const local = scripted(says("Sure, four works."), calls(call("escalate")), null);
-  const t = turns({ embed, local: local.model, cloud, followUp: true });
-  assert.equal((await t.hear("pause the music", { wake: false })).taken, false);
-  assert.deepEqual(app.state.log, []);
+  const u = turns({ local: local.model, cloud, followUp: true });
+  assert.deepEqual((await u.hear("what can you do", { wake: false })).result, { outcome: "success", message: "Sure, four works." });
   // Handing up is not even offered for it, and a model that does not answer is not replaced by the cloud.
   assert.ok(!local.asked[0].tools.includes("escalate"));
-  assert.equal((await t.hear("work out my week", { wake: false })).taken, false);
-  assert.equal((await t.hear("hmm", { wake: false })).taken, false);
+  await u.hear("work out my week", { wake: false });
+  await u.hear("hmm", { wake: false });
   assert.equal(clouded, 0);
 });
 
@@ -295,8 +295,8 @@ test("with no embedding model voice says it needs one, and with one that does no
   assert.deepEqual(silent.result, { outcome: "failure", message: "The embedding model did not answer" });
   assert.equal(local.asked.length, 0);
   assert.deepEqual(app.state.log, []);
-  // Without the wake phrase, nothing shows at all.
-  assert.deepEqual(await turns({ embed: async () => null, local: local.model, followUp: true }).hear("pause the music", { wake: false }), { result: null, taken: false, rest: false });
+  // Without the wake phrase it is said too: the sentence was taken as said to Coucou.
+  assert.deepEqual((await turns({ embed: async () => null, local: local.model, followUp: true }).hear("pause the music", { wake: false })).result, { outcome: "failure", message: "The embedding model did not answer" });
 });
 
 test("the wake phrase gets the embedding model ready, and the sentence after it waits for that, not for a second embedding", async () => {
@@ -850,5 +850,20 @@ test("a follow-up without the wake phrase runs what the model called, though nob
     wanted: () => opened,
   });
   assert.equal(heard.taken, true);
+  assert.deepEqual(app.state.log, ["pause"]);
+});
+
+test("a free action asked for twice runs twice, a few times at most; what can be put back still runs once", async () => {
+  app.registry.declare({ name: "next_track", area: "music", description: "Skips a track.", args: {}, tier: "free", run: async () => (app.state.log.push("next"), done("Next track", false)) });
+  const twice = scripted(calls(call("next_track")), calls(call("next_track")), says("Skipped twice."));
+  await turns({ local: twice.model }).hear("skip twice");
+  assert.deepEqual(app.state.log, ["next", "next"]);
+  app.state.log = [];
+  const many = scripted(calls(call("next_track"), call("next_track"), call("next_track"), call("next_track")), says("Done."));
+  await turns({ local: many.model }).hear("skip five times");
+  assert.deepEqual(app.state.log, ["next", "next", "next"], "three at most");
+  // What can be put back is still done once for one sentence.
+  app.state.log = [];
+  await turns({ local: scripted(calls(call("pause_music"), call("pause_music")), calls(call("pause_music"))).model }).hear("pause pause");
   assert.deepEqual(app.state.log, ["pause"]);
 });

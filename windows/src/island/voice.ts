@@ -21,7 +21,7 @@ export const RESULT_SHOWN_MS = 2000;
 export const VOICE_PATIENCE_MS = 6000;
 
 export interface VoiceEvent {
-  phase: "woke" | "partial" | "final" | "missed" | "cancelled" | "following" | "rested" | "again";
+  phase: "woke" | "partial" | "final" | "missed" | "cancelled" | "following" | "rested" | "hearing" | "again";
   text: string;
   /** How sure the speech model was of each word of `text`, 0…1, when it says (voice/resolve.ts). */
   sure?: number[];
@@ -36,6 +36,8 @@ export interface VoiceHost {
   voiceFollowing(on: boolean): void;
   /** A sentence said in that time: for Coucou, or for nobody. `sure`: how sure the speech model was of each word. */
   voiceAgain(text: string, sure?: readonly number[]): void;
+  /** A voice started in the follow-up time: the listening view comes back while it is written down. */
+  voiceHearing(): void;
   /** How loud the microphone hears while Coucou listens, 0…1. */
   voiceLevel(level: number): void;
   /** Ctrl+Shift+number or Ctrl+Shift+Enter, pressed while a question is on screen: "1"…"9" or "enter". */
@@ -81,6 +83,9 @@ export function applyVoice(island: VoiceHost, event: VoiceEvent) {
       break;
     case "rested":
       island.voiceFollowing(false);
+      break;
+    case "hearing":
+      island.voiceHearing();
       break;
     case "again":
       island.voiceAgain(event.text, event.sure);
