@@ -211,7 +211,7 @@ export function createRegistry(options: RegistryOptions): Registry {
     const args = resolved.args;
 
     // A click is never asked for what could not be done.
-    const cannot = (await capability.check?.(args)) ?? null;
+    const cannot = (await capability.check?.(args, context)) ?? null;
     if (cannot) return cannot;
 
     const tier = tierOf(capability, args);

@@ -5834,6 +5834,61 @@
    "ru": "Это больше, чем я могу сделать здесь.",
    "id": "Itu lebih dari yang bisa saya lakukan di sini."
   },
+  "Turn voice off?": {
+   "zh-Hans": "关闭语音？",
+   "hi": "आवाज़ बंद करें?",
+   "es": "¿Desactivar la voz?",
+   "ar": "إيقاف الصوت؟",
+   "fr": "Désactiver la voix ?",
+   "bn": "কণ্ঠস্বর বন্ধ করবেন?",
+   "pt-BR": "Desligar a voz?",
+   "ru": "Выключить голос?",
+   "id": "Matikan suara?"
+  },
+  "Turn off": {
+   "zh-Hans": "关闭",
+   "hi": "बंद करें",
+   "es": "Desactivar",
+   "ar": "إيقاف",
+   "fr": "Désactiver",
+   "bn": "বন্ধ করুন",
+   "pt-BR": "Desligar",
+   "ru": "Выключить",
+   "id": "Matikan"
+  },
+  "Keep listening": {
+   "zh-Hans": "继续聆听",
+   "hi": "सुनते रहें",
+   "es": "Seguir escuchando",
+   "ar": "متابعة الاستماع",
+   "fr": "Continuer d’écouter",
+   "bn": "শুনতে থাকুন",
+   "pt-BR": "Continuar ouvindo",
+   "ru": "Продолжать слушать",
+   "id": "Tetap mendengarkan"
+  },
+  "Pause Coucou?": {
+   "zh-Hans": "暂停 Coucou？",
+   "hi": "Coucou को रोकें?",
+   "es": "¿Pausar Coucou?",
+   "ar": "إيقاف Coucou مؤقتاً؟",
+   "fr": "Mettre Coucou en pause ?",
+   "bn": "Coucou-কে বিরতি দেবেন?",
+   "pt-BR": "Pausar o Coucou?",
+   "ru": "Приостановить Coucou?",
+   "id": "Jeda Coucou?"
+  },
+  "Keep going": {
+   "zh-Hans": "继续运行",
+   "hi": "चलता रहने दें",
+   "es": "Seguir",
+   "ar": "المتابعة",
+   "fr": "Continuer",
+   "bn": "চালু রাখুন",
+   "pt-BR": "Continuar",
+   "ru": "Продолжить работу",
+   "id": "Tetap jalan"
+  },
   "Asking a bigger model…": {
    "zh-Hans": "正在询问更强的模型…",
    "hi": "बड़े मॉडल से पूछ रहा हूँ…",

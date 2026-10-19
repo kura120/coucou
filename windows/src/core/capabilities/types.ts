@@ -105,8 +105,11 @@ export interface Capability {
    * What ends the call before anything is asked or clicked: arguments it
    * cannot do (a setting given a value it does not take), as the result the
    * model is given. Null when they can be done. Called with resolved arguments.
+   * It may also ask the user through `context.ask` when what it guards is a
+   * question rather than a click: a no ends the call before `run`, so nothing
+   * is remembered for a change that never happened.
    */
-  check?(args: Args): ToolResult | null | Promise<ToolResult | null>;
+  check?(args: Args, context?: RunContext): ToolResult | null | Promise<ToolResult | null>;
   /** For `confirm`: the exact change, for the toast. Called with resolved arguments, before `run`. */
   describe?(args: Args): Confirm | Promise<Confirm>;
   /**
