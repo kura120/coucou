@@ -296,7 +296,13 @@ export function createRegistry(options: RegistryOptions): Registry {
 
   // ── What a model is told every time ─────────────────────────────────────────
 
-  async function snapshot(): Promise<Record<string, unknown>> {
+  /**
+   * `lean`: only what is on screen, the last change, and what kinds of thing
+   * the app has — no names listed and no state read: the model looks up what
+   * it needs (`find`, the reads) instead of being given everything at once.
+   */
+  async function snapshot(options: { lean?: boolean } = {}): Promise<Record<string, unknown>> {
+    const lean = options.lean === true;
     const out: Record<string, unknown> = {};
     let room = SNAPSHOT_MOST;
     const add = (into: Record<string, unknown>, key: string, value: unknown) => {
@@ -323,7 +329,7 @@ export function createRegistry(options: RegistryOptions): Registry {
     const kinds: Record<string, string> = {};
     for (const source of sources.values()) {
       let line = source.description;
-      if (!source.near) {
+      if (!source.near && !lean) {
         const listed = await Promise.resolve().then(() => source.list()).catch(() => []);
         const labels = listed.slice(0, NAMES_MOST).map((thing) => thing.label);
         if (labels.length) line += ` ${labels.join(", ")}${listed.length > labels.length ? `, and ${listed.length - labels.length} more` : ""}.`;
@@ -334,7 +340,7 @@ export function createRegistry(options: RegistryOptions): Registry {
 
     // The reads that are always told. One that cannot be used or breaks is left out.
     const nobody: RunContext = { origin: "ui", ask: async () => ({ kind: "dropped" }), working: () => {} };
-    const reads = [...capabilities.values()].filter((capability) => capability.inSnapshot);
+    const reads = lean ? [] : [...capabilities.values()].filter((capability) => capability.inSnapshot);
     const read = await Promise.all(
       reads.map(async (capability) => {
         try {

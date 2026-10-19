@@ -12,7 +12,7 @@ import { capability, cut, str, type Area } from "./shared";
 const AREA = "coucou";
 
 /** `registry`: what `undo` and `more_tools` read. `areas`: the names of every area declared. */
-export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" | "get" | "execute" | "lastChange">, areas: readonly string[]): Area {
+export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" | "get" | "execute" | "lastChange" | "named" | "all">, areas: readonly string[]): Area {
   return {
     sources: [],
     capabilities: [
@@ -87,6 +87,29 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
         args: {},
         tier: "free",
         run: (_args, context) => registry.undo(context),
+      }),
+      capability({
+        name: "find",
+        area: AREA,
+        description: "Looks a name up within Coucou: what it is — a pill, an app, a service, a setting, a session, a view… or several of them at once — whether it was heard exactly or only nearly, and which capabilities take it. For a name you are not sure of, before acting on it.",
+        args: { name: { type: "string", maxLength: 80, description: "The name, as the user said it." } },
+        tier: "read",
+        async run(args) {
+          const name = cut(str(args.name), 80);
+          if (!name) return failed(t("Command not recognised"), "A name is needed.");
+          const found = await registry.named(name);
+          const takers = (kind: string) => registry.all().filter((c) => Object.values(c.args).some((spec) => (spec.type === "entity" || spec.type === "entities") && spec.kind === kind)).map((c) => c.name);
+          // One thing with several faces (GitHub is a pill and a service) is said once, with its faces.
+          const things = new Map<string, { label: string; as: { kind: string; id: string; takes: string[] }[]; heard_exactly: boolean }>();
+          for (const thing of found) {
+            const key = thing.label.toLowerCase();
+            const entry = things.get(key) ?? { label: thing.label, as: [], heard_exactly: false };
+            entry.as.push({ kind: thing.kind, id: thing.id, takes: takers(thing.kind) });
+            entry.heard_exactly ||= !thing.near;
+            things.set(key, entry);
+          }
+          return done("", true, { looked_for: name, found: [...things.values()] });
+        },
       }),
       capability({
         name: "instead",

@@ -4,7 +4,7 @@
 // machine and a fake of the app. A manual check, not a test: it needs a model
 // and its answers vary.
 //
-//   node --import ./tests/setup.mjs scripts/voice-eval.mjs [models] [server] [--words] [--path=areas|ranked|both] [--embed=model] [--only=text] [--trace]
+//   node --import ./tests/setup.mjs scripts/voice-eval.mjs [models] [server] [--words] [--path=areas|ranked|both] [--embed=model] [--only=text] [--trace] [--context=full|lean]
 //
 // `models`: one, or several separated by commas, each run on the whole table.
 // Default: qwen2.5:7b-instruct on http://127.0.0.1:11434 (Ollama). Nothing is
@@ -47,6 +47,8 @@ const SERVER = (ARGS[1] ?? "http://127.0.0.1:11434").replace(/\/$/, "");
 const WORDS = FLAGS.includes("--words");
 // Voice requires an embedding model now: "areas" measures only that it says so.
 const PATH = flag("path") ?? "ranked";
+// "full": the app's state is told every time; "lean": only the screen and the last change, the rest looked up (find).
+const CONTEXT = flag("context") === "lean" ? "lean" : "full";
 const ONLY = flag("only");
 const TRACE = FLAGS.includes("--trace");
 
@@ -343,7 +345,7 @@ const TURN_WORDS = {
 async function run(steps) {
   const { log, s, registry } = setup();
   // The model server here is this computer: a sentence without the wake phrase may be given to it.
-  const turns = new VoiceTurns({ registry, embed, local: () => local, cloud: () => null, followUp: () => true, words: TURN_WORDS });
+  const turns = new VoiceTurns({ registry, embed, local: () => local, cloud: () => null, followUp: () => true, words: TURN_WORDS, context: () => CONTEXT });
   /** The turn that waits on a question, and who is told when one goes up. */
   let turn = null;
   let up = () => {};
@@ -454,7 +456,8 @@ const ONE = [
   [["pause the music and remove stripe"], ["pause", "-stripe"]],
   [["ad get hub"], "nothing"], // GitHub is already there
   [["next rack"], ["next"]],
-  [["pause"], ["pause"]],
+  // The music, or Coucou's listening? Asking is fair.
+  [["pause"], any(["pause"], "ask:Music|Coucou")],
   [["add notion"], ["+notion"]],
   [["never mind"], "nothing"],
   [["ok done"], "nothing"],
@@ -599,7 +602,7 @@ function right(expected, { log, last }) {
   if (expected === "ignored") return log.length === 0 && !last?.asks;
   if (expected === "nothing") return log.length === 0 && !last?.asks;
   if (log.length) return false;
-  if (expected.startsWith("ask:")) return Boolean(last?.asks?.includes(expected.slice("ask:".length)));
+  if (expected.startsWith("ask:")) return expected.slice("ask:".length).split("|").some((name) => Boolean(last?.asks?.includes(name)));
   const said = last?.result?.outcome === "success" ? last.result.message.toLowerCase() : "";
   const words = expected === "answer" ? [] : expected.slice("answer:".length).split("|");
   return Boolean(said) && (!words.length || words.some((w) => said.includes(w)));

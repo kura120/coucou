@@ -172,7 +172,7 @@ export interface Registry {
   /** One capability as a tool in the OpenAI function format — the same JSON Schema an MCP tool takes. Null for a name not declared. */
   schema(name: string): unknown;
   /** What a model is told of the app every time: the `inSnapshot` reads, what is on screen, the entity kinds. */
-  snapshot(): Promise<Record<string, unknown>>;
+  snapshot(options?: { lean?: boolean }): Promise<Record<string, unknown>>;
   /**
    * The things the app has whose name is said whole in a sentence, of every
    * kind — and, for a kind too large to list (the apps), those its source

@@ -85,6 +85,7 @@ const NOTHING = "nothing";
 const ESCALATE = "escalate";
 const ASK_USER = "ask_user";
 const INSTEAD = "instead";
+const FIND = "find";
 
 /** The lines the turn itself shows, worded and translated by its maker. */
 export interface TurnWords {
@@ -122,6 +123,12 @@ export interface TurnOptions {
   followUp?: () => boolean;
   /** Gives the cloud model's endpoint the capabilities it may ask for. */
   publish?: (tools: unknown[]) => void;
+  /**
+   * "lean": the model is told only what is on screen and the last change, and
+   * looks up the rest (find, the reads) — fewer words to read, more rounds.
+   * "full" (the default): the app's state is told every time.
+   */
+  context?: () => "full" | "lean";
   /**
    * The debug log, when the user turned it on (voice/debug.rs): told each
    * step of a turn in a line — what was heard and ranked, what the models
@@ -291,6 +298,7 @@ export class VoiceTurns {
   private words: TurnWords;
   private now: () => number;
   private trace: (line: string) => void;
+  private contextMode: () => "full" | "lean";
 
   /** What the index was last given, to see that the capabilities changed. */
   private indexed = "";
@@ -315,6 +323,7 @@ export class VoiceTurns {
     this.words = options.words;
     this.now = options.now ?? (() => Date.now());
     this.trace = options.trace ?? (() => {});
+    this.contextMode = options.context ?? (() => "full");
   }
 
   /** The model, with each question to it and its answer told to the debug log. */
@@ -660,7 +669,10 @@ export class VoiceTurns {
     };
     const tools = () => [...shown].filter(usable).map((name) => this.registry.schema(name)).filter(Boolean);
 
-    const snapshot = await this.registry.snapshot();
+    const lean = this.contextMode() === "lean";
+    const snapshot = await this.registry.snapshot({ lean });
+    // Lean, the model looks things up: finding a name is always offered.
+    if (lean) for (const name of offered([FIND])) shown.add(name);
 
     const system = [systemPrompt(snapshot, SHORTLISTED), namedLine(turn.named), turn.wake ? "" : ASIDE, second?.note ?? ""].filter(Boolean).join("\n\n");
 
@@ -844,8 +856,18 @@ export class VoiceTurns {
  */
 function namedLine(named: Running["named"], calling = true): string {
   if (!named.length) return "";
-  const whole = named.filter((n) => !n.near).map((n) => `${n.label} (${n.kind})`);
-  const near = named.filter((n) => n.near).map((n) => `${n.heard ? `"${n.heard}" is ` : ""}most likely ${n.label} (${n.kind}), misheard`);
+  // One thing with several faces — GitHub a pill and a service, Spotify a pill, an app and a service — is said once.
+  const faces = (list: Running["named"]) => {
+    const by = new Map<string, { label: string; kinds: string[]; heard?: string }>();
+    for (const n of list) {
+      const entry = by.get(n.label.toLowerCase()) ?? { label: n.label, kinds: [], heard: n.heard };
+      if (!entry.kinds.includes(n.kind)) entry.kinds.push(n.kind);
+      by.set(n.label.toLowerCase(), entry);
+    }
+    return [...by.values()].map((e) => ({ ...e, as: e.kinds.length > 1 ? `one thing, as ${e.kinds.join(" and as ")}` : e.kinds[0] }));
+  };
+  const whole = faces(named.filter((n) => !n.near)).map((n) => `${n.label} (${n.as})`);
+  const near = faces(named.filter((n) => n.near)).map((n) => `${n.heard ? `"${n.heard}" is ` : ""}most likely ${n.label} (${n.as}), misheard`);
   return [
     whole.length ? `In what was said, the app finds: ${whole.join("; ")}.` : "",
     near.length ? `In what was said, ${near.join("; ")}${calling ? ": call with that name, and the app asks the user before it acts on it; or ask them yourself with ask_user" : ""}.` : "",

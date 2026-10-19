@@ -209,6 +209,8 @@ function registry() {
     // The last change, as the real registry keeps it: GitHub added.
     lastChange: () => ({ call: { name: "add_pills", arguments: { pills: ["integration_github"] } }, inverse: { name: "remove_pills", arguments: { pills: ["integration_github"] } } }),
     executed: [],
+    // GitHub, one thing with two faces: a pill and a service.
+    named: async () => [{ kind: "pill", id: "integration_github", label: "GitHub" }, { kind: "service", id: "integration_github", label: "GitHub" }],
     sources,
   };
   return self;
@@ -316,6 +318,7 @@ const CASES = [
   { name: "undo" },
   { name: "nothing" },
   { name: "instead", args: { meant: "Vercel" } },
+  { name: "find", args: { name: "github" } },
   { name: "ask_user", args: { question: "Open Discord?", option_1: "Discord", option_2: "Steam" } },
   { name: "escalate", args: { reason: "needs a plan" }, unverified: true },
   { name: "more_tools" },
@@ -371,7 +374,7 @@ test("the tiers: a click for what cannot be put back, an inverse for what can", 
     "set_recap_enabled", "set_recap_hide_projects", "set_repeat", "set_shuffle", "set_timer", "wear_outfit",
   ]);
   assert.deepEqual(of("read"), [
-    "current_view", "get_setting", "list_conversations", "list_outfits", "list_pills", "list_services", "list_sessions", "more_tools",
+    "current_view", "find", "get_setting", "list_conversations", "list_outfits", "list_pills", "list_services", "list_sessions", "more_tools",
     "now_playing", "read_agent_question", "read_chat", "read_mochi", "read_permission_request", "read_recap", "read_session_output",
     "read_timer", "service_report", "web_search",
   ]);
@@ -432,7 +435,7 @@ test("a capability never throws: what breaks in the app is a failure", async () 
   }
   for (const c of CASES) {
     // These three do not touch the app.
-    if (["undo", "nothing", "escalate", "more_tools", "ask_user", "instead"].includes(c.name)) continue;
+    if (["undo", "nothing", "escalate", "more_tools", "ask_user", "instead", "find"].includes(c.name)) continue;
     const result = await reg.get(c.name).run(c.args ?? {}, context());
     assert.equal(result.status, "failed", c.name);
     assert.equal(result.verified, false, c.name);
@@ -866,4 +869,13 @@ test("instead puts the last change back and does it again with what was meant", 
   assert.equal(result.status, "done");
   assert.deepEqual(reg.executed, [{ name: "add_pills", arguments: { pills: ["Vercel"] } }]);
   assert.match(result.line, /Put back/);
+});
+
+test("find says one thing once, with each of its faces and what takes it", async () => {
+  const { get } = app();
+  const result = await get("find").run({ name: "github" }, context());
+  assert.equal(result.data.found.length, 1);
+  assert.deepEqual(result.data.found[0].as.map((a) => a.kind), ["pill", "service"]);
+  assert.ok(result.data.found[0].as[0].takes.includes("add_pills"));
+  assert.ok(result.data.found[0].as[1].takes.includes("service_report"));
 });

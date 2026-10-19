@@ -888,3 +888,17 @@ test("a misheard name the model did nothing with, after the wake phrase, is look
   assert.ok(local.asked[1].tools.includes("ask_user"));
   assert.ok(!local.asked[1].tools.includes("pause_music"));
 });
+
+test("one thing with several faces is told once, and the lean context leaves the state to be looked up", async () => {
+  app.registry.entities({ kind: "service", description: "Services.", list: () => [{ id: "github", label: "GitHub" }] });
+  app.registry.declare({ name: "find", area: "coucou", description: "Looks a name up.", tier: "read", args: { name: { type: "string", description: "" } }, run: async () => done("", true, { found: [] }) });
+  const local = scripted(calls(call("nothing")));
+  await turns({ local: local.model }).hear("remove github");
+  assert.match(local.asked[0].system, /GitHub \(one thing, as pill and as service\)/);
+  assert.match(local.asked[0].system, /"now_playing"/);
+  const lean = scripted(calls(call("nothing")));
+  await new VoiceTurns({ registry: app.registry, embed: flat, local: () => lean.model, cloud: () => null, words: TURN_WORDS, now: () => now, context: () => "lean" }).hear("remove github");
+  assert.doesNotMatch(lean.asked[0].system, /"now_playing"/);
+  assert.doesNotMatch(lean.asked[0].system, /GitHub, Vercel, Stripe/);
+  assert.ok(lean.asked[0].tools.includes("find"));
+});
