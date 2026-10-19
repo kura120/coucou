@@ -413,18 +413,24 @@ export class VoiceTurns {
         value: String(i + 1),
         label: `${option.label}${option.hint ? ` (${option.hint})` : ""}, option ${i + 1} of ${all.length}${i === 0 ? ", the first" : i === all.length - 1 ? ", the last" : ""}`,
       }))
-      : [{ value: "yes", label: ask.yes ?? "Yes" }, { value: "no", label: ask.no ?? "No" }];
+      // Values that are not the words "yes" and "no", each with what it means: with thinking off,
+      // qwen3:8b read "yeah" and "do it" as no to a bare "yes / no" (measured; qwen2.5 did not).
+      : [
+        { value: "accept", label: `${ask.yes ?? "Yes"}: they agree, accept or confirm, in any words` },
+        { value: "refuse", label: `${ask.no ?? "No"}: they refuse or turn it down` },
+      ];
     const system = READ_ANSWER
       .replace("{question}", ask.question)
       .replace("{options}", options.map((o) => `${o.value}: ${o.label}`).join("\n"));
-    const reply = await within(local(system, sentence, [answerTool(options.map((o) => o.value))], []), ANSWER_MS);
+    // What they said, quoted: given bare, "yeah" was taken for a sentence of its own.
+    const reply = await within(local(system, `They said: "${sentence}"`, [answerTool(options.map((o) => o.value))], []), ANSWER_MS);
     // Answered meanwhile by a click, or dropped: this reading is for nothing.
     if (this.asked !== ask) return { is: "answer" };
     const call = reply ? [...reply.calls, ...written(reply.text, new Set(["answer"]))].find((c) => c.name === "answer") : undefined;
     const chosen = typeof call?.arguments?.option === "string" ? call.arguments.option.trim().toLowerCase() : "";
     const given: Answer | null =
       chosen === "none" ? { kind: "dropped" }
-      : ask.kind === "yes_no" ? (chosen === "yes" || chosen === "no" ? { kind: "yes_no", yes: chosen === "yes" } : null)
+      : ask.kind === "yes_no" ? (chosen === "accept" || chosen === "refuse" ? { kind: "yes_no", yes: chosen === "accept" } : null)
       : ask.options[Number(chosen) - 1] ? { kind: "choice", id: ask.options[Number(chosen) - 1].id } : null;
     this.trace(`answer read as: ${given ? JSON.stringify(given) : "unclear"}`);
     if (!given) return { is: "unclear" };

@@ -408,14 +408,14 @@ test("the last turns are given to the model as data, undo is the registry's, and
 // ── A question on screen ──────────────────────────────────────────────────────
 
 test("a spoken answer to a choice or a yes/no is read by the model, given the question and its options as one tool", async () => {
-  const reader = scripted(calls(call("answer", { option: "2" })), calls(call("answer", { option: "unclear" })), calls(call("answer", { option: "yes" })));
+  const reader = scripted(calls(call("answer", { option: "2" })), calls(call("answer", { option: "unclear" })), calls(call("answer", { option: "accept" })));
   const t = turns({ local: reader.model });
   const which = t.askUser({ kind: "choice", question: "Which account?", options: [{ id: "work", label: "Work" }, { id: "home", label: "Home", hint: "a@home" }] });
   assert.deepEqual(await t.answerSaid("the home one"), { is: "answer" });
   assert.deepEqual(await which, { kind: "choice", id: "home" });
   assert.deepEqual(reader.asked[0].tools, ["answer"]);
   assert.match(reader.asked[0].system, /Which account\?[\s\S]*1: Work, option 1 of 2, the first\n2: Home \(a@home\), option 2 of 2, the last/);
-  assert.equal(reader.asked[0].said, "the home one");
+  assert.equal(reader.asked[0].said, "They said: \"the home one\"");
   // Not an answer: the question stays.
   const open = t.askUser({ kind: "yes_no", question: "Open Spotify?" });
   assert.deepEqual(await t.answerSaid("what time is it"), { is: "unclear" });
@@ -446,7 +446,7 @@ test("with no model nothing said answers a question: a click or a key does", asy
 
 test("no to a question, with a request of its own, is heard as the next turn", async () => {
   const embed = embedBy({ "remove strife": { remove_pills: 1 } });
-  const local = scripted(calls(call("answer", { option: "no", also_asks: true })));
+  const local = scripted(calls(call("answer", { option: "refuse", also_asks: true })));
   const t = turns({ embed, local: local.model });
   t.onAsk = (ask) => {
     if (ask) queueMicrotask(() => void t.answerSaid("no, github"));
@@ -716,7 +716,7 @@ test("a no that names another thing of the kind asked about is what was meant in
   const embed = embedBy({ "remove strife": { remove_pills: 1 } });
   for (const [said, next] of [["no, github", "no, github"], ["no", undefined], ["no, the chat", undefined]]) {
     app = makeApp();
-    const t = turns({ embed, local: scripted(calls(call("answer", { option: "no", also_asks: false }))).model });
+    const t = turns({ embed, local: scripted(calls(call("answer", { option: "refuse", also_asks: false }))).model });
     t.onAsk = (ask) => {
       if (ask) queueMicrotask(() => void t.answerSaid(said));
     };
