@@ -294,12 +294,24 @@ async function local(system, said, tools, history = [], steps = []) {
     writeFileSync(`${process.env.VOICE_EVAL_DUMP}/messages-${rounds.length}.json`, JSON.stringify(messages(system, history, said, steps)));
   }
   const began = performance.now();
+  // On Ollama, its own chat API: the OpenAI one ignores the context size, and a prompt cut at 4096 loses the instructions.
+  // 8192 is brain.rs's VOICE_CONTEXT. That API takes a tool call's arguments as an object, not a string.
+  const ollama = tags.length > 0;
   const request = () =>
-    fetch(`${SERVER}/v1/chat/completions`, {
+    fetch(`${SERVER}/${ollama ? "api/chat" : "v1/chat/completions"}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // No thinking, as the app asks (src-tauri/src/voice/brain.rs).
-      body: JSON.stringify({ model: MODEL, temperature: 0, stream: false, reasoning_effort: "none", tools, messages: messages(system, history, said, steps) }),
+      body: JSON.stringify(
+        ollama
+          ? {
+              model: MODEL, stream: false, think: false, tools,
+              messages: messages(system, history, said, steps).map((m) =>
+                m.tool_calls ? { ...m, tool_calls: m.tool_calls.map((c) => ({ ...c, function: { ...c.function, arguments: JSON.parse(c.function.arguments) } })) } : m),
+              options: { temperature: 0, num_ctx: 8192 },
+            }
+          : { model: MODEL, temperature: 0, stream: false, reasoning_effort: "none", tools, messages: messages(system, history, said, steps) },
+      ),
     });
   // A server that is being restarted, or is busy with another session's model: once more, a little later.
   const reply = await request().catch(() => new Promise((resolve) => setTimeout(resolve, 5000)).then(request));

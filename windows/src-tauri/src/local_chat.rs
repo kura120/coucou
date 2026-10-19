@@ -298,6 +298,14 @@ pub async fn complete_at(client: reqwest::Client, base: &Url, server: &Server, b
     post_at(client, base, server, "v1/chat/completions", body).await
 }
 
+/// `POST /api/chat` on an Ollama server, answered whole: what voice asks of
+/// Ollama (voice/brain.rs). Unlike the OpenAI endpoint it takes the context
+/// size, so the model is loaded at the size the prompt needs.
+pub async fn ollama_chat(server: &Server, body: &Value, timeout: Duration) -> Result<Value, String> {
+    let base = base_url(server)?;
+    post_at(net::client(&base, timeout)?, &base, server, "api/chat", body).await
+}
+
 /// `POST /v1/embeddings`, answered whole: what voice ranks with
 /// (voice/embed.rs). The errors are for the caller to tell apart, not to show.
 pub async fn embeddings(server: &Server, body: &Value, timeout: Duration) -> Result<Value, String> {

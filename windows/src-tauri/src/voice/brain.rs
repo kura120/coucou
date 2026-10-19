@@ -38,6 +38,11 @@ const MAX_RESULT: usize = 240;
 /// so it can go on from there or say what happened (src/voice/conversation.ts).
 const MAX_STEPS: usize = 5;
 const MAX_STEP_RESULT: usize = 1200;
+/// Ollama loads a model at 4096 tokens unless asked for more, and a prompt that
+/// does not fit loses its start: the instructions. Voice's requests weigh 3–4 K
+/// tokens with six turns, so 8192. One size for every request: a model loaded
+/// at another size is loaded again.
+const VOICE_CONTEXT: u32 = 8192;
 
 /// A turn that came before: what was said, what was done for it (as the tool
 /// calls a model would have made) and what came of it.
@@ -98,9 +103,22 @@ pub fn warm(settings: &Settings) {
     if model.is_empty() || !here || WARMING.swap(true, Ordering::Relaxed) {
         return;
     }
+    let ollama = settings.voice.brain == "ollama";
     tauri::async_runtime::spawn(async move {
-        let body = json!({ "model": model, "messages": [{ "role": "user", "content": "ok" }], "max_tokens": 1, "stream": false });
-        if let Err(why) = local_chat::complete(&server, &body, WARM_UP).await {
+        let asked = if ollama {
+            let body = json!({
+                "model": model,
+                "messages": [{ "role": "user", "content": "ok" }],
+                "think": false,
+                "stream": false,
+                "options": { "num_ctx": VOICE_CONTEXT, "num_predict": 1 },
+            });
+            local_chat::ollama_chat(&server, &body, WARM_UP).await
+        } else {
+            let body = json!({ "model": model, "messages": [{ "role": "user", "content": "ok" }], "max_tokens": 1, "stream": false });
+            local_chat::complete(&server, &body, WARM_UP).await
+        };
+        if let Err(why) = asked {
             crate::log::line(format!("voice: the model is not ready: {}", why.chars().take(160).collect::<String>()));
         }
         WARMING.store(false, Ordering::Relaxed);
@@ -147,20 +165,59 @@ pub async fn ask(
         return Err("voice: request refused".into());
     }
     tell_if_elsewhere(app, &server);
-    let body = json!({
-        "model": model,
-        "messages": with_steps(messages(system, history, said), steps),
-        "tools": tools,
-        "temperature": 0,
-        "stream": false,
-        // A model that thinks before it answers (qwen3) wrote some 150 tokens of
-        // it for every call, a voice command waiting on each: measured, qwen3:8b
-        // writes 2 tokens for a one-word answer with this and 138 without. As
-        // hear.rs asks; a server that does not think ignores it.
-        "reasoning_effort": "none",
-    });
-    let answer = local_chat::complete(&server, &body, TIMEOUT).await?;
+    let ollama = settings.voice.brain == "ollama";
+    let body = request(ollama, model, with_steps(messages(system, history, said), steps), tools);
+    let answer = if ollama {
+        local_chat::ollama_chat(&server, &body, TIMEOUT).await?
+    } else {
+        local_chat::complete(&server, &body, TIMEOUT).await?
+    };
     Ok(read(&answer))
+}
+
+/// The body of one request to the model server. Ollama gets its own chat API,
+/// the one that takes the context size (its OpenAI API ignores it), with
+/// thinking off. Any other server gets the request it always had.
+fn request(ollama: bool, model: &str, messages: Vec<Value>, tools: &Value) -> Value {
+    if ollama {
+        json!({
+            "model": model,
+            "messages": native(messages),
+            "tools": tools,
+            "stream": false,
+            // What reasoning_effort "none" asks of the OpenAI-style servers.
+            "think": false,
+            "options": { "temperature": 0, "num_ctx": VOICE_CONTEXT },
+        })
+    } else {
+        json!({
+            "model": model,
+            "messages": messages,
+            "tools": tools,
+            "temperature": 0,
+            "stream": false,
+            // A model that thinks before it answers (qwen3) wrote some 150 tokens of
+            // it for every call, a voice command waiting on each: measured, qwen3:8b
+            // writes 2 tokens for a one-word answer with this and 138 without. As
+            // hear.rs asks; a server that does not think ignores it.
+            "reasoning_effort": "none",
+        })
+    }
+}
+
+/// The same conversation for Ollama's own chat API, which takes a tool call's
+/// arguments as an object where the OpenAI API takes a JSON string. What is not
+/// an object is an empty one. Everything else is left as it is.
+fn native(mut messages: Vec<Value>) -> Vec<Value> {
+    for message in messages.iter_mut() {
+        let Some(calls) = message.get_mut("tool_calls").and_then(Value::as_array_mut) else { continue };
+        for call in calls.iter_mut() {
+            if let Some(text) = call["function"]["arguments"].as_str().map(str::to_string) {
+                call["function"]["arguments"] = serde_json::from_str(&text).ok().filter(Value::is_object).unwrap_or_else(|| json!({}));
+            }
+        }
+    }
+    messages
 }
 
 /// The conversation as the server is given it: what the app is, the turns so
@@ -233,11 +290,13 @@ pub fn with_steps(mut messages: Vec<Value>, steps: &[Step]) -> Vec<Value> {
     messages
 }
 
-/// The tool calls and the text of an OpenAI-style answer. Arguments arrive as
-/// a JSON string from most servers and as an object from some; what cannot be
-/// read is an empty object, which the island's own checks then refuse.
+/// The tool calls and the text of an OpenAI-style answer, or of Ollama's own
+/// (the message at the top). Arguments arrive as a JSON string from most servers
+/// and as an object from some; what cannot be read is an empty object, which the
+/// island's own checks then refuse.
 pub fn read(answer: &Value) -> Reply {
-    let message = &answer["choices"][0]["message"];
+    let openai = &answer["choices"][0]["message"];
+    let message = if openai.is_null() { &answer["message"] } else { openai };
     let calls = message["tool_calls"]
         .as_array()
         .map(|list| {
@@ -380,5 +439,55 @@ mod tests {
         let many: Vec<Value> = (0..40).map(|_| json!({ "function": { "name": "music", "arguments": "{}" } })).collect();
         let answer = json!({ "choices": [{ "message": { "tool_calls": many } }] });
         assert_eq!(read(&answer).calls.len(), MAX_CALLS);
+    }
+
+    #[test]
+    fn ollama_answers_are_read_from_the_message_at_the_top() {
+        let answer = json!({ "message": { "content": "", "tool_calls": [{ "function": { "name": "pause_music", "arguments": {} } }] } });
+        assert_eq!(read(&answer), Reply { calls: vec![Call { name: "pause_music".into(), arguments: json!({}) }], text: String::new() });
+        let answer = json!({ "message": { "content": "<think>hmm</think>\n The CI is passing. " } });
+        assert_eq!(read(&answer), Reply { calls: vec![], text: "The CI is passing.".into() });
+    }
+
+    #[test]
+    fn ollama_takes_a_call_s_arguments_as_an_object() {
+        let messages = vec![
+            json!({ "role": "user", "content": "open spotify" }),
+            json!({ "role": "assistant", "content": "", "tool_calls": [
+                { "id": "c", "type": "function", "function": { "name": "open_app", "arguments": "{\"app\":\"Spotify\"}" } },
+                { "id": "d", "type": "function", "function": { "name": "music", "arguments": "not json" } },
+            ] }),
+            json!({ "role": "tool", "tool_call_id": "c", "content": "Spotify opened" }),
+        ];
+        let converted = native(messages.clone());
+        assert_eq!(converted[0], messages[0]);
+        assert_eq!(converted[1]["tool_calls"][0]["function"]["arguments"], json!({ "app": "Spotify" }));
+        assert_eq!(converted[1]["tool_calls"][0]["id"], "c");
+        assert_eq!(converted[1]["tool_calls"][1]["function"]["arguments"], json!({}));
+        assert_eq!(converted[2], messages[2]);
+    }
+
+    #[test]
+    fn ollama_gets_its_own_request_with_the_context_size_and_no_thinking() {
+        let messages = vec![json!({ "role": "assistant", "content": "", "tool_calls": [
+            { "id": "c", "type": "function", "function": { "name": "music", "arguments": "{\"action\":\"pause\"}" } },
+        ] })];
+        let body = request(true, "qwen3:8b", messages.clone(), &json!([]));
+        assert_eq!(body["model"], "qwen3:8b");
+        assert_eq!(body["options"]["num_ctx"], json!(VOICE_CONTEXT));
+        assert_eq!(body["options"]["temperature"], json!(0));
+        assert_eq!(body["think"], json!(false));
+        assert_eq!(body["stream"], json!(false));
+        assert!(body.get("reasoning_effort").is_none());
+        assert_eq!(body["messages"][0]["tool_calls"][0]["function"]["arguments"], json!({ "action": "pause" }));
+
+        // Any other server is sent the request it always was.
+        let body = request(false, "m", messages, &json!([]));
+        assert_eq!(body["reasoning_effort"], "none");
+        assert_eq!(body["temperature"], json!(0));
+        assert_eq!(body["stream"], json!(false));
+        assert_eq!(body["messages"][0]["tool_calls"][0]["function"]["arguments"], "{\"action\":\"pause\"}");
+        assert!(body.get("options").is_none());
+        assert!(body.get("think").is_none());
     }
 }
