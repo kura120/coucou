@@ -8,6 +8,8 @@ import type { AppHost } from "./host";
 import { capability, type Area } from "./shared";
 
 const AREA = "music";
+/** Which player a result is about: what Mochi says of it ("Spotify is paused") is checked against the results. */
+const PLAYER = { player: "Spotify" };
 
 export function music(host: AppHost): Area {
   /** Music the user switched off is not touched, and not started either. */
@@ -79,7 +81,7 @@ export function music(host: AppHost): Area {
           }
           // Play said as such, never a toggle: what the app last read of the player may be late.
           if (!(await host.musicControl("play"))) return failed(t("That did not change"), "The player did not take it.");
-          return done(t("Playing"), await seen(() => host.music().playing));
+          return done(t("Playing"), await seen(() => host.music().playing), PLAYER);
         },
       }),
       capability({
@@ -95,7 +97,7 @@ export function music(host: AppHost): Area {
           if (stopped) return stopped;
           // Pause said as such, never a toggle: a toggle on a late reading started the music instead.
           if (!(await host.musicControl("pause"))) return failed(t("That did not change"), "The player did not take it.");
-          return done(t("Paused"), await seen(() => !host.music().playing));
+          return done(t("Paused"), await seen(() => !host.music().playing), PLAYER);
         },
       }),
       capability({
@@ -109,7 +111,7 @@ export function music(host: AppHost): Area {
           const stopped = refusedNow();
           if (stopped) return stopped;
           // Which track comes is the player's to say, a moment later: asked for, not seen.
-          return (await host.musicControl("next")) ? done(t("Next track"), false) : failed(t("That did not change"), "The player did not take it.");
+          return (await host.musicControl("next")) ? done(t("Next track"), false, PLAYER) : failed(t("That did not change"), "The player did not take it.");
         },
       }),
       capability({
@@ -122,7 +124,7 @@ export function music(host: AppHost): Area {
         async run() {
           const stopped = refusedNow();
           if (stopped) return stopped;
-          return (await host.musicControl("previous")) ? done(t("Previous track"), false) : failed(t("That did not change"), "The player did not take it.");
+          return (await host.musicControl("previous")) ? done(t("Previous track"), false, PLAYER) : failed(t("That did not change"), "The player did not take it.");
         },
       }),
       capability({

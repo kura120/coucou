@@ -497,7 +497,7 @@ export class VoiceTurns {
     this.trace(`cloud asked (${came.is})`);
     const words = await this.cloudly(cloud, turn);
     this.trace(words == null ? "cloud did not answer" : `cloud answered: ${JSON.stringify(words)}`);
-    if (turn.how.wanted && !turn.how.wanted()) return { result: null, taken: true, rest: false };
+    if (gone(turn)) return { result: null, taken: true, rest: false };
     return this.end(turn, await this.checked(turn, words ?? ""), words == null && !shownOf(turn).length ? this.words.silent() : undefined);
   }
 
@@ -639,12 +639,12 @@ export class VoiceTurns {
     const system = [systemPrompt(snapshot, SHORTLISTED), namedLine(turn.named), turn.taken ? "" : ASIDE].filter(Boolean).join("\n\n");
 
     let reply = await local(system, said, tools(), history);
-    if (how.wanted && !how.wanted()) return { is: "dropped" };
+    if (gone(turn)) return { is: "dropped" };
     // An empty answer — no call, no words — is a small model's call that did not come out: asked once more.
     if (reply && !reply.calls.length && !reply.text.trim()) {
       const offered = tools().map((tool) => (tool as { function: { name: string } }).function.name);
       reply = await local(`${system}\n\n${EMPTY.replace("{tools}", offered.join(", "))}`, said, tools(), history);
-      if (how.wanted && !how.wanted()) return { is: "dropped" };
+      if (gone(turn)) return { is: "dropped" };
     }
     if (!reply) return { is: "silent" };
 
@@ -675,7 +675,7 @@ export class VoiceTurns {
       const step: ModelStep = { calls: [], results: [] };
       for (const call of fresh) {
         const result = await this.run(call, "local", turn);
-        if (how.wanted && !how.wanted()) return { is: "dropped" };
+        if (gone(turn)) return { is: "dropped" };
         if (call.name === ESCALATE && result.status === "done") return { is: "escalated" };
         step.calls.push(call);
         // An area's capabilities, asked for: they are tools from the next round on.
@@ -695,14 +695,14 @@ export class VoiceTurns {
       // What was only asked for is said in its own line whatever the words (`unfounded`): none are asked for.
       const after = !shownOf(turn).length ? AFTER_CALLS : shownOf(turn).every((ran) => ran.result.verified) ? AFTER_RAN : AFTER_RAN_DONE;
       const next = await within(local(`${system}\n\n${after}`, said, tools(), history, steps), acted(turn) ? Math.min(left, WORDING_MS) : left);
-      if (how.wanted && !how.wanted()) return { is: "dropped" };
+      if (gone(turn)) return { is: "dropped" };
       if (!next) break;
       reply = next;
     }
     // What only read is said from what was read, and from nothing else.
     if (shownOf(turn).length && !acted(turn) && shownOf(turn).every((ran) => ran.result.status === "done")) {
       words = (await this.report(this.traced(this.local(), "reporter") ?? local, turn)) ?? "";
-      if (how.wanted && !how.wanted()) return { is: "dropped" };
+      if (gone(turn)) return { is: "dropped" };
     }
     return { is: "answered", words };
   }
@@ -909,6 +909,14 @@ export function misheard(ranked: readonly Ranked[] | null, capabilities: readonl
 /** The kinds of thing a capability takes as an argument. */
 export const kindsOf = (capability: Capability): string[] =>
   Object.values(capability.args).flatMap((spec) => (spec.type === "entity" || spec.type === "entities" ? [spec.kind] : []));
+
+/**
+ * Nobody waits for this turn any more: the island moved on. Only once it was
+ * taken as said to Coucou — before that, a sentence said without the wake
+ * phrase has no view waiting on it at all, and dropping it there lost every
+ * follow-up ("next track" a few seconds after a command did nothing).
+ */
+const gone = (turn: Pick<Running, "taken" | "how">) => turn.taken && turn.how.wanted != null && !turn.how.wanted();
 
 /** What ran that is the app's doing: not the capabilities that are about the conversation. */
 const shownOf = (turn: Running) => turn.ran.filter((ran) => ![MORE_TOOLS, NOTHING, ESCALATE].includes(ran.call.name));

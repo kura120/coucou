@@ -839,3 +839,16 @@ test("with the debug log on, each step of a turn is told in a line: heard, ranke
   await turns({ embed, local: quiet.model }).hear("could you pause the music for me");
   assert.equal(lines.length, before);
 });
+
+test("a follow-up without the wake phrase runs what the model called, though nobody waited on it before it was taken", async () => {
+  // As the island has it: no view waits on a sentence said without the wake phrase until it is taken as said to Coucou.
+  let opened = false;
+  const local = scripted(calls(call("pause_music")));
+  const heard = await turns({ local: local.model, followUp: true }).hear("uh pause the music", {
+    wake: false,
+    taken: () => (opened = true),
+    wanted: () => opened,
+  });
+  assert.equal(heard.taken, true);
+  assert.deepEqual(app.state.log, ["pause"]);
+});
