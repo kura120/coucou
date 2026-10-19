@@ -84,6 +84,8 @@ export function createRegistry(options: RegistryOptions): Registry {
   let onScreen: () => ScreenContext | null = () => null;
   /** How to put the last reversible thing back. */
   let last: Call | null = null;
+  /** That last reversible thing, as it was done: what a correction ("no, Vercel") does again with another name. */
+  let lastDone: Call | null = null;
 
   function declare(...added: Capability[]) {
     for (const capability of added) {
@@ -233,8 +235,13 @@ export function createRegistry(options: RegistryOptions): Registry {
     }
     if (remember && result.status === "done") {
       // Something changed that cannot be put back: an older change must not be undone in its place.
-      if (!capability.inverse) last = null;
-      else if (inverse) last = inverse;
+      if (!capability.inverse) {
+        last = null;
+        lastDone = null;
+      } else if (inverse) {
+        last = inverse;
+        lastDone = { name: capability.name, arguments: args };
+      }
     }
     return result;
   }
@@ -253,6 +260,7 @@ export function createRegistry(options: RegistryOptions): Registry {
     if (!inverse) return failed(words.nothingToUndo(), "Nothing reversible was done, or it was already put back.");
     // Once: it is forgotten before it runs, and putting back is not itself remembered.
     last = null;
+    lastDone = null;
     return run(inverse, context, true);
   }
 
@@ -298,6 +306,9 @@ export function createRegistry(options: RegistryOptions): Registry {
       into[key] = value;
       return true;
     };
+
+    // What was changed last and can be put back: what a correction of it is about.
+    if (last && lastDone) add(out, "last_change", { did: lastDone, undo_does: last });
 
     const screen = safely(() => onScreen());
     if (screen) {
@@ -363,6 +374,7 @@ export function createRegistry(options: RegistryOptions): Registry {
     named: namedIn,
     execute: (call, context) => run(call, context, false),
     undo,
+    lastChange: () => (last && lastDone ? { call: lastDone, inverse: last } : null),
   };
 }
 

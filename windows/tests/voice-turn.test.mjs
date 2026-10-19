@@ -867,3 +867,24 @@ test("what may be done again runs twice when asked twice, a few times at most; a
   await turns({ local: scripted(calls(call("pause_music"), call("pause_music")), calls(call("pause_music"))).model }).hear("pause pause");
   assert.deepEqual(app.state.log, ["pause"]);
 });
+
+test("an argument that must have been said is refused when the model made it up", async () => {
+  const { notSaid } = await import("../src/voice/turn.ts");
+  const open = { args: { url: { type: "string", said: true, description: "" } } };
+  assert.equal(notSaid({ name: "open_url", arguments: { url: "github.com" } }, open, "ad get hub"), "github.com");
+  assert.equal(notSaid({ name: "open_url", arguments: { url: "https://www.github.com/" } }, open, "open github dot com"), null);
+  assert.equal(notSaid({ name: "open_url", arguments: { url: "example.org/page" } }, open, "go to example.org/page please"), null);
+  assert.equal(notSaid({ name: "x", arguments: {} }, undefined, "anything"), null);
+});
+
+test("a misheard name the model did nothing with, after the wake phrase, is looked at once more with asking offered", async () => {
+  app.registry.entities({ kind: "app", description: "Apps.", list: () => [], near: async (said) => (/spy flight/.test(said) ? [{ id: "Spotify", label: "Spotify", score: 0.8 }] : []) });
+  app.registry.declare({ name: "ask_user", area: "coucou", description: "Asks.", tier: "free", args: { question: { type: "string", description: "" } }, run: async () => done("", true, { answered: "yes" }) });
+  const local = scripted(calls(call("nothing")), calls(call("ask_user", { question: "Open Spotify?" })), says("Opening Spotify."));
+  await turns({ local: local.model }).hear("open spy flight");
+  assert.equal(local.asked.length >= 2, true);
+  assert.match(local.asked[1].system, /most likely Spotify \(app\), misheard\. Ask them with ask_user/);
+  // This test app's open_app takes a plain string, not an app: only asking is left to choose.
+  assert.ok(local.asked[1].tools.includes("ask_user"));
+  assert.ok(!local.asked[1].tools.includes("pause_music"));
+});

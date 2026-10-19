@@ -12,7 +12,7 @@ import { capability, cut, str, type Area } from "./shared";
 const AREA = "coucou";
 
 /** `registry`: what `undo` and `more_tools` read. `areas`: the names of every area declared. */
-export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" | "get">, areas: readonly string[]): Area {
+export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" | "get" | "execute" | "lastChange">, areas: readonly string[]): Area {
   return {
     sources: [],
     capabilities: [
@@ -87,6 +87,29 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
         args: {},
         tier: "free",
         run: (_args, context) => registry.undo(context),
+      }),
+      capability({
+        name: "instead",
+        area: AREA,
+        description: "Corrects the last change: puts it back and does it again with the thing the user meant instead — for \"no, I meant Resend\", \"no, Vercel\", \"Resend instead\" right after a change. Give the thing as the user said it. To only put the last change back, it is undo.",
+        args: { meant: { type: "string", maxLength: 80, description: "The thing meant instead, in the user's words." } },
+        tier: "free",
+        available: () => (registry.lastChange() ? true : t("There is nothing to put back")),
+        async run(args, context) {
+          const change = registry.lastChange();
+          const meant = cut(str(args.meant), 80);
+          if (!change) return failed(t("There is nothing to put back"), "Nothing was changed that can be corrected.");
+          if (!meant) return failed(t("Command not recognised"), "Say what was meant instead.");
+          // The last change's thing to name, to be named again: one argument that is a thing of the app.
+          const named = Object.entries(registry.get(change.call.name)?.args ?? {}).find(([, spec]) => spec.type === "entity" || spec.type === "entities");
+          if (!named) return failed(t("That did not change"), "The last change names no thing to replace.");
+          const back = await registry.undo(context);
+          if (back.status !== "done") return back;
+          const [arg, spec] = named;
+          const again = await registry.execute({ name: change.call.name, arguments: { ...change.call.arguments, [arg]: spec.type === "entities" ? [meant] : meant } }, context);
+          // Both said: what was put back, and what was done in its place.
+          return again.status === "done" ? { ...again, line: [back.line, again.line].filter(Boolean).join(". "), data: { put_back: change.call, then: again.data ?? again.line } } : again;
+        },
       }),
       capability({
         name: "nothing",

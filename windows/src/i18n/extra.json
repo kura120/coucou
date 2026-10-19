@@ -5943,6 +5943,17 @@
    "pt-BR": "Abrir a pasta do registro",
    "ru": "Открыть папку журнала",
    "id": "Buka folder log"
+  },
+  "Click Allow on the card to approve it": {
+   "zh-Hans": "点击卡片上的“允许”来批准",
+   "hi": "मंज़ूरी देने के लिए कार्ड पर अनुमति दें पर क्लिक करें",
+   "es": "Haz clic en Permitir en la tarjeta para aprobarlo",
+   "ar": "انقر على «سماح» في البطاقة للموافقة",
+   "fr": "Cliquez sur Autoriser sur la carte pour l'approuver",
+   "bn": "অনুমোদন দিতে কার্ডে অনুমতি দিন-এ ক্লিক করুন",
+   "pt-BR": "Clique em Permitir no cartão para aprovar",
+   "ru": "Нажмите «Разрешить» на карточке, чтобы одобрить",
+   "id": "Klik Izinkan pada kartu untuk menyetujuinya"
   }
  }
 }

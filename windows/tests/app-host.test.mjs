@@ -143,8 +143,8 @@ test("the registry of the app: every capability declared, and the screen is the 
   const registry = createAppRegistry(ports({ screen: () => ({ view: "prompt", subjects: [{ kind: "chat_model", id: "ollama/x", label: "x" }] }) }));
   assert.ok(registry.all().length >= 64);
   for (const name of ["pause_music", "show_view", "set_setting", "decline_permission", "undo", "more_tools", "escalate", "nothing"]) assert.ok(registry.get(name), name);
-  // Approving a permission is nowhere.
-  assert.deepEqual(registry.all().filter((c) => /approve|allow/.test(c.name)), []);
+  // Approving a permission is nowhere: the one name for it only brings the card up, free, and asks nothing of Rust.
+  assert.deepEqual(registry.all().filter((c) => /approve|allow/.test(c.name)).map((c) => [c.name, c.tier]), [["approve_permission_request", "free"]]);
   const snapshot = await registry.snapshot();
   assert.equal(snapshot.screen.view, "prompt");
 });

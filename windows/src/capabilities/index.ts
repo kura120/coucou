@@ -24,7 +24,7 @@ import { web } from "./web";
 export type { AppHost } from "./host";
 
 /** The app's areas, in the order a model is shown them. */
-export function appAreas(host: AppHost, registry: Pick<Registry, "undo" | "areas" | "get">): Area[] {
+export function appAreas(host: AppHost, registry: Pick<Registry, "undo" | "areas" | "get" | "execute" | "lastChange">): Area[] {
   const declared = [
     music(host), pills(host), sessions(host), permissions(host), timer(host), apps(host), views(host),
     settings(host), chat(host), wardrobe(host), recap(host), mochi(host), services(host), web(host),

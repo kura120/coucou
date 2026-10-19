@@ -60,6 +60,11 @@ export interface EntitySource {
 export type ArgSpec = {
   description: string;
   optional?: boolean;
+  /**
+   * The value must be in what the user said (an address said as "github dot
+   * com" is "github.com"): one a model made up is refused before it runs.
+   */
+  said?: boolean;
 } & (
   | { type: "string"; enum?: readonly string[]; maxLength?: number }
   | { type: "number"; min?: number; max?: number }
@@ -187,4 +192,6 @@ export interface Registry {
   execute(call: Call, context: RunContext): Promise<ToolResult>;
   /** Puts the last reversible thing back. */
   undo(context: RunContext): Promise<ToolResult>;
+  /** The last reversible thing done, with its resolved arguments, and what puts it back; null when nothing is to put back. */
+  lastChange(): { call: Call; inverse: Call } | null;
 }

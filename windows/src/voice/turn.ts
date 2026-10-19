@@ -84,6 +84,7 @@ const UNDO = "undo";
 const NOTHING = "nothing";
 const ESCALATE = "escalate";
 const ASK_USER = "ask_user";
+const INSTEAD = "instead";
 
 /** The lines the turn itself shows, worded and translated by its maker. */
 export interface TurnWords {
@@ -214,7 +215,7 @@ const ROLE = [
   "- Names: write each name in the arguments in the user's own words, as it was heard, even when it looks misheard, cut short or unlike anything in the state (\"open st\" is the app \"st\", \"open this squad\" the app \"this squad\"). The app looks it up and asks the user when it is not sure. A name you do not know is never a reason to do nothing. Never write a name or an address the user did not say.",
   "- When you are not sure what the user meant — a name that may be misheard, two things it could be — ask them with ask_user, giving the likely answers as options, then do what they answer. Asking is never wrong; doing nothing with a request is.",
   "- A sentence that goes on from the turn before (\"and Discord too\", \"what about Steam\") asks for the same again, for what it names now.",
-  "- A correction of the turn before (\"no, I meant Resend\", \"take that one off\") is a request: put the last change back with undo, then do what is meant now, if anything.",
+  "- A correction of the turn before is a request. Another thing meant (\"no, I meant Resend\", \"no, Vercel\"): call instead with it. The change only taken back (\"take that one off\", \"actually I changed my mind\"): call undo. The last change is in the state as last_change.",
   "- Some capabilities wait for the user's click before anything happens. That is the app's doing: call them when they are what was asked.",
   "- A question about the app is answered from its state, below, or by a capability that reads.",
   "- When what was heard asks nothing of Coucou, call the capability named nothing.",
@@ -475,8 +476,21 @@ export class VoiceTurns {
     const local = this.traced(this.local());
     if (!local) return this.end(turn, "", this.words.noModel());
     turn.how.waiting?.();
-    const came = await this.locally(local, turn, ranked);
+    let came = await this.locally(local, turn, ranked);
     if (came.is === "dropped") return { result: null, taken: true, rest: false };
+    // Said to Coucou by name, a name in it only nearly the app's, and the model did nothing with it:
+    // asked once more, told so, with only asking and what takes that kind of thing to choose from.
+    const doubt = turn.wake && came.is === "answered" && turn.ran.length > 0 && turn.ran.every((ran) => ran.call.name === NOTHING)
+      ? turn.named.find((n) => n.near) : undefined;
+    if (doubt) {
+      turn.ran = [];
+      this.trace(`second look: "${doubt.heard ?? turn.said}" may be ${doubt.label} (${doubt.kind})`);
+      came = await this.locally(local, turn, ranked, {
+        note: `The user said Coucou's name: this was said to Coucou, and it asks for something. In it, ${doubt.heard ? `"${doubt.heard}"` : "a name"} is most likely ${doubt.label} (${doubt.kind}), misheard. Ask them with ask_user whether they meant ${doubt.label}, or call what does it with the name as they said it; the app asks before acting on a name it is not sure of.`,
+        only: [ASK_USER, ...this.registry.all().filter((c) => kindsOf(c).includes(doubt.kind)).map((c) => c.name)],
+      });
+      if (came.is === "dropped") return { result: null, taken: true, rest: false };
+    }
     if (came.is === "answered") {
       // The sentence nearly names a thing and the model did nothing with it ("open spy flight" taken for
       // nonsense): the capability that takes such a thing is called with it as heard, and the executor
@@ -574,7 +588,10 @@ export class VoiceTurns {
 
   private async run(call: ModelCall, origin: RunContext["origin"], turn: Running): Promise<ToolResult> {
     const given = await this.heardCall(call, turn);
-    const result = await this.registry.execute(given, this.context(origin, turn));
+    const unsaid = notSaid(given, this.registry.get(given.name), turn.said);
+    const result = unsaid
+      ? { status: "refused" as const, verified: false, line: this.words.notUnderstood(), detail: `"${unsaid}" is not in what the user said: say only what they said, or ask them.` }
+      : await this.registry.execute(given, this.context(origin, turn));
     turn.ran.push({ call: given, result, capability: this.registry.get(call.name) });
     this.traceRan(origin, given, result);
     return result;
@@ -617,6 +634,8 @@ export class VoiceTurns {
     local: LocalModel,
     turn: Running,
     ranked: Ranked[],
+    /** A second look: a line told to the model, and the only capabilities it is shown. */
+    second?: { note: string; only: readonly string[] },
   ): Promise<{ is: "answered"; words: string } | { is: "escalated" } | { is: "silent" } | { is: "dropped" }> {
     const { how, said } = turn;
     const capabilities = this.registry.all();
@@ -627,7 +646,9 @@ export class VoiceTurns {
     // A follow-up ("and Discord too") goes on with what the turn before called, whatever it ranks alone.
     const carried = (history[history.length - 1]?.calls ?? []).map((call) => call.name);
     // Asking the user is always offered: a name the model is not sure of is asked about, not guessed or dropped.
-    const shown = new Set(offered([...shortlist(ranked, capabilities, SHORTLIST, [...carried, ...takers(ranked, capabilities, turn.named)]), UNDO, ASK_USER]));
+    const shown = new Set(offered([...shortlist(ranked, capabilities, SHORTLIST, [...carried, ...takers(ranked, capabilities, turn.named)]), UNDO, INSTEAD, ASK_USER]));
+    if (second) for (const name of [...shown]) if (!second.only.includes(name)) shown.delete(name);
+    if (second) for (const name of offered(second.only)) shown.add(name);
     // What cannot be used right now is not offered (no question waits, the chat's field is empty): read again
     // each round, since a call may make another usable — a message prepared can be sent.
     const usable = (name: string) => {
@@ -641,7 +662,7 @@ export class VoiceTurns {
 
     const snapshot = await this.registry.snapshot();
 
-    const system = [systemPrompt(snapshot, SHORTLISTED), namedLine(turn.named), turn.wake ? "" : ASIDE].filter(Boolean).join("\n\n");
+    const system = [systemPrompt(snapshot, SHORTLISTED), namedLine(turn.named), turn.wake ? "" : ASIDE, second?.note ?? ""].filter(Boolean).join("\n\n");
 
     let reply = await local(system, said, tools(), history);
     if (gone(turn)) return { is: "dropped" };
@@ -907,6 +928,24 @@ export function misheard(ranked: readonly Ranked[] | null, capabilities: readonl
     });
     const best = ranked ? ranked.find((r) => fit.some((c) => c.name === r.name))?.name : fit.length === 1 ? fit[0].name : undefined;
     if (best) return { name: best, heard: thing.heard };
+  }
+  return null;
+}
+
+/**
+ * The first argument marked `said` whose value is not in the sentence, or
+ * null. Compared as written down, with "dot" read as a dot and the spaces
+ * gone, and an address without its scheme, "www." and trailing slash:
+ * "github dot com" holds "https://github.com/", "ad get hub" does not.
+ */
+export function notSaid(call: ModelCall, capability: Capability | undefined, sentence: string): string | null {
+  if (!capability) return null;
+  const heard = sentence.toLowerCase().replace(/\s+dot\s+/g, ".").replace(/[^a-z0-9.\/:-]+/g, "");
+  for (const [arg, spec] of Object.entries(capability.args)) {
+    const value = call.arguments?.[arg];
+    if (!spec.said || typeof value !== "string" || !value.trim()) continue;
+    const wanted = value.toLowerCase().trim().replace(/^[a-z]+:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "").replace(/[^a-z0-9.\/:-]+/g, "");
+    if (!wanted || !heard.includes(wanted)) return value;
   }
   return null;
 }

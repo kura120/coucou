@@ -76,6 +76,20 @@ export function permissions(host: AppHost): Area {
         },
       }),
       capability({
+        // The name a model reaches for when it is asked to allow a request (measured: it called one that did
+        // not exist). It approves nothing: it brings the card up, and only the user's click on Allow approves.
+        name: "approve_permission_request",
+        area: AREA,
+        description: "What to call when the user asks to allow, approve or accept the permission request that waits (\"yeah allow it\", \"approve it\", \"go ahead\"). Voice cannot approve: this brings the request's card up, and the user clicks Allow on it themselves. Never decline_permission for this.",
+        args: {},
+        tier: "free",
+        available: () => (host.permission() ? true : t("No request is waiting")),
+        async run() {
+          if (!host.permission()) return failed(t("No request is waiting"));
+          return host.showWaitingCard() ? done(t("Click Allow on the card to approve it"), true) : failed(t("That cannot be shown right now"));
+        },
+      }),
+      capability({
         name: "decline_permission",
         area: AREA,
         description: "Declines the permission request that is waiting: the agent is told no. Only when the user clearly wants it refused. There is no way to approve a request from here.",

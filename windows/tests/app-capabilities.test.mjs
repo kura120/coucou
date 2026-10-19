@@ -204,8 +204,11 @@ function registry() {
     areas: () => [...new Set(all.map((c) => c.area))].map((area) => ({ area, names: all.filter((c) => c.area === area).map((c) => c.name) })),
     schema: () => null,
     snapshot: async () => ({}),
-    execute: async () => ({ status: "refused", verified: false, line: "", detail: "not in this test" }),
+    execute: async (call) => (self.executed.push(call), { status: "done", verified: true, line: `${call.name} done` }),
     undo: async () => ({ status: "done", verified: true, line: "Put back" }),
+    // The last change, as the real registry keeps it: GitHub added.
+    lastChange: () => ({ call: { name: "add_pills", arguments: { pills: ["integration_github"] } }, inverse: { name: "remove_pills", arguments: { pills: ["integration_github"] } } }),
+    executed: [],
     sources,
   };
   return self;
@@ -258,6 +261,7 @@ const CASES = [
 
   { name: "read_permission_request" },
   { name: "show_waiting_card", refused: "failed", unverified: true },
+  { name: "approve_permission_request", refused: "failed" },
   { name: "decline_permission", refused: "failed" },
   { name: "read_agent_question", with: { question: QUESTION, permission: null } },
   { name: "answer_agent_question", with: { question: QUESTION, permission: null }, args: { options: ["1.2", "2.1", "2.2"] }, refused: "failed" },
@@ -311,6 +315,7 @@ const CASES = [
   { name: "notify", args: { text: "Stand up" }, unverified: true },
   { name: "undo" },
   { name: "nothing" },
+  { name: "instead", args: { meant: "Vercel" } },
   { name: "ask_user", args: { question: "Open Discord?", option_1: "Discord", option_2: "Steam" } },
   { name: "escalate", args: { reason: "needs a plan" }, unverified: true },
   { name: "more_tools" },
@@ -427,7 +432,7 @@ test("a capability never throws: what breaks in the app is a failure", async () 
   }
   for (const c of CASES) {
     // These three do not touch the app.
-    if (["undo", "nothing", "escalate", "more_tools", "ask_user"].includes(c.name)) continue;
+    if (["undo", "nothing", "escalate", "more_tools", "ask_user", "instead"].includes(c.name)) continue;
     const result = await reg.get(c.name).run(c.args ?? {}, context());
     assert.equal(result.status, "failed", c.name);
     assert.equal(result.verified, false, c.name);
@@ -747,8 +752,8 @@ test("nothing private is declared: by name", () => {
   ]) {
     assert.ok(!names.includes(name), name);
   }
-  // No name speaks of them either, whatever it is called.
-  for (const name of names) {
+  // No name speaks of them either, whatever it is called — but the one that only brings the card up (below).
+  for (const name of names.filter((n) => n !== "approve_permission_request")) {
     for (const part of ["approve", "allow", "hook", "status_line", "secret", "key", "token", "phone", "shortcut", "guard", "password"]) {
       assert.ok(!name.split("_").includes(part), `${name}: ${part}`);
     }
@@ -841,4 +846,24 @@ test("web_search is not offered while nobody is chosen to answer from the web: t
   assert.equal(get("open_web_search").available?.() ?? true, true);
   host.setting = (key) => (key === "voice.webSearch" ? "brave" : undefined);
   assert.equal(get("web_search").available(), true);
+});
+
+test("approve_permission_request approves nothing: it brings the card up, and only the click on Allow approves", async () => {
+  const { get, log, registry: reg } = app();
+  const capability = get("approve_permission_request");
+  assert.equal(capability.tier, "free");
+  const result = await capability.run({}, context());
+  assert.equal(result.status, "done");
+  assert.match(result.line, /Allow/);
+  // What it did to the app: the card, and nothing else.
+  assert.deepEqual(log.filter((what) => !what.startsWith("read")), ["card"].filter((x) => log.includes(x)));
+  assert.ok(!reg.all().some((c) => c !== capability && /approve|allow/.test(c.name)));
+});
+
+test("instead puts the last change back and does it again with what was meant", async () => {
+  const { get, registry: reg } = app();
+  const result = await get("instead").run({ meant: "Vercel" }, context());
+  assert.equal(result.status, "done");
+  assert.deepEqual(reg.executed, [{ name: "add_pills", arguments: { pills: ["Vercel"] } }]);
+  assert.match(result.line, /Put back/);
 });

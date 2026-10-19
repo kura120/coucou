@@ -73,7 +73,7 @@ export function apps(host: AppHost): Area {
         name: "open_url",
         area: AREA,
         description: "Opens a web address in the browser, when the user said one with its dot and ending, such as github.com. Only http and https. Never for a name said without an address: an application is open_app, a pill add_pills; to look something up, it is a web search.",
-        args: { url: { type: "string", maxLength: 2000, description: "The address: 'github.com', 'https://example.org/page'." } },
+        args: { url: { type: "string", maxLength: 2000, said: true, description: "The address as the user said it: 'github.com', 'https://example.org/page'." } },
         tier: "free",
         async run(args) {
           const url = webAddress(str(args.url));
