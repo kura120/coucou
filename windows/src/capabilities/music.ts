@@ -87,7 +87,7 @@ export function music(host: AppHost): Area {
       capability({
         name: "pause_music",
         area: AREA,
-        description: "Pauses or stops the music playing in Spotify, for a moment or for good: what stopping or pausing the music, a song or Spotify means. What a pause means when nothing else is named. Not for pausing Coucou itself, and not for turning off Coucou's microphone.",
+        description: "Pauses the music playing in Spotify, which is also what stopping the music or Spotify means. What a pause means when nothing else is named. Not for pausing Coucou itself, and not for turning off Coucou's microphone.",
         args: {},
         tier: "reversible",
         available,
@@ -106,6 +106,7 @@ export function music(host: AppHost): Area {
         description: "Skips to the next track.",
         args: {},
         tier: "free",
+        repeatable: true,
         available,
         async run() {
           const stopped = refusedNow();
@@ -120,6 +121,7 @@ export function music(host: AppHost): Area {
         description: "Goes back to the previous track, or to the start of this one.",
         args: {},
         tier: "free",
+        repeatable: true,
         available,
         async run() {
           const stopped = refusedNow();

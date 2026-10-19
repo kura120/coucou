@@ -420,7 +420,8 @@ const SETTING = "confirm:Change a setting?";
 // may be answered in words, which is not counted against it). `any(…)`: one
 // of several is right.
 const ONE = [
-  [["put on some music"], "nothing"], // already playing: no toggle
+  [["um stop spotify real quick"], ["pause"]],
+  [["put on some music"], any("nothing", ["play"])], // already playing: play is asked as play, which changes nothing
   [["hold the music for a sec"], ["pause"]],
   [["skip this song"], ["next"]],
   [["go back to the last track"], ["previous"]],

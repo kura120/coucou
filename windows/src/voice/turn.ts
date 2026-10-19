@@ -65,7 +65,7 @@ export type CloudModel = (system: string, said: string, history: ModelTurn[]) =>
 export const MOST_MODEL_ROUNDS = 5;
 /** At most this many calls are run for one round. */
 export const MOST_CALLS = 4;
-/** A free action done again on purpose ("skip twice") runs this many times at most in one turn. */
+/** What may be done again on purpose ("skip twice", `Capability.repeatable`) runs this many times at most in one turn. */
 export const MOST_REPEATS = 3;
 /** Past this, a turn says what it has with the capabilities' own lines. */
 export const TURN_BUDGET_MS = 8000;
@@ -667,11 +667,11 @@ export class VoiceTurns {
       const fresh: ModelCall[] = [];
       for (const call of calls) {
         const given = await this.heardCall(call, turn);
-        // Except what is done again on purpose ("skip twice"): a free action that worked may run again, a few times at most.
+        // Except what is done again on purpose ("skip twice"): what declares that doing it again does something again, a few times at most.
         const before = turn.ran.filter((ran) => same(ran.call, given));
         const times = before.length + fresh.filter((other) => same(other, given)).length;
         const again = times < MOST_REPEATS && before.every((ran) => ran.result.status === "done")
-          && this.registry.get(given.name)?.tier === "free" && ![NOTHING, ASK_USER, UNDO].includes(given.name);
+          && this.registry.get(given.name)?.repeatable === true;
         if (times === 0 || again) fresh.push(given);
         if (fresh.length >= MOST_CALLS) break;
       }

@@ -117,6 +117,11 @@ export interface Capability {
    * from how things are now. Null when there is nothing to put back.
    */
   inverse?(args: Args): Call | null;
+  /**
+   * Doing it again does something again (skipping a track): it may run more
+   * than once for one sentence ("skip twice"). Anything else runs once.
+   */
+  repeatable?: boolean;
   /** A `read` capability whose result is part of what the model is told every time (kept small). */
   inSnapshot?: boolean;
 }

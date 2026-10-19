@@ -853,8 +853,8 @@ test("a follow-up without the wake phrase runs what the model called, though nob
   assert.deepEqual(app.state.log, ["pause"]);
 });
 
-test("a free action asked for twice runs twice, a few times at most; what can be put back still runs once", async () => {
-  app.registry.declare({ name: "next_track", area: "music", description: "Skips a track.", args: {}, tier: "free", run: async () => (app.state.log.push("next"), done("Next track", false)) });
+test("what may be done again runs twice when asked twice, a few times at most; anything else runs once", async () => {
+  app.registry.declare({ name: "next_track", area: "music", description: "Skips a track.", args: {}, tier: "free", repeatable: true, run: async () => (app.state.log.push("next"), done("Next track", false)) });
   const twice = scripted(calls(call("next_track")), calls(call("next_track")), says("Skipped twice."));
   await turns({ local: twice.model }).hear("skip twice");
   assert.deepEqual(app.state.log, ["next", "next"]);
