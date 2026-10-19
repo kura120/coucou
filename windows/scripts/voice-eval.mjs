@@ -420,7 +420,9 @@ const SETTING = "confirm:Change a setting?";
 // one of them); "ask:Name" (a question is on screen, about that); "ignored"
 // (a sentence said to someone else did nothing: no effect, no toast, no
 // question — since 2026-10-18 such a sentence is taken as said to Coucou and
-// may be answered in words, which is not counted against it). `any(…)`: one
+// may be answered in words, which is not counted against it); "rest" (nothing
+// done or asked, nothing shown, and listening ends); "pardon" (nothing done
+// or asked, a card shown, and listening goes on: "Sorry?"). `any(…)`: one
 // of several is right.
 const ONE = [
   [["um stop spotify real quick"], ["pause"]],
@@ -589,12 +591,26 @@ const NOBODY = [
   [["open spotify", { again: "pause the music" }], ["app:spotify", "pause"]],
 ];
 
+// Said to Coucou by name and heard badly: the speech model was not sure of
+// its words. What it asks nothing of is answered "Sorry?", and listening goes
+// on; a sentence heard well that asks nothing still ends the conversation.
+const UNCLEAR = [
+  [[{ said: "uh can you place modified", sure: [0.85, 0.9, 0.95, 0.3, 0.2] }], "pardon"],
+  [[{ said: "mm the uh hmm", sure: [0.3, 0.35, 0.4, 0.2] }], "pardon"],
+  [[{ said: "uh can you place modified", sure: [0.85, 0.9, 0.95, 0.3, 0.2] }, { again: "skip this song" }], ["next"]],
+  [[{ said: "never mind", sure: [0.95, 0.97] }], "rest"],
+  [[{ said: "ok done", sure: [0.9, 0.95] }], "rest"],
+  [[{ said: "alright that is everything thanks", sure: [0.9, 0.95, 0.97, 0.99, 0.92] }], "rest"],
+  [[{ said: "skip this song", sure: [0.9, 0.95, 0.97] }], ["next"]],
+];
+
 const PARTS = [
   ["one sentence", ONE],
   ["names, follow-ups", NAMES],
   ["questions, clicks, corrections", TURNS],
   ["negations", NEGATIONS],
   ["for nobody", NOBODY],
+  ["unclear", UNCLEAR],
 ];
 
 function right(expected, { log, last }) {
@@ -602,6 +618,8 @@ function right(expected, { log, last }) {
   if (Array.isArray(expected)) return JSON.stringify(log) === JSON.stringify(expected);
   if (expected === "ignored") return log.length === 0 && !last?.asks;
   if (expected === "nothing") return log.length === 0 && !last?.asks;
+  if (expected === "rest") return log.length === 0 && !last?.asks && !last?.result && last?.rest === true;
+  if (expected === "pardon") return log.length === 0 && !last?.asks && Boolean(last?.result) && !last?.rest;
   if (log.length) return false;
   if (expected.startsWith("ask:")) return expected.slice("ask:".length).split("|").some((name) => Boolean(last?.asks?.includes(name)));
   const said = last?.result?.outcome === "success" ? last.result.message.toLowerCase() : "";
