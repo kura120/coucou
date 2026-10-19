@@ -833,3 +833,12 @@ test("pause and play are said as such, never as a toggle: a late reading of the 
   assert.equal(played.verified, true);
   assert.equal(s.music.playing, true);
 });
+
+test("web_search is not offered while nobody is chosen to answer from the web: the browser search is", async () => {
+  const { get, host } = app();
+  host.setting = (key) => (key === "voice.webSearch" ? "browser" : undefined);
+  assert.equal(typeof get("web_search").available(), "string");
+  assert.equal(get("open_web_search").available?.() ?? true, true);
+  host.setting = (key) => (key === "voice.webSearch" ? "brave" : undefined);
+  assert.equal(get("web_search").available(), true);
+});

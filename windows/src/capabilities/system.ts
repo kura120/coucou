@@ -19,7 +19,7 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
       capability({
         name: "stop_listening",
         area: AREA,
-        description: "Turns voice off altogether: the microphone closes until the user turns it back on. Only when they ask for the voice or the microphone to be off — being done with a request is 'nothing', and stopping the music is pause_music.",
+        description: "Turns Coucou's own voice control off altogether: its microphone closes and nothing said is heard until the user turns it back on in Settings. Only when they ask for Coucou's voice, listening or microphone to be off. Never for the music, a song or Spotify — stopping those is pause_music — and never for being done with a request, which is nothing.",
         args: {},
         // Closing the microphone is never made hard. Opening it again is the user's: there is no inverse.
         tier: "free",

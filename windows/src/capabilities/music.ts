@@ -87,7 +87,7 @@ export function music(host: AppHost): Area {
       capability({
         name: "pause_music",
         area: AREA,
-        description: "Pauses the music that is playing, whether for a moment or not. What a pause means when nothing else is named. Not for pausing Coucou itself, and not for stopping the microphone.",
+        description: "Pauses or stops the music playing in Spotify, for a moment or for good: what stopping or pausing the music, a song or Spotify means. What a pause means when nothing else is named. Not for pausing Coucou itself, and not for turning off Coucou's microphone.",
         args: {},
         tier: "reversible",
         available,

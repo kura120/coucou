@@ -22,6 +22,8 @@ export function web(host: AppHost): Area {
         description: "Searches the web and gives back the first results — title, address, a few words — to answer a question from. Nothing opens. When it cannot search, open_web_search shows the results in the browser instead.",
         args: { query: { type: "string", maxLength: 200, description: "What to look up, as a search query." } },
         tier: "read",
+        // Not offered while nobody is chosen to answer: the model then opens the browser instead of being refused.
+        available: () => (host.setting("voice.webSearch") === "browser" ? "Nobody is chosen in Settings to answer from the web: open_web_search opens the browser." : true),
         async run(args, context) {
           const query = cut(str(args.query), 200);
           if (!query) return failed(t("Couldn't search the web."), "There is nothing to search for.");
