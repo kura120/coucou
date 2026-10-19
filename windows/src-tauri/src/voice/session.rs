@@ -77,40 +77,6 @@ pub enum Heard {
     Again(String),
 }
 
-/// What is written down when nothing was really said: a breath, a noise, a
-/// word to oneself.
-const FILLERS: &[&str] = &[
-    "a", "ah", "and", "bye", "eh", "er", "ha", "hm", "hmm", "huh", "i", "mhm", "mm", "oh", "ok", "okay", "so", "thank", "thanks",
-    "the", "uh", "um", "well", "yeah", "you",
-];
-
-/// The user is done talking: "ok done", "that's all", "never mind", "thanks".
-/// Said in the time another command may follow, it ends that time.
-pub fn says_done(text: &str) -> bool {
-    let said: Vec<String> = text
-        .split_whitespace()
-        .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric() && c != '\'').to_lowercase())
-        .filter(|w| !w.is_empty())
-        .collect();
-    const DONE: &[&str] = &[
-        "done", "ok done", "okay done", "i'm done", "im done", "all done", "that's all", "thats all", "that's it", "thats it", "that is all",
-        "nothing else", "never mind", "nevermind", "thanks", "thank you", "ok thanks", "okay thanks", "ok thank you", "okay thank you",
-        "goodbye", "bye", "stop listening", "you can stop", "you can stop listening",
-    ];
-    DONE.contains(&said.join(" ").as_str())
-}
-
-/// One or two words that say nothing ("Uh.", "Thank you."): what a speech
-/// model makes of a noise more often than what someone asks for.
-pub fn says_nothing(text: &str) -> bool {
-    let words: Vec<String> = text
-        .split_whitespace()
-        .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase())
-        .filter(|w| !w.is_empty())
-        .collect();
-    words.len() <= 2 && words.iter().all(|w| FILLERS.contains(&w.as_str()))
-}
-
 /// A sentence as the free-speech engine wrote it, without the wake phrase if
 /// it was said again: "Okay, Coucou, next track." is "next track.". The engine
 /// writes "coucou" a different way each time, so it is recognised by its
@@ -262,15 +228,13 @@ impl Session {
                 self.command_until = Some(now + COMMAND_WAIT);
                 Some(Heard::Woke)
             }
-            // Noise or a sentence that was not words is not an answer to anything.
-            // Nor does it let another follow: the island says if it was a command.
-            // "Thanks", "that's all": the time another command may follow is over.
-            (Listen::FollowUp, Raw::Phrase { rule: Rule::Command, text, .. }) if says_done(&text) => {
-                self.follow_until = None;
-                None
-            }
+            // Whatever was written down goes to the island, which works out what
+            // it means: a request, a word that says nothing ("uh"), or being done
+            // ("thanks, that's all") — then it ends this time (`rest`). No list
+            // of words is kept here to decide it. A sentence that was not words
+            // (`Rejected`) is not handed over.
             (Listen::FollowUp, Raw::Phrase { rule: Rule::Command, text, confidence })
-                if confidence >= COMMAND_FLOOR && !says_nothing(&text) =>
+                if confidence >= COMMAND_FLOOR && text.chars().any(char::is_alphanumeric) =>
             {
                 Some(Heard::Again(text))
             }
@@ -394,42 +358,33 @@ mod tests {
     }
 
     #[test]
-    fn a_noise_written_down_as_a_word_or_two_is_not_handed_over() {
+    fn every_sentence_said_in_the_follow_up_time_is_handed_over_and_the_island_decides() {
         let now = Instant::now();
         let mut s = Session::new(true, Duration::from_secs(8));
         s.heard(wake(0.95), now);
         s.heard(command("pause", 1.0), now);
-        for nothing in ["Uh.", "Thank you.", "Hmm, okay.", "you", "..."] {
-            assert!(says_nothing(nothing), "{nothing}");
-            assert_eq!(s.heard(command(nothing, 1.0), now), None, "{nothing}");
+        // No word is judged here: "uh", "thanks", "that's all" go to the island like a request.
+        for said in ["Uh.", "Thank you.", "That's all.", "Okay, next track.", "play"] {
+            assert_eq!(s.heard(command(said, 1.0), now), Some(Heard::Again(said.into())), "{said}");
         }
-        for something in ["Pause.", "next", "Okay, next track.", "thank you very much", "play"] {
-            assert!(!says_nothing(something), "{something}");
-        }
+        // What was not words, or what the engine was not sure enough of, is not.
+        assert_eq!(s.heard(command("...", 1.0), now), None);
+        assert_eq!(s.heard(command("next track", COMMAND_FLOOR - 0.01), now), None);
+        assert_eq!(s.heard(Raw::Rejected, now), None);
         // After the wake phrase a word is an answer: "okay" to a question Mochi asked.
         s.talk(now);
         assert_eq!(s.heard(command("Okay.", 1.0), now), Some(Heard::Final("Okay.".into())));
     }
 
     #[test]
-    fn being_done_ends_the_time_another_command_may_follow() {
+    fn being_done_is_the_islands_to_say_and_ends_the_time_another_command_may_follow() {
         let now = Instant::now();
-        for done in ["Ok, done.", "That's all.", "Thank you.", "never mind", "Thanks!", "Stop listening."] {
-            assert!(says_done(done), "{done}");
-            let mut s = Session::new(true, Duration::from_secs(8));
-            s.heard(wake(0.95), now);
-            s.heard(command("pause", 1.0), now);
-            assert_eq!(s.listen(), Listen::FollowUp);
-            assert_eq!(s.heard(command(done, 1.0), now), None, "{done}");
-            assert_eq!(s.listen(), Listen::Wake, "{done}");
-        }
-        for not_done in ["are you done", "thanks for adding stripe now remove it", "stop", "done with stripe add vercel"] {
-            assert!(!says_done(not_done), "{not_done}");
-        }
-        // The island says so after a command that was only that.
         let mut s = Session::new(true, Duration::from_secs(8));
         s.heard(wake(0.95), now);
-        s.heard(command("ok done", 1.0), now);
+        s.heard(command("pause", 1.0), now);
+        assert_eq!(s.listen(), Listen::FollowUp);
+        assert_eq!(s.heard(command("that's all, thanks", 1.0), now), Some(Heard::Again("that's all, thanks".into())));
+        // The island's model called nothing: voice_rest.
         s.rest();
         assert_eq!(s.listen(), Listen::Wake);
     }
