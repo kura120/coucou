@@ -277,6 +277,8 @@ function messages(system, history, said, steps = []) {
 const worded = [];
 /** How many times the model was asked, and how long each took. */
 const rounds = [];
+/** How many tokens each request to the model weighed, as the server counted them: against its context. */
+const prompts = [];
 let refusedBySize = 0;
 
 async function local(system, said, tools, history = [], steps = []) {
@@ -302,7 +304,10 @@ async function local(system, said, tools, history = [], steps = []) {
   // A server that is being restarted, or is busy with another session's model: once more, a little later.
   const reply = await request().catch(() => new Promise((resolve) => setTimeout(resolve, 5000)).then(request));
   rounds.push(performance.now() - began);
-  const message = (await reply.json()).choices?.[0]?.message ?? {};
+  const answer = await reply.json();
+  const weighed = answer.usage?.prompt_tokens ?? answer.prompt_eval_count;
+  if (typeof weighed === "number") prompts.push(weighed);
+  const message = answer.choices?.[0]?.message ?? answer.message ?? {};
   const calls = (message.tool_calls ?? []).slice(0, MAX_CALLS).map((c) => {
     let args = c.function?.arguments ?? {};
     if (typeof args === "string") {
@@ -589,12 +594,22 @@ const NOBODY = [
   [["open spotify", { again: "pause the music" }], ["app:spotify", "pause"]],
 ];
 
+// A long conversation: six turns before the last, each with its calls and
+// results, on top of the app's state and the tools. What the model is sent
+// grows with every turn; a server that cuts it short cuts the instructions.
+const LONG = [
+  [["open spotify", "what's playing", "add notion", "what is claude doing", "is the ci green", "remove stripe", "what about vercel"], ["app:spotify", "+notion", "-stripe", "-vercel"]],
+  [["add notion", "what's playing", "is the ci green", "what is claude doing", "which pills do i have", "how long is left on the timer", "put it back"], ["+notion", "-notion"]],
+  [["open figma", "what's playing", "what is claude doing", "is the ci green", "what's the permission request", "which pills do i have", "and discord too"], ["app:figma", "app:discord"]],
+];
+
 const PARTS = [
   ["one sentence", ONE],
   ["names, follow-ups", NAMES],
   ["questions, clicks, corrections", TURNS],
   ["negations", NEGATIONS],
   ["for nobody", NOBODY],
+  ["long", LONG],
 ];
 
 function right(expected, { log, last }) {
@@ -644,6 +659,7 @@ for (const model of MODELS) {
     console.log(`\n${model} · ${path}${EMBED ? ` (${EMBED})` : ""}`);
     const row = { name: `${model} · ${path}`, parts: [], wrong: 0, dangerous: 0, instant: [], modelled: [], asked: [] };
     rounds.length = 0;
+    prompts.length = 0;
     worded.length = 0;
     for (const [, cases] of PARTS) {
       let ok = 0;
@@ -669,6 +685,7 @@ for (const model of MODELS) {
       row.parts.push(`${ok}/${cases.length}`);
     }
     row.rounds = [...rounds];
+    row.prompts = [...prompts];
     row.worded = [...worded];
     report.push(row);
   }
@@ -677,7 +694,7 @@ for (const model of MODELS) {
 const total = PARTS.reduce((n, [, cases]) => n + cases.length, 0);
 console.log(`\n${total} cases · ${PARTS.map(([part, cases]) => `${part} ${cases.length}`).join(", ")}`);
 if (refusedBySize) console.log(`${refusedBySize} requests were larger than Rust allows and were not sent.`);
-console.log(`model · path | ${PARTS.map(([part]) => part).join(" | ")} | wrong | dangerous | turns with no model | a turn with the model | model calls a turn | one model call | words that held up`);
+console.log(`model · path | ${PARTS.map(([part]) => part).join(" | ")} | wrong | dangerous | turns with no model | a turn with the model | model calls a turn | one model call | prompt tokens | words that held up`);
 for (const row of report) {
   console.log(
     [
@@ -686,6 +703,7 @@ for (const row of report) {
       `${seconds(median(row.modelled))} median, ${seconds(Math.max(0, ...row.modelled))} longest (${row.modelled.length})`,
       `${median(row.asked)} median, ${Math.max(0, ...row.asked)} most`,
       `${seconds(median(row.rounds))} median, ${seconds(Math.max(0, ...row.rounds))} longest (${row.rounds.length})`,
+      `${median(row.prompts)} median, ${Math.max(0, ...row.prompts)} most`,
       `${row.worded.filter((w) => w === true).length} of ${row.worded.length} (not: ${["unseen", "thing", "number", "empty"].map((why) => `${why} ${row.worded.filter((w) => w === why).length}`).join(", ")})`,
     ].join(" | "),
   );
