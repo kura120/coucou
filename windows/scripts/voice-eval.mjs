@@ -589,12 +589,27 @@ const NOBODY = [
   [["open spotify", { again: "pause the music" }], ["app:spotify", "pause"]],
 ];
 
+// Put right after a first try that went wrong or was unclear, as the voice
+// debug log of 2026-10-18 has them: what "it" is a few turns on, a no that
+// says what was meant, a turn in between.
+const REPAIRS = [
+  [["remove github", "can you add it back"], ["-github", "+github"]],
+  [["remove github", "what's playing", "add it back"], ["-github", "+github"]],
+  [["get rid of stripe", "what's playing", "no put it back"], ["-stripe", "+stripe"]],
+  [["open spy flight", "uh no, i meant discord"], ["app:discord"]],
+  [["open the squad", "no i meant steam"], ["app:steam"]],
+  [["remove strife", "no, vercel"], ["-vercel"]],
+  [["open st", "no, figma"], ["app:figma"]],
+  [["add notion", "what's playing", "no i meant resend"], any(["+notion", "-notion", "+resend"])],
+];
+
 const PARTS = [
   ["one sentence", ONE],
   ["names, follow-ups", NAMES],
   ["questions, clicks, corrections", TURNS],
   ["negations", NEGATIONS],
   ["for nobody", NOBODY],
+  ["repairs", REPAIRS],
 ];
 
 function right(expected, { log, last }) {
