@@ -358,7 +358,8 @@ mod tests {
     /// The measurement, by hand: `COUCOU_VOICE_SAMPLES` is a folder of 16-bit
     /// WAVE files. Each `.wav` in it is a group named by its stem, and each
     /// subfolder is a group of its `.wav` files. The group named `mine` is the
-    /// user's: its first five files are the enrolment, its others are "same";
+    /// user's: its first five files are the enrolment, its others are "same",
+    /// as is every group whose name starts with "mine" ("mine-with-video");
     /// every other group is "other". Prints the scores, the groups, the false
     /// rejections and acceptances for each threshold, and the time of an embedding.
     /// Writes nothing. `cargo test -p coucou voice::speaker -- --ignored --nocapture`
@@ -419,7 +420,7 @@ mod tests {
                 }
                 if let Some(embedding) = embed_file(&voices, path, &mut times) {
                     let file = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
-                    scored.push((name.clone(), name == "mine", file, cosine(&embedding, &voiceprint)));
+                    scored.push((name.clone(), name.starts_with("mine"), file, cosine(&embedding, &voiceprint)));
                 }
             }
         }
