@@ -82,6 +82,9 @@ pub mod mcp;
 mod sapi;
 mod sherpa;
 mod speak;
+// Nothing uses the fingerprints yet: the measurement only.
+#[allow(dead_code)]
+mod speaker;
 mod vad;
 mod session;
 
