@@ -604,7 +604,13 @@ export class VoiceTurns {
 
   /** The call as it is run: its names put back as heard (`asHeard`). */
   private heardCall(call: ModelCall, turn: Running): Promise<ModelCall> {
-    return asHeard(call, this.registry.get(call.name), turn, (text) => this.registry.named(text));
+    const capability = this.registry.get(call.name);
+    // What the capability does not take, or is given as null, is no part of the call: a model that adds it
+    // asks for the same thing again (measured: quit_coucou({"object": null}) after the toast was left unclicked).
+    const taken = capability
+      ? { ...call, arguments: Object.fromEntries(Object.entries(call.arguments ?? {}).filter(([arg, value]) => arg in capability.args && value != null)) }
+      : call;
+    return asHeard(taken, capability, turn, (text) => this.registry.named(text));
   }
 
   private async run(call: ModelCall, origin: RunContext["origin"], turn: Running): Promise<ToolResult> {

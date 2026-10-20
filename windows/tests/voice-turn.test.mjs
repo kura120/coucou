@@ -348,6 +348,11 @@ test("nothing is done twice for one sentence, and a turn is five rounds at most"
   const twice = scripted(calls(call("pause_music")), calls(call("pause_music")));
   await turns({ local: twice.model }).hear("pause");
   assert.deepEqual(app.state.log, ["pause"]);
+  // Again with an argument it does not take, or one given as null: the same call (measured: quit_coucou({"object": null}) after a toast left unclicked).
+  app = makeApp();
+  const padded = scripted(calls(call("pause_music")), calls(call("pause_music", { object: null })), calls(call("pause_music", { now: true })));
+  await turns({ local: padded.model }).hear("pause");
+  assert.deepEqual(app.state.log, ["pause"]);
   app = makeApp();
   let n = 0;
   const endless = { model: async () => calls(call("open_app", { app: `App ${n++}` })) };
