@@ -595,15 +595,16 @@ const NOBODY = [
 ];
 
 // A misheard name the user confirmed is not asked about again; one they said
-// no to is; one put back right after is forgotten.
+// no to is. A change done through a learned name and put back right after
+// forgets it; putting back a change whose name was just confirmed does not.
 const LEARNING = [
   [["remove strife", "yes", "add strife"], ["-stripe", "+stripe"]],
   [["can you open this squad", "yeah", "open this squad"], ["app:discord", "app:discord"]],
-  [["switch to cortex", "yeah", "switch to claude", "switch to cortex"], ["main:codex", "main:claude", "main:codex"]],
+  [["switch to cortex", "yeah", "undo", "switch to cortex"], ["main:codex", "main:claude", "main:codex"]],
   [["open st", "steam", "open st"], ["app:steam", "app:steam"]],
   [["remove strife", { click: { kind: "yes_no", yes: true } }, "add strife"], ["-stripe", "+stripe"]],
   [["remove strife", "no", "remove strife"], "ask:Stripe"],
-  [["switch to cortex", "yeah", "undo", "switch to cortex"], ["main:codex", "main:claude"]],
+  [["switch to cortex", "yeah", "undo", "switch to cortex", "undo", "switch to cortex"], ["main:codex", "main:claude", "main:codex", "main:claude"]],
 ];
 
 const PARTS = [
