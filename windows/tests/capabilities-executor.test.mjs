@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { among } from "../src/core/capabilities/match.ts";
 import assert from "node:assert/strict";
 import { createRegistry } from "../src/core/capabilities/registry.ts";
+import { createLearnedNames } from "../src/core/capabilities/names.ts";
 import { done } from "../src/voice/result.ts";
 
 const WORDS = {
@@ -34,7 +35,7 @@ const SESSIONS = [
 ];
 
 /** A registry over a small made-up app, and everything that happened to it. */
-function setup({ click = true, answers = [], doubted } = {}) {
+function setup({ click = true, answers = [], doubted, names } = {}) {
   const log = { ran: [], asked: [], confirmed: [], working: [] };
   const app = { volume: 40, shown: ["integration_github"], playing: true, music: true };
   const guard = {
@@ -43,7 +44,7 @@ function setup({ click = true, answers = [], doubted } = {}) {
       return click;
     },
   };
-  const registry = createRegistry({ guard, words: WORDS, doubted });
+  const registry = createRegistry({ guard, words: WORDS, doubted, names });
   const ran = (name, args) => log.ran.push({ name, args });
 
   registry.entities({ kind: "pill", description: "The pills of the island.", list: () => PILLS });
@@ -505,4 +506,126 @@ test("a short sound key is enough when the letters agree too; one measure alone 
   // A letter apart and other sounds, or alike in sound and not in letters: asked about.
   assert.equal(among("strife", things).is, "unsure");
   assert.equal(among("cortex", things).is, "unsure");
+});
+
+// ── Names learned from the user's answers ─────────────────────────────────────
+
+/** A registry of one kind of thing, and one capability given it: for a name's answers alone. */
+function learning({ things, answers = [], names = createLearnedNames() }) {
+  const log = { ran: [], asked: [] };
+  const registry = createRegistry({ guard: { confirm: async () => true }, words: WORDS, names });
+  registry.entities({ kind: "tool", description: "The tools.", list: () => things });
+  registry.declare({
+    name: "open_tool", area: "test", description: "Opens a tool.", tier: "free",
+    args: { tool: { type: "entity", kind: "tool", description: "The tool." } },
+    run: async (args) => (log.ran.push(args), done("Opened")),
+  });
+  const context = {
+    origin: "local",
+    ask: async (ask) => (log.asked.push(ask), answers.shift() ?? { kind: "dropped" }),
+    working: () => {},
+  };
+  return { registry, log, names, call: (tool) => registry.execute({ name: "open_tool", arguments: { tool } }, context) };
+}
+
+test("a name asked about and said yes to is learned: the same words resolve with no question", async () => {
+  const names = createLearnedNames();
+  const { call, log } = setup({ names, answers: [{ kind: "yes_no", yes: true }] });
+  assert.equal((await call("show_pill", { pill: "strife" })).status, "done");
+  assert.equal(log.asked.length, 1);
+  assert.equal(names.find("pill", "strife").id, "integration_stripe");
+  assert.equal((await call("show_pill", { pill: "strife" })).status, "done");
+  assert.equal(log.asked.length, 1);
+  assert.deepEqual(log.ran.at(-1), { name: "show_pill", args: { pill: "integration_stripe" } });
+});
+
+test("a pick in a choice is learned for the one picked, and the same words then resolve surely", async () => {
+  const things = [{ id: "vs", label: "Visual Studio Code", spoken: ["vs code"] }, { id: "vs22", label: "Visual Studio 2022" }];
+  const { call, log, names } = learning({ things, answers: [{ kind: "choice", id: "vs22" }] });
+  assert.equal((await call("visual studio")).status, "done");
+  assert.equal(log.asked[0].kind, "choice");
+  assert.equal(log.ran.at(-1).tool, "vs22");
+  assert.equal(names.find("tool", "visual studio").id, "vs22");
+  assert.equal((await call("visual studio")).status, "done");
+  assert.equal(log.asked.length, 1);
+  assert.equal(log.ran.at(-1).tool, "vs22");
+});
+
+test("a no is not learned: the same unsure name is asked about again", async () => {
+  const names = createLearnedNames();
+  const { call, log } = setup({ names, answers: [{ kind: "yes_no", yes: false }, { kind: "yes_no", yes: false }] });
+  assert.equal((await call("show_pill", { pill: "strife" })).line, "Nothing was changed.");
+  await call("show_pill", { pill: "strife" });
+  assert.equal(log.asked.length, 2);
+  assert.deepEqual(names.list(), []);
+  assert.deepEqual(log.ran, []);
+});
+
+test("learned through a sentence, only the words nearest the thing are kept", async () => {
+  const names = createLearnedNames();
+  const { call, log } = setup({ names, answers: [{ kind: "yes_no", yes: true }] });
+  assert.equal((await call("show_pill", { pill: "please remove strife now" })).status, "done");
+  assert.equal(log.asked.length, 1);
+  assert.deepEqual(names.list().map((name) => [name.heard, name.id]), [["strife", "integration_stripe"]]);
+});
+
+test("named() reports a learned name said whole, as it reports any name said whole", async () => {
+  const names = createLearnedNames();
+  const { registry } = setup({ names });
+  names.learn("pill", "strife", "integration_stripe", "Stripe");
+  const stripe = (await registry.named("remove strife")).find((thing) => thing.id === "integration_stripe");
+  assert.deepEqual(stripe, { kind: "pill", id: "integration_stripe", label: "Stripe" });
+});
+
+test("a kind too large to list: a learned name is sure without the source ranking it, and named() reports it whole", async () => {
+  const names = createLearnedNames();
+  names.learn("app", "this squad", "discord", "Discord");
+  const ranked = [];
+  const asked = [];
+  const opened = [];
+  const registry = createRegistry({ guard: { confirm: async () => true }, words: WORDS, names });
+  registry.entities({ kind: "app", description: "The installed apps.", list: () => [], near: async (said) => (ranked.push(said), []) });
+  registry.declare({
+    name: "open_app", area: "apps", description: "Opens an app.", tier: "free",
+    args: { app: { type: "entity", kind: "app", description: "The app." } },
+    run: async (args) => (opened.push(args), done("Opened", false)),
+  });
+  const context = { origin: "local", ask: async (ask) => (asked.push(ask), { kind: "dropped" }), working: () => {} };
+  assert.equal((await registry.execute({ name: "open_app", arguments: { app: "this squad" } }, context)).status, "done");
+  assert.deepEqual({ ranked, asked, opened }, { ranked: [], asked: [], opened: [{ app: "discord" }] });
+  assert.deepEqual((await registry.named("open this squad")).find((thing) => thing.id === "discord"), { kind: "app", id: "discord", label: "Discord" });
+});
+
+test("a reversible change done through a learned name is put back with it, and the name is forgotten", async () => {
+  const names = createLearnedNames();
+  names.learn("pill", "strife", "integration_stripe", "Stripe");
+  const { registry, call, log, context, app } = setup({ names, answers: [{ kind: "dropped" }] });
+  assert.equal((await call("add_pills", { pills: ["strife"] })).status, "done");
+  assert.deepEqual(app.shown, ["integration_github", "integration_stripe"]);
+  assert.equal((await registry.undo(context())).status, "done");
+  assert.deepEqual(app.shown, ["integration_github"]);
+  assert.equal(names.find("pill", "strife"), undefined);
+  // Asked about again, where it used to be sure.
+  assert.equal((await call("show_pill", { pill: "strife" })).line, "Nothing was changed.");
+  assert.equal(log.asked.length, 1);
+});
+
+test("a name done through is kept until its change is put back: another change after it does not forget it", async () => {
+  const names = createLearnedNames();
+  names.learn("pill", "strife", "integration_stripe", "Stripe");
+  const { registry, call, log, context } = setup({ names });
+  await call("add_pills", { pills: ["strife"] });
+  assert.equal(names.find("pill", "strife").id, "integration_stripe");
+  await call("set_volume", { percent: 60 });
+  assert.equal((await registry.undo(context())).status, "done");
+  assert.equal(names.find("pill", "strife").id, "integration_stripe");
+  assert.equal((await call("show_pill", { pill: "strife" })).status, "done");
+  assert.equal(log.asked.length, 0);
+});
+
+test("without names, nothing is learned: the same unsure name is asked about twice", async () => {
+  const { call, log } = setup({ answers: [{ kind: "yes_no", yes: true }, { kind: "yes_no", yes: true }] });
+  await call("show_pill", { pill: "strife" });
+  await call("show_pill", { pill: "strife" });
+  assert.equal(log.asked.length, 2);
 });

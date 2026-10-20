@@ -74,7 +74,7 @@ export function contained(said: string, things: readonly Entity[]): Entity[] {
 }
 
 /** The longest run of words of a sentence compared with a name: names are one to three words. */
-const SPAN_WORDS = 3;
+export const SPAN_WORDS = 3;
 
 /**
  * The things a sentence perhaps names: a run of its words that is a name
