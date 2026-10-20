@@ -38,6 +38,9 @@ import { DEFAULT_SETTINGS } from "../src/core/state.ts";
 import { heardWith, sureOf, UNSURE_WORD } from "../src/voice/resolve.ts";
 import { VoiceTurns } from "../src/voice/turn.ts";
 
+// Names learned from the user's answers (core/capabilities/names.ts), when this build has them.
+const { createLearnedNames } = await import("../src/core/capabilities/names.ts").catch(() => ({}));
+
 const FLAGS = process.argv.slice(2).filter((arg) => arg.startsWith("--"));
 const ARGS = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
 const flag = (name) => FLAGS.find((f) => f.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -230,6 +233,8 @@ function setup() {
       one: (label) => `Did you mean ${label}?`, which: (labels) => `${labels.slice(0, -1).join(", ")} or ${labels[labels.length - 1]}?`,
     },
     doubted: (said) => (sureOf(said) ?? 1) < UNSURE_WORD,
+    // Learned for this case only: each case starts with nothing learned.
+    ...(createLearnedNames ? { names: createLearnedNames() } : {}),
   });
   registerApp(registry, host);
   registry.screen(() => ({ view: "overview", subjects: [{ kind: "session", id: "integration_claude", label: "VS Code" }], summary: "VS Code (working): running the test suite in coucou" }));
@@ -661,6 +666,19 @@ const LONG = [
   [["open figma", "what's playing", "what is claude doing", "is the ci green", "what's the permission request", "which pills do i have", "and discord too"], ["app:figma", "app:discord"]],
 ];
 
+// A misheard name the user confirmed is not asked about again; one they said
+// no to is. A change done through a learned name and put back right after
+// forgets it; putting back a change whose name was just confirmed does not.
+const LEARNING = [
+  [["remove strife", "yes", "add strife"], ["-stripe", "+stripe"]],
+  [["can you open this squad", "yeah", "open this squad"], ["app:discord", "app:discord"]],
+  [["switch to cortex", "yeah", "undo", "switch to cortex"], ["main:codex", "main:claude", "main:codex"]],
+  [["open st", "steam", "open st"], ["app:steam", "app:steam"]],
+  [["remove strife", { click: { kind: "yes_no", yes: true } }, "add strife"], ["-stripe", "+stripe"]],
+  [["remove strife", "no", "remove strife"], "ask:Stripe"],
+  [["switch to cortex", "yeah", "undo", "switch to cortex", "undo", "switch to cortex"], ["main:codex", "main:claude", "main:codex", "main:claude"]],
+];
+
 const PARTS = [
   ["one sentence", ONE],
   ["names, follow-ups", NAMES],
@@ -671,6 +689,7 @@ const PARTS = [
   ["unclear", UNCLEAR],
   ["going quiet", QUIET],
   ["long", LONG],
+  ["learning", LEARNING],
 ];
 
 function right(expected, { log, last }) {

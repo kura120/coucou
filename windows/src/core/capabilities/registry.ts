@@ -13,9 +13,11 @@
 // No wording lives here: every line a person reads comes from `Words`, given
 // by whoever makes the registry, or from the capability itself.
 
+import { normalise } from "../../voice/entity";
 import { done, failed, notFoundResult, refused } from "../../voice/result";
 import { sureOf, UNSURE_WORD } from "../../voice/resolve";
 import { among, contained, nearly, type Resolved } from "./match";
+import type { LearnedNames } from "./names";
 import { schemaOf } from "./schema";
 import type { Answer, ArgSpec, Args, Ask, Call, Capability, Entity, EntitySource, GuardHost, Registry, RunContext, ScreenContext, Tier, ToolResult } from "./types";
 import { check } from "./validate";
@@ -49,6 +51,14 @@ export interface RegistryOptions {
    * voice/resolve.ts was told of the last sentence (`heardWith`).
    */
   doubted?(said: string): boolean;
+  /** The names the user confirmed (names.ts). Absent: nothing is learned. */
+  names?: LearnedNames;
+}
+
+/** A learned name a call was resolved through: what it was heard as, for a kind. */
+interface LearnedUse {
+  kind: string;
+  heard: string;
 }
 
 /**
@@ -77,7 +87,7 @@ const tierOf = (capability: Capability, args: Args): Tier => (typeof capability.
 const required = (capability: Capability) => Object.values(capability.args).some((spec) => !spec.optional);
 
 export function createRegistry(options: RegistryOptions): Registry {
-  const { guard, words } = options;
+  const { guard, words, names } = options;
   const doubted = options.doubted ?? ((said: string) => (sureOf(said) ?? 1) < UNSURE_WORD);
   const capabilities = new Map<string, Capability>();
   const sources = new Map<string, EntitySource>();
@@ -86,6 +96,14 @@ export function createRegistry(options: RegistryOptions): Registry {
   let last: Call | null = null;
   /** That last reversible thing, as it was done: what a correction ("no, Vercel") does again with another name. */
   let lastDone: Call | null = null;
+  /** The learned names that thing was resolved through: forgotten when it is put back. */
+  let lastLearned: LearnedUse[] = [];
+
+  /** Learned names are written forms of their things: each thing of a kind carries what was learned for it. */
+  function withLearned<T extends Entity>(kind: string, things: readonly T[]): T[] {
+    if (!names) return [...things];
+    return things.map((thing) => ({ ...thing, spoken: [...(thing.spoken ?? []), ...names.forms(kind, thing.id)] }));
+  }
 
   function declare(...added: Capability[]) {
     for (const capability of added) {
@@ -118,24 +136,45 @@ export function createRegistry(options: RegistryOptions): Registry {
 
   /** What one name is among a kind's things, and the things it was looked for in. */
   async function resolve(source: EntitySource, said: string): Promise<{ found: Resolved; things: readonly Entity[] }> {
-    const listed = await source.list();
+    const listed = withLearned(source.kind, await source.list());
     const byId = listed.find((thing) => thing.id === said);
     if (byId) return { found: { is: "sure", id: byId.id, label: byId.label }, things: listed };
     if (!source.near) return { found: among(said, listed, { doubted }), things: listed };
+    // A name learned for a thing is sure: the source is not asked to rank it.
+    const learned = names?.find(source.kind, said);
+    if (learned) return { found: { is: "sure", id: learned.id, label: learned.label }, things: [] };
     // Too many to list: the source ranks them, and the same judgement is made of its ranking.
-    const near = await source.near(said);
+    const near = withLearned(source.kind, await source.near(said));
     return { found: among(said, near, { doubted, scores: new Map(near.map((thing) => [thing.id, thing.score])) }), things: near };
+  }
+
+  /**
+   * What a confirmed name is learned as: the words it was heard as, the run of
+   * them nearest the chosen thing, else the whole sentence (learn drops it when
+   * it is more than a name).
+   */
+  function confirmed(kind: string, said: string, id: string, label: string, things: readonly Entity[]): { id: string } {
+    if (names) {
+      const thing = things.find((entity) => entity.id === id);
+      const heard = (thing && nearly(said, [thing], 0)[0]?.heard) || normalise(said);
+      names.learn(kind, heard, id, label);
+    }
+    return { id };
   }
 
   /**
    * One named thing as its id — asking when unsure — or the result that ends
    * the call: nothing by that name, or the user said no.
    */
-  async function identify(capability: Capability, arg: string, kind: string, said: string, context: RunContext): Promise<{ id: string } | ToolResult> {
+  async function identify(capability: Capability, arg: string, kind: string, said: string, context: RunContext, used: LearnedUse[]): Promise<{ id: string } | ToolResult> {
     const source = sources.get(kind);
     if (!source) return failed(words.failed(), `No source lists the things of kind "${kind}".`);
-    const { found } = await resolve(source, said);
-    if (found.is === "sure") return { id: found.id };
+    const { found, things } = await resolve(source, said);
+    if (found.is === "sure") {
+      const learned = names?.find(kind, said);
+      if (learned && learned.id === found.id) used.push({ kind, heard: learned.heard });
+      return { id: found.id };
+    }
     if (found.is === "none") return { ...notFoundResult(words.notFound(said), found.near), detail: `No ${kind} is named "${said}".` };
 
     const [first, ...others] = found.candidates;
@@ -143,20 +182,20 @@ export function createRegistry(options: RegistryOptions): Registry {
       ? { kind: "choice", question: words.which(found.candidates.map((c) => c.label)), options: found.candidates.map(({ id, label, hint }) => ({ id, label, ...(hint ? { hint } : {}) })), about: kind }
       : { kind: "yes_no", question: capability.question?.(first.label, arg) ?? words.one(first.label), about: kind };
     const answer: Answer = await context.ask(ask);
-    if (answer.kind === "yes_no" && answer.yes && !others.length) return { id: first.id };
+    if (answer.kind === "yes_no" && answer.yes && !others.length) return confirmed(kind, said, first.id, first.label, things);
     const chosen = answer.kind === "choice" && others.length ? found.candidates.find((c) => c.id === answer.id) : undefined;
-    if (chosen) return { id: chosen.id };
-    const names = found.candidates.map((c) => c.label).join(", ");
-    return { ...done(words.unchanged(), false), detail: `Nothing was done: "${said}" was not surely a ${kind}, and the user did not pick ${names}.` };
+    if (chosen) return confirmed(kind, said, chosen.id, chosen.label, things);
+    const labels = found.candidates.map((c) => c.label).join(", ");
+    return { ...done(words.unchanged(), false), detail: `Nothing was done: "${said}" was not surely a ${kind}, and the user did not pick ${labels}.` };
   }
 
   /** The arguments with every named thing replaced by its id, or the result that ends the call. */
-  async function named(capability: Capability, args: Args, context: RunContext): Promise<{ args: Args } | { ended: ToolResult }> {
+  async function named(capability: Capability, args: Args, context: RunContext, used: LearnedUse[]): Promise<{ args: Args } | { ended: ToolResult }> {
     const out: Args = { ...args };
     for (const [arg, spec] of Object.entries(capability.args) as [string, ArgSpec][]) {
       if (out[arg] === undefined) continue;
       if (spec.type === "entity") {
-        const one = await identify(capability, arg, spec.kind, out[arg] as string, context);
+        const one = await identify(capability, arg, spec.kind, out[arg] as string, context, used);
         if (!("id" in one)) return { ended: one };
         out[arg] = one.id;
       } else if (spec.type === "entities") {
@@ -167,7 +206,7 @@ export function createRegistry(options: RegistryOptions): Registry {
             ids.push(...several);
             continue;
           }
-          const one = await identify(capability, arg, spec.kind, said, context);
+          const one = await identify(capability, arg, spec.kind, said, context, used);
           if (!("id" in one)) return { ended: one };
           ids.push(one.id);
         }
@@ -183,7 +222,7 @@ export function createRegistry(options: RegistryOptions): Registry {
   async function severalIn(kind: string, said: string): Promise<string[] | null> {
     const source = sources.get(kind);
     if (!source || source.near) return null;
-    const listed = await source.list();
+    const listed = withLearned(kind, await source.list());
     if (listed.some((thing) => thing.id === said)) return null;
     const inside = contained(said, listed);
     return inside.length > 1 ? inside.map((thing) => thing.id) : null;
@@ -206,7 +245,8 @@ export function createRegistry(options: RegistryOptions): Registry {
     const can = capability.available?.() ?? true;
     if (can !== true) return { status: "failed", verified: false, line: words.unavailable(), detail: can || `"${capability.name}" cannot be used right now.` };
 
-    const resolved = await named(capability, checked.args, context);
+    const used: LearnedUse[] = [];
+    const resolved = await named(capability, checked.args, context, used);
     if ("ended" in resolved) return resolved.ended;
     const args = resolved.args;
 
@@ -238,9 +278,11 @@ export function createRegistry(options: RegistryOptions): Registry {
       if (!capability.inverse) {
         last = null;
         lastDone = null;
+        lastLearned = [];
       } else if (inverse) {
         last = inverse;
         lastDone = { name: capability.name, arguments: args };
+        lastLearned = used;
       }
     }
     return result;
@@ -259,8 +301,12 @@ export function createRegistry(options: RegistryOptions): Registry {
     const inverse = last;
     if (!inverse) return failed(words.nothingToUndo(), "Nothing reversible was done, or it was already put back.");
     // Once: it is forgotten before it runs, and putting back is not itself remembered.
+    // Names it was done through were wrong, so they are forgotten too: the next time they are asked.
+    const forget = lastLearned;
     last = null;
     lastDone = null;
+    lastLearned = [];
+    for (const { kind, heard } of forget) names?.forget(kind, heard);
     return run(inverse, context, true);
   }
 
@@ -274,7 +320,7 @@ export function createRegistry(options: RegistryOptions): Registry {
     for (const source of sources.values()) {
       try {
         if (!source.near) {
-          const listed = await source.list();
+          const listed = withLearned(source.kind, await source.list());
           const whole = contained(sentence, listed);
           for (const thing of whole) out.push({ kind: source.kind, id: thing.id, label: thing.label });
           // Said a letter or a sound away ("strife", "get hub"): perhaps that thing, by the same measure.
@@ -282,10 +328,17 @@ export function createRegistry(options: RegistryOptions): Registry {
           continue;
         }
         // A kind too large to list: what its source ranks near the sentence. Said whole, it is named; close, perhaps.
-        const near = await source.near(sentence);
+        const near = withLearned(source.kind, await source.near(sentence));
         const whole = contained(sentence, near);
         for (const thing of whole) out.push({ kind: source.kind, id: thing.id, label: thing.label });
-        const close = near.filter((thing) => thing.score >= NEAR_NAMED && !whole.includes(thing)).slice(0, NAMED_NEAR_MOST);
+        // A learned name said whole is named too, though the source did not rank its thing near.
+        const spoken = ` ${normalise(sentence)} `;
+        for (const learned of names?.list() ?? []) {
+          if (learned.kind !== source.kind || !spoken.includes(` ${learned.heard} `)) continue;
+          if (out.some((o) => o.kind === source.kind && o.id === learned.id)) continue;
+          out.push({ kind: source.kind, id: learned.id, label: learned.label });
+        }
+        const close = near.filter((thing) => thing.score >= NEAR_NAMED && !out.some((o) => o.kind === source.kind && o.id === thing.id)).slice(0, NAMED_NEAR_MOST);
         for (const thing of close) out.push({ kind: source.kind, id: thing.id, label: thing.label, near: true });
       } catch {
         // A source that breaks names nothing.
