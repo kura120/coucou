@@ -14,13 +14,28 @@
   --mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
   --ink: #f5f6f8;
   --dim: #9398a1;
-  --dim-2: #6b7079;
+  /* Was #6b7079 (3.7:1 on the cards): #7d828b reaches 4.7:1 on --card and
+     5.0:1 on --bg, AA for the small group labels and sub-headings. */
+  --dim-2: #7d828b;
   --bg: #0b0c0e;
   --card: #141518;
   --hairline: rgba(255, 255, 255, 0.07);
   --green: #22c55e;
   --red: #f4505e;
   --amber: #f5a524;
+
+  /* Window-only tokens: the chrome (title bar and index), the labels of the
+     rows, the fields and the focus ring. */
+  --chrome: #0e0f12;
+  --label: #c8cdd4;
+  --border: rgba(255, 255, 255, 0.09);
+  --border-hover: rgba(255, 255, 255, 0.18);
+  --field: rgba(255, 255, 255, 0.05);
+  --fill: rgba(255, 255, 255, 0.08);
+  --fill-hover: rgba(255, 255, 255, 0.14);
+  --focus: rgba(255, 255, 255, 0.62);
+  --control-h: 30px;
+  --ease: 0.14s ease-out;
 }
 
 * {
@@ -34,49 +49,319 @@ body.settings-window {
   color: var(--ink);
   font: 400 13px/1.45 var(--font);
   -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
+/* Thin dark scrollbars, inset from the edge, in the tree and the pane. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* One focus ring for every control reached with the keyboard. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The window is frameless: a title bar, then the tree and the pane. */
 #settings-root {
-  padding: 22px 24px 32px;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  max-width: 720px;
-  margin: 0 auto;
+}
+
+#titlebar {
+  flex: none;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  padding-inline-start: 14px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--chrome);
+  user-select: none;
+}
+
+#titlebar .title {
+  flex: 1;
+  min-width: 0;
+  font: 500 12px var(--font);
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#titlebar button.win-btn {
+  flex: none;
+  width: 46px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dim);
+  font: 400 13px/1 var(--font);
+  cursor: default;
+  transition: background-color var(--ease), color var(--ease);
+}
+
+#titlebar button.win-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+}
+
+#titlebar button.win-btn:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  transform: none;
+}
+
+/* Windows 11's close red. */
+#titlebar button.win-btn.close:hover:not(:disabled) {
+  background: #c42b1c;
+  color: #fff;
+}
+
+#titlebar button.win-btn.close:active:not(:disabled) {
+  background: #a8261a;
+  color: #fff;
+}
+
+#titlebar button.win-btn:focus-visible {
+  outline-offset: -2px;
+}
+
+#frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* The index: groups and their pages, a fixed column. */
+#tree {
+  flex: none;
+  width: 200px;
+  overflow-y: auto;
+  padding: 10px 8px 16px;
+  border-inline-end: 1px solid var(--hairline);
+  background: var(--chrome);
+}
+
+#tree .group {
+  padding: 16px 10px 5px;
+  font: 600 11px/1.3 var(--font);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dim-2);
+  overflow-wrap: anywhere;
+}
+
+#tree .group:first-child {
+  padding-top: 4px;
+}
+
+#tree .leaf {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 30px;
+  margin-top: 1px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--dim);
+  font: 400 13px/1.35 var(--font);
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: background-color var(--ease), color var(--ease);
+}
+
+#tree .leaf:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--ink);
+}
+
+#tree .leaf:active:not(:disabled) {
+  transform: none;
+}
+
+#tree .leaf.on,
+#tree .leaf.on:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* The selected page's marker, on the reading side. */
+#tree .leaf.on::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 50%;
+  width: 3px;
+  height: 14px;
+  margin-top: -7px;
+  border-radius: 2px;
+  background: var(--ink);
+}
+
+#tree .leaf:focus-visible {
+  outline-offset: -2px;
+}
+
+#pane {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 22px 28px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* A maximized window keeps readable lines. */
+#pane > * {
+  width: 100%;
+  max-width: 820px;
+}
+
+#pane .page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+#pane .page[hidden] {
+  display: none;
+}
+
+/* A window narrower than its default: a slimmer index. */
+@media (max-width: 700px) {
+  #tree {
+    width: 176px;
+  }
+
+  #pane {
+    padding: 20px 20px 32px;
+  }
+}
+
+/* A narrow window: the tree turns into a row across the top. */
+@media (max-width: 600px) {
+  #frame {
+    flex-direction: column;
+  }
+
+  #tree {
+    width: auto;
+    display: flex;
+    gap: 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 8px;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  #tree .group {
+    display: none;
+  }
+
+  #tree .leaf {
+    width: auto;
+    flex: none;
+    margin-top: 0;
+    padding: 6px 12px;
+    white-space: nowrap;
+  }
+
+  /* The marker moves under the label. */
+  #tree .leaf.on::before {
+    top: auto;
+    bottom: 2px;
+    inset-inline-start: 12px;
+    inset-inline-end: 12px;
+    width: auto;
+    height: 2px;
+    margin-top: 0;
+  }
+
+  #pane {
+    padding: 18px 16px 28px;
+  }
 }
 
 h1 {
-  font: 600 17px var(--font);
+  font: 600 20px/1.25 var(--font);
   letter-spacing: -0.01em;
+  padding-inline-start: 2px;
 }
 
 h1 .version {
   font: 400 12px var(--font);
   color: var(--dim-2);
-  margin-left: 8px;
+  margin-inline-start: 8px;
 }
 
 section {
   background: var(--card);
   border: 1px solid var(--hairline);
-  border-radius: 14px;
-  padding: 16px 18px;
+  border-radius: 12px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
 }
 
 section > h2 {
-  font: 600 13px var(--font);
+  font: 600 14px/1.3 var(--font);
+  color: var(--ink);
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+section > h2 .version {
+  font: 400 12px var(--font);
+  color: var(--dim);
+}
+
+/* A hint under a provider's key field, lined up with the field (RTL-safe). */
+.hint.key-hint {
+  margin-block-start: -4px;
+  margin-inline-start: 144px;
 }
 
 .hint {
-  font: 400 12px var(--font);
+  font: 400 12px/1.5 var(--font);
   color: var(--dim);
+  overflow-wrap: anywhere;
 }
 
 .row {
@@ -84,16 +369,31 @@ section > h2 {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  min-height: var(--control-h);
+  min-width: 0;
 }
 
 .row > label {
   min-width: 132px;
-  color: var(--dim);
+  color: var(--label);
   font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.row > label:has(input[type="checkbox"]) {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
 }
 
 .spacer {
   flex: 1 1 auto;
+}
+
+/* A dot with its label after it, spaced from the label (RTL-safe). */
+.dot.spaced {
+  margin-inline-end: 8px;
 }
 
 .dot {
@@ -102,25 +402,34 @@ section > h2 {
   border-radius: 50%;
   display: inline-block;
   flex: 0 0 auto;
+  vertical-align: middle;
 }
 
+/* Buttons: a pill, as in the island. Secondary by default, .primary and .danger. */
 button {
-  font: 500 12.5px var(--font);
-  padding: 7px 14px;
-  border: 0;
+  font: 500 12.5px/18px var(--font);
+  min-height: var(--control-h);
+  padding: 5px 14px;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--fill);
   color: var(--ink);
+  max-width: 100%;
   cursor: pointer;
-  transition: background 0.14s, transform 0.08s;
+  transition: background-color var(--ease), border-color var(--ease), color var(--ease), transform 0.08s;
+}
+
+/* The right-click menu's items keep their own size (menu.css). */
+.ctx-menu button {
+  min-height: 0;
 }
 
 button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--fill-hover);
 }
 
 button:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 button.primary {
@@ -133,8 +442,12 @@ button.primary:hover:not(:disabled) {
 }
 
 button.danger {
-  background: rgba(244, 80, 94, 0.16);
+  background: rgba(244, 80, 94, 0.14);
   color: #ff8d97;
+}
+
+button.danger:hover:not(:disabled) {
+  background: rgba(244, 80, 94, 0.24);
 }
 
 button:disabled {
@@ -144,40 +457,63 @@ button:disabled {
 
 code,
 .path {
-  font: 400 11.5px var(--mono);
+  font: 400 11.5px/1.45 var(--mono);
   color: var(--dim);
   word-break: break-all;
   user-select: text;
+  min-width: 0;
 }
 
-.switch {
+/* The switch is a <button>: it keeps its own size and colours over the
+   button rules above. */
+button.switch {
   position: relative;
   width: 36px;
+  min-height: 0;
   height: 20px;
+  border: 0;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.16);
   flex: 0 0 36px;
   padding: 0;
+  transition: background-color var(--ease);
 }
 
-.switch.on {
+button.switch:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+button.switch.on {
   background: var(--green);
+}
+
+button.switch.on:hover:not(:disabled) {
+  background: #34d16e;
+}
+
+button.switch:active:not(:disabled) {
+  transform: none;
 }
 
 .switch::after {
   content: "";
   position: absolute;
   top: 2px;
-  left: 2px;
+  inset-inline-start: 2px;
   width: 16px;
   height: 16px;
   border-radius: 50%;
   background: #fff;
-  transition: transform 0.18s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: transform 0.16s ease-out;
 }
 
 .switch.on::after {
   transform: translateX(16px);
+}
+
+html[dir="rtl"] .switch.on::after {
+  transform: translateX(-16px);
 }
 
 input[type="range"] {
@@ -187,26 +523,62 @@ input[type="range"] {
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.2);
   width: 140px;
+  max-width: 100%;
+  cursor: pointer;
 }
 
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform var(--ease);
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+input[type="range"]:focus-visible {
+  outline-offset: 6px;
+}
+
+input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--green);
+  cursor: pointer;
+  flex: none;
 }
 
 input[type="number"],
 input[type="text"],
 input[type="password"],
 select {
-  font: 400 12.5px var(--font);
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid var(--hairline);
+  font: 400 12.5px/18px var(--font);
+  height: var(--control-h);
+  min-width: 0;
+  max-width: 100%;
+  background: var(--field);
+  border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--ink);
-  padding: 5px 8px;
+  padding: 5px 10px;
+  transition: border-color var(--ease), box-shadow var(--ease), background-color var(--ease);
+}
+
+select {
+  padding-inline-end: 6px;
+  cursor: pointer;
+}
+
+input[type="number"]:hover:not(:disabled),
+input[type="text"]:hover:not(:disabled),
+input[type="password"]:hover:not(:disabled),
+select:hover:not(:disabled) {
+  border-color: var(--border-hover);
 }
 
 input::placeholder {
@@ -216,7 +588,24 @@ input::placeholder {
 input:focus,
 select:focus {
   outline: none;
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+
+/* The keyboard ring on fields is the brighter border above, plus the ring. */
+input[type="number"]:focus-visible,
+input[type="text"]:focus-visible,
+input[type="password"]:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+}
+
+input:disabled,
+select:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* The popup is drawn by the OS: give it an explicit pair of colours rather than
@@ -251,23 +640,28 @@ select option {
 }
 
 .notice {
-  font: 400 12px var(--font);
+  font: 400 12px/1.5 var(--font);
+  border: 1px solid transparent;
   border-radius: 10px;
   padding: 8px 12px;
+  overflow-wrap: anywhere;
 }
 
 .notice.ok {
-  background: rgba(34, 197, 94, 0.12);
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.22);
   color: #86efac;
 }
 
 .notice.err {
-  background: rgba(244, 80, 94, 0.14);
+  background: rgba(244, 80, 94, 0.11);
+  border-color: rgba(244, 80, 94, 0.24);
   color: #ff8d97;
 }
 
 .notice.warn {
-  background: rgba(245, 165, 36, 0.13);
+  background: rgba(245, 165, 36, 0.1);
+  border-color: rgba(245, 165, 36, 0.24);
   color: #fbc06a;
 }
 
@@ -276,25 +670,30 @@ select option {
 .pill-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-top: 10px;
+  gap: 6px;
+  padding-top: 12px;
   border-top: 1px solid var(--hairline);
 }
 
 .pill-group > h3 {
-  font: 600 11px var(--font);
-  color: var(--dim);
+  font: 600 11px/1.3 var(--font);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dim-2);
+  margin-bottom: 2px;
 }
 
 .pill-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 24px;
+  min-height: 28px;
 }
 
 .pill-row .name {
   font-size: 12.5px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* The dot of a pill's row opens the colour palette (see ./colors.ts). The dot
@@ -304,7 +703,7 @@ select option {
 }
 
 .color-dot:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -315,24 +714,27 @@ select option {
   align-items: center;
   gap: 7px;
   padding: 8px 10px;
-  background: var(--card);
-  border: 1px solid var(--hairline);
+  background: #16171b;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
-.palette .swatch {
+.palette button.swatch {
   width: 18px;
   height: 18px;
+  min-height: 0;
   padding: 0;
+  border: 0;
   border-radius: 50%;
 }
 
 .palette .swatch.on {
-  box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px var(--ink);
+  box-shadow: 0 0 0 2px #16171b, 0 0 0 3.5px var(--ink);
 }
 
-.palette .reset {
+.palette button.reset {
+  min-height: 0;
   padding: 3px 10px;
   font-size: 11.5px;
 }
@@ -342,7 +744,7 @@ select option {
 }
 
 .pill-row .state {
-  margin-left: auto;
+  margin-inline-start: auto;
   font: 400 11.5px var(--font);
   color: var(--dim);
 }
@@ -354,17 +756,17 @@ select option {
 /* Shortcuts section */
 
 .subhead {
-  font: 600 11px var(--font);
+  font: 600 11px/1.3 var(--font);
   color: var(--dim-2);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .shortcut-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .row.shortcut {
@@ -380,22 +782,28 @@ select option {
   flex: 1 1 auto;
   min-width: 0;
   font-size: 12.5px;
+  color: var(--label);
 }
 
 .keycap {
-  font: 500 11.5px var(--mono);
+  font: 500 11.5px/18px var(--mono);
   min-width: 118px;
   padding: 5px 10px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid var(--hairline);
+  background: var(--field);
+  border: 1px solid var(--border);
   color: var(--ink);
   text-align: center;
   flex: 0 0 auto;
 }
 
+button.keycap:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-hover);
+}
+
 .keycap.recording {
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.45);
   color: var(--dim);
 }
 
@@ -405,8 +813,8 @@ select option {
 }
 
 .tag {
-  font: 500 10.5px var(--font);
-  padding: 2px 8px;
+  font: 500 10.5px/16px var(--font);
+  padding: 1px 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   color: var(--dim);
@@ -428,6 +836,22 @@ select option {
    diffs, paths, keys and addresses stay left to right. */
 html[dir="rtl"] :is(.diff, .path, .keycap, input[type="password"], input[type="text"]) {
   direction: ltr;
+}
+
+/* Hover and state changes of the controls stay still for people who ask for
+   less motion (the window's own opening, below, is kept on purpose). */
+@media (prefers-reduced-motion: reduce) {
+  button,
+  input,
+  select,
+  .switch::after,
+  input[type="range"]::-webkit-slider-thumb {
+    transition: none;
+  }
+
+  button:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 /* ── Opening and closing (motion.ts) ───────────────────────────────────────────

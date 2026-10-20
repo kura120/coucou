@@ -749,8 +749,10 @@ fn create_settings_window(app: &AppHandle) {
     match WebviewWindowBuilder::new(app, "settings", url)
         .additional_browser_args(BROWSER_ARGS)
         .title(i18n::t("Settings — Coucou"))
-        .inner_size(560.0, 680.0)
-        .min_inner_size(460.0, 480.0)
+        // Frameless: the page draws its own title bar (src/settings/main.ts).
+        .decorations(false)
+        .inner_size(760.0, 560.0)
+        .min_inner_size(640.0, 480.0)
         .resizable(true)
         .visible(false)
         .center()
@@ -814,6 +816,38 @@ fn hide_settings_window(app: AppHandle) {
 #[tauri::command]
 fn open_settings_window(app: AppHandle) {
     show_settings_window(&app);
+}
+
+/// The settings page's own title bar: the window has no frame of its own.
+/// Close goes through the window's close request, so the closing motion plays
+/// before it hides (create_settings_window).
+#[tauri::command]
+fn close_settings_window(app: AppHandle) {
+    if let Some(win) = app.get_webview_window("settings") {
+        let _ = win.close();
+    }
+}
+
+#[tauri::command]
+fn minimize_settings_window(app: AppHandle) {
+    if let Some(win) = app.get_webview_window("settings") {
+        let _ = win.minimize();
+    }
+}
+
+#[tauri::command]
+fn toggle_maximize_settings_window(app: AppHandle) {
+    if let Some(win) = app.get_webview_window("settings") {
+        let maximized = win.is_maximized().unwrap_or(false);
+        let _ = if maximized { win.unmaximize() } else { win.maximize() };
+    }
+}
+
+#[tauri::command]
+fn drag_settings_window(app: AppHandle) {
+    if let Some(win) = app.get_webview_window("settings") {
+        let _ = win.start_dragging();
+    }
 }
 
 pub fn run() {
@@ -903,6 +937,10 @@ pub fn run() {
             open_n8n,
             open_settings_window,
             hide_settings_window,
+            close_settings_window,
+            minimize_settings_window,
+            toggle_maximize_settings_window,
+            drag_settings_window,
             set_paused,
             shortcuts_status,
             shortcuts_suspend,
