@@ -3,13 +3,21 @@
 // putting the last thing back, doing nothing, handing over to a stronger
 // model, and asking to see more of what the app can do.
 
-import type { Registry } from "../core/capabilities/types";
+import type { Registry, RunContext, ToolResult } from "../core/capabilities/types";
 import { t } from "../i18n/i18n";
 import { done, failed } from "../voice/result";
 import type { AppHost } from "./host";
 import { capability, cut, str, type Area } from "./shared";
 
 const AREA = "coucou";
+
+// These two leave nobody to put a mistake right by voice, so they are asked first. The app's own interface is the click already.
+async function askedFirst(context: RunContext | undefined, question: string, yes: string, no: string): Promise<ToolResult | null> {
+  if (!context || context.origin === "ui") return null;
+  const answer = await context.ask({ kind: "yes_no", question, yes, no });
+  if (answer.kind === "yes_no" && answer.yes) return null;
+  return { ...done(t("OK, leaving it as is"), false), detail: "Nothing was changed: the user did not say yes." };
+}
 
 /** `registry`: what `undo` and `more_tools` read. `areas`: the names of every area declared. */
 export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" | "get" | "execute" | "lastChange" | "named" | "all">, areas: readonly string[]): Area {
@@ -19,10 +27,13 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
       capability({
         name: "stop_listening",
         area: AREA,
-        description: "Turns Coucou's own voice control off altogether: its microphone closes and nothing said is heard until the user turns it back on in Settings. Only when they ask for Coucou's voice, listening or microphone to be off. Never for the music, a song or Spotify — stopping those is pause_music — and never for being done with a request, which is nothing.",
+        description: "Turns Coucou's own voice control off altogether: its microphone closes and nothing said is heard until the user turns it back on in Settings. Only when they ask for Coucou's voice, listening or microphone to be off. Never for the music, a song or Spotify — stopping those is pause_music — and never for being done with a request, which is nothing. The user is asked first.",
         args: {},
         // Closing the microphone is never made hard. Opening it again is the user's: there is no inverse.
         tier: "free",
+        async check(_args, context) {
+          return askedFirst(context, t("Turn voice off?"), t("Turn off"), t("Keep listening"));
+        },
         async run() {
           host.stopListening();
           return host.listening() ? failed(t("That did not change"), "Voice is still on.") : done(t("Voice is off"), true);
@@ -31,10 +42,14 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
       capability({
         name: "pause_coucou",
         area: AREA,
-        description: "Takes the whole Coucou app off duty, as the Pause of its tray menu does: the island hides and the services are no longer asked, until it is resumed. Only when the user names Coucou, the app or the island: a pause with nothing named is the music's (pause_music).",
+        description: "Takes the whole Coucou app off duty, as the Pause of its tray menu does: the island hides and the services are no longer asked, until it is resumed. Only when the user names Coucou, the app or the island: a pause with nothing named is the music's (pause_music). The user is asked first.",
         args: {},
         tier: "reversible",
         inverse: () => (host.paused() ? null : { name: "resume_coucou", arguments: {} }),
+        // Asked before it is done, not after: a no leaves nothing to put back.
+        async check(_args, context) {
+          return askedFirst(context, t("Pause Coucou?"), t("Pause"), t("Keep going"));
+        },
         async run() {
           host.setPaused(true);
           return host.paused() ? done(t("Paused"), true) : failed(t("That did not change"));

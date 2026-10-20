@@ -398,6 +398,26 @@ test("the guard is not in what a capability is given, whatever the caller's cont
   assert.deepEqual(result.data.keys, ["ask", "origin", "working"]);
 });
 
+test("check is given the run context, and may ask: a no ends the call before run", async () => {
+  const { registry, call } = setup({ answers: [{ kind: "yes_no", yes: false }, { kind: "yes_no", yes: true }] });
+  const seen = [];
+  let ran = 0;
+  registry.declare({
+    name: "asks_first", area: "test", description: "Asks before it runs.", args: {}, tier: "free",
+    check: async (_args, context) => {
+      seen.push(context.origin);
+      const answer = await context.ask({ kind: "yes_no", question: "Go?" });
+      return answer.kind === "yes_no" && answer.yes ? null : done("Left as is", false);
+    },
+    run: async () => (ran += 1, done("Ran")),
+  });
+  assert.equal((await call("asks_first", {}, "cloud")).line, "Left as is");
+  assert.equal(ran, 0);
+  assert.equal((await call("asks_first", {}, "cloud")).line, "Ran");
+  assert.equal(ran, 1);
+  assert.deepEqual(seen, ["cloud", "cloud"]);
+});
+
 // ── What breaks ───────────────────────────────────────────────────────────────
 
 test("a capability that throws, or says nothing, is a failed result and never an exception", async () => {

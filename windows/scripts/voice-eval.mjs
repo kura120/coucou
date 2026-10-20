@@ -473,9 +473,10 @@ const ONE = [
   [["bring up the wardrobe for me would you"], ["view:wardrobe"]],
   [["set the sound effects to thirty percent"], ["set:soundVolume=0.06"]],
   [["could you put the sound effects at about thirty percent for me"], ["set:soundVolume=0.06"]],
-  [["turn voice off"], ["voice-off"]],
+  // What would leave nobody to put it right by voice is asked first, and a spoken yes does it.
+  [["turn voice off"], "ask:voice"],
   [["put a crown on mochi"], ["wear:crown"]],
-  [["pause coucou"], ["paused"]],
+  [["pause coucou"], "ask:Coucou"],
   [["can you look up how to center a div"], any(["search"], ["browse"])],
   [["tell claude to run the tests again and fix what fails"], ["chat:prepare"]],
   // What takes a click, and gets none: the toast, and nothing else.
@@ -619,6 +620,21 @@ const UNCLEAR = [
   [[{ said: "skip this song", sure: [0.9, 0.95, 0.97] }], ["next"]],
 ];
 
+// What would leave Coucou deaf to a correction — voice off, Coucou paused — is
+// asked first: yes does it, no or silence leaves it. Stopping the music is
+// still done at once.
+const QUIET = [
+  [["turn voice off", "yes"], ["voice-off"]],
+  [["turn voice off", "no"], "nothing"],
+  [["turn voice off", { click: { kind: "yes_no", yes: true } }], ["voice-off"]],
+  [["can you stop listening for a bit", "yeah"], ["voice-off"]],
+  [["pause coucou", "yeah"], ["paused"]],
+  [["pause coucou", "no"], "nothing"],
+  [["take a break coucou", "do it"], ["paused"]],
+  [["um stop spotify real quick"], ["pause"]],
+  [["stop the music"], ["pause"]],
+];
+
 const PARTS = [
   ["one sentence", ONE],
   ["names, follow-ups", NAMES],
@@ -627,6 +643,7 @@ const PARTS = [
   ["for nobody", NOBODY],
   ["repairs", REPAIRS],
   ["unclear", UNCLEAR],
+  ["going quiet", QUIET],
 ];
 
 function right(expected, { log, last }) {

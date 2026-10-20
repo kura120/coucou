@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { appAreas, registerApp } from "../src/capabilities/index.ts";
 import { SETTINGS, settingSpec } from "../src/capabilities/settings.ts";
 import { webAddress } from "../src/capabilities/apps.ts";
+import { createRegistry } from "../src/core/capabilities/registry.ts";
 
 const SOURCES = join(dirname(fileURLToPath(import.meta.url)), "../src/capabilities");
 
@@ -729,6 +730,70 @@ test("undo is the registry's own, and escalate only says so", async () => {
   assert.equal((await get("undo").run({}, context())).line, "Put back");
   assert.deepEqual((await get("escalate").run({ reason: "a long plan" }, context())).data, { escalate: true, reason: "a long plan" });
   assert.deepEqual(log, []);
+});
+
+// ── Asked first: what leaves nobody to put a mistake right by voice ───────────
+
+const WORDS = {
+  refused: () => "I can't do that.", unavailable: () => "Not right now.", failed: () => "That didn't work.",
+  notFound: (said) => `I can't find ${said}.`, unchanged: () => "Nothing was changed.", nothingToUndo: () => "Nothing to put back.",
+  one: (label) => `Did you mean ${label}?`, which: (labels) => labels.join(" or "),
+};
+
+/** The real executor, over the fake app: what the app runs through in use. */
+function real(made) {
+  const reg = createRegistry({ guard: { confirm: async () => false }, words: WORDS });
+  registerApp(reg, made.host);
+  return reg;
+}
+
+const turned = (name, s) => (name === "stop_listening" ? !s.settings.voice.enabled : s.paused);
+const ASKED = { stop_listening: ["Turn voice off?", "Turn off", "Keep listening"], pause_coucou: ["Pause Coucou?", "Pause", "Keep going"] };
+
+for (const name of ["stop_listening", "pause_coucou"]) {
+  test(`${name}: asked first, and done on a yes`, async () => {
+    const made = app();
+    const asked = [];
+    const result = await real(made).execute({ name, arguments: {} }, context({ kind: "yes_no", yes: true }, asked));
+    assert.deepEqual([result.status, result.verified], ["done", true]);
+    assert.deepEqual(asked, [{ kind: "yes_no", question: ASKED[name][0], yes: ASKED[name][1], no: ASKED[name][2] }]);
+    assert.ok(turned(name, made.s));
+  });
+
+  test(`${name}: a no, or no answer, does nothing and says so`, async () => {
+    for (const answer of [{ kind: "yes_no", yes: false }, { kind: "dropped" }]) {
+      const made = app();
+      const result = await real(made).execute({ name, arguments: {} }, context(answer));
+      assert.deepEqual([result.status, result.verified, result.line], ["done", false, "OK, leaving it as is"]);
+      assert.match(result.detail, /did not say yes/);
+      assert.equal(turned(name, made.s), false);
+      assert.deepEqual(made.log, []);
+    }
+  });
+
+  test(`${name}: the app's own interface is the click already, and nothing is asked`, async () => {
+    const made = app();
+    const asked = [];
+    const result = await real(made).execute({ name, arguments: {} }, { ...context({ kind: "yes_no", yes: false }, asked), origin: "ui" });
+    assert.equal(result.status, "done");
+    assert.deepEqual(asked, []);
+    assert.ok(turned(name, made.s));
+  });
+}
+
+test("a no to pause_coucou remembers nothing: the last change is what it was", async () => {
+  const made = app();
+  const reg = real(made);
+  await reg.execute({ name: "add_pills", arguments: { pills: ["integration_stripe"] } }, context());
+  const before = reg.lastChange();
+  assert.equal(before.call.name, "add_pills");
+  await reg.execute({ name: "pause_coucou", arguments: {} }, context({ kind: "yes_no", yes: false }));
+  assert.equal(made.s.paused, false);
+  assert.deepEqual(reg.lastChange(), before);
+  // A yes does it, and that is what is put back.
+  await reg.execute({ name: "pause_coucou", arguments: {} }, context({ kind: "yes_no", yes: true }));
+  assert.equal(made.s.paused, true);
+  assert.equal(reg.lastChange().call.name, "pause_coucou");
 });
 
 // ── What stays private ────────────────────────────────────────────────────────
