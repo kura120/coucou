@@ -32,6 +32,7 @@ import { usable } from "./asking";
 import { normalise } from "./entity";
 import { VoiceMemory, type ModelCall, type VoiceTurn } from "./memory";
 import { CapabilityIndex, indexText, instant, SHORTLIST, shortlist, type Embed, type Ranked } from "./rank";
+import { UNSURE_WORD } from "./resolve";
 import { forModel, spoken, type VoiceResult } from "./result";
 
 export type { ModelCall } from "./memory";
@@ -103,6 +104,8 @@ export interface TurnWords {
   beyond(): string;
   /** While the cloud model works. */
   askingCloud(): string;
+  /** Said to Coucou by name, heard too unsure to act on, and nothing asked of it: "Sorry?", and listening goes on. */
+  pardon(): string;
 }
 
 export interface TurnOptions {
@@ -865,8 +868,11 @@ export class VoiceTurns {
     };
 
     if (!shown.length) {
-      // Asked for nothing: the user is done.
-      if (turn.ran.some((ran) => ran.call.name === NOTHING)) return finish(null, true);
+      // Asked for nothing: the user is done. Said to Coucou by name but heard too unsure to act on: asked again, and listening goes on.
+      if (turn.ran.some((ran) => ran.call.name === NOTHING)) {
+        if (turn.wake && unclear(turn.how.sure)) return finish({ outcome: "failure", message: this.words.pardon() }, false);
+        return finish(null, true);
+      }
       if (failure) return { result: { outcome: "failure", message: failure }, taken: true, rest: false };
       const answer = spoken(words, "");
       return finish(answer ? { outcome: "success", message: answer } : { outcome: "failure", message: this.words.notUnderstood() });
@@ -1014,6 +1020,15 @@ export function notSaid(call: ModelCall, capability: Capability | undefined, sen
 /** The kinds of thing a capability takes as an argument. */
 export const kindsOf = (capability: Capability): string[] =>
   Object.values(capability.args).flatMap((spec) => (spec.type === "entity" || spec.type === "entities" ? [spec.kind] : []));
+
+/**
+ * Whether the speech model was too unsure of a sentence to act on it: one of
+ * its words under UNSURE_WORD, by its own numbers (resolve.ts). With no
+ * numbers nothing is known, and nothing is unclear.
+ */
+export function unclear(sure: readonly number[] | undefined): boolean {
+  return sure != null && sure.some((x) => x < UNSURE_WORD);
+}
 
 /**
  * Nobody waits for this turn any more: the island moved on. Only once it was

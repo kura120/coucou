@@ -29,7 +29,8 @@ export interface VoiceEvent {
 
 export interface VoiceHost {
   voiceWoke(): void;
-  voiceHeard(text: string, final: boolean): void;
+  /** `sure`: how sure the speech model was of each word, when the sentence is final and it says. */
+  voiceHeard(text: string, final: boolean, sure?: readonly number[]): void;
   voiceMissed(): void;
   voiceCancelled(): void;
   /** Another command may follow without the wake phrase, or that time is over. */
@@ -70,7 +71,7 @@ export function applyVoice(island: VoiceHost, event: VoiceEvent) {
       island.voiceHeard(event.text, false);
       break;
     case "final":
-      island.voiceHeard(event.text, true);
+      island.voiceHeard(event.text, true, event.sure);
       break;
     case "missed":
       island.voiceMissed();
@@ -160,6 +161,7 @@ export function createTurns(registry: Registry): VoiceTurns {
       notUnderstood: () => t("Command not recognised"),
       beyond: () => t("That is more than I can do here."),
       askingCloud: () => t("Asking a bigger model…"),
+      pardon: () => t("Sorry, I didn't catch that. Say it again?"),
     },
   });
 }

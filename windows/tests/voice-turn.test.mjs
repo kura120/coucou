@@ -8,7 +8,8 @@ import assert from "node:assert/strict";
 import { createRegistry } from "../src/core/capabilities/registry.ts";
 import { done, failed } from "../src/voice/result.ts";
 import { FORGOTTEN_AFTER_MS } from "../src/voice/memory.ts";
-import { MOST_MODEL_ROUNDS, VoiceTurns, asHeard, grounded, looksWritten, misheard, unfounded, written } from "../src/voice/turn.ts";
+import { MOST_MODEL_ROUNDS, VoiceTurns, asHeard, grounded, looksWritten, misheard, unclear, unfounded, written } from "../src/voice/turn.ts";
+import { UNSURE_WORD } from "../src/voice/resolve.ts";
 
 const WORDS = {
   refused: () => "I can't do that", unavailable: () => "Not possible now", failed: () => "That did not work",
@@ -19,6 +20,7 @@ const TURN_WORDS = {
   noModel: () => "Voice needs a model server", silent: () => "The model did not answer",
   noEmbedding: () => "Voice needs an embedding model", embedSilent: () => "The embedding model did not answer",
   notUnderstood: () => "Not recognised", beyond: () => "More than I can do here", askingCloud: () => "Asking a bigger model…",
+  pardon: () => "Sorry, I didn't catch that",
 };
 
 let app;
@@ -367,6 +369,29 @@ test("an answer in words, with nothing called, is Mochi's answer; asking for not
   assert.match(empty.asked[1].system, /called a capability that does not exist here[\s\S]*Call one of your tools — [a-z_, ]*more_tools/);
   const second = scripted(says(""), calls(call("pause_music")));
   assert.deepEqual((await turns({ local: second.model }).hear("pause")).result, { outcome: "success", message: "Paused" });
+});
+
+test("said after the wake phrase and heard too unsure to act on, asking for nothing is pardoned and listening goes on", async () => {
+  // "uh can you place modified": the speech model was not sure of the last words.
+  const unsure = [0.85, 0.9, 0.95, 0.3, 0.2];
+  const pardoned = await turns({ local: scripted(calls(call("nothing"))).model }).hear("uh can you place modified", { sure: unsure });
+  assert.deepEqual(pardoned, { result: { outcome: "failure", message: "Sorry, I didn't catch that" }, taken: true, rest: false });
+  // Sure of every word, or no numbers at all: nothing shown, and the user is done, as before.
+  assert.deepEqual(await turns({ local: scripted(calls(call("nothing"))).model }).hear("never mind", { sure: [0.9, 0.95] }), { result: null, taken: true, rest: true });
+  assert.deepEqual(await turns({ local: scripted(calls(call("nothing"))).model }).hear("never mind"), { result: null, taken: true, rest: true });
+});
+
+test("a sentence said without the wake phrase, heard unsure, is never pardoned: it may have been for someone else", async () => {
+  const t = turns({ local: scripted(calls(call("nothing"))).model, followUp: true });
+  assert.deepEqual(await t.hear("uh can you place modified", { wake: false, sure: [0.85, 0.9, 0.95, 0.3, 0.2] }), { result: null, taken: true, rest: true });
+});
+
+test("unclear: too unsure when one word is under UNSURE_WORD by the speech model's numbers; nothing known is not unclear", () => {
+  assert.equal(unclear(undefined), false);
+  assert.equal(unclear([]), false);
+  assert.equal(unclear([0.9, 0.95]), false);
+  assert.equal(unclear([0.9, 0.3]), true);
+  assert.equal(unclear([UNSURE_WORD]), false);
 });
 
 test("calls a model wrote out as text are calls, and its plumbing is never said", async () => {
