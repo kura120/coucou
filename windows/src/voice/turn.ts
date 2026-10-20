@@ -248,6 +248,9 @@ const AFTER_CALLS =
  */
 const EMPTY = "Your last answer called a capability that does not exist here, and nothing was done. Call one of your tools — {tools} — the one nearest to what was asked, or answer in words.";
 
+/** Said once to words that claim an action or ask in words, with nothing called: one more round, with the capabilities. */
+const WORDS_ONLY = "You answered in words and called no capability, so nothing was done and nothing is on screen for the user to answer. If they asked for something to be done, call the capability that does it now. If you need to ask them something, call ask_user. If they only asked a question that the app's state answers, or nothing here does what was asked, give that answer again in words.";
+
 /** Once the app's capabilities ran, the model only decides what else to call: its words are not what Mochi says. */
 const AFTER_RAN = "The results of your calls are above. If a call failed and can be made right with another value or another setting, make it now. If what was asked needs another capability, call it now. Otherwise tell the user, in one short sentence, what the results say was done — only that.";
 
@@ -436,8 +439,8 @@ export class VoiceTurns {
     if (!given) return { is: "unclear" };
     // "No, Discord": no to this, and a request of its own, heard once this turn is over.
     const refusal = given.kind === "dropped" || (given.kind === "yes_no" && !given.yes);
-    // Or a no that names another thing of the kind it was asked about: what was meant instead.
-    const instead = refusal && ask.about != null && (await this.registry.named(sentence)).some((n) => n.kind === ask.about && !n.near);
+    // Or a no that names a thing of the app, of any kind: what was meant instead.
+    const instead = refusal && (await this.registry.named(sentence)).some((n) => !n.near);
     if (refusal && (call?.arguments?.also_asks === true || instead)) this.nextSaid = sentence;
     this.answer(given);
     return { is: "answer" };
@@ -658,8 +661,11 @@ export class VoiceTurns {
     // Handing up is offered only when there is somebody to hand up to.
     const offered = (names: readonly string[]) => names.filter((n) => declared.has(n) && (n !== ESCALATE || (turn.wake && this.cloud() != null)));
     const history: ModelTurn[] = this.memory.recent(this.now()).map(({ said: s, calls, result }) => ({ said: s, calls, result }));
-    // A follow-up ("and Discord too") goes on with what the turn before called, whatever it ranks alone.
-    const carried = (history[history.length - 1]?.calls ?? []).map((call) => call.name);
+    // A follow-up ("and Discord too") goes on with what the last turns called, whatever it ranks alone; and what was
+    // changed last, with what puts it back, so that "put it back" finds them.
+    const recent = history.slice(-3).reverse().flatMap((past) => past.calls.map((call) => call.name));
+    const changed = this.registry.lastChange();
+    const carried = [...new Set([...recent, ...(changed ? [changed.call.name, changed.inverse.name] : [])])];
     // Asking the user is always offered: a name the model is not sure of is asked about, not guessed or dropped.
     const shown = new Set(offered([...shortlist(ranked, capabilities, SHORTLIST, [...carried, ...takers(ranked, capabilities, turn.named)]), UNDO, INSTEAD, ASK_USER]));
     if (second) for (const name of [...shown]) if (!second.only.includes(name)) shown.delete(name);
@@ -694,11 +700,25 @@ export class VoiceTurns {
 
     const steps: ModelStep[] = [];
     let words = "";
+    /** The app asked about a misheard name in place of the model's question: once. */
+    let redirected = false;
     for (let round = 1; ; round++) {
       // Calls written out as text are calls; what is left of them is never Mochi's words.
       const calls = reply.calls.length ? reply.calls : written(reply.text, declared);
       if (!calls.length) {
-        words = looksWritten(reply.text) ? "" : reply.text;
+        let answer = reply;
+        const budget = TURN_BUDGET_MS - (this.now() - turn.started);
+        // Words that claim an action, or ask in words, with nothing done: asked once more, with the capabilities.
+        if (round === 1 && reply.text.trim() && !looksWritten(reply.text) && turn.ran.length === 0 && second === undefined && budget > 0) {
+          const again = await within(local(`${system}\n\n${WORDS_ONLY}`, said, tools(), history), budget);
+          if (gone(turn)) return { is: "dropped" };
+          if (again && (again.calls.length || written(again.text, declared).length)) {
+            reply = again;
+            continue;
+          }
+          if (again?.text.trim() && !looksWritten(again.text)) answer = again;
+        }
+        words = looksWritten(answer.text) ? "" : answer.text;
         break;
       }
       // What it already called it has nothing more to ask of: nothing is done twice for one sentence —
@@ -718,6 +738,19 @@ export class VoiceTurns {
 
       const step: ModelStep = { calls: [], results: [] };
       for (const call of fresh) {
+        // A name the app only nearly has, which the model asks about with its own spelling: the app asks about it, as heard.
+        const near = turn.named.find((n) => n.near);
+        if (call.name === ASK_USER && near && !redirected) {
+          const questions = [call.arguments.question, call.arguments.option_1, call.arguments.option_2, call.arguments.option_3, call.arguments.option_4];
+          const text = questions.filter((x): x is string => typeof x === "string").join(" ");
+          if (!(await this.registry.named(text)).some((n) => !n.near && n.kind === near.kind)) {
+            const thing = misheard(ranked, capabilities, turn.named);
+            if (thing) {
+              redirected = true;
+              if (await this.instantly(thing.name, turn, thing.heard)) return { is: "answered", words: "" };
+            }
+          }
+        }
         const result = await this.run(call, "local", turn);
         if (gone(turn)) return { is: "dropped" };
         if (call.name === ESCALATE && result.status === "done") return { is: "escalated" };
