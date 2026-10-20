@@ -580,12 +580,12 @@ function chatProvidersSection(
     list.append(
       h("div", { class: "row" },
         h("label", {},
-          h("i", { class: "dot", style: `background:${p.accent};margin-right:8px` }),
+          h("i", { class: "dot spaced", style: `background:${p.accent}` }),
           h("span", { text: def.name }),
         ),
         input, saveBtn, removeBtn, dotEl,
       ),
-      h("div", { class: "hint", style: "margin:-4px 0 0 144px", text: t("Key from {site}", { site: def.where }) }),
+      h("div", { class: "hint key-hint", text: t("Key from {site}", { site: def.where }) }),
     );
   }
   return h(
@@ -649,7 +649,7 @@ function localSection(customKey: boolean): HTMLElement {
     const status = h("div", {});
     const exposure = h("div", {});
     const label = h("label", {},
-      h("i", { class: "dot", style: `background:${p.accent};margin-right:8px` }),
+      h("i", { class: "dot spaced", style: `background:${p.accent}` }),
       h("span", { text: t(def.name) }),
     );
     const block = h("div", { style: "display:flex;flex-direction:column;gap:6px" });
@@ -1709,14 +1709,14 @@ async function rerender() {
     renderAgain = true;
     return;
   }
-  const scroll = document.scrollingElement?.scrollTop ?? 0;
+  const scroll = paneEl?.scrollTop ?? 0;
   rendering = render();
   try {
     await rendering;
   } finally {
     rendering = null;
   }
-  if (document.scrollingElement) document.scrollingElement.scrollTop = scroll;
+  if (paneEl) paneEl.scrollTop = scroll;
   if (renderAgain) {
     renderAgain = false;
     await rerender();
@@ -1802,26 +1802,140 @@ async function render() {
   declaredViews.length = 0;
   localRedraw = null;
   shortcutsListener = null;
-  clear(root);
-  root.append(
-    h("h1", {}, h("span", { text: "Coucou" }), h("span", { class: "version", text: version })),
-    claudeSection(status),
-    agentsSection(agents),
-    planSection(status),
-    apiSection(hasKey),
-    chatProvidersSection(chatKeys, keyChanged),
-    localSection(customKey),
-    activePillsSection(connected),
-    integrationsSection(present),
-    phoneSection(settings.phoneLink ?? false, toggle, settings),
-    generalSection(),
-    voiceSection(),
-    shortcutsSection(shortcutReport),
-    h("div", {
-      class: "hint",
-      text: t("No telemetry. Network requests only go to the services you configure yourself."),
-    }),
+  // Built first: each is cut into pages at its sub-headings (splitAtSubheads).
+  const [voiceMain, voiceWeb, voiceDebug] = splitAtSubheads(voiceSection());
+  const [shortcutsGlobal, shortcutsIsland] = splitAtSubheads(shortcutsSection(shortcutReport));
+  // One page per leaf of the tree; only the one picked is shown (drawShell).
+  const pages: Record<string, HTMLElement> = {
+    "general": page(generalSection()),
+    "phone": page(phoneSection(settings.phoneLink ?? false, toggle, settings)),
+    "claude-code": page(claudeSection(status)),
+    "agents": page(agentsSection(agents)),
+    "plan-usage": page(planSection(status)),
+    "claude-api": page(apiSection(hasKey)),
+    "chat-providers": page(chatProvidersSection(chatKeys, keyChanged)),
+    "local-models": page(localSection(customKey)),
+    "pills": page(activePillsSection(connected)),
+    "integrations": page(integrationsSection(present)),
+    "voice": page(voiceMain),
+    "voice-web": page(voiceWeb),
+    "voice-debug": page(voiceDebug),
+    "shortcuts": page(shortcutsGlobal),
+    "shortcuts-island": page(shortcutsIsland),
+    "about": page(
+      h("section", {}, h("h2", {}, h("span", { text: "Coucou" }), h("span", { class: "version", text: version }))),
+      h("div", {
+        class: "hint",
+        text: t("No telemetry. Network requests only go to the services you configure yourself."),
+      }),
+    ),
+  };
+  drawShell(pages);
+}
+
+function page(...children: HTMLElement[]): HTMLElement {
+  return h("div", { class: "page" }, ...children);
+}
+
+/** The tree on the left: each group and the pages under it. */
+const TREE: [string, [string, string][]][] = [
+  [N_("General"), [["general", N_("General")], ["phone", N_("Phone link")]]],
+  // Product names stay as they are in every language, like the Claude Code section's heading.
+  ["Claude", [["claude-code", "Claude Code"], ["agents", N_("Agents")], ["plan-usage", N_("Plan usage")], ["claude-api", "Claude API"]]],
+  [N_("AI models"), [["chat-providers", N_("Chat providers")], ["local-models", N_("Local models")]]],
+  [N_("Pills & integrations"), [["pills", N_("Active pills")], ["integrations", N_("Integrations")]]],
+  [N_("Voice"), [["voice", N_("Voice")], ["voice-web", N_("Web answers")], ["voice-debug", N_("Debugging")]]],
+  [N_("Shortcuts"), [["shortcuts", N_("From anywhere")], ["shortcuts-island", N_("In the open island")]]],
+  [N_("About"), [["about", N_("About")]]],
+];
+
+/**
+ * A section cut at its sub-headings (`.subhead`) into one section per part.
+ * The nodes are moved, not rebuilt, so their listeners and live state stay.
+ * A part keeps the section's own heading when the section starts with
+ * controls; when it starts with hints only, the hints go with the first
+ * sub-heading's part instead, and that sub-heading becomes its heading.
+ */
+function splitAtSubheads(section: HTMLElement): HTMLElement[] {
+  const heading = section.querySelector("h2");
+  const segments: { title: string; nodes: Element[] }[] = [{ title: heading?.textContent ?? "", nodes: [] }];
+  for (const child of [...section.children]) {
+    if (child === heading) continue;
+    if (child.classList.contains("subhead")) {
+      segments.push({ title: child.textContent ?? "", nodes: [] });
+      child.remove();
+      continue;
+    }
+    segments[segments.length - 1].nodes.push(child);
+  }
+  if (segments.length === 1) return [section];
+
+  const [preamble, ...parts] = segments;
+  const hasControls = preamble.nodes.some((n) => !n.classList.contains("hint"));
+  const made = (title: string, nodes: Element[]) => {
+    const part = h("section", {}, h("h2", {}, h("span", { text: title })));
+    part.append(...nodes);
+    return part;
+  };
+  if (hasControls) {
+    return [section, ...parts.map((p) => made(p.title, p.nodes))];
+  }
+  return parts.map((p, i) => made(p.title, i === 0 ? [...preamble.nodes, ...p.nodes] : p.nodes));
+}
+
+/** The page picked in the tree, kept across redraws. */
+let current = "general";
+let paneEl: HTMLElement | null = null;
+
+/** Draws the title bar, the tree and the pane around the pages. */
+function drawShell(pages: Record<string, HTMLElement>) {
+  const leafButtons = new Map<string, HTMLElement>();
+  const groupOf: Record<string, string> = {};
+  const heading = h("h1", {});
+  const pane = h("main", { id: "pane" }, heading, ...Object.values(pages));
+  const tree = h("nav", { id: "tree", "aria-label": t("Settings") });
+
+  for (const [group, leaves] of TREE) {
+    tree.append(h("div", { class: "group", text: t(group) }));
+    for (const [id, label] of leaves) {
+      groupOf[id] = group;
+      const button = h("button", { class: "leaf", text: t(label), onclick: () => select(id) });
+      leafButtons.set(id, button);
+      tree.append(button);
+    }
+  }
+
+  const select = (id: string) => {
+    current = id in pages ? id : "general";
+    for (const [key, el] of Object.entries(pages)) el.hidden = key !== current;
+    for (const [key, button] of leafButtons) button.classList.toggle("on", key === current);
+    heading.textContent = t(groupOf[current]);
+    pane.scrollTop = 0;
+  };
+
+  const winButton = (label: string, cls: string, glyph: string, onClick: () => void) =>
+    h("button", { class: `win-btn ${cls}`, title: label, "aria-label": label, onclick: onClick, text: glyph });
+
+  const bar = h("header", {
+    id: "titlebar",
+    onmousedown: (e: Event) => {
+      const m = e as MouseEvent;
+      if (m.button === 0 && !(m.target as HTMLElement).closest("button")) void Bridge.dragSettingsWindow();
+    },
+    ondblclick: (e: Event) => {
+      if (!(e.target as HTMLElement).closest("button")) void Bridge.toggleMaximizeSettingsWindow();
+    },
+  },
+    h("span", { class: "title", text: t("Settings — Coucou") }),
+    winButton(t("Minimize"), "min", "–", () => void Bridge.minimizeSettingsWindow()),
+    winButton(t("Maximize"), "max", "□", () => void Bridge.toggleMaximizeSettingsWindow()),
+    winButton(t("Close"), "close", "✕", () => void Bridge.closeSettingsWindow()),
   );
+
+  clear(root);
+  root.append(bar, h("div", { id: "frame" }, tree, pane));
+  paneEl = pane;
+  select(current);
 }
 
 void main();

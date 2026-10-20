@@ -241,6 +241,11 @@ export const Bridge = {
   openSettingsWindow: () => call<void>("open_settings_window"),
   /** The settings page finished its closing motion: hide its window. */
   hideSettingsWindow: () => call<void>("hide_settings_window"),
+  /** The settings page's own title bar: close, minimize, maximize, drag. */
+  closeSettingsWindow: () => call<void>("close_settings_window"),
+  minimizeSettingsWindow: () => call<void>("minimize_settings_window"),
+  toggleMaximizeSettingsWindow: () => call<void>("toggle_maximize_settings_window"),
+  dragSettingsWindow: () => call<void>("drag_settings_window"),
 
   /** Writes to %LOCALAPPDATA%\Coucou\coucou.log, next to the Rust lines. */
   log: (message: string) => call<void>("log_line", { message }),
