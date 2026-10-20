@@ -744,18 +744,18 @@ impl Drop for Speaker {
 // ── Loading the library ───────────────────────────────────────────────────────
 
 #[cfg(windows)]
-const LIBRARY: &str = "sherpa-onnx-c-api.dll";
+pub(super) const LIBRARY: &str = "sherpa-onnx-c-api.dll";
 #[cfg(not(windows))]
-const LIBRARY: &str = "libsherpa-onnx-c-api.so";
+pub(super) const LIBRARY: &str = "libsherpa-onnx-c-api.so";
 
 #[cfg(windows)]
-struct Library(windows::Win32::Foundation::HMODULE);
+pub(super) struct Library(windows::Win32::Foundation::HMODULE);
 
 #[cfg(windows)]
 impl Library {
     /// By its full path, and its own folder searched for what it needs
     /// (onnxruntime.dll) — never the current directory or PATH.
-    fn open(path: &Path) -> Result<Self, String> {
+    pub(super) fn open(path: &Path) -> Result<Self, String> {
         use windows::core::HSTRING;
         use windows::Win32::System::LibraryLoader::{LoadLibraryExW, LOAD_WITH_ALTERED_SEARCH_PATH};
         if !path.is_absolute() || !path.is_file() {
@@ -767,7 +767,7 @@ impl Library {
     }
 
     /// `T` must be the function pointer type of that symbol.
-    unsafe fn function<T: Copy>(&self, name: &str) -> Result<T, String> {
+    pub(super) unsafe fn function<T: Copy>(&self, name: &str) -> Result<T, String> {
         use windows::core::PCSTR;
         use windows::Win32::System::LibraryLoader::GetProcAddress;
         let symbol = CString::new(name).map_err(|_| "bad name".to_string())?;
@@ -786,15 +786,15 @@ impl Drop for Library {
 
 /// Linux comes with its own step of the plan.
 #[cfg(not(windows))]
-struct Library;
+pub(super) struct Library;
 
 #[cfg(not(windows))]
 impl Library {
-    fn open(_path: &Path) -> Result<Self, String> {
+    pub(super) fn open(_path: &Path) -> Result<Self, String> {
         Err("the speech engine is not available on this system yet".into())
     }
 
-    unsafe fn function<T: Copy>(&self, name: &str) -> Result<T, String> {
+    pub(super) unsafe fn function<T: Copy>(&self, name: &str) -> Result<T, String> {
         Err(format!("{name} is missing"))
     }
 }
