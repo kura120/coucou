@@ -48,22 +48,20 @@ function btn(label: string | Msg, kind: "primary" | "secondary", onClick: () => 
   return h("button", { class: `btn ${kind}`, onclick: onClick }, h("span", { text: label }));
 }
 
-function chip(value: string, label: string): HTMLElement {
-  return h("div", { class: "recap-chip" },
-    h("div", { class: "v", text: value }),
+/** One headline number over its label. `wide` is for a value like "+639 / −1". */
+function stat(value: (string | Node)[], label: string, wide = false): HTMLElement {
+  return h("div", { class: wide ? "recap-stat wide" : "recap-stat" },
+    h("div", { class: "v" }, ...value),
     h("div", { class: "l", text: label }),
   );
 }
 
-/** "Label value · Label value" — values in white, like the who-row. */
-function metaLine(pairs: [string, string][]): HTMLElement | null {
-  if (pairs.length === 0) return null;
-  const el = h("div", { class: "recap-meta" });
-  pairs.forEach(([label, value], i) => {
-    if (i > 0) el.append(h("span", { class: "sep", text: "·" }));
-    el.append(h("span", { text: label }), h("span", { class: "n", text: value }));
-  });
-  return el;
+/** A label beside its value, one cell of the facts grid. */
+function fact(label: string, value: string): HTMLElement {
+  return h("div", { class: "recap-fact" },
+    h("span", { class: "k", text: label }),
+    h("span", { class: "v", text: value, title: value }),
+  );
 }
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
@@ -87,40 +85,44 @@ export function buildRecap(actions: ViewActions): ViewHost {
   });
 
   function summaryBody(s: WeeklySummary): HTMLElement {
-    const chips = h("div", { class: "recap-chips" },
-      chip(formatDuration(s.totalMinutes), T.coding),
-      chip(formatCount(s.sessionCount), plural(s.sessionCount, T.session, T.sessions)),
-      chip(formatCount(s.filesChanged), plural(s.filesChanged, T.file, T.files)),
+    const stats = h("div", { class: "recap-stats" },
+      stat([formatDuration(s.totalMinutes)], T.coding),
+      stat([formatCount(s.sessionCount)], plural(s.sessionCount, T.session, T.sessions)),
+      stat([formatCount(s.filesChanged)], plural(s.filesChanged, T.file, T.files)),
     );
     if (s.linesAdded + s.linesRemoved > 0) {
-      chips.append(chip(`+${formatCount(s.linesAdded)} / −${formatCount(s.linesRemoved)}`, T.lines));
+      stats.append(stat([
+        h("span", { class: "recap-pos", text: `+${formatCount(s.linesAdded)}` }),
+        " / ",
+        h("span", { class: "recap-neg", text: `−${formatCount(s.linesRemoved)}` }),
+      ], T.lines, true));
     }
-    if (s.commandsRun > 0) chips.append(chip(formatCount(s.commandsRun), T.commands));
 
-    const first: [string, string][] = [];
-    if (s.topAgent) first.push([T.topAgent, s.topAgent]);
-    if (s.topProject) first.push([T.topProject, s.topProject]);
-    if (s.busiestDay) first.push([T.busiestDay, t(s.busiestDay)]);
-    const second: [string, string][] = [];
-    if (s.longestSessionMinutes > 1) second.push([T.longest, formatDuration(s.longestSessionMinutes)]);
+    const facts: [string, string][] = [];
+    if (s.topAgent) facts.push([T.topAgent, s.topAgent]);
+    if (s.topProject) facts.push([T.topProject, s.topProject]);
+    if (s.busiestDay) facts.push([T.busiestDay, t(s.busiestDay)]);
+    if (s.longestSessionMinutes > 1) facts.push([T.longest, formatDuration(s.longestSessionMinutes)]);
     if (s.permissionsAllowed + s.permissionsDenied > 0) {
-      second.push([T.permissions, T.allowedDenied(s.permissionsAllowed, s.permissionsDenied)]);
+      facts.push([T.permissions, T.allowedDenied(s.permissionsAllowed, s.permissionsDenied)]);
     }
-    if (s.questions > 0) second.push([T.questions, formatCount(s.questions)]);
+    if (s.questions > 0) facts.push([T.questions, formatCount(s.questions)]);
+    if (s.commandsRun > 0) facts.push([T.commands, formatCount(s.commandsRun)]);
 
     return h("div", { class: "stack recap-stack" },
       h("div", { class: "recap-head" },
         h("span", { class: "recap-title", text: T.title }),
-        h("span", { class: "grow" }),
         h("span", { class: "recap-range", text: weekRangeLabel(s) }),
+        h("span", { class: "grow" }),
+        h("div", { class: "actions" },
+          btn(T.shareImage, "primary", () => showShare(s)),
+          btn(T.ok, "secondary", () => actions.collapse()),
+        ),
       ),
-      chips,
-      metaLine(first),
-      metaLine(second),
-      h("div", { class: "actions" },
-        btn(T.shareImage, "primary", () => showShare(s)),
-        btn(T.ok, "secondary", () => actions.collapse()),
-      ),
+      stats,
+      facts.length > 0
+        ? h("div", { class: "recap-facts" }, ...facts.map(([label, value]) => fact(label, value)))
+        : null,
     );
   }
 
