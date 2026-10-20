@@ -3025,69 +3025,125 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* ── Weekly recap ───────────────────────────────────────────────────────── */
-/* WeeklyRecapCardView: text from x = 116, indigo wash, chips of 17 px values. */
+/* Text starts after Mochi (x = 116) and the card is the island's full 640 px:
+   headline numbers over a two-column facts grid. Labels are 12 px and up; only
+   a value too long for its cell ends in an ellipsis. */
 
 .recap-stack {
-  padding: 4px 16px 4px 116px;
-  gap: 4px;
+  padding: 10px 18px 10px 116px;
+  gap: 10px;
 }
 
 .recap-head {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .recap-title {
-  font: 600 11px var(--font);
+  font: 600 13px var(--font);
   color: #818cf8;
+  white-space: nowrap;
 }
 
 .recap-range {
-  font: 400 10px var(--font);
+  font: 400 12px var(--font);
   color: var(--dim-2);
   white-space: nowrap;
 }
 
-.recap-chips {
-  display: flex;
-  gap: 14px;
-  white-space: nowrap;
+.recap-head .actions {
+  flex: none;
 }
 
-.recap-chip .v {
-  font: 700 17px var(--font);
-  color: var(--ink-2);
+.recap-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.recap-chip .l {
-  font: 400 9px var(--font);
-  color: var(--dim-2);
+/* With the lines figure, its cell takes more of the row. */
+.recap-stats:has(.recap-stat.wide) {
+  grid-template-columns: minmax(0, 1.3fr) repeat(2, minmax(0, 1fr)) minmax(0, 1.5fr);
 }
 
-.recap-meta {
-  display: flex;
-  gap: 5px;
-  font: 400 11px var(--font);
-  color: var(--dim-2);
+.recap-stat {
+  min-width: 0;
+  padding: 0 12px;
+}
+
+.recap-stat:first-child {
+  padding-left: 0;
+}
+
+.recap-stat + .recap-stat {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.recap-stat .v {
+  font: 700 24px/1.1 var(--font);
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.recap-meta .n {
-  color: var(--ink-2);
+/* "+1,217 / −312" has to fit one cell of the four. */
+.recap-stat.wide .v {
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.recap-stat .l {
+  margin-top: 2px;
+  font: 500 12px var(--font);
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recap-pos {
+  color: var(--green);
+}
+
+.recap-neg {
+  color: var(--red-text);
+}
+
+.recap-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 24px;
+}
+
+.recap-fact {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font: 400 13px var(--font);
+}
+
+.recap-fact .k {
+  flex: none;
+  color: var(--dim-2);
+  white-space: nowrap;
+}
+
+/* The key reads as a sentence start: "commands", shown as "Commands". */
+.recap-fact .k::first-letter {
+  text-transform: uppercase;
+}
+
+.recap-fact .v {
+  flex: 1;
+  min-width: 0;
   font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.recap-meta .sep {
-  color: var(--dim-4);
-}
-
-.recap-stack .actions {
-  margin-top: 3px;
 }
 
 .recap-share {
