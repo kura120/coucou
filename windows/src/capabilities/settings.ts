@@ -10,8 +10,8 @@
 //
 // What is left out is left out on purpose (CLAUDE.md, doc/voice-brain.md):
 // hooks and the status line write the agents' own configuration; addresses,
-// keys and folders are not things to dictate; the phone link is Rust's to
-// switch; shortcuts and colours are set by hand; turning voice on is the
+// keys and folders are not things to dictate;
+// shortcuts and colours are set by hand; turning voice on is the
 // user's alone. Where what was said may go — the model server, the cloud, the
 // web — is here, and each such change waits for the click.
 

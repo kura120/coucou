@@ -4,7 +4,7 @@
 //
 // What is not here cannot be reached by the assistant: nothing approves a
 // permission, installs or removes hooks or the status line, reads or writes a
-// key, switches the phone link, or changes an address, a folder or a shortcut.
+// key, or changes an address, a folder or a shortcut.
 
 /** A value now, or one that has to be asked for. */
 export type Awaitable<T> = T | Promise<T>;

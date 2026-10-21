@@ -5,7 +5,7 @@
 // the executor shows.
 //
 // What is not here cannot be reached: nothing approves a permission, installs
-// hooks, reads a key or switches the phone link.
+// hooks or reads a key.
 
 import { registerApp } from "../capabilities/index";
 import type { AppHost, ChatModel, Option } from "../capabilities/host";
