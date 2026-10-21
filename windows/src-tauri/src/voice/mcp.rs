@@ -4,7 +4,7 @@
 // it (`capability_result`). It carries calls and nothing more: the island's
 // registry still decides what runs, with a click where its tier asks for one.
 //
-// Transport: Claude Code starts `coucou-hook --mcp` as a stdio MCP server, and
+// Transport: Claude Code starts `peika-hook --mcp` as a stdio MCP server, and
 // that relay passes each message here over the pipe the hooks already use
 // (pipe.rs). So there is no listening socket, no port and no token on the
 // network, and the pipe keeps its own promise: only this user's processes
@@ -31,16 +31,16 @@ use tokio::sync::oneshot;
 use crate::island::WINDOW_LABEL;
 
 /// The server's name in Claude Code's configuration: its tools are
-/// `mcp__coucou__<capability>` there.
-pub const SERVER: &str = "coucou";
+/// `mcp__peika__<capability>` there.
+pub const SERVER: &str = "peika";
 /// The relay's argument for this mode (hook/src/mcp.rs).
 pub const RELAY_FLAG: &str = "--mcp";
 /// Where the relay finds the turn's secret: its own environment, set in the
 /// configuration Claude Code is given. Must match hook/src/mcp.rs.
-pub const TURN_ENV: &str = "COUCOU_MCP_TURN";
+pub const TURN_ENV: &str = "PEIKA_MCP_TURN";
 /// The key of a pipe line that is an MCP message and not a hook event:
-/// `{"coucou_mcp":{"turn":"…","message":{…}}}`. Must match hook/src/mcp.rs.
-pub const PIPE_KEY: &str = "coucou_mcp";
+/// `{"peika_mcp":{"turn":"…","message":{…}}}`. Must match hook/src/mcp.rs.
+pub const PIPE_KEY: &str = "peika_mcp";
 const CALL_EVENT: &str = "capability-call";
 
 /// What the island may publish: a tool list, not a document.
@@ -283,10 +283,10 @@ impl Endpoint {
         match tokio::time::timeout(wait, answered).await {
             Ok(Ok(result)) => said(id, &result.chars().take(MAX_RESULT).collect::<String>(), false),
             // The turn ended (stopped, or out of time) while the island was at it.
-            Ok(Err(_)) => said(id, "The turn ended before Coucou answered.", true),
+            Ok(Err(_)) => said(id, "The turn ended before Peika answered.", true),
             Err(_) => {
                 self.state().waiting.remove(&call_id);
-                said(id, "Coucou did not answer in time.", true)
+                said(id, "Peika did not answer in time.", true)
             }
         }
     }
@@ -487,7 +487,7 @@ mod tests {
         // No arguments at all is an empty object.
         let call = request(1, "tools/call", json!({ "name": "music_next" }));
         let answer = endpoint.answer(&turn.secret, &call, SOON, emit_to(&calls)).await.unwrap();
-        assert_eq!(text(&answer), ("Coucou did not answer in time.", true));
+        assert_eq!(text(&answer), ("Peika did not answer in time.", true));
         let told = calls.lock().unwrap()[0].clone();
         assert_eq!(told.arguments, json!({}));
         // The island's answer comes after all: there is nobody to give it to.
@@ -563,7 +563,7 @@ mod tests {
         }
         drop(turn);
         let answer = asking.await.unwrap().unwrap();
-        assert_eq!(text(&answer), ("The turn ended before Coucou answered.", true));
+        assert_eq!(text(&answer), ("The turn ended before Peika answered.", true));
     }
 
     #[tokio::test]

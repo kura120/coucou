@@ -45,7 +45,7 @@ export function recap(host: AppHost): Area {
           });
         },
       }),
-      option("set_recap_enabled", "enabled", "Turns the weekly recap on or off: whether Coucou keeps count of the sessions and shows the recap each Monday.", "Weekly recap"),
+      option("set_recap_enabled", "enabled", "Turns the weekly recap on or off: whether Peika keeps count of the sessions and shows the recap each Monday.", "Weekly recap"),
       option("set_recap_hide_projects", "hideProjects", "Chooses whether the recap's shared image leaves the project names out.", "Hide project names"),
     ],
   };

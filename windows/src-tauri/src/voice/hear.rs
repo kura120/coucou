@@ -191,7 +191,7 @@ static WARMING: AtomicBool = AtomicBool::new(false);
 /// lets go of a model nobody asked for a few minutes (Ollama: five), loading
 /// it again takes longer than `TIMEOUT`, and a request given up on stops the
 /// loading. So the model is asked for one word — no sound, nothing of the
-/// user's — when the listener starts and each time Coucou is woken; the
+/// user's — when the listener starts and each time Peika is woken; the
 /// sentence that follows too soon is the bundled model's.
 pub fn warm(ear: Ear) {
     if WARMING.swap(true, Ordering::Relaxed) {
@@ -333,19 +333,19 @@ mod tests {
     }
 
     /// The real thing: recorded sentences, written down by a model server on
-    /// this computer. `COUCOU_VOICE_WAV` is one sentence (16-bit mono), or a
+    /// this computer. `PEIKA_VOICE_WAV` is one sentence (16-bit mono), or a
     /// folder of them with a `sentences.txt` (a line for each: the file, a
     /// tab, what is said in it — doc\record-voice.ps1 makes one).
-    /// `COUCOU_VOICE_SERVER` is the server's address (Ollama's usual one when
-    /// not set) and `COUCOU_VOICE_SERVER_MODEL` its model (gemma4:e4b).
-    /// `COUCOU_VOICE_NAMES`, separated by commas, are the names it is told may
-    /// be said. For one sentence, `COUCOU_VOICE_EXPECT` may hold words the
+    /// `PEIKA_VOICE_SERVER` is the server's address (Ollama's usual one when
+    /// not set) and `PEIKA_VOICE_SERVER_MODEL` its model (gemma4:e4b).
+    /// `PEIKA_VOICE_NAMES`, separated by commas, are the names it is told may
+    /// be said. For one sentence, `PEIKA_VOICE_EXPECT` may hold words the
     /// text must have.
-    /// `cargo test -p coucou voice::hear -- --ignored --nocapture`
+    /// `cargo test -p peika voice::hear -- --ignored --nocapture`
     #[test]
     #[ignore = "needs a model server that takes audio, and recorded sentences"]
     fn recorded_sentences_are_written_down_by_the_model_server() {
-        let path = std::path::PathBuf::from(std::env::var("COUCOU_VOICE_WAV").expect("COUCOU_VOICE_WAV is not set"));
+        let path = std::path::PathBuf::from(std::env::var("PEIKA_VOICE_WAV").expect("PEIKA_VOICE_WAV is not set"));
         // The file, and what is said in it when that is known.
         let clips: Vec<(std::path::PathBuf, Option<String>)> = if path.is_dir() {
             let list = std::fs::read_to_string(path.join("sentences.txt")).expect("sentences.txt");
@@ -357,7 +357,7 @@ mod tests {
         } else {
             vec![(path, None)]
         };
-        let names: Vec<String> = std::env::var("COUCOU_VOICE_NAMES")
+        let names: Vec<String> = std::env::var("PEIKA_VOICE_NAMES")
             .unwrap_or_default()
             .split(',')
             .map(|name| name.trim().to_string())
@@ -366,11 +366,11 @@ mod tests {
 
         let mut settings = Settings::default();
         settings.voice.brain = "ollama".into();
-        settings.ollama_url = std::env::var("COUCOU_VOICE_SERVER").unwrap_or_else(|_| "http://127.0.0.1:11434".into());
-        settings.voice.brain_model = std::env::var("COUCOU_VOICE_SERVER_MODEL").unwrap_or_else(|_| "gemma4:e4b".into());
+        settings.ollama_url = std::env::var("PEIKA_VOICE_SERVER").unwrap_or_else(|_| "http://127.0.0.1:11434".into());
+        settings.voice.brain_model = std::env::var("PEIKA_VOICE_SERVER_MODEL").unwrap_or_else(|_| "gemma4:e4b".into());
         let heard_by = ear(&settings).expect("a server on this computer");
 
-        // As the listener does when Coucou is woken, but waited for here.
+        // As the listener does when Peika is woken, but waited for here.
         let started = std::time::Instant::now();
         tauri::async_runtime::block_on(one_word(&heard_by)).expect("the model server answers");
         println!("{} · in memory after {:.2} s · {} names told", heard_by.model(), started.elapsed().as_secs_f64(), names.len());
@@ -413,7 +413,7 @@ mod tests {
         }
         assert!(!last.is_empty(), "nothing was written down");
         if clips.len() == 1 {
-            for word in std::env::var("COUCOU_VOICE_EXPECT").unwrap_or_default().to_lowercase().split_whitespace() {
+            for word in std::env::var("PEIKA_VOICE_EXPECT").unwrap_or_default().to_lowercase().split_whitespace() {
                 assert!(last.to_lowercase().contains(word), "{word:?} not in {last:?}");
             }
         }

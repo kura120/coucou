@@ -1,7 +1,7 @@
-//! `coucou-hook --mcp` — the relay as a stdio MCP server, for the cloud model
+//! `peika-hook --mcp` — the relay as a stdio MCP server, for the cloud model
 //! of a voice turn.
 //!
-//! Coucou starts Claude Code for one turn of "OK Coucou" and names this as its
+//! Peika starts Claude Code for one turn of "OK Peika" and names this as its
 //! only MCP server (the app's voice/cloud.rs). Claude Code speaks MCP on our
 //! stdin and stdout, one JSON-RPC message a line; each line is passed to the
 //! app over the pipe the hooks use, and the app's answer is written back. The
@@ -24,9 +24,9 @@ use std::time::Duration;
 use serde_json::{json, Value};
 
 /// Where the turn's secret is. Must match the app's voice/mcp.rs.
-const TURN_ENV: &str = "COUCOU_MCP_TURN";
+const TURN_ENV: &str = "PEIKA_MCP_TURN";
 /// The key that tells the app this line is an MCP message. Must match too.
-const PIPE_KEY: &str = "coucou_mcp";
+const PIPE_KEY: &str = "peika_mcp";
 /// The longest message passed on. A tool call is a name and a few arguments;
 /// the app's own bound on arguments is far under this.
 const MAX_LINE: usize = 256 * 1024;
@@ -63,11 +63,11 @@ pub fn run() -> ! {
             });
             match rx.recv_timeout(ANSWER_BUDGET).ok().flatten() {
                 Some(answer) => print(&out, &answer),
-                // Coucou is closed or did not answer: a request is told so,
+                // Peika is closed or did not answer: a request is told so,
                 // a notification expects nothing.
                 None => {
                     if let Some(id) = id {
-                        print(&out, &error(&id, NOT_ANSWERED, "Coucou did not answer."));
+                        print(&out, &error(&id, NOT_ANSWERED, "Peika did not answer."));
                     }
                 }
             }
@@ -164,8 +164,8 @@ mod tests {
 
     #[test]
     fn an_unanswered_request_is_told_so_in_json_rpc() {
-        let told: Value = serde_json::from_str(&error(&json!(7), NOT_ANSWERED, "Coucou did not answer.")).unwrap();
-        assert_eq!(told, json!({ "jsonrpc": "2.0", "id": 7, "error": { "code": NOT_ANSWERED, "message": "Coucou did not answer." } }));
+        let told: Value = serde_json::from_str(&error(&json!(7), NOT_ANSWERED, "Peika did not answer.")).unwrap();
+        assert_eq!(told, json!({ "jsonrpc": "2.0", "id": 7, "error": { "code": NOT_ANSWERED, "message": "Peika did not answer." } }));
         assert!(!error(&Value::Null, PARSE_ERROR, "Parse error").contains('\n'));
     }
 }

@@ -29,7 +29,7 @@
 //
 // What it prints: top-1 and top-3 hit rates, the margins between the best and
 // the second, how many sentences tier 1 would run rightly and wrongly at each
-// margin, the best scores of sentences meant for Coucou and for nobody, and
+// margin, the best scores of sentences meant for Peika and for nobody, and
 // from those where each threshold would sit.
 
 import {
@@ -62,7 +62,7 @@ const cap = (name, area, tier, description, args = {}) => ({ name, area, tier, d
 /** Written the way the app's own are to be: what it does, and when it is the wrong one. */
 const INVENTED = [
   cap("play_music", "music", "reversible", "Starts or resumes the music in the music app. Not for choosing a particular song."),
-  cap("pause_music", "music", "reversible", "Pauses the music that is playing. Not for pausing Coucou itself."),
+  cap("pause_music", "music", "reversible", "Pauses the music that is playing. Not for pausing Peika itself."),
   cap("next_track", "music", "reversible", "Skips to the next track."),
   cap("previous_track", "music", "reversible", "Goes back to the previous track."),
   cap("now_playing", "music", "read", "Says which song is playing now and by whom. Changes nothing."),
@@ -76,8 +76,8 @@ const INVENTED = [
   cap("refresh_service", "pills", "free", "Asks a service for its latest numbers now instead of waiting.", { pill: one("pill", "The service.") }),
   cap("show_view", "views", "free", "Brings one of the island's views up: chat, sessions, settings, the wardrobe, the recap.", { view: one("view", "The view.") }),
   cap("close_view", "views", "free", "Closes the view that is open and folds the island back."),
-  cap("get_setting", "settings", "read", "Says what one of Coucou's settings is set to.", { setting: one("setting", "The setting.") }),
-  cap("set_setting", "settings", (args) => (args.setting === "language" ? "confirm" : "reversible"), "Changes one of Coucou's settings: sounds, language, the monitor, how long it keeps listening.", { setting: one("setting", "The setting."), value: text("What to set it to.") }),
+  cap("get_setting", "settings", "read", "Says what one of Peika's settings is set to.", { setting: one("setting", "The setting.") }),
+  cap("set_setting", "settings", (args) => (args.setting === "language" ? "confirm" : "reversible"), "Changes one of Peika's settings: sounds, language, the monitor, how long it keeps listening.", { setting: one("setting", "The setting."), value: text("What to set it to.") }),
   cap("prefill_chat", "chat", "free", "Writes a message in the chat's field without sending it.", { text: text("The message.") }),
   cap("send_chat", "chat", "confirm", "Sends the message written in the chat to the agent."),
   cap("stop_chat", "chat", "free", "Stops the answer the chat's agent is writing."),
@@ -95,14 +95,14 @@ const INVENTED = [
   cap("open_app", "apps", "free", "Opens an application installed on this computer.", { app: one("app", "The application.") }),
   cap("open_folder", "apps", "free", "Opens a folder in the file explorer: Downloads, Documents, a project's folder.", { folder: one("folder", "The folder.") }),
   cap("web_search", "web", "free", "Searches the web for something and shows what it found.", { query: text("What to search for.") }),
-  cap("pause_coucou", "app", "reversible", "Pauses Coucou itself: no sounds, no notifications, until it is resumed. Not for music."),
-  cap("resume_coucou", "app", "reversible", "Resumes Coucou after it was paused."),
-  cap("stop_listening", "app", "reversible", "Turns the microphone off: Coucou stops listening for its name."),
-  cap("quit_coucou", "app", "confirm", "Quits the Coucou app."),
-  cap("undo", "app", "free", "Puts the last thing Coucou changed back the way it was."),
+  cap("pause_peika", "app", "reversible", "Pauses Peika itself: no sounds, no notifications, until it is resumed. Not for music."),
+  cap("resume_peika", "app", "reversible", "Resumes Peika after it was paused."),
+  cap("stop_listening", "app", "reversible", "Turns the microphone off: Peika stops listening for its name."),
+  cap("quit_peika", "app", "confirm", "Quits the Peika app."),
+  cap("undo", "app", "free", "Puts the last thing Peika changed back the way it was."),
   cap("show_recap", "app", "free", "Shows the recap of what the agents did today."),
-  cap("change_outfit", "wardrobe", "reversible", "Dresses Mochi in another outfit.", { outfit: one("outfit", "The outfit.") }),
-  cap("toggle_desktop_mochi", "wardrobe", "reversible", "Lets Mochi out to walk on the desktop, or calls it back in."),
+  cap("change_outfit", "wardrobe", "reversible", "Dresses Peika in another outfit.", { outfit: one("outfit", "The outfit.") }),
+  cap("toggle_desktop_peika", "wardrobe", "reversible", "Lets Peika out to walk on the desktop, or calls it back in."),
   cap("notify", "app", "free", "Shows a short note in the island.", { text: text("The note.") }),
   cap("nothing", "app", "free", "Does nothing. For a sentence that asks for nothing, says not to do something, takes back what was just said, or was said to someone else."),
   cap("escalate", "app", "free", "Hands the sentence to a larger model. For what needs several steps, writing, or knowledge these tools do not have."),
@@ -128,7 +128,7 @@ function appRegistry() {
     music: () => ({ enabled: true, running: true, playing: true, shuffle: false, repeat: false, volume: 40, position: 0, track: null }),
     chat: () => ({ provider: "claudecode", model: "claude-sonnet-5-5", busy: false, draft: "", conversationId: null, messages: 0 }),
     currentView: () => ({ view: "overview", open: false }),
-    mochi: () => ({ supported: true, onDesktop: false, asleep: false }),
+    peika: () => ({ supported: true, onDesktop: false, asleep: false }),
     recapOptions: () => ({ enabled: true, hideProjects: false }),
   };
   registerApp(registry, new Proxy(listed, { get: (target, key) => target[key] ?? (() => []) }));
@@ -140,7 +140,7 @@ const AS_APP = {
   add_pill: ["add_pills"], remove_pill: ["remove_pills"], prefill_chat: ["prepare_chat_message"], send_chat: ["send_chat_message"],
   reset_chat: ["new_chat"], session_output: ["read_session_output"], show_permission: ["show_waiting_card", "read_permission_request"],
   answer_question: ["answer_agent_question"], start_timer: ["set_timer"], timer_left: ["read_timer"], web_search: ["web_search", "open_web_search"],
-  show_recap: ["read_recap", "show_view"], change_outfit: ["wear_outfit"], toggle_desktop_mochi: ["mochi_to_desktop", "mochi_come_home"],
+  show_recap: ["read_recap", "show_view"], change_outfit: ["wear_outfit"], toggle_desktop_peika: ["peika_to_desktop", "peika_come_home"],
   // The app has no such capability: the sentence is left out.
   close_view: [],
 };
@@ -190,14 +190,14 @@ const TABLE = [
   ...plain("open_app", "open Spotify", "launch Figma", "start Visual Studio Code"),
   ...plain("open_folder", "open my downloads", "show me the documents folder"),
   ...plain("web_search", "search the web for tauri tray icons", "look up the weather in Lyon"),
-  ...plain("pause_coucou", "pause Coucou", "be quiet for a while", "do not disturb"),
-  ...plain("resume_coucou", "resume Coucou", "you can come back now"),
+  ...plain("pause_peika", "pause Peika", "be quiet for a while", "do not disturb"),
+  ...plain("resume_peika", "resume Peika", "you can come back now"),
   ...plain("stop_listening", "stop listening", "turn the microphone off"),
-  ...plain("quit_coucou", "quit Coucou", "close the app"),
+  ...plain("quit_peika", "quit Peika", "close the app"),
   ...plain("undo", "undo that", "put it back the way it was"),
   ...plain("show_recap", "what happened today", "show me the recap"),
-  ...plain("change_outfit", "put the wizard hat on", "dress Mochi as a pirate"),
-  ...plain("toggle_desktop_mochi", "let Mochi out on the desktop", "call Mochi back in"),
+  ...plain("change_outfit", "put the wizard hat on", "dress Peika as a pirate"),
+  ...plain("toggle_desktop_peika", "let Peika out on the desktop", "call Peika back in"),
   ...plain("escalate", "look at the three failing sessions, work out what they have in common and write me a plan"),
 
   follow("add_pill", "add GitHub", "and Vercel too"),
@@ -408,14 +408,14 @@ for (const r of ran.filter((r) => !right(r))) console.log(`  ✗ ran ${r.instant
 console.log("\n── Without the wake phrase (directed) ──");
 const meant = rows.filter((r) => r.kind === "plain" || r.kind === "follow");
 const stray = of("nobody");
-console.log(`best scores — meant for Coucou:        ${spread(meant.map((r) => r.best.score))}`);
+console.log(`best scores — meant for Peika:        ${spread(meant.map((r) => r.best.score))}`);
 console.log(`              follow-ups, with a turn: ${spread(follows.map((r) => r.best.score))}`);
 console.log(`              for nobody:              ${spread(stray.filter((r) => !r.after).map((r) => r.best.score))}`);
 console.log(`              for nobody, after a turn: ${spread(stray.filter((r) => r.after).map((r) => r.best.score))}`);
 console.log(`              negations:               ${spread(of("negation").map((r) => r.best.score))}`);
 const highestStray = Math.max(...stray.map((r) => r.best.score));
-console.log(`DIRECTED_ASK is ${DIRECTED_ASK}: to ignore every sentence for nobody it would sit just above ${f(highestStray)}, which would also ignore ${pct(meant.filter((r) => r.best.score <= highestStray).length, meant.length)} of those meant for Coucou.`);
-console.log(`DIRECTED_ACT is ${DIRECTED_ACT}: a tenth of those meant for Coucou score under ${f(at(meant.map((r) => r.best.score), 0.1))}, half under ${f(at(meant.map((r) => r.best.score), 0.5))}.`);
+console.log(`DIRECTED_ASK is ${DIRECTED_ASK}: to ignore every sentence for nobody it would sit just above ${f(highestStray)}, which would also ignore ${pct(meant.filter((r) => r.best.score <= highestStray).length, meant.length)} of those meant for Peika.`);
+console.log(`DIRECTED_ACT is ${DIRECTED_ACT}: a tenth of those meant for Peika score under ${f(at(meant.map((r) => r.best.score), 0.1))}, half under ${f(at(meant.map((r) => r.best.score), 0.5))}.`);
 console.log(`FOLLOWS_TURN_EASE is ${FOLLOWS_TURN_EASE}; CONTEXT_SHARE is ${CONTEXT_SHARE}: compare the two "for nobody" lines with the follow-ups' to see whether a turn before helps the right ones more than the strays.`);
 console.log("As rank.ts is now (plain sentences are judged as if no turn came before):");
 for (const kind of ["plain", "follow", "negation", "nobody"]) {

@@ -444,7 +444,7 @@ mod tests {
     fn what_follows_the_wake_phrase_is_cut_out_or_there_is_nothing() {
         use std::time::Duration;
         let seconds = |s: f64| (s * f64::from(SAMPLE_RATE)) as usize;
-        // 0.3 s lead-in, "okay coucou" for 0.9 s, "next track" for 0.8 s, then the silence.
+        // 0.3 s lead-in, "okay peika" for 0.9 s, "next track" for 0.8 s, then the silence.
         let sentence = LEAD_IN + seconds(0.9 + 0.8) + TRAILING;
         let cut = after_wake(sentence, Duration::from_millis(900)).expect("a command followed");
         assert_eq!(cut, LEAD_IN + seconds(0.9) - CUT_EARLY);
@@ -500,19 +500,19 @@ mod tests {
         out
     }
 
-    /// With the real detector on disk (`COUCOU_VOICE_RUNTIME`, and
-    /// `COUCOU_VOICE_DETECTOR` for `silero_vad.onnx`): typing is loud enough
+    /// With the real detector on disk (`PEIKA_VOICE_RUNTIME`, and
+    /// `PEIKA_VOICE_DETECTOR` for `silero_vad.onnx`): typing is loud enough
     /// to be cut out as a sentence by loudness, and is not one for the
-    /// detector — which still cuts out a spoken sentence (`COUCOU_VOICE_WAV`,
+    /// detector — which still cuts out a spoken sentence (`PEIKA_VOICE_WAV`,
     /// 16 kHz, 16-bit mono), typed over or not, where loudness does.
-    /// `cargo test -p coucou voice::vad -- --ignored --nocapture`
+    /// `cargo test -p peika voice::vad -- --ignored --nocapture`
     #[test]
     #[cfg(windows)]
     #[ignore = "needs the downloaded engine"]
     fn typing_is_not_a_sentence_for_the_voice_detector_and_speech_still_is() {
         let var = |name: &str| std::path::PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set")));
         let of_voices = || {
-            Sentences::of_voices(sherpa::Detector::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_DETECTOR"), SILENCE_SECONDS).expect("detector"))
+            Sentences::of_voices(sherpa::Detector::load(&var("PEIKA_VOICE_RUNTIME"), &var("PEIKA_VOICE_DETECTOR"), SILENCE_SECONDS).expect("detector"))
         };
         // 10 ms at a time, like the microphone.
         let cut = |sentences: &mut Sentences, stream: &[f32]| -> Vec<Vec<f32>> {
@@ -528,7 +528,7 @@ mod tests {
         assert!(!by_loudness.is_empty(), "the typing here is not loud enough to prove anything");
         assert!(by_voice.is_empty() && !voices.speaking(), "typing was taken for a voice");
 
-        let bytes = std::fs::read(var("COUCOU_VOICE_WAV")).expect("wav");
+        let bytes = std::fs::read(var("PEIKA_VOICE_WAV")).expect("wav");
         assert_eq!(u32::from_le_bytes(bytes[24..28].try_into().unwrap()), SAMPLE_RATE, "the clip must be 16 kHz");
         let data = bytes.windows(4).position(|w| w == b"data").expect("data chunk") + 8;
         let speech: Vec<f32> = bytes[data..].chunks_exact(2).map(|b| f32::from(i16::from_le_bytes([b[0], b[1]])) / 32768.0).collect();

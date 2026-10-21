@@ -9,9 +9,9 @@
 // resumes that session with everything its tools did.
 //
 // Claude Code keeps sessions of its own, held in a terminal or in the Claude
-// app (claude_sessions.rs). They are listed with Coucou's and open the same
+// app (claude_sessions.rs). They are listed with Peika's and open the same
 // way, read from Claude Code's transcript; nothing is copied until such a
-// conversation gets an answer here. One Coucou already saved shows once, and
+// conversation gets an answer here. One Peika already saved shows once, and
 // opens with whatever was said in it elsewhere since.
 //
 // An answer during which Claude Code edited files keeps those edits with it
@@ -83,7 +83,7 @@ pub struct Summary {
     pub provider: String,
     pub dir: String,
     pub updated: u64,
-    /// Held in Claude Code only: Coucou has no record of its own to delete.
+    /// Held in Claude Code only: Peika has no record of its own to delete.
     pub external: bool,
 }
 
@@ -112,7 +112,7 @@ fn write(path: &Path, store: &Store) -> std::io::Result<()> {
         platform::ensure_private_dir(dir)?;
     }
     let json = serde_json::to_vec(store).map_err(|e| std::io::Error::new(ErrorKind::InvalidData, e))?;
-    let temp = path.with_extension(format!("json.coucou-{}", std::process::id()));
+    let temp = path.with_extension(format!("json.peika-{}", std::process::id()));
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
     #[cfg(unix)]
@@ -238,7 +238,7 @@ pub fn record(chat: &Chat, settings: &Settings, provider: &str, model: &str) -> 
     Some(snapshot.id)
 }
 
-/// The list, newest first: Coucou's conversations, and Claude Code's sessions
+/// The list, newest first: Peika's conversations, and Claude Code's sessions
 /// that are not one of them already.
 pub fn list() -> Vec<Summary> {
     let store = {
@@ -280,8 +280,8 @@ fn from_session(id: &str, t: claude_sessions::Transcript) -> Saved {
     }
 }
 
-/// What was said in a saved conversation's session since Coucou last saved
-/// it — in a terminal, say — replaces Coucou's older copy of the turns.
+/// What was said in a saved conversation's session since Peika last saved
+/// it — in a terminal, say — replaces Peika's older copy of the turns.
 fn caught_up(mut saved: Saved, session: Option<claude_sessions::Transcript>) -> Saved {
     if let Some(t) = session {
         if t.found.updated > saved.updated && t.turns.len() >= saved.turns.len() {
@@ -323,7 +323,7 @@ pub fn open(chat: &Chat, id: &str) -> Result<Saved, String> {
             Some(caught_up(saved, session))
         }
         Some(saved) => Some(saved),
-        // Not one of Coucou's (yet): a session of Claude Code's own.
+        // Not one of Peika's (yet): a session of Claude Code's own.
         None => id.strip_prefix(CLAUDE_PREFIX).and_then(claude_sessions::read).map(|t| from_session(id, t)),
     }
     .ok_or_else(|| crate::i18n::t("This conversation is gone."))?;
@@ -334,7 +334,7 @@ pub fn open(chat: &Chat, id: &str) -> Result<Saved, String> {
     Ok(saved)
 }
 
-/// Forgets a conversation. Coucou's record only: a Claude Code session stays
+/// Forgets a conversation. Peika's record only: a Claude Code session stays
 /// where Claude Code keeps it.
 pub fn delete(chat: &Chat, id: &str) {
     chat.detach(id);
@@ -422,7 +422,7 @@ mod tests {
 
     #[test]
     fn the_file_round_trips_and_a_broken_one_is_an_empty_list() {
-        let dir = std::env::temp_dir().join(format!("coucou-conversations-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("peika-conversations-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("conversations.json");
         assert!(load(&path).conversations.is_empty());
@@ -446,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn claude_code_s_own_sessions_are_listed_once_with_coucou_s() {
+    fn claude_code_s_own_sessions_are_listed_once_with_peika_s() {
         let mut store = Store::default();
         upsert(&mut store, Saved {
             id: "mine".into(), provider: "claudecode".into(), handle: Some("s1".into()), updated: 50, ..Saved::default()
@@ -476,7 +476,7 @@ mod tests {
         longer.push(json!({"role":"assistant","content":"They pass."}));
         let caught = caught_up(saved.clone(), Some(session("s1", 90, longer.clone())));
         assert_eq!((caught.turns.len(), caught.updated, caught.title.as_str()), (4, 90, saved.title.as_str()));
-        // Nothing newer, a shorter transcript, or no transcript at all: Coucou's copy stands.
+        // Nothing newer, a shorter transcript, or no transcript at all: Peika's copy stands.
         assert_eq!(caught_up(saved.clone(), Some(session("s1", 40, longer))), saved);
         assert_eq!(caught_up(saved.clone(), Some(session("s1", 90, vec![]))), saved);
         assert_eq!(caught_up(saved.clone(), None), saved);

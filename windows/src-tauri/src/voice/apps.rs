@@ -509,9 +509,9 @@ mod tests {
     }
 
     /// What this machine lists, without the names: how many apps, how long the
-    /// listing takes, and whether `COUCOU_VOICE_APP` (names as they might be
+    /// listing takes, and whether `PEIKA_VOICE_APP` (names as they might be
     /// heard, separated by `;`) finds one, or which are near.
-    /// `cargo test -p coucou voice::apps -- --ignored --nocapture`
+    /// `cargo test -p peika voice::apps -- --ignored --nocapture`
     #[test]
     #[cfg(windows)]
     #[ignore = "reads the apps installed on this machine"]
@@ -523,7 +523,7 @@ mod tests {
         println!("{} apps listed in {took:?}, {store} of them from the Store", listed.len());
         assert!(listed.len() > 10);
         assert!(listed.iter().all(|app| app.path.to_string_lossy().starts_with("shell:AppsFolder\\")));
-        for said in std::env::var("COUCOU_VOICE_APP").unwrap_or_default().split(';').filter(|said| !said.trim().is_empty()) {
+        for said in std::env::var("PEIKA_VOICE_APP").unwrap_or_default().split(';').filter(|said| !said.trim().is_empty()) {
             let started = std::time::Instant::now();
             let near = near(said, &listed);
             let took = started.elapsed();
@@ -533,12 +533,12 @@ mod tests {
     }
 
     /// Starting an app by the identifier Windows lists it under, which is what
-    /// `App::open` does and nothing else here shows. `COUCOU_VOICE_LAUNCH`
+    /// `App::open` does and nothing else here shows. `PEIKA_VOICE_LAUNCH`
     /// names the apps, separated by `;` — "Calculator;Character Map" is one
     /// from the Store and one that is not. Each is found, started, and a
     /// window that was not there comes up. It really starts them, and leaves
     /// them open: not for a machine nobody is looking at.
-    /// `cargo test -p coucou voice::apps -- --ignored --nocapture`
+    /// `cargo test -p peika voice::apps -- --ignored --nocapture`
     #[test]
     #[cfg(windows)]
     #[ignore = "starts the apps it is given"]
@@ -565,7 +565,7 @@ mod tests {
             list
         }
 
-        let wanted = std::env::var("COUCOU_VOICE_LAUNCH").expect("COUCOU_VOICE_LAUNCH");
+        let wanted = std::env::var("PEIKA_VOICE_LAUNCH").expect("PEIKA_VOICE_LAUNCH");
         let listed = listed().expect("the Applications folder");
         let (mut store, mut classic) = (0, 0);
         for said in wanted.split(';').map(str::trim).filter(|said| !said.is_empty()) {

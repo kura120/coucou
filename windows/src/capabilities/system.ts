@@ -1,4 +1,4 @@
-// Coucou itself: its microphone, its pause, quitting, a note on screen — and
+// Peika itself: its microphone, its pause, quitting, a note on screen — and
 // the few capabilities that are about the conversation rather than the app:
 // putting the last thing back, doing nothing, handing over to a stronger
 // model, and asking to see more of what the app can do.
@@ -9,7 +9,7 @@ import { done, failed } from "../voice/result";
 import type { AppHost } from "./host";
 import { capability, cut, str, type Area } from "./shared";
 
-const AREA = "coucou";
+const AREA = "app";
 
 // These two leave nobody to put a mistake right by voice, so they are asked first. The app's own interface is the click already.
 async function askedFirst(context: RunContext | undefined, question: string, yes: string, no: string): Promise<ToolResult | null> {
@@ -27,7 +27,7 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
       capability({
         name: "stop_listening",
         area: AREA,
-        description: "Turns Coucou's own voice control off altogether: its microphone closes and nothing said is heard until the user turns it back on in Settings. Only when they ask for Coucou's voice, listening or microphone to be off. Never for the music, a song or Spotify — stopping those is pause_music — and never for being done with a request, which is nothing. The user is asked first.",
+        description: "Turns Peika's own voice control off altogether: its microphone closes and nothing said is heard until the user turns it back on in Settings. Only when they ask for Peika's voice, listening or microphone to be off. Never for the music, a song or Spotify — stopping those is pause_music — and never for being done with a request, which is nothing. The user is asked first.",
         args: {},
         // Closing the microphone is never made hard. Opening it again is the user's: there is no inverse.
         tier: "free",
@@ -40,15 +40,15 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
         },
       }),
       capability({
-        name: "pause_coucou",
+        name: "pause_peika",
         area: AREA,
-        description: "Takes the whole Coucou app off duty, as the Pause of its tray menu does: the island hides and the services are no longer asked, until it is resumed. Only when the user names Coucou, the app or the island: a pause with nothing named is the music's (pause_music). The user is asked first.",
+        description: "Takes the whole Peika app off duty, as the Pause of its tray menu does: the island hides and the services are no longer asked, until it is resumed. Only when the user names Peika, the app or the island: a pause with nothing named is the music's (pause_music). The user is asked first.",
         args: {},
         tier: "reversible",
-        inverse: () => (host.paused() ? null : { name: "resume_coucou", arguments: {} }),
+        inverse: () => (host.paused() ? null : { name: "resume_peika", arguments: {} }),
         // Asked before it is done, not after: a no leaves nothing to put back.
         async check(_args, context) {
-          return askedFirst(context, t("Pause Coucou?"), t("Pause"), t("Keep going"));
+          return askedFirst(context, t("Pause Peika?"), t("Pause"), t("Keep going"));
         },
         async run() {
           host.setPaused(true);
@@ -56,25 +56,25 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
         },
       }),
       capability({
-        name: "resume_coucou",
+        name: "resume_peika",
         area: AREA,
-        description: "Lifts Coucou's pause: the island comes back and the services are asked again. Not for resuming the music.",
+        description: "Lifts Peika's pause: the island comes back and the services are asked again. Not for resuming the music.",
         args: {},
         tier: "reversible",
-        available: () => (host.paused() ? true : t("Coucou is not paused")),
-        inverse: () => (host.paused() ? { name: "pause_coucou", arguments: {} } : null),
+        available: () => (host.paused() ? true : t("Peika is not paused")),
+        inverse: () => (host.paused() ? { name: "pause_peika", arguments: {} } : null),
         async run() {
           host.setPaused(false);
-          return host.paused() ? failed(t("That did not change")) : done(t("Coucou is back"), true);
+          return host.paused() ? failed(t("That did not change")) : done(t("Peika is back"), true);
         },
       }),
       capability({
-        name: "quit_coucou",
+        name: "quit_peika",
         area: AREA,
-        description: "Quits Coucou: the app closes and nothing is shown or listened for until it is started again. The user must click to confirm. To stop only for a while, it is pause_coucou.",
+        description: "Quits Peika: the app closes and nothing is shown or listened for until it is started again. The user must click to confirm. To stop only for a while, it is pause_peika.",
         args: {},
         tier: "confirm",
-        describe: () => ({ title: t("Quit Coucou?"), change: t("Coucou closes until you start it again."), action: t("Quit") }),
+        describe: () => ({ title: t("Quit Peika?"), change: t("Peika closes until you start it again."), action: t("Quit") }),
         async run() {
           host.quit();
           // The app is going; nothing is left to look.
@@ -106,7 +106,7 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
       capability({
         name: "find",
         area: AREA,
-        description: "Looks a name up within Coucou: what it is — a pill, an app, a service, a setting, a session, a view… or several of them at once — whether it was heard exactly or only nearly, and which capabilities take it. For a name you are not sure of, before acting on it.",
+        description: "Looks a name up within Peika: what it is — a pill, an app, a service, a setting, a session, a view… or several of them at once — whether it was heard exactly or only nearly, and which capabilities take it. For a name you are not sure of, before acting on it.",
         args: { name: { type: "string", maxLength: 80, description: "The name, as the user said it." } },
         tier: "read",
         async run(args) {
@@ -159,7 +159,7 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
       capability({
         name: "nothing",
         area: AREA,
-        description: "Does nothing. For when the user changed their mind, is done, only thanked, said not to do something, or when what was heard was said to someone else and is not a request to Coucou.",
+        description: "Does nothing. For when the user changed their mind, is done, only thanked, said not to do something, or when what was heard was said to someone else and is not a request to Peika.",
         args: {},
         tier: "free",
         async run() {
@@ -171,7 +171,7 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
         area: AREA,
         description: "Asks the user a short question on screen and waits for the answer: for when what they meant is not sure — a name that may be misheard, two things it could be. Give the likely answers as options (two to four), or none for a yes or no. What they answer comes back; then do what it says.",
         args: {
-          question: { type: "string", maxLength: 160, description: "The question, short, as Coucou asks it." },
+          question: { type: "string", maxLength: 160, description: "The question, short, as Peika asks it." },
           option_1: { type: "string", maxLength: 60, optional: true, description: "A likely answer." },
           option_2: { type: "string", maxLength: 60, optional: true, description: "Another likely answer." },
           option_3: { type: "string", maxLength: 60, optional: true, description: "Another." },
@@ -210,7 +210,7 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
       capability({
         name: "more_tools",
         area: AREA,
-        description: "Lists what else Coucou can do. Without an area: the areas. With one: every capability of that area, to call next. For when none of the capabilities shown does what was asked.",
+        description: "Lists what else Peika can do. Without an area: the areas. With one: every capability of that area, to call next. For when none of the capabilities shown does what was asked.",
         args: { area: { type: "string", enum: areas, optional: true, description: "The area to list." } },
         tier: "read",
         async run(args) {
@@ -218,7 +218,7 @@ export function system(host: AppHost, registry: Pick<Registry, "undo" | "areas" 
           const wanted = str(args.area);
           if (!wanted) return done("", true, { areas: all.map(({ area, names }) => ({ area, capabilities: names })) });
           const found = all.find(({ area }) => area === wanted);
-          if (!found) return { ...failed(t("Not found: {0}", { 0: cut(wanted, 40) }), "Coucou has no area by that name."), near: all.map(({ area }) => area) };
+          if (!found) return { ...failed(t("Not found: {0}", { 0: cut(wanted, 40) }), "Peika has no area by that name."), near: all.map(({ area }) => area) };
           return done("", true, {
             area: found.area,
             capabilities: found.names.map((name) => ({ name, description: registry.get(name)?.description ?? "" })),

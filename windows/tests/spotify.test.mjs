@@ -1,5 +1,5 @@
-// The Spotify pill and Mochi's dance: the page's rules in
-// src/core/spotify.ts, the dance in src/mochi/engine.ts, the report handling in
+// The Spotify pill and Peika's dance: the page's rules in
+// src/core/spotify.ts, the dance in src/peika/engine.ts, the report handling in
 // src/island/spotify.ts and the views in src/views/spotify.ts. The MPRIS side —
 // metadata, position, the bus itself — is tested in src-tauri/src/spotify.rs.
 
@@ -13,7 +13,7 @@ import {
 } from "../src/core/spotify.ts";
 import { EXPANDED_W, MUSIC_CARD_GAP, MUSIC_CARD_W, PANEL_W, islandSize, nowPlayingRoom } from "../src/core/layout.ts";
 import { createMarquee } from "../src/views/marquee.ts";
-import { BotEngine, danceTransform, hexToRGB, stepBodyColor, stepDanceLevel } from "../src/mochi/engine.ts";
+import { BotEngine, danceTransform, hexToRGB, stepBodyColor, stepDanceLevel } from "../src/peika/engine.ts";
 import { registerSpotifyHandlers } from "../src/island/spotify.ts";
 import { buildSpotifyCard, buildSpotifyMini, musicAppBadge } from "../src/views/spotify.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
@@ -82,7 +82,7 @@ test("a cover shows only on the track it belongs to", () => {
   Spotify.artwork = null;
 });
 
-// ── When Mochi dances ─────────────────────────────────────────────────────────
+// ── When Peika dances ─────────────────────────────────────────────────────────
 
 test("music counts only when it plays on a declared Spotify pill", () => {
   assert.ok(musicPlaying(playing(), [SPOTIFY_ID]));
@@ -91,7 +91,7 @@ test("music counts only when it plays on a declared Spotify pill", () => {
   assert.ok(!musicPlaying(playing({ track: null }), [SPOTIFY_ID]));
 });
 
-test("the island's Mochi dances by the Mac's rules", () => {
+test("the island's Peika dances by the Mac's rules", () => {
   const base = { music: true, state: "idle", mode: "compact", view: "overview", focusId: "integration_claude" };
   // Compact: whenever music plays, in the calm and busy states.
   for (const state of ["idle", "working", "thinking", "searching", "finished"]) {
@@ -109,7 +109,7 @@ test("the island's Mochi dances by the Mac's rules", () => {
   assert.ok(!islandDances({ ...base, mode: "expanded", focusId: SPOTIFY_ID, view: "prompt" }));
 });
 
-test("Mochi on the desktop dances by the compact island's rules", () => {
+test("Peika on the desktop dances by the compact island's rules", () => {
   assert.ok(desktopDances(true, "working"));
   assert.ok(!desktopDances(true, "approval"));
   assert.ok(!desktopDances(false, "idle"));
@@ -140,7 +140,7 @@ test("112 BPM: still on the beat, highest half a beat later, nothing at level 0"
   assert.deepEqual([off.dx, off.dy, off.rotate, off.sx, off.sy].map((v) => Math.abs(v)), [0, 0, 0, 1, 1]);
 });
 
-test("Mochi changes colour over a moment when another pill comes to the front", () => {
+test("Peika changes colour over a moment when another pill comes to the front", () => {
   const green = hexToRGB("#1DB954");
   const red = hexToRGB("#F4505E");
   // Already there: nothing to do.
@@ -330,10 +330,10 @@ test("a line that fits stays still; a longer one passes at reading speed", () =>
   assert.equal(marquee(NaN, 163), null);
 });
 
-test("the compact island's line has the room between Mochi and the little Mochis", () => {
+test("the compact island's line has the room between Peika and the little Peikas", () => {
   // The compact island's own width, whatever the island is drawn at meanwhile.
   assert.deepEqual(nowPlayingRoom(2), { left: 60, width: 165 });
-  // A third column of little Mochis takes its width from the line.
+  // A third column of little Peikas takes its width from the line.
   assert.deepEqual(nowPlayingRoom(3), { left: 60, width: 149 });
 });
 
@@ -369,7 +369,7 @@ test("a line passes through its place only when it is too long for it", () => {
   line.set("A very long title that goes on and on — and its artist");
   line.fit(165);
   assert.equal(spans()[0], first);
-  // Less room (a third column of little Mochis): placed again for it.
+  // Less room (a third column of little Peikas): placed again for it.
   line.fit(400);
   assert.ok(!line.el.classList.contains("scroll"));
   assert.equal(spans().length, 1);

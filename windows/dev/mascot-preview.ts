@@ -1,7 +1,7 @@
 // Dev harness: every state and a few emotes of the mascot side by side.
 // Not part of the app bundle.
 
-import { BotEngine } from "../src/mochi/engine";
+import { BotEngine } from "../src/peika/engine";
 import type { BotStateName } from "../src/core/layout";
 
 const STATES: BotStateName[] = [

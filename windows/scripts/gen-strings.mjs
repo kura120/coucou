@@ -1,3 +1,7 @@
+// NOTE: since the rebrand, src/i18n/strings.json is edited by hand and this script
+// is no longer run (it would bring the old names back). It stays for its format
+// helpers, which the tests cover.
+//
 // Generates src/i18n/strings.json from the Mac app's string catalog
 // (NotchBuddy/Resources/Localizable.xcstrings), so Windows and Linux show the
 // Mac's own translations.
@@ -23,7 +27,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const SOURCE = resolve(here, "../../NotchBuddy/Resources/Localizable.xcstrings");
 const OUTPUT = resolve(here, "../src/i18n/strings.json");
 
-/** The languages Coucou ships, in the Mac's picker order. English is the source. */
+/** The languages Peika ships, in the Mac's picker order. English is the source. */
 export const LANGUAGES = ["en", "zh-Hans", "hi", "es", "ar", "fr", "bn", "pt-BR", "ru", "id"];
 
 /**

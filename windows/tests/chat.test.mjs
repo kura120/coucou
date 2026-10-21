@@ -218,12 +218,12 @@ test("the chat keeps the height it was dragged to, within what the window shows"
 test("an empty chat says what it is for, until the first question", async () => {
   const empty = () => view.el.find(".chat-empty");
   assert.equal(empty().length, 1);
-  assert.equal($(".chat-empty-title").textContent, "Ask Mochi anything");
+  assert.equal($(".chat-empty-title").textContent, "Ask Peika anything");
   assert.equal($(".chat-empty-sub").textContent, "Pick a model below, or just start typing.");
   // With Claude Code in a folder, it says where it works.
-  State.settings = { ...State.settings, chatProvider: "claudecode", claudeCodeDir: "C:\\dev\\coucou" };
+  State.settings = { ...State.settings, chatProvider: "claudecode", claudeCodeDir: "C:\\dev\\peika" };
   view.sync();
-  assert.equal($(".chat-empty-sub").textContent, "Claude Code works in coucou");
+  assert.equal($(".chat-empty-sub").textContent, "Claude Code works in peika");
   State.settings = { ...State.settings, claudeCodeDir: "" };
   view.sync();
   assert.equal($(".chat-empty-sub").textContent, "Pick a model below, or just start typing.");
@@ -296,15 +296,15 @@ test("the text field tells the island when it has the keyboard", async () => {
 
 test("Claude Code's conversations are listed by folder, and opening one puts it back", async () => {
   const { groupByFolder, folderName } = await import("../src/views/chat.ts");
-  assert.equal(folderName("C:\\dev\\coucou"), "coucou");
+  assert.equal(folderName("C:\\dev\\peika"), "peika");
   assert.equal(folderName("/home/me/py-doc/"), "py-doc");
   const list = [
-    { id: "a", title: "review the branch", provider: "claudecode", dir: "C:\\dev\\coucou", updated: 300 },
+    { id: "a", title: "review the branch", provider: "claudecode", dir: "C:\\dev\\peika", updated: 300 },
     { id: "b", title: "what is this?", provider: "claudecode", dir: "", updated: 200 },
-    { id: "c", title: "plan review", provider: "claudecode", dir: "C:\\dev\\coucou", updated: 100 },
+    { id: "c", title: "plan review", provider: "claudecode", dir: "C:\\dev\\peika", updated: 100 },
   ];
   assert.deepEqual(groupByFolder(list).map((g) => [g.dir, g.items.map((c) => c.id)]), [
-    ["C:\\dev\\coucou", ["a", "c"]],
+    ["C:\\dev\\peika", ["a", "c"]],
     ["", ["b"]],
   ]);
 
@@ -327,7 +327,7 @@ test("Claude Code's conversations are listed by folder, and opening one puts it 
   await flush();
   assert.ok($(".chat-body").classList.contains("listing"));
   assert.equal(State.chatPicking, true);
-  assert.deepEqual(view.el.find(".convo-group").map((g) => g.textContent), ["coucou2", "No folder1"]); // name, count
+  assert.deepEqual(view.el.find(".convo-group").map((g) => g.textContent), ["peika2", "No folder1"]); // name, count
   // A folder is a node of the tree: its heading folds its conversations away, and back.
   const node = view.el.find(".convo-node")[0];
   assert.equal(node.find(".convo-row").length, 2);
@@ -344,7 +344,7 @@ test("Claude Code's conversations are listed by folder, and opening one puts it 
   assert.deepEqual(sent("conversation_open"), [{ id: "a" }]);
   assert.deepEqual(State.chatHistory.map((m) => [m.role, m.content]), [["user", "review the branch"], ["assistant", "Looks good."]]);
   assert.equal(State.conversationId, "a");
-  assert.equal(State.settings.claudeCodeDir, "C:\\dev\\coucou");
+  assert.equal(State.settings.claudeCodeDir, "C:\\dev\\peika");
   assert.equal(State.settings.chatModels.claudecode, "claude-opus-5-5");
   assert.ok(!$(".chat-body").classList.contains("listing"));
   assert.equal($(".convo-name").textContent, "review the branch");
@@ -507,7 +507,7 @@ test("a conversation opened again shows the files its answers edited", async () 
           { tool: "Edit", input: { file_path: "/w/src/app.rs", old_string: "let a = 1;", new_string: "let b = 1;" } },
           // Too large to have been kept: its file's name only.
           { tool: "Write", path: "/w/big.json", tooLarge: true },
-          // Nothing Coucou can draw.
+          // Nothing Peika can draw.
           { tool: "Bash", input: { command: "ls" } },
           null,
         ],

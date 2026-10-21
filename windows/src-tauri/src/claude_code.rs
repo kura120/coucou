@@ -1,21 +1,21 @@
 // Chat through the Claude Code the user already has — no API key.
 //
-// Coucou asks the Claude Code CLI itself, the way codex_plan.rs asks Codex:
+// Peika asks the Claude Code CLI itself, the way codex_plan.rs asks Codex:
 // `claude -p` is started for one turn, given the question, and read until its
-// answer. Coucou reads no credential and calls nothing itself: Claude Code
+// answer. Peika reads no credential and calls nothing itself: Claude Code
 // answers with its own sign-in (a Claude Pro or Max plan, usually), so a turn
 // counts against that plan's limits.
 //
 // Two ways to run it, picked above the chat box:
 //
 // * No folder — a plain chat model. Web search is its only tool, no settings
-//   file is read (Coucou's own hooks do not fire), nothing is saved to disk,
-//   and the earlier turns ride along with each question. (Coucou itself keeps
+//   file is read (Peika's own hooks do not fire), nothing is saved to disk,
+//   and the earlier turns ride along with each question. (Peika itself keeps
 //   the conversation's text, like any conversation of the list: conversations.rs.)
 // * A folder — Claude Code as it runs in a terminal there: its tools, the
 //   user's settings and the project's, in the permission mode picked. The
 //   conversation is a Claude Code session, resumed turn after turn. Anything
-//   that needs a permission is never answered here: with Coucou's hooks in
+//   that needs a permission is never answered here: with Peika's hooks in
 //   place the request shows in the island like any other session's and waits
 //   for a click, and without them it is denied.
 //
@@ -25,9 +25,9 @@
 // the tool's own input, once the tool has succeeded — which the chat shows as
 // a pill with its diff.
 //
-// A third way, for voice and not for the chat: one turn of "OK Coucou" that
+// A third way, for voice and not for the chat: one turn of "OK Peika" that
 // the local model handed up (voice/cloud.rs). Claude Code then has no tool of
-// its own at all — only the app's capabilities, through Coucou's MCP endpoint
+// its own at all — only the app's capabilities, through Peika's MCP endpoint
 // (voice/mcp.rs) — reads no settings, saves nothing, and is stopped when its
 // time is up. `voice_args` is its command line.
 
@@ -104,8 +104,8 @@ pub(crate) fn edit_stub(tool: &str, input: &Value) -> Value {
     json!({ "tool": tool, "path": path, "tooLarge": true })
 }
 
-/// Mochi's voice on top of Claude Code's own instructions, when it works in a folder.
-const AGENT_PROMPT: &str = "You are answering as Mochi, in Coucou's small chat window at the top of the user's screen. \
+/// Peika's voice on top of Claude Code's own instructions, when it works in a folder.
+const AGENT_PROMPT: &str = "You are answering as Peika, in Peika's small chat window at the top of the user's screen. \
 Respond in the user's language. Keep answers short and use light Markdown: short paragraphs, bullet lists, \
 **bold**, `inline code` and fenced code blocks. Avoid tables and big headings.";
 
@@ -113,8 +113,8 @@ Respond in the user's language. Keep answers short and use light Markdown: short
 /// quotes: an npm install is a `.cmd`, which takes neither a line break nor
 /// much else in an argument. What the app is and can do comes in the message
 /// (voice/cloud.rs), written by the island.
-const VOICE_PROMPT: &str = "You are the reasoning behind Coucou, a small desktop companion, for one spoken request. \
-The message starts with the briefing Coucou wrote for you: follow it. You act only by calling the coucou tools; \
+const VOICE_PROMPT: &str = "You are the reasoning behind Peika, a small desktop companion, for one spoken request. \
+The message starts with the briefing Peika wrote for you: follow it. You act only by calling the peika tools; \
 you have no other tool, no files and no shell. Finish with one or two short plain sentences that can be said out loud.";
 /// The most back-and-forth one voice turn gets: a backstop behind the
 /// endpoint's own count of calls and the turn's time limit.
@@ -178,7 +178,7 @@ fn args(model: &str, options: &Options, resume: Option<&str>) -> Vec<String> {
         "--verbose",
         "--include-partial-messages",
         "--model", model,
-        // Nothing is ever approved from here: a hook (Coucou's) answers, or nobody.
+        // Nothing is ever approved from here: a hook (Peika's) answers, or nobody.
         "--permission-prompts", "none",
     ]);
     if let Some(effort) = options.effort {
@@ -208,12 +208,12 @@ fn args(model: &str, options: &Options, resume: Option<&str>) -> Vec<String> {
 ///
 /// What each part is for:
 /// * `--tools ""` — none of Claude Code's own tools: no file, shell or web tool.
-/// * `--mcp-config` with `--strict-mcp-config` — Coucou's server and no other:
+/// * `--mcp-config` with `--strict-mcp-config` — Peika's server and no other:
 ///   not the user's, not a project's, not a plugin's.
 /// * `--allowedTools mcp__<server>` — that server's tools run without a
 ///   prompt. Nothing else is allowed, and `--permission-prompts none` denies
 ///   whatever would have asked.
-/// * `--setting-sources ""` — no user, project or local settings: Coucou's own
+/// * `--setting-sources ""` — no user, project or local settings: Peika's own
 ///   hooks do not fire for this turn, and no permission rule of the user's applies.
 /// * `--no-session-persistence` — nothing of the turn is written to disk.
 pub(crate) fn voice_args(model: &str, mcp_config: &str, server: &str) -> Vec<String> {
@@ -296,8 +296,8 @@ fn input_line(history: &[Value], content: &[Value]) -> String {
     if !history.is_empty() {
         blocks.push(text("The conversation so far, for context. Answer only the new message at the end."));
         for turn in history {
-            let mochi = turn.get("role").and_then(Value::as_str) == Some("assistant");
-            blocks.push(text(if mochi { "Mochi:" } else { "User:" }));
+            let peika = turn.get("role").and_then(Value::as_str) == Some("assistant");
+            blocks.push(text(if peika { "Peika:" } else { "User:" }));
             match turn.get("content") {
                 Some(Value::String(s)) => blocks.push(text(s)),
                 Some(Value::Array(parts)) => blocks.extend(parts.iter().cloned()),
@@ -657,7 +657,7 @@ mod tests {
         assert_eq!(after(&a, "--model"), Some("claude-opus-5-5"));
         assert_eq!(after(&a, "--tools"), Some("WebSearch"));
         assert_eq!(after(&a, "--permission-prompts"), Some("none"));
-        // No settings file: Coucou's own hooks never see the chat.
+        // No settings file: Peika's own hooks never see the chat.
         assert_eq!(after(&a, "--setting-sources"), Some(""));
         assert!(a.contains(&"--no-session-persistence".to_string()));
         assert!(a.contains(&"--strict-mcp-config".to_string()));
@@ -666,20 +666,20 @@ mod tests {
     }
 
     #[test]
-    fn a_voice_turn_has_coucous_tools_and_nothing_else_of_claude_code() {
-        let config = r#"{"mcpServers":{"coucou":{"type":"stdio","command":"C:/x/coucou-hook.exe","args":["--mcp"]}}}"#;
-        let a = voice_args("claude-sonnet-5-5", config, "coucou");
+    fn a_voice_turn_has_peikas_tools_and_nothing_else_of_claude_code() {
+        let config = r#"{"mcpServers":{"peika":{"type":"stdio","command":"C:/x/peika-hook.exe","args":["--mcp"]}}}"#;
+        let a = voice_args("claude-sonnet-5-5", config, "peika");
         assert_eq!(a[0], "-p");
         assert_eq!(after(&a, "--model"), Some("claude-sonnet-5-5"));
         // No tool of Claude Code's own: no file, shell or web tool.
         assert_eq!(after(&a, "--tools"), Some(""));
-        // Coucou's server, and no other configuration's.
+        // Peika's server, and no other configuration's.
         assert_eq!(after(&a, "--mcp-config"), Some(config));
         assert!(a.contains(&"--strict-mcp-config".to_string()));
         // Only that server's tools run without a prompt; whatever else would ask is denied.
-        assert_eq!(after(&a, "--allowedTools"), Some("mcp__coucou"));
+        assert_eq!(after(&a, "--allowedTools"), Some("mcp__peika"));
         assert_eq!(after(&a, "--permission-prompts"), Some("none"));
-        // No settings file: Coucou's own hooks do not fire, and nothing is saved.
+        // No settings file: Peika's own hooks do not fire, and nothing is saved.
         assert_eq!(after(&a, "--setting-sources"), Some(""));
         assert!(a.contains(&"--no-session-persistence".to_string()));
         assert!(a.contains(&"--disable-slash-commands".to_string()));
@@ -735,7 +735,7 @@ mod tests {
         s.claude_code_effort = "--dangerously-skip-permissions".into();
         s.claude_code_mode = "bypassPermissions".into();
         assert_eq!(options(&s).unwrap(), Options { dir: Some(here.clone()), effort: None, mode: "default" });
-        s.claude_code_dir = here.join("coucou-no-such-folder").to_string_lossy().to_string();
+        s.claude_code_dir = here.join("peika-no-such-folder").to_string_lossy().to_string();
         assert!(options(&s).is_err());
         s.claude_code_dir = "relative/folder".into();
         assert!(options(&s).is_err());
@@ -789,7 +789,7 @@ mod tests {
         let shown: Vec<&str> = blocks.iter().map(|b| b["text"].as_str().unwrap_or("<image>")).collect();
         assert_eq!(
             shown[1..],
-            ["User:", "<image>", "what is this?", "Mochi:", "A cat.", "The new message:", "and now?"]
+            ["User:", "<image>", "what is this?", "Peika:", "A cat.", "The new message:", "and now?"]
         );
     }
 

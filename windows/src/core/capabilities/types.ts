@@ -1,4 +1,4 @@
-// What Coucou lets its assistant see and do, declared by the app itself
+// What Peika lets its assistant see and do, declared by the app itself
 // (doc/voice-brain.md). A function of the app that is declared as a
 // `Capability` is public: the assistant is told of it and may ask for it. One
 // that is not declared does not exist for the assistant — there is no other

@@ -30,7 +30,7 @@ const PILLS = [
 
 /** Two sessions of the same agent: only their folders tell them apart. */
 const SESSIONS = [
-  { id: "session_1", label: "Codex", hint: "coucou" },
+  { id: "session_1", label: "Codex", hint: "peika" },
   { id: "session_2", label: "Codex", hint: "website" },
 ];
 
@@ -259,7 +259,7 @@ test("two as near as each other are a choice, and the one picked is used", async
   assert.equal(log.asked[0].kind, "choice");
   assert.equal(log.asked[0].question, "Codex or Codex?");
   assert.deepEqual(log.asked[0].options, [
-    { id: "session_1", label: "Codex", hint: "coucou" },
+    { id: "session_1", label: "Codex", hint: "peika" },
     { id: "session_2", label: "Codex", hint: "website" },
   ]);
   assert.equal(result.status, "done");

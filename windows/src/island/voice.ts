@@ -1,4 +1,4 @@
-// "OK Coucou" → the island (src-tauri/src/voice/mod.rs). Rust owns the
+// "OK Peika" → the island (src-tauri/src/voice/mod.rs). Rust owns the
 // microphone and the recogniser; one `voice` event tells the island what was
 // heard. What a sentence means and what is done for it is worked out in three
 // tiers (voice/turn.ts) over what the app declared it can do (island/app.ts).
@@ -35,15 +35,15 @@ export interface VoiceHost {
   voiceCancelled(): void;
   /** Another command may follow without the wake phrase, or that time is over. */
   voiceFollowing(on: boolean): void;
-  /** A sentence said in that time: for Coucou, or for nobody. `sure`: how sure the speech model was of each word. */
+  /** A sentence said in that time: for Peika, or for nobody. `sure`: how sure the speech model was of each word. */
   voiceAgain(text: string, sure?: readonly number[]): void;
   /** A voice started in the follow-up time: the listening view comes back while it is written down. */
   voiceHearing(): void;
-  /** How loud the microphone hears while Coucou listens, 0…1. */
+  /** How loud the microphone hears while Peika listens, 0…1. */
   voiceLevel(level: number): void;
   /** Ctrl+Shift+number or Ctrl+Shift+Enter, pressed while a question is on screen: "1"…"9" or "enter". */
   voiceAskKey(key: string): void;
-  /** Mochi started saying an answer (its length in ms), or finished (null). */
+  /** Peika started saying an answer (its length in ms), or finished (null). */
   voiceSpoken(ms: number | null): void;
   /** A cloud model asked for a capability through its endpoint: the text it is given back. */
   voiceCapabilityCall(name: string, args: unknown): Promise<string>;
@@ -51,7 +51,7 @@ export interface VoiceHost {
 
 /**
  * Why a wake phrase is ignored right now, or null when it may open the
- * listening view. Only a paused Coucou ignores it: over a permission request
+ * listening view. Only a paused Peika ignores it: over a permission request
  * or a question that waits, the wake phrase is heard — the request keeps
  * waiting under the listening view, voice may read it out, and declining it
  * takes a click like any change that cannot be put back.
@@ -166,9 +166,9 @@ export function createTurns(registry: Registry): VoiceTurns {
   });
 }
 
-// ── Mochi's voice (src-tauri/src/voice/speak.rs) ──────────────────────────────
+// ── Peika's voice (src-tauri/src/voice/speak.rs) ──────────────────────────────
 
-/** The sound effects' default volume: Mochi speaks at full level there. */
+/** The sound effects' default volume: Peika speaks at full level there. */
 const USUAL_VOLUME = 0.12;
 
 let speechContext: AudioContext | null = null;
@@ -185,7 +185,7 @@ export function decodeSpeech(pcm: string): Float32Array {
   return samples;
 }
 
-/** How loud Mochi speaks for a Sound volume: the usual volume and above is full. */
+/** How loud Peika speaks for a Sound volume: the usual volume and above is full. */
 export function speechGain(soundVolume: number): number {
   return Math.max(0, Math.min(1, soundVolume / USUAL_VOLUME));
 }
@@ -200,7 +200,7 @@ export function stopSpeaking() {
 }
 
 function playSpeech(speech: { sampleRate: number; pcm: string }) {
-  // Muted is muted, for Mochi's voice like for his sounds.
+  // Muted is muted, for Peika's voice like for his sounds.
   if (!State.settings.soundEnabled || !speech.sampleRate) return;
   const samples = decodeSpeech(speech.pcm);
   if (!samples.length) return;
@@ -224,10 +224,10 @@ function playSpeech(speech: { sampleRate: number; pcm: string }) {
   spoken?.(Math.round((samples.length / speech.sampleRate) * 1000));
 }
 
-/** Told when Mochi starts saying something (how long it is, in ms) and when he has finished (null). */
+/** Told when Peika starts saying something (how long it is, in ms) and when he has finished (null). */
 let spoken: ((ms: number | null) => void) | null = null;
 
-/** How long the card waits for Mochi's voice to be made before it stops waiting for it. */
+/** How long the card waits for Peika's voice to be made before it stops waiting for it. */
 export const SPEECH_WAITED_MS = 6000;
 
 /** Whether this result will be said out loud: the card then stays until it has been. */
@@ -235,7 +235,7 @@ export const willSpeak = (result: VoiceResult) =>
   State.settings.voice.speak && State.settings.soundEnabled && language() === "en" && result.message.trim() !== "";
 
 /**
- * Has Mochi say what a command did, when speaking is on. English only for
+ * Has Peika say what a command did, when speaking is on. English only for
  * now, like listening: in another language the card says it.
  */
 export function sayResult(result: VoiceResult) {

@@ -1,5 +1,5 @@
 // What the web answer card and the email cards share (views/websearch.ts,
-// views/email.ts): the card with Mochi's place on its left, its head, the
+// views/email.ts): the card with Peika's place on its left, its head, the
 // dots of a wait, and the island growing to what a card holds.
 
 import { clear, h, svg } from "./dom";
@@ -27,7 +27,7 @@ export interface CardDriver {
   close(): void;
   /** Opens a link in the browser. */
   open(url: string): void;
-  /** Mochi says it, when he speaks. */
+  /** Peika says it, when he speaks. */
   say(text: string): void;
 }
 
@@ -54,7 +54,7 @@ export interface Shell {
   fit(view: IslandViewName, actions: ViewActions): void;
 }
 
-/** A card is never shorter than the island's usual one: Mochi needs the room. */
+/** A card is never shorter than the island's usual one: Peika needs the room. */
 const SMALLEST_CARD = 108;
 /** `.vc-body`'s padding and the gap under its head (voice-cards.css). */
 const CARD_INSET = 12;
@@ -62,7 +62,7 @@ const HEAD_GAP = 8;
 
 /**
  * A card as these are laid out: a head — an icon and what the card is — over
- * the card's content, with room on the left for Mochi.
+ * the card's content, with room on the left for Peika.
  */
 export function buildShell(name: string): Shell {
   const icon = h("span", { class: "vc-icon" });

@@ -26,10 +26,10 @@ export const SHORTCUT_TEXT = {
   attachFrontWindow: N_("Attach the front window to the chat"),
   nextPill: N_("Next pill"),
   prevPill: N_("Previous pill"),
-  muteToggle: N_("Mute or unmute Mochi"),
-  desktopToggle: N_("Send Mochi to the desktop"),
+  muteToggle: N_("Mute or unmute Peika"),
+  desktopToggle: N_("Send Peika to the desktop"),
   wardrobeToggle: N_("Open the wardrobe"),
-  talkToCoucou: N_("Talk to Coucou"),
+  talkToPeika: N_("Talk to Peika"),
   island: {
     nextPrev: N_("Next or previous pill"),
     byNumber: N_("Go to pill 1 to 9"),
@@ -58,7 +58,7 @@ export type ShortcutId =
   | "muteToggle"
   | "desktopToggle"
   | "wardrobeToggle"
-  | "talkToCoucou";
+  | "talkToPeika";
 
 export interface ShortcutDef {
   id: ShortcutId;
@@ -83,7 +83,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   def("muteToggle", "Ctrl+Alt+S", true, true),
   def("desktopToggle", "Ctrl+Alt+D", true, true),
   def("wardrobeToggle", "Ctrl+Alt+G", true, true),
-  def("talkToCoucou", "Ctrl+Alt+V", false, true),
+  def("talkToPeika", "Ctrl+Alt+V", false, true),
 ];
 
 export interface Binding {
@@ -299,7 +299,7 @@ export function duplicates(entries: Iterable<[string, string]>): Set<string> {
   return dups;
 }
 
-/** The (id, keys) pairs Coucou would register with `stored`. */
+/** The (id, keys) pairs Peika would register with `stored`. */
 export function activeKeys(stored: Bindings | undefined): [string, string][] {
   return SHORTCUTS.filter((d) => d.ported)
     .map((d) => [d.id, effective(d, stored)] as const)

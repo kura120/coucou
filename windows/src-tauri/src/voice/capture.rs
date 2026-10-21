@@ -5,11 +5,11 @@
 // It is open only while it exists: dropping it closes the microphone.
 //
 // In a debug build only, recordings can stand in for the microphone, so the
-// app can be driven by sentences that were recorded once: `COUCOU_VOICE_WAV`
+// app can be driven by sentences that were recorded once: `PEIKA_VOICE_WAV`
 // names a WAV file or a folder of them (16-bit PCM, any rate, taken in the
 // order of their names, round and round). Each time a command is listened
-// for — after the wake phrase, the "Talk to Coucou" shortcut, or a question
-// Mochi asked — the next one is "said"; the rest of the time the room is
+// for — after the wake phrase, the "Talk to Peika" shortcut, or a question
+// Peika asked — the next one is "said"; the rest of the time the room is
 // quiet. No release build reads that variable or has this code.
 
 use std::time::Duration;
@@ -170,7 +170,7 @@ pub mod played {
     use super::SAMPLE_RATE;
 
     /// The variable that names the WAV file, or the folder of them.
-    pub const VARIABLE: &str = "COUCOU_VOICE_WAV";
+    pub const VARIABLE: &str = "PEIKA_VOICE_WAV";
     /// Quiet before a recording, so its first sound is not the start of the sentence.
     const LEAD: Duration = Duration::from_millis(400);
     /// The most that is handed over in one read: a stalled thread does not get a burst.
@@ -245,7 +245,7 @@ pub mod played {
     }
 
     impl Played {
-        /// What `COUCOU_VOICE_WAV` names, when it is set and holds a recording.
+        /// What `PEIKA_VOICE_WAV` names, when it is set and holds a recording.
         pub fn from_env() -> Option<Self> {
             let path = std::env::var_os(VARIABLE)?;
             let clips = clips(Path::new(&path));
@@ -352,13 +352,13 @@ mod tests {
         }
     }
 
-    /// The recordings `COUCOU_VOICE_WAV` names, cut out as sentences the way
+    /// The recordings `PEIKA_VOICE_WAV` names, cut out as sentences the way
     /// the listener cuts the microphone: how many there are and how long each
-    /// is. `cargo test -p coucou voice::capture -- --ignored --nocapture`
+    /// is. `cargo test -p peika voice::capture -- --ignored --nocapture`
     #[test]
-    #[ignore = "reads the recordings COUCOU_VOICE_WAV names"]
+    #[ignore = "reads the recordings PEIKA_VOICE_WAV names"]
     fn the_recordings_named_are_each_cut_out_as_one_sentence() {
-        let path = std::env::var_os(played::VARIABLE).expect("COUCOU_VOICE_WAV");
+        let path = std::env::var_os(played::VARIABLE).expect("PEIKA_VOICE_WAV");
         let clips = played::clips(std::path::Path::new(&path));
         assert!(!clips.is_empty(), "no 16-bit PCM recording there");
         let count = clips.len();
@@ -379,7 +379,7 @@ mod tests {
     }
 
     /// Opens the real microphone for a second and reads from it:
-    /// `cargo test -p coucou voice::capture -- --ignored --nocapture`.
+    /// `cargo test -p peika voice::capture -- --ignored --nocapture`.
     #[test]
     #[ignore = "opens the microphone"]
     fn the_microphone_gives_sixteen_thousand_samples_a_second() {

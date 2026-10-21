@@ -26,9 +26,9 @@ export interface ShortcutHost {
   takeKeyboard(): void;
   /** The wardrobe from any state, or back if it is open (Island.wardrobeAnywhere). */
   wardrobeAnywhere(): void;
-  /** False where Mochi can't leave the island (GNOME on Wayland). */
+  /** False where Peika can't leave the island (GNOME on Wayland). */
   canLeaveIsland(): boolean;
-  /** Mochi out to the desktop, or home (DesktopMochiController.flyOutOrHome). */
+  /** Peika out to the desktop, or home (DesktopPeikaController.flyOutOrHome). */
   flyOutOrHome(): void;
   /** Hands Ctrl+O / Ctrl+E to the view on screen (the Mac posts notifications). */
   viewCommand(command: ViewCommand): void;
@@ -82,7 +82,7 @@ export function runGlobalShortcut(host: ShortcutHost, action: string, resume: ()
         host.alert("question");
         host.takeKeyboard();
       } else {
-        // Nothing is waiting: Mochi says so.
+        // Nothing is waiting: Peika says so.
         host.emote("annoyed");
         Sound.play("error");
       }
@@ -122,14 +122,14 @@ export function runGlobalShortcut(host: ShortcutHost, action: string, resume: ()
     }
 
     // The Mac's ⌃⌥D. Sending him out lifts Pause, as the other shortcuts do;
-    // where he can't leave the island, Mochi says so.
+    // where he can't leave the island, Peika says so.
     case "desktopToggle":
       if (!host.canLeaveIsland()) {
         host.emote("annoyed");
         Sound.play("error");
         break;
       }
-      if (!State.mochiOnDesktop) resume();
+      if (!State.peikaOnDesktop) resume();
       host.flyOutOrHome();
       break;
 
@@ -192,7 +192,7 @@ function inTextField(target: EventTarget | null): boolean {
 export function registerShortcutHandlers(host: ShortcutHost, resume: () => void) {
   void onEvent<string>("shortcut", (action) => runGlobalShortcut(host, action, resume));
   // The wardrobe shortcut comes as its own event (shortcuts.rs): it opens the
-  // wardrobe (mochi/wardrobe.ts, views/wardrobe.ts), or closes it again.
+  // wardrobe (peika/wardrobe.ts, views/wardrobe.ts), or closes it again.
   void onEvent<null>("open-wardrobe", () => {
     resume();
     host.wardrobeAnywhere();

@@ -1,4 +1,4 @@
-// The island: DOM shell, sizing animation, Mochi placement, mouse handling.
+// The island: DOM shell, sizing animation, Peika placement, mouse handling.
 // Mirrors IslandRootView.swift + IslandWindowController.swift.
 
 import { Tracked, Spring, clamp } from "../core/anim";
@@ -16,10 +16,10 @@ import { SPOTIFY_ID, Spotify, islandDances, nowPlayingLine } from "../core/spoti
 import { createMarquee } from "../views/marquee";
 import { t } from "../i18n/i18n";
 import { miniGridColumns } from "../core/pills";
-import { BotEngine, hexToRGB, stepBodyColor, type RGB } from "../mochi/engine";
-import { Greeting } from "../mochi/greeting";
-import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../mochi/minibots";
-import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
+import { BotEngine, hexToRGB, stepBodyColor, type RGB } from "../peika/engine";
+import { Greeting } from "../peika/greeting";
+import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../peika/minibots";
+import { SeasonCache, parseOutfit } from "../peika/wardrobe";
 import { UploadCanvas } from "../upload/canvas";
 import { USC, UploadSeq } from "../upload/sequence";
 import { closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
@@ -29,7 +29,7 @@ import { IslandStateMachine } from "./fsm";
 import { refreshHookPills } from "./integrations";
 import { DesktopLink } from "./desktop";
 import type { ViewCommand } from "./shortcuts";
-import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
+import { DRAG_THRESHOLD } from "../peika/desktop-logic";
 import { interruptedAfter, isPlace } from "./restore";
 import {
   RESULT_SHOWN_MS, SPEECH_WAITED_MS, VOICE_PATIENCE_MS, createTurns, sayResult, stopSpeaking, wakeBlocked, willSpeak,
@@ -43,11 +43,11 @@ import type { WebFound } from "../views/websearch";
 import { installContextMenu, type ContextMenu, type Rect } from "../views/menu";
 import { createAppRegistry } from "./app";
 import type { ScreenContext } from "../core/capabilities/types";
-import type { OutfitSelection } from "../mochi/wardrobe";
+import type { OutfitSelection } from "../peika/wardrobe";
 
 const BOT_OVERHANG = 40;
 const CLAUDE_DESKTOP_ID = "agent_claude-desktop";
-/** Extra canvas on each side of Mochi, for the witch hat's brim and the Santa hat's tip. */
+/** Extra canvas on each side of Peika, for the witch hat's brim and the Santa hat's tip. */
 const BOT_SIDE = 24;
 /** Same margin as the Rust hit test (src-tauri/src/island.rs). */
 const HIT_MARGIN = 14;
@@ -58,7 +58,7 @@ const UPLOAD_VIEWS: ReadonlySet<IslandViewName> = new Set(["upload", "uploading"
 /** Seconds between the drop and the moment the progress bar starts filling. */
 const PRE_PROGRESS = USC.T_PROG_START - USC.T_DROP;
 
-/** A little Mochi of the compact island and the gap after it (#mini-grid). */
+/** A little Peika of the compact island and the gap after it (#mini-grid). */
 const MINI_PITCH = 16;
 
 const modeOrder = (m: IslandMode) => (m === "hidden" ? 0 : m === "compact" ? 1 : 2);
@@ -68,7 +68,7 @@ const HOVER_GLOW_BURST_MS = 520;
 
 export class Island {
   readonly fsm = new IslandStateMachine();
-  /** Mochi on the desktop: his life cycle and the drag out of the island. */
+  /** Peika on the desktop: his life cycle and the drag out of the island. */
   readonly desktop: DesktopLink;
 
   private root: HTMLElement;
@@ -85,12 +85,12 @@ export class Island {
   private greetingCanvas!: HTMLCanvasElement;
   private miniGrid!: HTMLElement;
   private miniColumns = 2;
-  /** The colour Mochi is on his way to: the pill's in front, null for his own. */
+  /** The colour Peika is on his way to: the pill's in front, null for his own. */
   private bodyHex: string | null = null;
   private bodyTarget: RGB | null = null;
   /** What is playing, passing through the middle of the compact island. */
   private nowPlaying = createMarquee("now-playing");
-  /** The microphone dot beside Mochi while another command may follow. */
+  /** The microphone dot beside Peika while another command may follow. */
   private listenGlow!: HTMLElement;
   /** The music card was there at the last sync: the island is wider with it. */
   private hadMusicCard = false;
@@ -137,7 +137,7 @@ export class Island {
   private confusedRecovery: number | null = null;
   private voiceTimer: number | null = null;
   /**
-   * Everything Coucou lets its assistant see and do, declared on this island
+   * Everything Peika lets its assistant see and do, declared on this island
    * (island/app.ts): made once, and the only way anything it asks for runs.
    */
   readonly registry = createAppRegistry({
@@ -178,7 +178,7 @@ export class Island {
   onGreetingDone: (() => void) | null = null;
   onWake: (() => void) | null = null;
 
-  /** Where a press on Mochi started: moving past DRAG_THRESHOLD drags him out. */
+  /** Where a press on Peika started: moving past DRAG_THRESHOLD drags him out. */
   private botPress: { x: number; y: number } | null = null;
 
   /** The next reveal from hidden makes no peek (music starting, as on macOS). */
@@ -368,7 +368,7 @@ export class Island {
     for (const v of this.views.values()) this.viewsEl.append(v.el);
     this.contentEl = h("div", { id: "content" }, this.header.el, this.viewsEl);
 
-    // The drop sequence draws the card, the bar and its own Mochi. It sits under
+    // The drop sequence draws the card, the bar and its own Peika. It sits under
     // the header, which stays visible on top of it exactly as on macOS.
     this.uploadCanvas = new UploadCanvas({
       ask: () => {
@@ -392,7 +392,7 @@ export class Island {
       "div",
       { id: "island" },
       this.clipEl,
-      // Under Mochi, who hangs below the compact island.
+      // Under Peika, who hangs below the compact island.
       this.listenGlow,
       this.botGlow,
       this.botCanvas,
@@ -418,17 +418,17 @@ export class Island {
     this.fsm.openOnHover = State.settings.openOnHover;
     this.fsm.onTransition = (from, to) => {
       // The greeting is over, however it ended: back to his desktop spot.
-      if (from === "coucou" && to !== "coucou") this.desktop.launch();
+      if (from === "peika" && to !== "peika") this.desktop.launch();
       if (from === "listening") this.leftListening();
       switch (to) {
         case "hidden":
           this.setMode("hidden");
           break;
         case "petit":
-          if (from === "coucou") this.greeting.interrupt();
+          if (from === "peika") this.greeting.interrupt();
           else if (from === "hidden" && !this.silentReveal) Sound.play("peek");
           this.setMode("compact");
-          if (from === "coucou" || from === "listening") State.view = State.resumeView();
+          if (from === "peika" || from === "listening") State.view = State.resumeView();
           if (!this.wasInIsland) this.fsm.mouseLeft();
           break;
         case "home":
@@ -439,12 +439,12 @@ export class Island {
           // say so on the next open, without polling while the island is shut.
           void refreshHookPills();
           break;
-        case "coucou":
+        case "peika":
           this.expand("greeting");
           this.greeting.start();
           break;
         case "listening":
-          if (from === "coucou") this.greeting.interrupt();
+          if (from === "peika") this.greeting.interrupt();
           this.expand("listening");
           this.engine.enterListening();
           Sound.play("question");
@@ -568,17 +568,17 @@ export class Island {
     this.silentReveal = false;
   }
 
-  /** Right-click on Mochi: wardrobe open ↔ back to the usual view. */
+  /** Right-click on Peika: wardrobe open ↔ back to the usual view. */
   toggleWardrobe() {
     if (State.paused || State.mode === "hidden") return;
-    // The greeting and the drop sequence draw a Mochi of their own.
+    // The greeting and the drop sequence draw a Peika of their own.
     if (State.mode === "expanded" && (State.view === "greeting" || this.uploadActive)) return;
     if (State.mode === "expanded" && State.view === "wardrobe") this.setView(State.defaultView());
     else this.setView("wardrobe");
   }
 
   /**
-   * Right-click on the desktop Mochi (macOS openWardrobeFromDesktop): opens the
+   * Right-click on the desktop Peika (macOS openWardrobeFromDesktop): opens the
    * wardrobe from any state, or goes back if it is already open.
    */
   wardrobeFromDesktop() {
@@ -587,7 +587,7 @@ export class Island {
 
   /**
    * The wardrobe from any state — compact or hidden island included — or back
-   * to the usual view if it is already open. The desktop Mochi's right-click
+   * to the usual view if it is already open. The desktop Peika's right-click
    * and the wardrobe shortcut (`open-wardrobe`) both land here.
    */
   wardrobeAnywhere() {
@@ -601,14 +601,14 @@ export class Island {
 
   // ── Voice (island/voice.ts) ─────────────────────────────────────────────────
 
-  /** The wake phrase, or the "Talk to Coucou" shortcut. */
+  /** The wake phrase, or the "Talk to Peika" shortcut. */
   voiceWoke() {
     if (wakeBlocked(State.paused)) {
       void Bridge.voiceCancel();
       return;
     }
     this.clearVoiceTimer();
-    // A question is on screen and Mochi listens for its answer: the turn that asked goes on.
+    // A question is on screen and Peika listens for its answer: the turn that asked goes on.
     if (State.voice.ask && this.fsm.state === "listening" && State.view === "listening") {
       stopSpeaking();
       State.voice = { ...State.voice, text: "" };
@@ -659,7 +659,7 @@ export class Island {
 
   /**
    * After a command, another may follow without the wake phrase: the view
-   * closes as usual, and Mochi keeps his listening look until that time is over.
+   * closes as usual, and Peika keeps his listening look until that time is over.
    */
   voiceFollowing(on: boolean) {
     State.voiceFollowing = on;
@@ -681,7 +681,7 @@ export class Island {
 
   /**
    * A voice started in the follow-up time: the listening view comes back at
-   * once, so it is plain that Coucou hears and is writing it down — not only
+   * once, so it is plain that Peika hears and is writing it down — not only
    * once the sentence is in and the model has answered.
    */
   voiceHearing() {
@@ -693,7 +693,7 @@ export class Island {
 
   /**
    * A sentence said in that time. Typing, a cough or a word to someone else is
-   * cut out as a sentence too: whether it was for Coucou is decided on this
+   * cut out as a sentence too: whether it was for Peika is decided on this
    * computer (voice/rank.ts `directed`), and nothing shows unless it was.
    */
   voiceAgain(said: string, sure?: readonly number[]) {
@@ -757,8 +757,8 @@ export class Island {
 
   /** Keeps an outfit, as a click in the wardrobe does. */
   private wearOutfit(selection: OutfitSelection) {
-    if (parseOutfit(State.settings.mochiOutfit) === selection) return;
-    State.settings.mochiOutfit = selection;
+    if (parseOutfit(State.settings.peikaOutfit) === selection) return;
+    State.settings.peikaOutfit = selection;
     void Bridge.saveSettings(State.settings);
     Sound.play("pop");
     this.engine.triggerEmote("proud");
@@ -844,17 +844,17 @@ export class Island {
     void Bridge.voiceTalk();
   }
 
-  /** For the browser preview (main.ts `coucouAsk`): a question with no turn behind it. */
+  /** For the browser preview (main.ts `peikaAsk`): a question with no turn behind it. */
   voicePreviewAsk(ask: Ask) {
     this.voiceWoke();
     void this.turns.askUser(ask).then((answer) => {
-      console.log("[coucou] answered", answer);
+      console.log("[peika] answered", answer);
       // Another question asked over this one dropped it: that one is on screen now.
       if (this.fsm.state === "listening" && !this.turns.asked) this.fsm.voiceFinished();
     });
   }
 
-  /** For the browser preview (main.ts `coucouWorking`): the gray card with a line, or back to listening. */
+  /** For the browser preview (main.ts `peikaWorking`): the gray card with a line, or back to listening. */
   voicePreviewWorking(line: string | null) {
     if (this.fsm.state !== "listening") this.voiceWoke();
     State.voice = { ...State.voice, thinking: line != null, working: line ?? undefined };
@@ -873,7 +873,7 @@ export class Island {
    * waited for shows "Thinking…" at once, and is waited for a few seconds at
    * most: then the card says so, and whatever answer comes later is for
    * nobody. A sentence said without the wake phrase shows nothing until it is
-   * taken as said to Coucou.
+   * taken as said to Peika.
    */
   private async voiceUnderstand(said: string, heard: { wake: boolean; sure?: readonly number[] } = { wake: true }) {
     let turn = heard.wake ? ++this.voiceTurn : -1;
@@ -936,7 +936,7 @@ export class Island {
       this.voiceNext = null;
       this.voiceWeb = null;
     }
-    // Not for Coucou, or the island moved on meanwhile: the answer is for nobody.
+    // Not for Peika, or the island moved on meanwhile: the answer is for nobody.
     if (!came?.taken || late || !here()) return;
     State.voice = { ...State.voice, thinking: false };
     const result = came.result;
@@ -993,13 +993,13 @@ export class Island {
     if (!State.voiceFollowing) this.engine.exitListening();
     this.engine.triggerEmote(result.outcome === "success" ? "happy" : "surprised");
     this.setView("voiceResult");
-    // Read at about fifteen characters a second, and never under two seconds. When Mochi says it out
+    // Read at about fifteen characters a second, and never under two seconds. When Peika says it out
     // loud the card stays until he has finished (`voiceSpoken`): what is on screen is what is being said.
     const reading = Math.max(RESULT_SHOWN_MS, Math.min(12_000, result.message.length * 65));
     this.voiceEndsIn(willSpeak(result) ? Math.max(reading, SPEECH_WAITED_MS) : reading);
   }
 
-  /** Mochi started saying the answer (`ms` long), or finished: the card stays for it, then a moment more. */
+  /** Peika started saying the answer (`ms` long), or finished: the card stays for it, then a moment more. */
   voiceSpoken(ms: number | null) {
     if (this.fsm.state !== "listening" || State.view !== "voiceResult") return;
     this.voiceEndsIn(ms == null ? 600 : ms + 600);
@@ -1061,17 +1061,17 @@ export class Island {
     void Bridge.focusWindow(true);
   }
 
-  /** The desktop shortcut needs a desktop Mochi: none on GNOME's Wayland. */
+  /** The desktop shortcut needs a desktop Peika: none on GNOME's Wayland. */
   canLeaveIsland(): boolean {
     return this.desktop.supported;
   }
 
-  /** The desktop shortcut (macOS DesktopMochiController.flyOutOrHome). */
+  /** The desktop shortcut (macOS DesktopPeikaController.flyOutOrHome). */
   flyOutOrHome() {
-    // The greeting and the drop sequence draw a Mochi of their own: he stays
+    // The greeting and the drop sequence draw a Peika of their own: he stays
     // for them, as he does for a drag (canDragOut).
     const busy = State.mode === "expanded" && (State.view === "greeting" || this.uploadActive);
-    if (busy && !State.mochiOnDesktop) return;
+    if (busy && !State.peikaOnDesktop) return;
     this.desktop.flyOutOrHome();
   }
 
@@ -1121,7 +1121,7 @@ export class Island {
   }
 
   /**
-   * Mochi eats the file. Nothing here waits on the file system: the copy into
+   * Peika eats the file. Nothing here waits on the file system: the copy into
    * the inbox runs in the background and swaps the path in when it lands, so a
    * slow disk can never stall the animation — same as FileDropHandler on macOS.
    */
@@ -1173,7 +1173,7 @@ export class Island {
 
   /**
    * Sounds and view changes hung off the canvas timeline: a `tick` every 10 %,
-   * the ✓ chime when the bar completes, then `choose` once Mochi has grown back.
+   * the ✓ chime when the bar completes, then `choose` once Peika has grown back.
    */
   private stepSequence() {
     const since = UploadSeq.sinceDrop();
@@ -1207,7 +1207,7 @@ export class Island {
     if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
       h = QUESTION_PICKER_H;
     }
-    // A question Mochi asks brings its choices, its buttons or its field.
+    // A question Peika asks brings its choices, its buttons or its field.
     if (State.mode === "expanded" && State.view === "listening") h += askRoom(State.voice.ask ?? null);
     // An answer is shown whole: the result card grows by its lines.
     if (State.mode === "expanded" && State.view === "voiceResult") h += resultRoom(State.voiceResult?.message);
@@ -1367,11 +1367,11 @@ export class Island {
         this.dirty = true;
         this.ensureRunning();
       }
-      // A press on Mochi may become a drag out to the desktop.
+      // A press on Peika may become a drag out to the desktop.
       if (e.button === 0 && this.isBotHit(e.clientX, e.clientY)) {
         this.botPress = { x: e.clientX, y: e.clientY };
       }
-      // Right-click on Mochi opens the wardrobe, and closes it again.
+      // Right-click on Peika opens the wardrobe, and closes it again.
       if (e.button === 2 && this.isBotHit(e.clientX, e.clientY)) {
         this.cancelBotHover();
         this.toggleWardrobe();
@@ -1387,8 +1387,8 @@ export class Island {
       }
     });
 
-    // Never the webview's own menu: Coucou's, made of what the thing under the
-    // pointer offers (views/menu.ts). Over Mochi a right-click is the wardrobe.
+    // Never the webview's own menu: Peika's, made of what the thing under the
+    // pointer offers (views/menu.ts). Over Peika a right-click is the wardrobe.
     this.menu = installContextMenu(this.root, {
       skip: (e) => this.isBotHit(e.clientX, e.clientY),
       clipboardText: () => Bridge.clipboardText(),
@@ -1405,7 +1405,7 @@ export class Island {
       shown = now;
     });
 
-    // Dragging Mochi out of the island puts him on the desktop.
+    // Dragging Peika out of the island puts him on the desktop.
     window.addEventListener("mousemove", (e) => {
       if (this.desktop.carrying) {
         this.desktop.carry(e.clientX, e.clientY);
@@ -1499,7 +1499,7 @@ export class Island {
     const wasIn = this.wasInIsland;
     this.wasInIsland = inIsland;
     if (inIsland && !wasIn) {
-      if (this.fsm.state === "coucou") this.greeting.hover();
+      if (this.fsm.state === "peika") this.greeting.hover();
       this.fsm.mouseEntered();
     }
     if (!inIsland && wasIn) {
@@ -1523,15 +1523,15 @@ export class Island {
     this.ensureRunning();
   }
 
-  /** The greeting and the drop sequence draw a Mochi of their own: not that one. */
+  /** The greeting and the drop sequence draw a Peika of their own: not that one. */
   private canDragOut(): boolean {
     if (State.mode === "hidden" || !this.desktop.canPickUp()) return false;
     return !(State.mode === "expanded" && (State.view === "greeting" || this.uploadActive));
   }
 
   private isBotHit(x: number, y: number): boolean {
-    // Out on the desktop, the island's Mochi is invisible: nothing to hit.
-    if (State.mochiOnDesktop) return false;
+    // Out on the desktop, the island's Peika is invisible: nothing to hit.
+    if (State.peikaOnDesktop) return false;
     const rect = this.islandRect();
     const cx = rect.x + this.botCx.value;
     const cy = rect.y + this.botCy.value;
@@ -1623,7 +1623,7 @@ export class Island {
         this.greeting.draw(gctx);
       }
     } else {
-      // Kept running even while the drop canvas is up, so the island's own Mochi
+      // Kept running even while the drop canvas is up, so the island's own Peika
       // is already in the right place the moment the canvas fades out.
       this.drawBot(dt);
     }
@@ -1668,9 +1668,9 @@ export class Island {
     this.botSize.target = p.diameter / 0.6;
 
     const greetingActive = State.mode === "expanded" && State.view === "greeting";
-    // The drop canvas draws its own Mochi; two of them would overlap. Out on the
+    // The drop canvas draws its own Peika; two of them would overlap. Out on the
     // desktop, he isn't here at all.
-    const away = State.mochiOnDesktop;
+    const away = State.peikaOnDesktop;
     const visible = p.opacity > 0 && !greetingActive && !this.uploadActive && !away;
     this.botCanvas.style.opacity = visible ? "1" : "0";
 
@@ -1709,7 +1709,7 @@ export class Island {
     if (!ctx) return;
 
     const focus = State.focusTask;
-    // While a plan card is open Mochi wears the plan's colour, like its pill.
+    // While a plan card is open Peika wears the plan's colour, like its pill.
     const wears = planCardOpen() ? openPlanColor() : focus?.isIntegration ? focus.color : null;
     if (wears !== this.bodyHex) {
       this.bodyHex = wears;
@@ -1732,14 +1732,14 @@ export class Island {
         this.engine.slotHVel = 0;
       }
     }
-    // Only the main Mochi is dressed — the one of the main tool's pill (Settings →
+    // Only the main Peika is dressed — the one of the main tool's pill (Settings →
     // Active pills): a focused integration pill shows its own colours, unless
     // the wardrobe is open (BotCanvasView.showOutfit, macOS).
     // In the wardrobe the hovered outfit swaps in at once, without the drop-in.
     const inWardrobe = State.mode === "expanded" && State.view === "wardrobe";
     const mainFocused = State.focusId == null || State.focusId === State.mainPillId;
     const showOutfit = mainFocused || State.mode !== "expanded" || inWardrobe;
-    const outfit = State.wardrobePreview ?? this.seasons.get(parseOutfit(State.settings.mochiOutfit));
+    const outfit = State.wardrobePreview ?? this.seasons.get(parseOutfit(State.settings.peikaOutfit));
     this.engine.setOutfit(showOutfit ? outfit : "none", !inWardrobe);
     // Dances while music plays: always in the compact island, expanded only on
     // the music pill's card (BotCanvasView, macOS). Asked every frame.
@@ -1855,7 +1855,7 @@ export class Island {
       const key = others.map((t) => t.id).join("|");
       if (this.miniGrid.dataset.key !== key) {
         this.miniGrid.dataset.key = key;
-        // Two rows always: a fifth and a sixth Mochi make a third column.
+        // Two rows always: a fifth and a sixth Peika make a third column.
         this.miniColumns = miniGridColumns(others.length);
         this.miniGrid.style.gridTemplateColumns = `repeat(${this.miniColumns}, 13px)`;
         this.miniGrid.style.width = `${this.miniColumns * MINI_PITCH - 3}px`;

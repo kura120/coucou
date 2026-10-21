@@ -1,6 +1,6 @@
-// Mochi on the desktop — the pure logic, port of
+// Peika on the desktop — the pure logic, port of
 // NotchBuddy/Sources/App/DesktopMochiLogic.swift and of the life cycle in
-// DesktopMochiController (DesktopMochi.swift). No DOM, no Tauri: the island
+// DesktopPeikaController (DesktopMochi.swift). No DOM, no Tauri: the island
 // wires it up in src/island/desktop.ts, the desktop window draws him in
 // src/desktop/main.ts, and Rust owns the window (src-tauri/src/desktop.rs).
 //
@@ -13,7 +13,7 @@ import type { Outfit } from "./wardrobe";
 /** What the island tells the desktop window, whenever it changes. */
 export interface DesktopSnapshot {
   state: BotStateName;
-  /** He is always the main Mochi, so always dressed (try-ons included). */
+  /** He is always the main Peika, so always dressed (try-ons included). */
   outfit: Outfit;
   soundEnabled: boolean;
   soundVolume: number;
@@ -23,25 +23,25 @@ export interface DesktopSnapshot {
   dancing: boolean;
 }
 
-/** Events between the two windows. Rust adds `desktop-mochi-dropped`. */
+/** Events between the two windows. Rust adds `desktop-peika-dropped`. */
 export const DESKTOP_EVENTS = {
   /** island → desktop window */
-  state: "desktop-mochi-state",
-  emote: "desktop-mochi-emote",
+  state: "desktop-peika-state",
+  emote: "desktop-peika-emote",
   /** desktop window → island */
-  ready: "desktop-mochi-ready",
-  home: "desktop-mochi-home",
-  wardrobe: "desktop-mochi-wardrobe",
-  dizzy: "desktop-mochi-dizzy",
+  ready: "desktop-peika-ready",
+  home: "desktop-peika-home",
+  wardrobe: "desktop-peika-wardrobe",
+  dizzy: "desktop-peika-dizzy",
   /** Rust → island: a drag ended, `{ from: "island" | "desktop", home }`. */
-  dropped: "desktop-mochi-dropped",
+  dropped: "desktop-peika-dropped",
   /** Rust → desktop window */
   cursor: "desktop-cursor",
   visible: "desktop-visible",
   flight: "desktop-flight",
 } as const;
 
-// ── Constants (DesktopMochiLogic) ────────────────────────────────────────────
+// ── Constants (DesktopPeikaLogic) ────────────────────────────────────────────
 
 /** Side of the desktop window, logical pixels. */
 export const PANEL_SIZE = 120;
@@ -69,7 +69,7 @@ export interface Point {
 }
 
 /**
- * Whether Mochi should be asleep: no agent activity for longer than
+ * Whether Peika should be asleep: no agent activity for longer than
  * SLEEP_TIMEOUT (strictly), and the pointer not close to him.
  */
 export function shouldSleep(sinceAgentActive: number, mouseDistanceToCenter: number): boolean {
@@ -163,7 +163,7 @@ export function windowDragTopLeft(origin: Point, screen: Point, screenAtPress: P
   };
 }
 
-// ── Life cycle (DesktopMochiController) ──────────────────────────────────────
+// ── Life cycle (DesktopPeikaController) ──────────────────────────────────────
 
 export type DesktopPhase =
   /** No window on screen. */
@@ -189,9 +189,9 @@ export interface DesktopPorts {
   flyOut(anywhere: boolean): Promise<boolean>;
   /** Flies the window to the island and hides it. `forget`: he lives there again. */
   flyHome(forget: boolean): Promise<boolean>;
-  /** The island's own Mochi hides while he is out. */
+  /** The island's own Peika hides while he is out. */
   setAway(away: boolean): void;
-  /** An emote on the desktop Mochi. */
+  /** An emote on the desktop Peika. */
   emote(emote: BotEmoteName, duration?: number): void;
   play(sound: string): void;
   alertActive(): boolean;
@@ -200,7 +200,7 @@ export interface DesktopPorts {
   later(fn: () => void, ms: number): void;
 }
 
-export class DesktopMochiController {
+export class DesktopPeikaController {
   phase: DesktopPhase = "home";
   /** He lives on the desktop (the `onDesktop` preference). */
   enabled = false;
@@ -258,7 +258,7 @@ export class DesktopMochiController {
   }
 
   /**
-   * The desktop shortcut (DesktopMochiController.flyOutOrHome, ⌃⌥D on the
+   * The desktop shortcut (DesktopPeikaController.flyOutOrHome, ⌃⌥D on the
    * Mac): out to his spot from the island, home from the desktop. In flight,
    * or away for an alert, nothing.
    */

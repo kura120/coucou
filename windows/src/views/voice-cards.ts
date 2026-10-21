@@ -17,7 +17,7 @@ import { MailCard, buildEmail } from "./email";
 import type { ViewActions, ViewHost } from "./views";
 import { WebCard, buildWebAnswer, webAnswer, type WebFound } from "./websearch";
 
-/** The first sentence of a text: what Mochi says of a longer answer. */
+/** The first sentence of a text: what Peika says of a longer answer. */
 export function firstSentence(text: string): string {
   const end = text.search(/[.!?](\s|$)/);
   return (end < 0 ? text : text.slice(0, end + 1)).trim();
@@ -80,7 +80,7 @@ export function registerVoiceCards(views: Map<IslandViewName, ViewHost>, actions
       if (!IS_TAURI) window.open(url, "_blank", "noopener");
     },
     say(text) {
-      // English only, like the rest of Mochi's voice (island/voice.ts `sayResult`).
+      // English only, like the rest of Peika's voice (island/voice.ts `sayResult`).
       if (!State.settings.voice.speak || language() !== "en" || !text) return;
       void Bridge.voiceSay(text.slice(0, MAX_SPOKEN));
     },

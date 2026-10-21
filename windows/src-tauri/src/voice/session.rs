@@ -11,14 +11,14 @@
 // found to be a command (`followed`) lets yet another follow.
 //
 // The floors come from one voice on one machine (2026-10-09, Windows' own
-// recogniser): the wake phrase scored 0.90–0.94, "coucou" alone and "ok cool,
+// recogniser): the wake phrase scored 0.90–0.94, "peika" alone and "ok cool,
 // cool" 0.77–0.79. A command has no such score: the engine that writes it
 // down either made words of it or did not.
 
 use std::time::{Duration, Instant};
 
-/// What wakes Coucou. Never "coucou" alone.
-pub const WAKE_PHRASES: &[&str] = &["ok coucou", "okay coucou", "hey coucou"];
+/// What wakes Peika. Never "peika" alone.
+pub const WAKE_PHRASES: &[&str] = &["ok peika", "okay peika", "hey peika"];
 
 /// Under this, a wake phrase is something else that sounded like it.
 pub const WAKE_FLOOR: f32 = 0.85;
@@ -73,13 +73,13 @@ pub enum Heard {
     /// Nothing was said, or listening had to stop.
     Cancelled,
     /// A sentence said without the wake phrase after a command: another
-    /// command, or nothing meant for Coucou.
+    /// command, or nothing meant for Peika.
     Again(String),
 }
 
 /// A sentence as the free-speech engine wrote it, without the wake phrase if
-/// it was said again: "Okay, Coucou, next track." is "next track.". The engine
-/// writes "coucou" a different way each time, so it is recognised by its
+/// it was said again: "Okay, Peika, next track." is "next track.". The engine
+/// writes "peika" a different way each time, so it is recognised by its
 /// place — the word after "ok" or "hey", set off by a comma — not its spelling.
 pub fn without_wake(text: &str) -> String {
     let text = text.trim();
@@ -100,9 +100,9 @@ pub fn without_wake(text: &str) -> String {
 }
 
 /// The wake phrase and nothing else, as the free-speech engine writes it:
-/// "Okay, cuckoo.", "Hey Kuku". It spells "coucou" a different way each time,
-/// so the word is known by its sound — it starts with a `k` and has another —
-/// after "ok" or "hey". "Okay, cool." is not it.
+/// "Okay, Pika.", "Hey Peeka". It spells "peika" a different way each time,
+/// so the word is known by its sound — `p`, a vowel or two, a hard `k`, and a
+/// soft ending — after "ok" or "hey". "Okay, pick." is not it.
 pub fn is_wake_alone(text: &str) -> bool {
     let words: Vec<String> = text
         .split_whitespace()
@@ -113,9 +113,26 @@ pub fn is_wake_alone(text: &str) -> bool {
     if !matches!(first.as_str(), "ok" | "okay" | "hey") || name.is_empty() || name.len() > 2 {
         return false;
     }
-    let name = name.concat();
-    let hard = |c: char| matches!(c, 'c' | 'k' | 'q');
-    name.len() <= 8 && name.starts_with(hard) && name.chars().skip(1).any(hard)
+    match name {
+        [one] => sounds_like_peika(one),
+        // "pee ka", "pea car": the two halves said apart.
+        [a, b] => matches!(a.as_str(), "pee" | "pea" | "pi" | "pe" | "pie" | "pay" | "peek")
+            && matches!(b.as_str(), "ka" | "ca" | "kah" | "cah" | "kuh" | "ker" | "ko"),
+        _ => false,
+    }
+}
+
+/// One word that sounds like "peika": pika, peeka, pica, pikka, peaker, pico.
+fn sounds_like_peika(word: &str) -> bool {
+    let is_vowel = |c: char| matches!(c, 'a' | 'e' | 'i' | 'o' | 'u' | 'y');
+    let Some(rest) = word.strip_prefix('p') else { return false };
+    let vowels = rest.chars().take_while(|&c| is_vowel(c)).count();
+    if !(1..=3).contains(&vowels) {
+        return false;
+    }
+    let rest = &rest[vowels..];
+    let rest = ["ck", "kk", "k", "c", "q"].iter().find_map(|h| rest.strip_prefix(h));
+    matches!(rest, Some("a" | "ah" | "o" | "er" | "ar" | "uh"))
 }
 
 pub struct Session {
@@ -147,7 +164,7 @@ impl Session {
         }
     }
 
-    /// The "Talk to Coucou" shortcut, or the island waiting for the answer to
+    /// The "Talk to Peika" shortcut, or the island waiting for the answer to
     /// a question it asked: the command, without the wake phrase.
     pub fn talk(&mut self, now: Instant) -> Option<Heard> {
         if self.held || self.command_until.is_some() {
@@ -302,7 +319,7 @@ mod tests {
 
     #[test]
     fn the_wake_phrase_said_during_the_follow_up_wakes() {
-        for said in ["Okay, cuckoo.", "Hey Kuku", "OK Coco!", "okay kalku", "Okay, cow-coo.", "Hey, coucou."] {
+        for said in ["Okay, Pika.", "Hey Peeka", "OK Pica!", "okay peaker", "Okay, pee ka.", "Hey, peika."] {
             assert!(is_wake_alone(said), "{said}");
             let now = Instant::now();
             let mut s = Session::new(true, Duration::from_secs(8));
@@ -315,7 +332,7 @@ mod tests {
             assert_eq!(s.heard(command("open spotify", 1.0), now + Duration::from_secs(5)), Some(Heard::Final("open spotify".into())));
         }
         // Not the wake phrase: handed over like any other sentence, or nothing at all.
-        for said in ["Okay, cool.", "okay", "hey you", "Okay, next track.", "cuckoo", "okay cuckoo clock strikes", "hey can", "ok kombucha kick"] {
+        for said in ["Okay, cool.", "okay", "hey you", "Okay, next track.", "pika", "okay pick", "okay pick up", "okay pickle", "hey can", "ok kombucha kick"] {
             assert!(!is_wake_alone(said), "{said}");
         }
         // Where only the shortcut wakes, it does not wake here either.
@@ -323,7 +340,7 @@ mod tests {
         let mut s = Session::new(false, Duration::from_secs(8));
         s.talk(now);
         s.heard(command("pause", 1.0), now);
-        assert_eq!(s.heard(command("Okay, cuckoo.", 1.0), now), Some(Heard::Again("Okay, cuckoo.".into())));
+        assert_eq!(s.heard(command("Okay, Pika.", 1.0), now), Some(Heard::Again("Okay, Pika.".into())));
     }
 
     #[test]
@@ -371,7 +388,7 @@ mod tests {
         assert_eq!(s.heard(command("...", 1.0), now), None);
         assert_eq!(s.heard(command("next track", COMMAND_FLOOR - 0.01), now), None);
         assert_eq!(s.heard(Raw::Rejected, now), None);
-        // After the wake phrase a word is an answer: "okay" to a question Mochi asked.
+        // After the wake phrase a word is an answer: "okay" to a question Peika asked.
         s.talk(now);
         assert_eq!(s.heard(command("Okay.", 1.0), now), Some(Heard::Final("Okay.".into())));
     }
@@ -432,7 +449,7 @@ mod tests {
     }
 
     fn wake(confidence: f32) -> Raw {
-        Raw::Phrase { rule: Rule::Wake, text: "okay coucou".into(), confidence }
+        Raw::Phrase { rule: Rule::Wake, text: "okay peika".into(), confidence }
     }
 
     fn command(text: &str, confidence: f32) -> Raw {
@@ -452,7 +469,7 @@ mod tests {
 
     #[test]
     fn what_only_sounds_like_the_wake_phrase_wakes_nothing() {
-        // The measured false wakes: "coucou" alone at 0.77, "ok cool, cool" at 0.79.
+        // The measured false wakes: "peika" alone at 0.77, "ok cool, cool" at 0.79.
         let now = Instant::now();
         let mut s = plain(true);
         for confidence in [0.77, 0.79, 0.84] {
@@ -557,7 +574,7 @@ mod tests {
     }
 
     #[test]
-    fn coucou_alone_is_not_a_wake_phrase() {
-        assert!(WAKE_PHRASES.iter().all(|p| p.split(' ').count() == 2 && p.ends_with(" coucou")));
+    fn peika_alone_is_not_a_wake_phrase() {
+        assert!(WAKE_PHRASES.iter().all(|p| p.split(' ').count() == 2 && p.ends_with(" peika")));
     }
 }

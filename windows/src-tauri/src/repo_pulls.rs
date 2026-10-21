@@ -2,9 +2,9 @@
 // the chat's conversations: the open ones on GitHub, and the local branches
 // whose work is not in a pull request yet.
 //
-// Coucou asks the tools the user already has, as for Codex and Claude Code:
+// Peika asks the tools the user already has, as for Codex and Claude Code:
 // `git` for the branches, and the GitHub CLI (`gh`, with its own sign-in) for
-// the pull requests. No token of Coucou's is involved and nothing is written.
+// the pull requests. No token of Peika's is involved and nothing is written.
 // It runs only when the list is opened.
 
 use std::path::{Path, PathBuf};
@@ -184,12 +184,12 @@ mod tests {
     #[test]
     fn the_repository_is_read_from_a_github_remote_and_nothing_else() {
         for url in [
-            "https://github.com/kura120/coucou.git",
-            "https://github.com/kura120/coucou",
-            "git@github.com:kura120/coucou.git\n",
-            "ssh://git@github.com/kura120/coucou.git",
+            "https://github.com/kura120/peika.git",
+            "https://github.com/kura120/peika",
+            "git@github.com:kura120/peika.git\n",
+            "ssh://git@github.com/kura120/peika.git",
         ] {
-            assert_eq!(github_repo(url).as_deref(), Some("kura120/coucou"), "{url}");
+            assert_eq!(github_repo(url).as_deref(), Some("kura120/peika"), "{url}");
         }
         for url in [
             "https://gitlab.com/a/b.git",

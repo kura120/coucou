@@ -195,8 +195,8 @@ test("buildFileDiff — Write and other tools", () => {
 // ── A file's pill in the chat ─────────────────────────────────────────────────
 
 test("a file is placed from the folder Claude Code works in", () => {
-  assert.equal(relativePath("C:\\dev\\coucou\\windows\\src\\views\\chat.ts", "C:\\dev\\coucou"), "windows/src/views/chat.ts");
-  assert.equal(relativePath("c:/DEV/coucou/README.md", "C:\\dev\\coucou\\"), "README.md");
+  assert.equal(relativePath("C:\\dev\\peika\\windows\\src\\views\\chat.ts", "C:\\dev\\peika"), "windows/src/views/chat.ts");
+  assert.equal(relativePath("c:/DEV/peika/README.md", "C:\\dev\\peika\\"), "README.md");
   // Not under it, or no folder at all: the path as it is.
   assert.equal(relativePath("/etc/hosts", "/home/me/app"), "/etc/hosts");
   assert.equal(relativePath("/home/me/application/a.rs", "/home/me/app"), "/home/me/application/a.rs");

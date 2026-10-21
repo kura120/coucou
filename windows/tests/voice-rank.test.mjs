@@ -254,7 +254,7 @@ const DECLARED = [
   cap("prefill_chat", "free", { text }),
   cap("start_timer", "reversible", { minutes: { type: "number", description: "how long" } }),
   cap("set_setting", (args) => (args.setting === "language" ? "confirm" : "reversible"), { setting: { type: "entity", kind: "setting", description: "which" }, value: text }),
-  cap("toggle_mochi", () => "reversible"),
+  cap("toggle_peika", () => "reversible"),
   cap("quit", () => "confirm"),
   cap("needs_args", (args) => args.pill.tier),
   cap("by_entity", () => "reversible", { pill: entity }),
@@ -290,7 +290,7 @@ test("instant: never what takes a click", () => {
 });
 
 test("instant: a tier that depends on the arguments counts only when there are none to give", () => {
-  assert.equal(instant(clear("toggle_mochi"), DECLARED), "toggle_mochi");
+  assert.equal(instant(clear("toggle_peika"), DECLARED), "toggle_peika");
   assert.equal(instant(clear("by_entity"), DECLARED), null, "its tier may be confirm for the thing named");
   assert.equal(instant(clear("needs_args"), DECLARED), null, "it threw without its arguments");
 });

@@ -18,7 +18,7 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T |
   try {
     return await invoke<T>(cmd, args);
   } catch (err) {
-    console.error(`[coucou] ${cmd} failed`, err);
+    console.error(`[peika] ${cmd} failed`, err);
     return null;
   }
 }
@@ -33,7 +33,7 @@ export interface BootInfo {
   cursorPoll: boolean;
 }
 
-/** The bundled engine's parts (src-tauri/src/voice/engine.rs): what hears free speech, and Mochi's voice. */
+/** The bundled engine's parts (src-tauri/src/voice/engine.rs): what hears free speech, and Peika's voice. */
 export type VoiceEnginePart = "hearing" | "speaking";
 
 /** src-tauri/src/voice/mod.rs `Status`. */
@@ -247,12 +247,12 @@ export const Bridge = {
   toggleMaximizeSettingsWindow: () => call<void>("toggle_maximize_settings_window"),
   dragSettingsWindow: () => call<void>("drag_settings_window"),
 
-  /** Writes to %LOCALAPPDATA%\Coucou\coucou.log, next to the Rust lines. */
+  /** Writes to %LOCALAPPDATA%\Peika\peika.log, next to the Rust lines. */
   log: (message: string) => call<void>("log_line", { message }),
 
   // ── Claude Code hooks ─────────────────────────────────────────────────────
   hooksStatus: () => call<HookStatus>("hooks_status"),
-  /** Pill ID → whether that agent's hooks reach Coucou (read-only, Mac #183). */
+  /** Pill ID → whether that agent's hooks reach Peika (read-only, Mac #183). */
   agentHooksStatus: () => call<Record<string, boolean>>("agent_hooks_status"),
   /** Diff to show before anything is written. `install: false` previews removal. */
   hooksPreview: (install: boolean) => callOrThrow<HookPreview>("hooks_preview", { install }),
@@ -298,7 +298,7 @@ export const Bridge = {
   /** "Nobody can act on this" — Claude Code asks in the terminal right away. */
   approvalDecline: (requestId: string) => call<void>("approval_decline", { requestId }),
 
-  // ── Phone link (Coucou for Android) ───────────────────────────────────────
+  // ── Phone link (Peika for Android) ───────────────────────────────────────
   phoneLinkStatus: () => call<PhoneLinkStatus>("phone_link_status"),
   /** Only ever from the switch in Settings. Throws with the reason if it cannot start. */
   phoneLinkSetEnabled: (enabled: boolean) => callOrThrow<PhoneLinkStatus>("phone_link_set_enabled", { enabled }),
@@ -336,7 +336,7 @@ export const Bridge = {
   phoneLinkPublish: (sessions: PhoneLinkSession[], approval: PhoneLinkApproval | null) =>
     call<void>("phone_link_publish", { sessions, approval }),
   phoneLinkPublishQuestion: (question: PhoneLinkQuestion | null) => call<void>("phone_link_publish_question", { question }),
-  /** What Mochi wears ("auto" or an outfit), for phones that asked for it. */
+  /** What Peika wears ("auto" or an outfit), for phones that asked for it. */
   phoneLinkPublishPrefs: (outfit: string) => call<void>("phone_link_publish_prefs", { outfit }),
 
   // ── Chat, files, secrets ──────────────────────────────────────────────────
@@ -406,25 +406,25 @@ export const Bridge = {
   /** Opens the folder of the image saved last. */
   recapRevealSaved: () => call<void>("recap_reveal_saved"),
 
-  // ── Mochi on the desktop (src-tauri/src/desktop.rs) ───────────────────────
-  desktopInfo: () => call<DesktopInfo>("desktop_mochi_info"),
+  // ── Peika on the desktop (src-tauri/src/desktop.rs) ───────────────────────
+  desktopInfo: () => call<DesktopInfo>("desktop_peika_info"),
   /** Dragged out of the island: (x, y) is the pointer in island-window coordinates. */
-  desktopPickUp: (x: number, y: number) => call<boolean>("desktop_mochi_pick_up", { x, y }),
+  desktopPickUp: (x: number, y: number) => call<boolean>("desktop_peika_pick_up", { x, y }),
   /** Linux: the pointer moved during that drag (Windows carries him from Rust). */
-  desktopCarry: (x: number, y: number) => call<void>("desktop_mochi_carry", { x, y }),
-  desktopCarryEnd: (x: number, y: number) => call<void>("desktop_mochi_carry_end", { x, y }),
-  /** A drag started on the desktop Mochi; resolves to his top-left corner. */
-  desktopDragBegin: () => call<[number, number] | null>("desktop_mochi_drag_begin"),
+  desktopCarry: (x: number, y: number) => call<void>("desktop_peika_carry", { x, y }),
+  desktopCarryEnd: (x: number, y: number) => call<void>("desktop_peika_carry_end", { x, y }),
+  /** A drag started on the desktop Peika; resolves to his top-left corner. */
+  desktopDragBegin: () => call<[number, number] | null>("desktop_peika_drag_begin"),
   /** X11: top-left corner, physical pixels. */
-  desktopDragMove: (x: number, y: number) => call<void>("desktop_mochi_drag_move", { x, y }),
-  desktopDragEnd: (x: number, y: number) => call<void>("desktop_mochi_drag_end", { x, y }),
+  desktopDragMove: (x: number, y: number) => call<void>("desktop_peika_drag_move", { x, y }),
+  desktopDragEnd: (x: number, y: number) => call<void>("desktop_peika_drag_end", { x, y }),
   /** From the island to his spot. False: no spot on any connected display.
    *  `anywhere`: the first-visit corner then, rather than staying home. */
-  desktopFlyOut: (anywhere = false) => call<boolean>("desktop_mochi_fly_out", { anywhere }),
+  desktopFlyOut: (anywhere = false) => call<boolean>("desktop_peika_fly_out", { anywhere }),
   /** To the island, then hidden. `forget`: he lives in the island again. */
-  desktopFlyHome: (forget: boolean) => call<boolean>("desktop_mochi_fly_home", { forget }),
+  desktopFlyHome: (forget: boolean) => call<boolean>("desktop_peika_fly_home", { forget }),
   /** Asleep, the cursor poll stops. */
-  desktopSetAsleep: (asleep: boolean) => call<void>("desktop_mochi_set_asleep", { asleep }),
+  desktopSetAsleep: (asleep: boolean) => call<void>("desktop_peika_set_asleep", { asleep }),
 
   // ── Spotify (src-tauri/src/spotify.rs) ────────────────────────────────────
   /** Reads the player again (the card came on screen) and reports it. */
@@ -438,7 +438,7 @@ export const Bridge = {
   spotifyInstalled: () => call<boolean>("spotify_installed"),
 
   // ── Voice ─────────────────────────────────────────────────────────────────
-  /** Whether "OK Coucou" is listening, and why not (Settings). */
+  /** Whether "OK Peika" is listening, and why not (Settings). */
   voiceStatus: () => call<VoiceStatus>("voice_status"),
   /** The island left the listening view itself: the command is not waited for. */
   voiceCancel: () => call<void>("voice_cancel"),
@@ -515,7 +515,7 @@ export const Bridge = {
   /** Downloads that part; progress arrives as `voice-engine` events. */
   voiceEngineInstall: (part: VoiceEnginePart) => call<void>("voice_engine_install", { part }),
   voiceEngineRemove: (part: VoiceEnginePart) => call<void>("voice_engine_remove", { part }),
-  /** Mochi says this out loud, when speaking is on and his voice is installed. */
+  /** Peika says this out loud, when speaking is on and his voice is installed. */
   voiceSay: (text: string) => call<void>("voice_say", { text }),
   /** Opens the mail app on a draft, for the user to read and send. False when the recipient is not one address. */
   openMailDraft: (to: string, subject: string, body: string) => call<boolean>("open_mail_draft", { to, subject, body }),
@@ -550,7 +550,7 @@ export interface ShortcutsReport {
   portal?: "pending" | "active" | null;
 }
 
-/** How the desktop Mochi's window works here (platform::DesktopMode). */
+/** How the desktop Peika's window works here (platform::DesktopMode). */
 export type DesktopMode = "poll" | "window" | "layer" | "off";
 
 export interface DesktopInfo {
@@ -559,13 +559,13 @@ export interface DesktopInfo {
   onDesktop: boolean;
 }
 
-/** An event for one window only (island ⇄ desktop Mochi). Never throws. */
+/** An event for one window only (island ⇄ desktop Peika). Never throws. */
 export async function emitToWindow(label: string, event: string, payload?: unknown) {
   if (!IS_TAURI) return;
   try {
     await emitTo(label, event, payload);
   } catch (err) {
-    console.error(`[coucou] emit ${event} failed`, err);
+    console.error(`[peika] emit ${event} failed`, err);
   }
 }
 
@@ -594,7 +594,7 @@ export interface ConversationSummary {
   dir: string;
   /** Seconds since 1970, at the last answer. */
   updated: number;
-  /** A session of Claude Code's own (a terminal, the Claude app): Coucou has no record to delete. */
+  /** A session of Claude Code's own (a terminal, the Claude app): Peika has no record to delete. */
   external?: boolean;
 }
 
@@ -656,7 +656,7 @@ export interface DroppedFile {
 
 export interface HookStatus {
   installed: boolean;
-  /** Coucou's status line relay (plan usage) is the status line in settings.json. */
+  /** Peika's status line relay (plan usage) is the status line in settings.json. */
   planRelayInstalled: boolean;
   settingsPath: string;
   hookPath: string;
@@ -669,7 +669,7 @@ export interface AgentHookStatus {
   id: string;
   name: string;
   installed: boolean;
-  /** The file (or files, one per line) Coucou writes. */
+  /** The file (or files, one per line) Peika writes. */
   path: string;
   hookReady: boolean;
   /** The island can allow or deny this agent's permission requests. */
@@ -696,7 +696,7 @@ export interface HookPreview {
 
 /** Same as `call`, but surfaces the error so the UI can show what went wrong. */
 async function callOrThrow<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (!IS_TAURI) throw new Error("not running inside Coucou");
+  if (!IS_TAURI) throw new Error("not running inside Peika");
   return invoke<T>(cmd, args);
 }
 
@@ -760,7 +760,7 @@ export async function onDragDrop(handler: (e: DragDropPayload) => void) {
       handler({ type: "drop", paths: [] });
       return;
     }
-    webview.postMessageWithAdditionalObjects("coucou-file-drop", files);
+    webview.postMessageWithAdditionalObjects("peika-file-drop", files);
   };
 
   window.addEventListener("dragenter", onEnter);
@@ -783,8 +783,8 @@ export async function onEvent<T>(name: string, handler: (payload: T) => void) {
 }
 
 /**
- * Whether the console hooks for trying things by hand (coucouVoice, coucouAsk,
- * coucouPreview…) are installed: in a plain browser, and in a development
+ * Whether the console hooks for trying things by hand (peikaVoice, peikaAsk,
+ * peikaPreview…) are installed: in a plain browser, and in a development
  * build of the app — never in a release.
  */
 export const CONSOLE_HOOKS = !IS_TAURI || Boolean((import.meta as { env?: { DEV?: boolean } }).env?.DEV);

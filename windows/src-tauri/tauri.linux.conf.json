@@ -7,8 +7,8 @@
       "rpm"
     ],
     "resources": {
-      "../target/release/coucou-hook.exe": null,
-      "../target/release/coucou-hook": "coucou-hook"
+      "../target/release/peika-hook.exe": null,
+      "../target/release/peika-hook": "peika-hook"
     },
     "linux": {
       "appimage": {
@@ -30,7 +30,7 @@
     "windows": [
       {
         "label": "island",
-        "title": "Coucou",
+        "title": "Peika",
         "url": "index.html",
         "width": 240,
         "height": 6,

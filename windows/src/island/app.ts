@@ -1,5 +1,5 @@
 // The app behind the declarations (capabilities/host.ts): each method here
-// does what a click in Coucou would do, on the real island. The capabilities
+// does what a click in Peika would do, on the real island. The capabilities
 // reach the app through this and nothing else; the registry they are declared
 // on is made here, once, with its guard — a click on a toast — and the lines
 // the executor shows.
@@ -23,7 +23,7 @@ import { Sound } from "../core/sound";
 import { SPOTIFY_ID, Spotify, spotifyPosition } from "../core/spotify";
 import { State, type Settings } from "../core/state";
 import { LANGUAGES, t } from "../i18n/i18n";
-import { OUTFIT_KEYS, OUTFIT_SELECTIONS, parseOutfit, type OutfitSelection } from "../mochi/wardrobe";
+import { OUTFIT_KEYS, OUTFIT_SELECTIONS, parseOutfit, type OutfitSelection } from "../peika/wardrobe";
 import { Recap } from "../recap/recap";
 import { formatDuration } from "../recap/summary";
 import { askToast, showToast } from "../toast/api";
@@ -37,7 +37,7 @@ const VIEW_OF: Readonly<Record<string, IslandViewName>> = { chat: "prompt", ward
 
 /** What the host needs of the island itself. */
 export interface IslandPorts {
-  /** Mochi on the desktop. */
+  /** Peika on the desktop. */
   desktop(): DesktopLink;
   /** The island's view under the listening one, and whether the island was open on it. */
   place(): { view: IslandViewName; open: boolean };
@@ -135,7 +135,7 @@ export function createAppHost(island: IslandPorts): AppHost {
 
   /** The models of each provider the picker shows, kept while the app runs: a provider is asked once. */
   const models = new Map<string, ChatModel[]>();
-  /** Whether the desktop Mochi was put to sleep from here: nothing else reads it back. */
+  /** Whether the desktop Peika was put to sleep from here: nothing else reads it back. */
   let asleep = false;
   // The recap's switches are Rust's; read once so that they are known without waiting.
   void Bridge.recapPrefs().then((prefs) => {
@@ -353,12 +353,12 @@ export function createAppHost(island: IslandPorts): AppHost {
 
     // ── Wardrobe ──
     outfits: () => OUTFIT_SELECTIONS.map((id) => ({ id, label: t(OUTFIT_KEYS[id]) })),
-    outfit: () => parseOutfit(State.settings.mochiOutfit),
+    outfit: () => parseOutfit(State.settings.peikaOutfit),
     wearOutfit(id) {
       const selection = OUTFIT_SELECTIONS.find((o) => o === id);
       if (!selection) return false;
       island.wearOutfit(selection);
-      return parseOutfit(State.settings.mochiOutfit) === selection;
+      return parseOutfit(State.settings.peikaOutfit) === selection;
     },
 
     // ── Recap ──
@@ -395,22 +395,22 @@ export function createAppHost(island: IslandPorts): AppHost {
       return Recap.prefs[option] === on;
     },
 
-    // ── Mochi on the desktop ──
-    mochi: () => ({ supported: island.desktop().supported, onDesktop: State.mochiOnDesktop, asleep: asleep && State.mochiOnDesktop }),
-    async mochiFlyOut() {
+    // ── Peika on the desktop ──
+    peika: () => ({ supported: island.desktop().supported, onDesktop: State.peikaOnDesktop, asleep: asleep && State.peikaOnDesktop }),
+    async peikaFlyOut() {
       const { supported, controller } = island.desktop();
       // The desktop shortcut's own way out; in flight or away for an alert, nothing.
       if (!supported || controller.phase !== "home") return false;
       await controller.flyOutOrHome();
-      return State.mochiOnDesktop;
+      return State.peikaOnDesktop;
     },
-    async mochiFlyHome() {
+    async peikaFlyHome() {
       await island.desktop().controller.flyHome();
       asleep = false;
-      return !State.mochiOnDesktop;
+      return !State.peikaOnDesktop;
     },
-    setMochiAsleep(next) {
-      if (!State.mochiOnDesktop) return false;
+    setPeikaAsleep(next) {
+      if (!State.peikaOnDesktop) return false;
       asleep = next;
       void Bridge.desktopSetAsleep(next);
       return true;
@@ -451,13 +451,13 @@ export function createAppHost(island: IslandPorts): AppHost {
       return true;
     },
 
-    // ── Coucou itself ──
+    // ── Peika itself ──
     listening: () => State.settings.voice.enabled,
     stopListening() {
       void setSetting("voice.enabled", false);
       // Closing the microphone is never made hard; the way back is on screen for a while.
       void askToast({
-        kind: "info", title: t("Voice is off"), text: t("Coucou no longer listens. Turn it back on here, or in Settings."),
+        kind: "info", title: t("Voice is off"), text: t("Peika no longer listens. Turn it back on here, or in Settings."),
         actions: { yes: t("Turn back on"), no: t("OK") }, durationMs: 20_000,
       }).then((answer) => {
         if (answer === "yes") void setSetting("voice.enabled", true);

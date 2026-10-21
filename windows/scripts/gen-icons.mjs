@@ -20,7 +20,7 @@ const RIM = [58, 74, 99]; // #3A4A63
 
 const SS = 4; // supersampling factor
 
-/** The cloud's puffs as [x, y, radius] in units of R (same as src/mochi/engine.ts). */
+/** The cloud's puffs as [x, y, radius] in units of R (same as src/peika/engine.ts). */
 const PUFFS = [
   [0, -0.3, 0.52], [-0.46, -0.12, 0.38], [0.46, -0.12, 0.38],
   [-0.72, 0.18, 0.36], [0.72, 0.18, 0.36], [-0.32, 0.36, 0.38], [0.32, 0.36, 0.38],

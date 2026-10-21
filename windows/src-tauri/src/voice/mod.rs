@@ -1,5 +1,5 @@
-// "OK Coucou" — hands-free voice control. Say the wake phrase (or press the
-// "Talk to Coucou" shortcut), the island opens on its listening view, the
+// "OK Peika" — hands-free voice control. Say the wake phrase (or press the
+// "Talk to Peika" shortcut), the island opens on its listening view, the
 // command is heard, and the island understands it and acts (src/voice/). This
 // side only listens: it owns the microphone and the recogniser.
 //
@@ -28,7 +28,7 @@
 // Linux has no system recogniser: nothing listens there yet.
 //
 // Two engines, each for what it is good at. The wake phrase is Windows' own
-// recogniser's (sapi.rs): it hears "coucou" where a free engine writes it a
+// recogniser's (sapi.rs): it hears "peika" where a free engine writes it a
 // different way each time. It is given the wake phrases and nothing else — a
 // fixed grammar can only hear the sentences it was given, and no list of
 // sentences is kept for voice. The command after it is always free speech,
@@ -42,7 +42,7 @@
 // The model that writes the sentence down is one of the bundled ones, or the
 // model server's own (hear.rs) with a bundled one behind it for the sentences
 // the server does not answer for in time.
-// And the two may be one breath, "OK Coucou, next track": Windows' recogniser
+// And the two may be one breath, "OK Peika, next track": Windows' recogniser
 // says when in the sentence the wake phrase ended, and what the microphone
 // gave after that moment is written down.
 //
@@ -137,7 +137,7 @@ pub enum Status {
     Listening,
     /// Microphone closed until the shortcut is pressed.
     Shortcut,
-    /// Coucou is paused, the screen is locked, or battery saver is on.
+    /// Peika is paused, the screen is locked, or battery saver is on.
     Paused,
     NoRecogniser,
     Microphone,
@@ -156,7 +156,7 @@ enum Control {
     /// The user is done talking: nothing more is listened for until the wake phrase.
     Rest,
     Paused(bool),
-    /// Mochi is speaking until then: nothing heard meanwhile is a command.
+    /// Peika is speaking until then: nothing heard meanwhile is a command.
     Hush(Instant),
     Stop,
 }
@@ -279,12 +279,12 @@ pub fn set_paused(paused: bool) {
     send(&s, Control::Paused(paused));
 }
 
-/// Mochi speaks for this long: the listener does not take him for the user.
+/// Peika speaks for this long: the listener does not take him for the user.
 fn hush(length: Duration) {
     send(&shared(), Control::Hush(Instant::now() + length));
 }
 
-/// The island has something for Mochi to say. Said only when speaking is on
+/// The island has something for Peika to say. Said only when speaking is on
 /// in Settings and the voice is installed.
 pub fn say(app: &AppHandle, pref: &VoicePref, text: &str) {
     if pref.enabled && pref.speak {
@@ -292,7 +292,7 @@ pub fn say(app: &AppHandle, pref: &VoicePref, text: &str) {
     }
 }
 
-/// The "Talk to Coucou" shortcut. Does nothing while voice is off.
+/// The "Talk to Peika" shortcut. Does nothing while voice is off.
 pub fn talk() {
     send(&shared(), Control::Talk);
 }
@@ -399,7 +399,7 @@ fn titled(title: &str, name: &str) -> bool {
     !name.trim().is_empty() && (title.contains(name.trim()) || (first.len() >= 4 && title.split(|c: char| !c.is_alphanumeric()).any(|w| w == first)))
 }
 
-/// The installed apps nearest to a name that is none of them, for Mochi to
+/// The installed apps nearest to a name that is none of them, for Peika to
 /// ask about ("Open Spotify?"): nothing is opened.
 #[derive(Serialize)]
 pub struct NearApps {
@@ -715,7 +715,7 @@ impl Free {
     }
 
     /// A command is listened for: where recordings stand in for the
-    /// microphone (a debug build's `COUCOU_VOICE_WAV`), the next one is said.
+    /// microphone (a debug build's `PEIKA_VOICE_WAV`), the next one is said.
     fn say_next(&mut self) {
         if let Some(capture) = self.capture.as_mut() {
             capture.say_next();
@@ -755,7 +755,7 @@ impl Free {
     fn tail(&self, sentence: &[f32], wake: Duration) -> Option<Raw> {
         let from = vad::after_wake(sentence.len(), wake)?;
         match self.written(&sentence[from..]) {
-            // Only the end of "coucou" was in there: not a command that was missed.
+            // Only the end of "peika" was in there: not a command that was missed.
             Raw::Rejected => None,
             command => Some(command),
         }
@@ -868,7 +868,7 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, rx: &Receiver<Control>) 
     let mut ear = Listen::Nothing;
     let mut held_checked: Option<Instant> = None;
     let mut hush_until: Option<Instant> = None;
-    // The command is the rest of the sentence that woke Coucou: not to be forgotten.
+    // The command is the rest of the sentence that woke Peika: not to be forgotten.
     let mut same_breath = false;
     // A voice was heard in the follow-up time: told once, until that sentence ends.
     let mut follow_heard = false;
@@ -888,7 +888,7 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, rx: &Receiver<Control>) 
             }
         }
         let now = Instant::now();
-        // While Mochi speaks, what is waited for waits on, and nothing heard counts.
+        // While Peika speaks, what is waited for waits on, and nothing heard counts.
         let hushed = hush_until.is_some_and(|until| now < until);
         if hushed {
             session.speaking(now);
@@ -935,7 +935,7 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, rx: &Receiver<Control>) 
                 return give_up(app, generation, why);
             }
             // Another command may follow without the wake phrase: the island
-            // shows Mochi still listening, and that he has stopped.
+            // shows Peika still listening, and that he has stopped.
             if want == Listen::FollowUp {
                 note(app, "following");
             } else if ear == Listen::FollowUp && want != Listen::Command {
@@ -990,7 +990,7 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, rx: &Receiver<Control>) 
                 if !free.speaking() {
                     follow_heard = false;
                 }
-                // The glow under the island moves with the voice, not with Mochi's.
+                // The glow under the island moves with the voice, not with Peika's.
                 if freely && level_told.elapsed() >= LEVEL_EVERY {
                     level_told = Instant::now();
                     let loudest = free.loudest();
@@ -1008,7 +1008,7 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, rx: &Receiver<Control>) 
             if let Some(heard) = heard {
                 tell(app, heard);
             }
-            // "OK Coucou, next track": the sentence the wake phrase was in may
+            // "OK Peika, next track": the sentence the wake phrase was in may
             // go on, and what follows it is the command.
             if woke {
                 same_breath = true;
@@ -1194,7 +1194,7 @@ mod seen_tests {
     #[test]
     fn a_window_is_an_apps_by_its_title() {
         assert!(titled("Spotify Premium", "Spotify"));
-        assert!(titled("main.rs — coucou — Visual Studio Code", "Visual Studio Code"));
+        assert!(titled("main.rs — peika — Visual Studio Code", "Visual Studio Code"));
         assert!(titled("#general | Discord", "Discord"));
         // Its first word alone, when it is a word of the title and long enough to mean it.
         assert!(titled("Figma — Untitled", "Figma Desktop"));
@@ -1212,18 +1212,18 @@ mod tests {
     /// One breath, on recorded sentences and without a microphone: Windows'
     /// recogniser hears the wake phrase and says when it ended, the voice
     /// detector cuts the sentence out, and what follows the wake phrase is
-    /// written down — or there is nothing after it. `COUCOU_VOICE_CLIPS` holds
+    /// written down — or there is nothing after it. `PEIKA_VOICE_CLIPS` holds
     /// `alone.wav` and `with-command.wav` (16 kHz, 16-bit mono, quiet around
-    /// the speech); `COUCOU_VOICE_RUNTIME` and `COUCOU_VOICE_MODEL` the engine.
-    /// `cargo test -p coucou voice::tests -- --ignored --nocapture`
+    /// the speech); `PEIKA_VOICE_RUNTIME` and `PEIKA_VOICE_MODEL` the engine.
+    /// `cargo test -p peika voice::tests -- --ignored --nocapture`
     #[test]
     #[ignore = "needs the downloaded engine and recorded clips"]
     fn a_command_said_in_the_same_breath_as_the_wake_phrase_is_written_down() {
         let var = |name: &str| std::path::PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set")));
-        let engine = sherpa::Engine::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_MODEL"), sherpa::test_family()).expect("engine");
+        let engine = sherpa::Engine::load(&var("PEIKA_VOICE_RUNTIME"), &var("PEIKA_VOICE_MODEL"), sherpa::test_family()).expect("engine");
 
         let after_wake = |file: &str| -> Option<String> {
-            let path = var("COUCOU_VOICE_CLIPS").join(file);
+            let path = var("PEIKA_VOICE_CLIPS").join(file);
             // Windows' recogniser: is it the wake phrase, and when did it end?
             let mut recogniser = Recogniser::open_on(Some(&path)).expect("recogniser");
             recogniser.listen(Listen::Wake).expect("listen");
@@ -1251,7 +1251,7 @@ mod tests {
 
         assert_eq!(after_wake("alone.wav"), None, "nothing follows the wake phrase said alone");
         let command = after_wake("with-command.wav").expect("a command follows");
-        for word in std::env::var("COUCOU_VOICE_EXPECT").unwrap_or_default().to_lowercase().split_whitespace() {
+        for word in std::env::var("PEIKA_VOICE_EXPECT").unwrap_or_default().to_lowercase().split_whitespace() {
             assert!(command.contains(word), "{word:?} not in {command:?}");
         }
     }
@@ -1259,15 +1259,15 @@ mod tests {
     /// The free-speech path on real audio, without a microphone: a recorded
     /// sentence with quiet around it is fed as a microphone would give it, cut
     /// out by the voice detector and written down by the engine.
-    /// `COUCOU_VOICE_RUNTIME`, `COUCOU_VOICE_MODEL` and `COUCOU_VOICE_WAV`
+    /// `PEIKA_VOICE_RUNTIME`, `PEIKA_VOICE_MODEL` and `PEIKA_VOICE_WAV`
     /// (16-bit mono) say where things are.
-    /// `cargo test -p coucou voice::tests -- --ignored --nocapture`
+    /// `cargo test -p peika voice::tests -- --ignored --nocapture`
     #[test]
     #[ignore = "needs the downloaded engine"]
     fn a_sentence_in_a_stream_is_cut_out_and_written_down() {
         let var = |name: &str| std::path::PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set")));
-        let engine = sherpa::Engine::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_MODEL"), sherpa::test_family()).expect("engine");
-        let bytes = std::fs::read(var("COUCOU_VOICE_WAV")).expect("wav");
+        let engine = sherpa::Engine::load(&var("PEIKA_VOICE_RUNTIME"), &var("PEIKA_VOICE_MODEL"), sherpa::test_family()).expect("engine");
+        let bytes = std::fs::read(var("PEIKA_VOICE_WAV")).expect("wav");
         let rate = u32::from_le_bytes(bytes[24..28].try_into().unwrap()) as f64;
         let data = bytes.windows(4).position(|w| w == b"data").expect("data chunk") + 8;
         let recorded: Vec<f32> = bytes[data..].chunks_exact(2).map(|b| f32::from(i16::from_le_bytes([b[0], b[1]])) / 32768.0).collect();
@@ -1291,7 +1291,7 @@ mod tests {
             }
         }
         assert_eq!(heard.len(), 1, "one sentence was said");
-        let expected = std::env::var("COUCOU_VOICE_EXPECT").unwrap_or_default().to_lowercase();
+        let expected = std::env::var("PEIKA_VOICE_EXPECT").unwrap_or_default().to_lowercase();
         for word in expected.split_whitespace() {
             assert!(heard[0].to_lowercase().contains(word), "{word:?} not in {:?}", heard[0]);
         }

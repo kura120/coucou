@@ -1,4 +1,4 @@
-// Mochi — direct port of NotchBuddy/Sources/App/BotEngine.swift to Canvas 2D.
+// Peika — direct port of NotchBuddy/Sources/App/BotEngine.swift to Canvas 2D.
 // Same constants, same tweens, same easings, same particles. The only intentional
 // difference is the `happy`/`wink` eye arc, which follows the prototype
 // (design/prototype/notch-buddy.html, the visual source of truth) — the Swift
@@ -61,7 +61,7 @@ interface Particle {
   age: number; life: number; rot: number; size: number;
 }
 
-// ── Constants (MochiConst / PISTES.mochi) ─────────────────────────────────────
+// ── Constants (PeikaConst / PISTES.peika) ─────────────────────────────────────
 
 const EYE_W = 0.25;
 const EYE_H = 0.27;
@@ -133,14 +133,14 @@ const EMOTE_EYE: Record<BotEmoteName, EyeShape> = {
 const now = () => performance.now() / 1000;
 
 /**
- * How fast Mochi changes colour when another pill comes to the front: each
+ * How fast Peika changes colour when another pill comes to the front: each
  * 70 ms he covers most of what is left, so he is there in about a quarter of
  * a second, quickly at first.
  */
 const BODY_BLEND = 0.07;
 
 /**
- * The colour Mochi wears a frame later, on its way from `shown` to `target`
+ * The colour Peika wears a frame later, on its way from `shown` to `target`
  * (null is his own white). Changing pill changes his colour over a moment
  * instead of at once. He is his own white again — gradient, reflection and
  * all — only once the blend has reached it.
@@ -230,7 +230,7 @@ export function danceTransform(seconds: number, level: number, R: number) {
 
 export class BotEngine {
   isMini = false;
-  /** Solid body colour for mini bots / integration pills (null = Mochi gradient). */
+  /** Solid body colour for mini bots / integration pills (null = Peika gradient). */
   bodyColor: RGB | null = null;
 
   // Animated state (BotEngine `s`)
@@ -238,7 +238,7 @@ export class BotEngine {
   sx = 1; sy = 1; oy = 0; ox = 0;
   tint = 0; morph = 0; hands = 0; blush = 0; es = 1; badgeS = 0;
 
-  // Outfit (the main Mochi only — minis never wear one). `outfit` is what is
+  // Outfit (the main Peika only — minis never wear one). `outfit` is what is
   // drawn; it changes only once the previous one has left.
   outfit: Outfit = "none";
   /** 0 = gone, 1 = fully on. */
@@ -302,7 +302,7 @@ export class BotEngine {
   private miniLookTarget = { x: 0, y: 0 };
   private miniLookNextTime = 0;
 
-  // Listening ("OK Coucou"): head tilted, eyes wide, right hand to the ear.
+  // Listening ("OK Peika"): head tilted, eyes wide, right hand to the ear.
   /** 0 = at rest, 1 = raised beside the head. */
   listenHand = 0;
   /** Peekaboo: 0 = puffs away, 1 = both puffs over the eyes. */
@@ -617,8 +617,8 @@ export class BotEngine {
   }
 
   /**
-   * Dresses Mochi. Animated: the old outfit leaves (180 ms), the new one drops
-   * in (350 ms) and Mochi does a little squash — BotEngine.setOutfit on macOS.
+   * Dresses Peika. Animated: the old outfit leaves (180 ms), the new one drops
+   * in (350 ms) and Peika does a little squash — BotEngine.setOutfit on macOS.
    */
   setOutfit(next: Outfit, animated = true) {
     if (next === this.outfitTarget) return;

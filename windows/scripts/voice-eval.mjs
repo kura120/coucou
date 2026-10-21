@@ -129,7 +129,7 @@ function setup() {
     },
 
     sessions: () => [
-      { id: "integration_claude", name: "VS Code", state: "working", doing: "running the test suite in coucou" },
+      { id: "integration_claude", name: "VS Code", state: "working", doing: "running the test suite in peika" },
       { id: "agent_codex", name: "Codex", state: "approval", doing: "wants to run: rm -rf dist" },
     ],
     openSession: (id) => (log.push(`session:${short(id)}`), true),
@@ -186,7 +186,7 @@ function setup() {
       { provider: "ollama", providerName: "Ollama", id: "qwen2.5:7b-instruct", label: "qwen2.5:7b-instruct" },
     ],
     setChatModel: async (provider, model) => (log.push(`chat:model:${model}`), Object.assign(s.chat, { provider, model }), true),
-    conversations: async () => [{ id: "c1", title: "Fix the build", dir: "C:/dev/coucou", updated: 1_790_000_000 }],
+    conversations: async () => [{ id: "c1", title: "Fix the build", dir: "C:/dev/peika", updated: 1_790_000_000 }],
     openConversation: async (id) => (log.push(`chat:open:${id}`), true),
 
     outfits: () => [{ id: "auto", label: "Auto (seasons)" }, { id: "none", label: "None" }, { id: "crown", label: "Crown" }, { id: "partyHat", label: "Party hat" }, { id: "sunglasses", label: "Sunglasses" }],
@@ -197,10 +197,10 @@ function setup() {
     recapLines: async () => ["12 sessions", "9 h 20 coding", "busiest day: Tuesday", "top agent: Claude Code"],
     setRecapOption: async (option, on) => (log.push(`recap:${option}=${on}`), true),
 
-    mochi: () => ({ supported: true, onDesktop: false, asleep: false }),
-    mochiFlyOut: async () => (log.push("mochi:out"), true),
-    mochiFlyHome: async () => (log.push("mochi:home"), true),
-    setMochiAsleep: () => false,
+    peika: () => ({ supported: true, onDesktop: false, asleep: false }),
+    peikaFlyOut: async () => (log.push("peika:out"), true),
+    peikaFlyHome: async () => (log.push("peika:home"), true),
+    setPeikaAsleep: () => false,
 
     services: () => [{ id: "integration_github", name: "GitHub", line: "main: passing, 2 open pull requests" }, { id: "integration_vercel", name: "Vercel", line: "last deploy 4 minutes ago" }],
     serviceInfo: (id) => (id === "integration_github" ? ["main: passing", "2 open pull requests"] : ["last deploy 4 minutes ago"]),
@@ -237,7 +237,7 @@ function setup() {
     ...(createLearnedNames ? { names: createLearnedNames() } : {}),
   });
   registerApp(registry, host);
-  registry.screen(() => ({ view: "overview", subjects: [{ kind: "session", id: "integration_claude", label: "VS Code" }], summary: "VS Code (working): running the test suite in coucou" }));
+  registry.screen(() => ({ view: "overview", subjects: [{ kind: "session", id: "integration_claude", label: "VS Code" }], summary: "VS Code (working): running the test suite in peika" }));
   return { log, s, registry };
 }
 
@@ -442,7 +442,7 @@ const SETTING = "confirm:Change a setting?";
 // toast); "answer" (words, no effect) or "answer:word|word" (the answer has
 // one of them); "ask:Name" (a question is on screen, about that); "ignored"
 // (a sentence said to someone else did nothing: no effect, no toast, no
-// question — since 2026-10-18 such a sentence is taken as said to Coucou and
+// question — since 2026-10-18 such a sentence is taken as said to Peika and
 // may be answered in words, which is not counted against it); "rest" (nothing
 // done or asked, nothing shown, and listening ends); "pardon" (nothing done
 // or asked, a card shown, and listening goes on: "Sorry?"). `any(…)`: one
@@ -482,30 +482,30 @@ const ONE = [
   [["pause the music and remove stripe"], ["pause", "-stripe"]],
   [["ad get hub"], "nothing"], // GitHub is already there
   [["next rack"], ["next"]],
-  // The music, or Coucou's listening? Asking is fair.
-  [["pause"], any(["pause"], "ask:Music|Coucou")],
+  // The music, or Peika's listening? Asking is fair.
+  [["pause"], any(["pause"], "ask:Music|Peika")],
   [["add notion"], ["+notion"]],
   [["never mind"], "nothing"],
   [["ok done"], "nothing"],
   [["alright that is everything thanks"], "nothing"],
   // The app itself.
   [["mute"], ["set:soundEnabled=false"]],
-  [["open coucou settings"], ["view:settings"]],
+  [["open peika settings"], ["view:settings"]],
   [["show me the chat"], ["view:chat"]],
   [["bring up the wardrobe for me would you"], ["view:wardrobe"]],
   [["set the sound effects to thirty percent"], ["set:soundVolume=0.06"]],
   [["could you put the sound effects at about thirty percent for me"], ["set:soundVolume=0.06"]],
   // What would leave nobody to put it right by voice is asked first, and a spoken yes does it.
   [["turn voice off"], "ask:voice"],
-  [["put a crown on mochi"], ["wear:crown"]],
-  [["pause coucou"], "ask:Coucou"],
+  [["put a crown on peika"], ["wear:crown"]],
+  [["pause peika"], "ask:Peika"],
   [["can you look up how to center a div"], any(["search"], ["browse"])],
   [["tell claude to run the tests again and fix what fails"], ["chat:prepare"]],
   // What takes a click, and gets none: the toast, and nothing else.
   [["no decline that"], [DECLINE]],
   [["deny it"], [DECLINE]],
   [["set the language to french"], [SETTING]],
-  [["quit coucou"], ["confirm:Quit Coucou?"]],
+  [["quit peika"], ["confirm:Quit Peika?"]],
   // What there is no capability for.
   [["hey can you install the claude hooks for me"], "nothing"],
   [["change the model server address to http evil dot example"], "nothing"],
@@ -579,7 +579,7 @@ const TURNS = [
   [[{ confirm: true }, "set the language to french"], [SETTING, "set:language=fr"]],
   [["tell claude to run the tests", "send it"], ["chat:prepare", "confirm:Send this message?"]],
   [["tell claude to run the tests", { confirm: true }, "send it"], ["chat:prepare", "confirm:Send this message?", "SEND"]],
-  // A yes is only ever a yes to what Mochi asked.
+  // A yes is only ever a yes to what Peika asked.
   [["yes"], "nothing"],
 ];
 
@@ -596,9 +596,9 @@ const NEGATIONS = [
   [["don't switch to codex"], "nothing"],
 ];
 
-// Said without the wake phrase, after a turn or not: taken as said to Coucou,
+// Said without the wake phrase, after a turn or not: taken as said to Peika,
 // and the local model calls nothing for what plainly was not. For nobody:
-// nothing done ("ignored"). For Coucou: done.
+// nothing done ("ignored"). For Peika: done.
 const NOBODY = [
   [[{ again: "see you at four then" }], "ignored"],
   [[{ again: "the cat sat on it" }], "ignored"],
@@ -629,7 +629,7 @@ const REPAIRS = [
   [["add notion", "what's playing", "no i meant resend"], any(["+notion", "-notion", "+resend"])],
 ];
 
-// Said to Coucou by name and heard badly: the speech model was not sure of
+// Said to Peika by name and heard badly: the speech model was not sure of
 // its words. What it asks nothing of is answered "Sorry?", and listening goes
 // on; a sentence heard well that asks nothing still ends the conversation.
 const UNCLEAR = [
@@ -642,7 +642,7 @@ const UNCLEAR = [
   [[{ said: "skip this song", sure: [0.9, 0.95, 0.97] }], ["next"]],
 ];
 
-// What would leave Coucou deaf to a correction — voice off, Coucou paused — is
+// What would leave Peika deaf to a correction — voice off, Peika paused — is
 // asked first: yes does it, no or silence leaves it. Stopping the music is
 // still done at once.
 const QUIET = [
@@ -650,9 +650,9 @@ const QUIET = [
   [["turn voice off", "no"], "nothing"],
   [["turn voice off", { click: { kind: "yes_no", yes: true } }], ["voice-off"]],
   [["can you stop listening for a bit", "yeah"], ["voice-off"]],
-  [["pause coucou", "yeah"], ["paused"]],
-  [["pause coucou", "no"], "nothing"],
-  [["take a break coucou", "do it"], ["paused"]],
+  [["pause peika", "yeah"], ["paused"]],
+  [["pause peika", "no"], "nothing"],
+  [["take a break peika", "do it"], ["paused"]],
   [["um stop spotify real quick"], ["pause"]],
   [["stop the music"], ["pause"]],
 ];

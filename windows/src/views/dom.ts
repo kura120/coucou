@@ -138,12 +138,12 @@ export function clear(el: Element) {
 
 /**
  * How far from a pill's edge a centred name must stay to clear the little
- * Mochi (he ends at 31 px) with some air; `.pill .lbl.long` in style.css.
+ * Peika (he ends at 31 px) with some air; `.pill .lbl.long` in style.css.
  */
 const PILL_BOT_CLEARANCE = 38;
 
 /**
- * A pill's name is centred across the whole pill, the little Mochi included.
+ * A pill's name is centred across the whole pill, the little Peika included.
  * One wide enough to reach him is marked `long`: it starts after him instead,
  * and is cut with an ellipsis at the pill's other end. Called again whenever
  * the name changes (a track's title on the Spotify pill).

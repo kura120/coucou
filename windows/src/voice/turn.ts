@@ -1,4 +1,4 @@
-// One sentence in, what Mochi makes of it out (doc/voice-brain.md, 3.4). The
+// One sentence in, what Peika makes of it out (doc/voice-brain.md, 3.4). The
 // app declared what it can do (core/capabilities); here a sentence is turned
 // into calls to it, by the cheapest of three tiers that can:
 //
@@ -10,9 +10,9 @@
 //   cloud    when the user allowed it, what the local model handed up or
 //            could not answer goes to the provider chosen for the chat
 //
-// Before any of them: was the sentence said to Coucou? The wake phrase settles
+// Before any of them: was the sentence said to Peika? The wake phrase settles
 // it. Without it — the few seconds after a turn — it is taken as said to
-// Coucou too (the user's choice: better answer a remark than ignore a
+// Peika too (the user's choice: better answer a remark than ignore a
 // request), given only to a model on this computer, with the turn before;
 // the model calls `nothing` for what plainly was for someone else, and the
 // island then closes again. Such a sentence never reaches the cloud.
@@ -23,7 +23,7 @@
 // `confirm`). The texts below are instructions to a model, not rules about
 // wording. The one comparison with the sentence is of names: whether it
 // holds a name a model wrote (`asHeard`), by the matcher's own normalising.
-// What Mochi says of what was done is the capabilities' own lines; a model
+// What Peika says of what was done is the capabilities' own lines; a model
 // words only what was read, given nothing but the results (`report`).
 // Nothing said is written to disk or logged.
 
@@ -104,7 +104,7 @@ export interface TurnWords {
   beyond(): string;
   /** While the cloud model works. */
   askingCloud(): string;
-  /** Said to Coucou by name, heard too unsure to act on, and nothing asked of it: "Sorry?", and listening goes on. */
+  /** Said to Peika by name, heard too unsure to act on, and nothing asked of it: "Sorry?", and listening goes on. */
   pardon(): string;
 }
 
@@ -120,7 +120,7 @@ export interface TurnOptions {
   cloud: () => CloudModel | null;
   /**
    * Whether a sentence said without the wake phrase may be given to the local
-   * model, to decide whether it was meant for Coucou: only when the model
+   * model, to decide whether it was meant for Peika: only when the model
    * server is this computer. False: such a sentence is for nobody.
    */
   followUp?: () => boolean;
@@ -144,11 +144,11 @@ export interface TurnOptions {
 }
 
 export interface Hearing {
-  /** False for a sentence said without the wake phrase: the local model decides whether it was for Coucou. */
+  /** False for a sentence said without the wake phrase: the local model decides whether it was for Peika. */
   wake?: boolean;
   /** How sure the speech model was of each word, when it says. */
   sure?: readonly number[];
-  /** The sentence is taken as said to Coucou: called before anything shows or runs. Not called for one that is ignored. */
+  /** The sentence is taken as said to Peika: called before anything shows or runs. Not called for one that is ignored. */
   taken?: () => void;
   /** The answer has to be waited for. `line`: what is being done, when known. `ms`: for how long at most, when it is long. */
   waiting?: (line?: string, ms?: number) => void;
@@ -162,7 +162,7 @@ export interface Hearing {
 export interface Heard {
   /** For the card; null when there is nothing to show. */
   result: VoiceResult | null;
-  /** False for a sentence that was not for Coucou: nothing was done and nothing is shown. */
+  /** False for a sentence that was not for Peika: nothing was done and nothing is shown. */
   taken: boolean;
   /** The user is done talking: nothing more is listened for until the wake phrase. */
   rest: boolean;
@@ -201,7 +201,7 @@ interface Running {
   ran: Ran[];
   /** When the time a turn may take started; set again after the user answered a question. */
   started: number;
-  /** Taken as said to Coucou: always, now; false only for a turn that ends ignored. */
+  /** Taken as said to Peika: always, now; false only for a turn that ends ignored. */
   taken: boolean;
   /** Said after the wake phrase. Without it, the sentence never reaches the cloud. */
   wake: boolean;
@@ -216,7 +216,7 @@ const IGNORED: Heard = { result: null, taken: false, rest: false };
 
 // ── What a model is told ──────────────────────────────────────────────────────
 
-const INTRO = "You are the voice of Coucou, a small desktop app: its user has just said one sentence to it, and you act for them through the app's own capabilities, given to you as tools.";
+const INTRO = "You are the voice of Peika, a small desktop app: its user has just said one sentence to it, and you act for them through the app's own capabilities, given to you as tools.";
 
 /** Said after the app's state: a small model follows best what it read last. */
 const ROLE = [
@@ -228,7 +228,7 @@ const ROLE = [
   "- A correction of the turn before is a request. Another thing meant (\"no, I meant Resend\", \"no, Vercel\"): call instead with it. The change only taken back (\"take that one off\", \"actually I changed my mind\"): call undo. The last change is in the state as last_change.",
   "- Some capabilities wait for the user's click before anything happens. That is the app's doing: call them when they are what was asked.",
   "- A question about the app is answered from its state, below, or by a capability that reads.",
-  "- When what was heard asks nothing of Coucou, call the capability named nothing.",
+  "- When what was heard asks nothing of Peika, call the capability named nothing.",
   "- When no capability does what was asked, say so in words. Never call one that does something else instead.",
   "- Never say something was done unless a capability's result says so.",
   "- When you answer in words: one or two short sentences, plain text, no lists.",
@@ -239,7 +239,7 @@ const SHORTLISTED = "Your tools are the capabilities nearest to what was said. W
 
 /** Told to the model of a sentence said without the wake phrase. */
 const ASIDE =
-  "This sentence was said without Coucou's name, a few seconds after the turn above. Take it as said to Coucou, as a request or a follow-up of the turn above, and act on it. Call the capability named nothing only when it is plainly said to someone else in the room: a remark to a person, a plan or a time that is not for Coucou.";
+  "This sentence was said without Peika's name, a few seconds after the turn above. Take it as said to Peika, as a request or a follow-up of the turn above, and act on it. Call the capability named nothing only when it is plainly said to someone else in the room: a remark to a person, a plan or a time that is not for Peika.";
 
 const AFTER_CALLS =
   "The results of your calls are above. If what was asked needs another capability, call it now. Otherwise say what happened in one short sentence, from the results alone.";
@@ -254,7 +254,7 @@ const EMPTY = "Your last answer called a capability that does not exist here, an
 /** Said once to words that claim an action or ask in words, with nothing called: one more round, with the capabilities. */
 const WORDS_ONLY = "You answered in words and called no capability, so nothing was done and nothing is on screen for the user to answer. If they asked for something to be done, call the capability that does it now. If you need to ask them something, call ask_user. If they only asked a question that the app's state answers, or nothing here does what was asked, give that answer again in words.";
 
-/** Once the app's capabilities ran, the model only decides what else to call: its words are not what Mochi says. */
+/** Once the app's capabilities ran, the model only decides what else to call: its words are not what Peika says. */
 const AFTER_RAN = "The results of your calls are above. If a call failed and can be made right with another value or another setting, make it now. If what was asked needs another capability, call it now. Otherwise tell the user, in one short sentence, what the results say was done — only that.";
 
 /** After what was only asked for, not seen: the model only decides what else to call. */
@@ -470,7 +470,7 @@ export class VoiceTurns {
 
     const heard = await this.understand(turn, ranked);
     if (!turn.taken) {
-      this.trace("ignored: not taken as said to Coucou");
+      this.trace("ignored: not taken as said to Peika");
       return IGNORED;
     }
     this.trace(`card: ${heard.result ? `${heard.result.outcome} ${JSON.stringify(heard.result.message)}` : "nothing shown"}${heard.worded === false ? ` · the model's words did not hold up (${heard.unworded})` : ""}${heard.rest ? " · done talking" : ""}`);
@@ -499,7 +499,7 @@ export class VoiceTurns {
     turn.how.waiting?.();
     let came = await this.locally(local, turn, ranked);
     if (came.is === "dropped") return { result: null, taken: true, rest: false };
-    // Said to Coucou by name, a name in it only nearly the app's, and the model did nothing with it:
+    // Said to Peika by name, a name in it only nearly the app's, and the model did nothing with it:
     // asked once more, told so, with only asking and what takes that kind of thing to choose from.
     const doubt = turn.wake && came.is === "answered" && turn.ran.length > 0 && turn.ran.every((ran) => ran.call.name === NOTHING)
       ? turn.named.find((n) => n.near) : undefined;
@@ -507,7 +507,7 @@ export class VoiceTurns {
       turn.ran = [];
       this.trace(`second look: "${doubt.heard ?? turn.said}" may be ${doubt.label} (${doubt.kind})`);
       came = await this.locally(local, turn, ranked, {
-        note: `The user said Coucou's name: this was said to Coucou, and it asks for something. In it, ${doubt.heard ? `"${doubt.heard}"` : "a name"} is most likely ${doubt.label} (${doubt.kind}), misheard. Ask them with ask_user whether they meant ${doubt.label}, or call what does it with the name as they said it; the app asks before acting on a name it is not sure of.`,
+        note: `The user said Peika's name: this was said to Peika, and it asks for something. In it, ${doubt.heard ? `"${doubt.heard}"` : "a name"} is most likely ${doubt.label} (${doubt.kind}), misheard. Ask them with ask_user whether they meant ${doubt.label}, or call what does it with the name as they said it; the app asks before acting on a name it is not sure of.`,
         only: [ASK_USER, ...this.registry.all().filter((c) => kindsOf(c).includes(doubt.kind)).map((c) => c.name)],
       });
       if (came.is === "dropped") return { result: null, taken: true, rest: false };
@@ -550,7 +550,7 @@ export class VoiceTurns {
   }
 
   /**
-   * "OK Coucou" was heard: the embedding model is got ready while the
+   * "OK Peika" was heard: the embedding model is got ready while the
    * sentence is said — the capabilities embedded when they changed, else one
    * word, so that a server that let the model go has it back in memory. A
    * failure here is not held against it: the sentence asks again.
@@ -606,7 +606,7 @@ export class VoiceTurns {
   private heardCall(call: ModelCall, turn: Running): Promise<ModelCall> {
     const capability = this.registry.get(call.name);
     // What the capability does not take, or is given as null, is no part of the call: a model that adds it
-    // asks for the same thing again (measured: quit_coucou({"object": null}) after the toast was left unclicked).
+    // asks for the same thing again (measured: quit_peika({"object": null}) after the toast was left unclicked).
     const taken = capability
       ? { ...call, arguments: Object.fromEntries(Object.entries(call.arguments ?? {}).filter(([arg, value]) => arg in capability.args && value != null)) }
       : call;
@@ -712,7 +712,7 @@ export class VoiceTurns {
     /** The app asked about a misheard name in place of the model's question: once. */
     let redirected = false;
     for (let round = 1; ; round++) {
-      // Calls written out as text are calls; what is left of them is never Mochi's words.
+      // Calls written out as text are calls; what is left of them is never Peika's words.
       const calls = reply.calls.length ? reply.calls : written(reply.text, declared);
       if (!calls.length) {
         let answer = reply;
@@ -864,7 +864,7 @@ export class VoiceTurns {
    * words. `failure`: the turn's own line when nothing could be done at all.
    */
   private end(turn: Running, words: string, failure?: string): Heard {
-    // Not taken as said to Coucou: nothing is shown, and nothing is remembered.
+    // Not taken as said to Peika: nothing is shown, and nothing is remembered.
     if (!turn.taken) return IGNORED;
     const shown = shownOf(turn);
     const calls = turn.ran.map((ran) => ran.call);
@@ -874,7 +874,7 @@ export class VoiceTurns {
     };
 
     if (!shown.length) {
-      // Asked for nothing: the user is done. Said to Coucou by name but heard too unsure to act on: asked again, and listening goes on.
+      // Asked for nothing: the user is done. Said to Peika by name but heard too unsure to act on: asked again, and listening goes on.
       if (turn.ran.some((ran) => ran.call.name === NOTHING)) {
         if (turn.wake && unclear(turn.how.sure)) return finish({ outcome: "failure", message: this.words.pardon() }, false);
         return finish(null, true);
@@ -1038,7 +1038,7 @@ export function unclear(sure: readonly number[] | undefined): boolean {
 
 /**
  * Nobody waits for this turn any more: the island moved on. Only once it was
- * taken as said to Coucou — before that, a sentence said without the wake
+ * taken as said to Peika — before that, a sentence said without the wake
  * phrase has no view waiting on it at all, and dropping it there lost every
  * follow-up ("next track" a few seconds after a command did nothing).
  */
@@ -1063,7 +1063,7 @@ const acted = (turn: Running) =>
  *   numbers  each number in the words is in the results
  *
  * Not checked: which action the words say, when they name nothing the app
- * has ("Coucou is paused" after pause_music). Tried with the embedding
+ * has ("Peika is paused" after pause_music). Tried with the embedding
  * model — one that ran among the three capabilities nearest the words —
  * and measured: 27 rejections in 114 worded turns, every one of them true
  * ("Spotify has been opened" is nearest to opening a conversation). Gone.

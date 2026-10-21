@@ -1,4 +1,4 @@
-// The keys that answer a question Mochi has on screen: Ctrl+Shift+1…9 for a
+// The keys that answer a question Peika has on screen: Ctrl+Shift+1…9 for a
 // choice (1 and 2 for yes and no), Ctrl+Shift+Enter to confirm what was
 // dictated. Held only while the question is there, as a toast holds its Yes
 // and No (toast.rs): the island never has the keyboard, so these are global.

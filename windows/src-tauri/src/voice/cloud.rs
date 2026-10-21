@@ -2,7 +2,7 @@
 // the user chose for chat. Off unless `voice.cloud` is on in Settings.
 //
 // Version one is Claude Code only — the provider that answers with the
-// user's own Claude plan, with no key of Coucou's (claude_code.rs). For any
+// user's own Claude plan, with no key of Peika's (claude_code.rs). For any
 // other chat provider nothing is asked, and the log says it is not supported
 // yet. A turn counts against the plan's limits like a chat turn does.
 //
@@ -10,7 +10,7 @@
 // the last turns, the sentence — and reaches the app only through the MCP
 // endpoint (mcp.rs): Claude Code is started with that one server and nothing
 // else. No tool of its own (no file, shell or web tool), no settings read (so
-// Coucou's hooks do not fire for it), nothing saved to disk, and only that
+// Peika's hooks do not fire for it), nothing saved to disk, and only that
 // server's tools allowed without a prompt. The island still guards every
 // call; a `confirm` capability still takes its click.
 //
@@ -99,7 +99,7 @@ fn mcp_config(relay: &Path, secret: &str) -> String {
 /// sentence. The oldest turns go first when there are too many.
 fn message(system: &str, history: &[brain::Turn], said: &str) -> Vec<String> {
     let cut = |text: &str, most: usize| text.chars().take(most).collect::<String>();
-    let mut parts = vec![format!("Coucou's briefing:\n{}", system.trim())];
+    let mut parts = vec![format!("Peika's briefing:\n{}", system.trim())];
     let turns: Vec<&brain::Turn> = history[history.len().saturating_sub(MAX_TURNS)..].iter().filter(|turn| !turn.said.trim().is_empty()).collect();
     if !turns.is_empty() {
         let mut earlier = String::from("Earlier in this conversation, oldest first:");
@@ -107,10 +107,10 @@ fn message(system: &str, history: &[brain::Turn], said: &str) -> Vec<String> {
             earlier.push_str(&format!("\nUser: {}", cut(turn.said.trim(), MAX_SAID)));
             for call in turn.calls.iter().filter(|call| !call.name.trim().is_empty()).take(MAX_TURN_CALLS) {
                 let arguments = if call.arguments.is_object() { call.arguments.to_string() } else { "{}".to_string() };
-                earlier.push_str(&format!("\nCoucou called: {}", cut(&format!("{} {arguments}", call.name.trim()), MAX_CALL)));
+                earlier.push_str(&format!("\nPeika called: {}", cut(&format!("{} {arguments}", call.name.trim()), MAX_CALL)));
             }
             if !turn.result.trim().is_empty() {
-                earlier.push_str(&format!("\nCoucou: {}", cut(turn.result.trim(), MAX_RESULT)));
+                earlier.push_str(&format!("\nPeika: {}", cut(turn.result.trim(), MAX_RESULT)));
             }
         }
         parts.push(earlier);
@@ -232,26 +232,26 @@ mod tests {
 
     #[test]
     fn claude_code_is_given_the_relay_as_its_one_server_with_the_turns_secret() {
-        let config: Value = serde_json::from_str(&mcp_config(Path::new(r"C:\Users\Jane O'Neil\AppData\Local\Coucou\bin\coucou-hook.exe"), "abc123")).unwrap();
+        let config: Value = serde_json::from_str(&mcp_config(Path::new(r"C:\Users\Jane O'Neil\AppData\Local\Peika\bin\peika-hook.exe"), "abc123")).unwrap();
         let servers = config["mcpServers"].as_object().unwrap();
-        assert_eq!(servers.keys().collect::<Vec<_>>(), ["coucou"]);
-        let server = &servers["coucou"];
+        assert_eq!(servers.keys().collect::<Vec<_>>(), ["peika"]);
+        let server = &servers["peika"];
         assert_eq!(server["type"], "stdio");
-        assert_eq!(server["command"], "C:/Users/Jane O'Neil/AppData/Local/Coucou/bin/coucou-hook.exe");
+        assert_eq!(server["command"], "C:/Users/Jane O'Neil/AppData/Local/Peika/bin/peika-hook.exe");
         assert_eq!(server["args"], json!(["--mcp"]));
-        assert_eq!(server["env"], json!({ "COUCOU_MCP_TURN": "abc123" }));
+        assert_eq!(server["env"], json!({ "PEIKA_MCP_TURN": "abc123" }));
         // One line, and nothing a `.cmd` cannot carry.
-        let text = mcp_config(Path::new(r"C:\x\coucou-hook.exe"), "abc123");
+        let text = mcp_config(Path::new(r"C:\x\peika-hook.exe"), "abc123");
         assert!(!text.contains(['\n', '\r', '%', '\\']));
         // The whole command line names that server and allows its tools alone.
         let args = claude_code::voice_args("m", &text, mcp::SERVER);
-        assert!(args.contains(&text) && args.contains(&"mcp__coucou".to_string()));
+        assert!(args.contains(&text) && args.contains(&"mcp__peika".to_string()));
     }
 
     #[test]
     fn the_message_is_the_briefing_the_turns_so_far_and_the_sentence() {
-        let alone = message(" You are in Coucou. ", &[], " pause the music ");
-        assert_eq!(alone, ["Coucou's briefing:\nYou are in Coucou.", "The user now says:\npause the music"]);
+        let alone = message(" You are in Peika. ", &[], " pause the music ");
+        assert_eq!(alone, ["Peika's briefing:\nYou are in Peika.", "The user now says:\npause the music"]);
 
         let history: Vec<brain::Turn> = serde_json::from_value(json!([
             { "said": "open figma", "calls": [{ "name": "open_app", "arguments": { "app": "Figma" } }], "result": "Opened Figma." },
@@ -264,8 +264,8 @@ mod tests {
         assert_eq!(
             parts[1],
             "Earlier in this conversation, oldest first:\n\
-             User: open figma\nCoucou called: open_app {\"app\":\"Figma\"}\nCoucou: Opened Figma.\n\
-             User: what time is it\nCoucou: It is four."
+             User: open figma\nPeika called: open_app {\"app\":\"Figma\"}\nPeika: Opened Figma.\n\
+             User: what time is it\nPeika: It is four."
         );
         assert_eq!(parts[2], "The user now says:\nand spotify");
     }
@@ -287,7 +287,7 @@ mod tests {
         // The last six, three calls each, every piece cut.
         assert_eq!(earlier.matches("\nUser: ").count(), MAX_TURNS);
         assert!(earlier.contains("sentence 39") && !earlier.contains("sentence 33 "));
-        assert_eq!(earlier.matches("\nCoucou called: ").count(), MAX_TURNS * MAX_TURN_CALLS);
+        assert_eq!(earlier.matches("\nPeika called: ").count(), MAX_TURNS * MAX_TURN_CALLS);
         assert!(earlier.len() < MAX_TURNS * (MAX_SAID + MAX_TURN_CALLS * MAX_CALL + MAX_RESULT + 100));
     }
 
@@ -307,13 +307,13 @@ mod tests {
     /// with, started exactly as `voice_cloud` starts it. It counts against
     /// that plan, so it runs only when asked for:
     ///
-    ///   cargo build --release -p coucou-hook
-    ///   cargo test -p coucou voice::cloud::tests::claude_code_answers_a_voice_turn -- --ignored --nocapture
+    ///   cargo build --release -p peika-hook
+    ///   cargo test -p peika voice::cloud::tests::claude_code_answers_a_voice_turn -- --ignored --nocapture
     ///
     /// What it shows: Claude Code takes the command line (the MCP server as
     /// its only configuration, no tool of its own, no settings) and answers
     /// in words. What it cannot show: a tool call. The relay it starts talks
-    /// to whichever Coucou is running, not to this test, and that Coucou has
+    /// to whichever Peika is running, not to this test, and that Peika has
     /// no turn with this test's secret: it answers "no voice turn is running"
     /// (or nothing at all, if it is an older build, which takes the line for
     /// a hook event it does not know). So the model is offered no tool here
@@ -325,7 +325,7 @@ mod tests {
     fn claude_code_answers_a_voice_turn() {
         let exe = claude_code::installed().expect("Claude Code is not installed");
         let relay = Path::new(env!("CARGO_MANIFEST_DIR")).join("../target/release").join(crate::platform::HOOK_EXE);
-        assert!(relay.is_file(), "build the relay first: cargo build --release -p coucou-hook");
+        assert!(relay.is_file(), "build the relay first: cargo build --release -p peika-hook");
         let running = mcp::endpoint().begin().expect("a turn");
         let parts = message("You are being tested. Call no tool.", &[], "Answer with the single word: ready");
         let started = Instant::now();

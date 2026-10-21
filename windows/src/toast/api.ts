@@ -1,4 +1,4 @@
-// Showing a toast from any page — the island, Settings, the desktop Mochi.
+// Showing a toast from any page — the island, Settings, the desktop Peika.
 // The toasts' own window draws it (./main.ts); Rust carries it there and brings
 // a decision's answer back (src-tauri/src/toast.rs).
 //
@@ -22,7 +22,7 @@ export async function showToast(toast: ToastRequest): Promise<string | null> {
   try {
     return await invoke<string>("toast_show", { toast: { ...toast, id: toast.id ?? "" } });
   } catch (err) {
-    console.error("[coucou] toast_show failed", err);
+    console.error("[peika] toast_show failed", err);
     return null;
   }
 }
@@ -37,7 +37,7 @@ export async function askToast(toast: ToastRequest): Promise<ToastAnswer> {
   try {
     return await invoke<ToastAnswer>("toast_ask", { toast: { ...toast, id: toast.id ?? "" } });
   } catch (err) {
-    console.error("[coucou] toast_ask failed", err);
+    console.error("[peika] toast_ask failed", err);
     return "dismissed";
   }
 }

@@ -89,27 +89,27 @@
    "ru": "Модель эмбеддингов",
    "id": "Model embedding"
   },
-  "Finds which of Coucou's commands a sentence is closest to, before any model is asked. It runs on the server chosen above.": {
-   "zh-Hans": "在询问任何模型之前，先找出一句话最接近 Coucou 的哪条命令。它运行在上面选择的服务器上。",
-   "hi": "किसी मॉडल से पूछने से पहले यह पता लगाता है कि वाक्य Coucou के किस आदेश के सबसे करीब है। यह ऊपर चुने गए सर्वर पर चलता है।",
-   "es": "Encuentra a cuál de las órdenes de Coucou se parece más una frase, antes de preguntar a ningún modelo. Funciona en el servidor elegido arriba.",
-   "ar": "يجد أي أوامر Coucou أقرب إلى الجملة، قبل سؤال أي نموذج. يعمل على الخادم المختار أعلاه.",
-   "fr": "Trouve de quelle commande de Coucou une phrase est la plus proche, avant d’interroger un modèle. Il tourne sur le serveur choisi ci-dessus.",
-   "bn": "কোনো মডেলকে জিজ্ঞাসা করার আগে খুঁজে বের করে বাক্যটি Coucou-র কোন কমান্ডের সবচেয়ে কাছাকাছি। এটি উপরে বেছে নেওয়া সার্ভারে চলে।",
-   "pt-BR": "Encontra de qual comando do Coucou uma frase está mais próxima, antes de perguntar a qualquer modelo. Roda no servidor escolhido acima.",
-   "ru": "Находит, к какой из команд Coucou ближе всего фраза, ещё до обращения к модели. Работает на сервере, выбранном выше.",
-   "id": "Mencari perintah Coucou mana yang paling dekat dengan sebuah kalimat, sebelum model mana pun ditanya. Berjalan di server yang dipilih di atas."
+  "Finds which of Peika's commands a sentence is closest to, before any model is asked. It runs on the server chosen above.": {
+   "zh-Hans": "在询问任何模型之前，先找出一句话最接近 Peika 的哪条命令。它运行在上面选择的服务器上。",
+   "hi": "किसी मॉडल से पूछने से पहले यह पता लगाता है कि वाक्य Peika के किस आदेश के सबसे करीब है। यह ऊपर चुने गए सर्वर पर चलता है।",
+   "es": "Encuentra a cuál de las órdenes de Peika se parece más una frase, antes de preguntar a ningún modelo. Funciona en el servidor elegido arriba.",
+   "ar": "يجد أي أوامر Peika أقرب إلى الجملة، قبل سؤال أي نموذج. يعمل على الخادم المختار أعلاه.",
+   "fr": "Trouve de quelle commande de Peika une phrase est la plus proche, avant d’interroger un modèle. Il tourne sur le serveur choisi ci-dessus.",
+   "bn": "কোনো মডেলকে জিজ্ঞাসা করার আগে খুঁজে বের করে বাক্যটি Peika-র কোন কমান্ডের সবচেয়ে কাছাকাছি। এটি উপরে বেছে নেওয়া সার্ভারে চলে।",
+   "pt-BR": "Encontra de qual comando do Peika uma frase está mais próxima, antes de perguntar a qualquer modelo. Roda no servidor escolhido acima.",
+   "ru": "Находит, к какой из команд Peika ближе всего фраза, ещё до обращения к модели. Работает на сервере, выбранном выше.",
+   "id": "Mencari perintah Peika mana yang paling dekat dengan sebuah kalimat, sebelum model mana pun ditanya. Berjalan di server yang dipilih di atas."
   },
-  "This server has no embedding model. You install one on your server yourself: Coucou downloads nothing here.": {
-   "zh-Hans": "此服务器没有嵌入模型。请自行在服务器上安装一个：Coucou 在这里不会下载任何东西。",
-   "hi": "इस सर्वर पर कोई एम्बेडिंग मॉडल नहीं है। आप अपने सर्वर पर इसे खुद इंस्टॉल करते हैं: Coucou यहाँ कुछ भी डाउनलोड नहीं करता।",
-   "es": "Este servidor no tiene ningún modelo de embeddings. Lo instalas tú en tu servidor: Coucou no descarga nada aquí.",
-   "ar": "لا يوجد نموذج تضمين على هذا الخادم. تثبّته أنت بنفسك على خادمك: لا ينزّل Coucou شيئًا هنا.",
-   "fr": "Ce serveur n’a aucun modèle d’embedding. Vous en installez un vous-même sur votre serveur : Coucou ne télécharge rien ici.",
-   "bn": "এই সার্ভারে কোনো এমবেডিং মডেল নেই। আপনি নিজেই আপনার সার্ভারে একটি ইনস্টল করবেন: Coucou এখানে কিছুই ডাউনলোড করে না।",
-   "pt-BR": "Este servidor não tem nenhum modelo de embeddings. Você mesmo instala um no seu servidor: o Coucou não baixa nada aqui.",
-   "ru": "На этом сервере нет модели эмбеддингов. Вы устанавливаете её на свой сервер сами: Coucou здесь ничего не загружает.",
-   "id": "Server ini tidak punya model embedding. Anda memasangnya sendiri di server Anda: Coucou tidak mengunduh apa pun di sini."
+  "This server has no embedding model. You install one on your server yourself: Peika downloads nothing here.": {
+   "zh-Hans": "此服务器没有嵌入模型。请自行在服务器上安装一个：Peika 在这里不会下载任何东西。",
+   "hi": "इस सर्वर पर कोई एम्बेडिंग मॉडल नहीं है। आप अपने सर्वर पर इसे खुद इंस्टॉल करते हैं: Peika यहाँ कुछ भी डाउनलोड नहीं करता।",
+   "es": "Este servidor no tiene ningún modelo de embeddings. Lo instalas tú en tu servidor: Peika no descarga nada aquí.",
+   "ar": "لا يوجد نموذج تضمين على هذا الخادم. تثبّته أنت بنفسك على خادمك: لا ينزّل Peika شيئًا هنا.",
+   "fr": "Ce serveur n’a aucun modèle d’embedding. Vous en installez un vous-même sur votre serveur : Peika ne télécharge rien ici.",
+   "bn": "এই সার্ভারে কোনো এমবেডিং মডেল নেই। আপনি নিজেই আপনার সার্ভারে একটি ইনস্টল করবেন: Peika এখানে কিছুই ডাউনলোড করে না।",
+   "pt-BR": "Este servidor não tem nenhum modelo de embeddings. Você mesmo instala um no seu servidor: o Peika não baixa nada aqui.",
+   "ru": "На этом сервере нет модели эмбеддингов. Вы устанавливаете её на свой сервер сами: Peika здесь ничего не загружает.",
+   "id": "Server ini tidak punya model embedding. Anda memasangnya sendiri di server Anda: Peika tidak mengunduh apa pun di sini."
   },
   "Use the cloud when needed": {
    "zh-Hans": "需要时使用云端",
@@ -122,16 +122,16 @@
    "ru": "Использовать облако при необходимости",
    "id": "Gunakan cloud bila perlu"
   },
-  "When the local model cannot handle a request, the sentence and a description of Coucou's state are sent to the provider chosen for chat ({provider}). It counts against your plan or key with that provider. Off: nothing is sent to it.": {
-   "zh-Hans": "当本地模型无法处理某个请求时，这句话和对 Coucou 状态的描述会发送给为聊天选择的提供商（{provider}）。这会计入你在该提供商的套餐或密钥用量。关闭时：不会向它发送任何内容。",
-   "hi": "जब लोकल मॉडल कोई अनुरोध नहीं संभाल पाता, तो वाक्य और Coucou की स्थिति का विवरण चैट के लिए चुने गए प्रदाता ({provider}) को भेजा जाता है। यह उस प्रदाता के आपके प्लान या कुंजी में गिना जाता है। बंद: उसे कुछ नहीं भेजा जाता।",
-   "es": "Cuando el modelo local no puede con una petición, la frase y una descripción del estado de Coucou se envían al proveedor elegido para el chat ({provider}). Cuenta para tu plan o tu clave con ese proveedor. Desactivado: no se le envía nada.",
-   "ar": "عندما لا يستطيع النموذج المحلي معالجة طلب، تُرسل الجملة ووصف لحالة Coucou إلى المزوّد المختار للدردشة ({provider}). يُحتسب ذلك من خطتك أو مفتاحك لدى ذلك المزوّد. عند الإيقاف: لا يُرسل إليه شيء.",
-   "fr": "Quand le modèle local ne sait pas traiter une demande, la phrase et une description de l’état de Coucou sont envoyées au fournisseur choisi pour le chat ({provider}). Cela compte dans votre forfait ou votre clé chez ce fournisseur. Désactivé : rien ne lui est envoyé.",
-   "bn": "লোকাল মডেল কোনো অনুরোধ সামলাতে না পারলে বাক্যটি এবং Coucou-র অবস্থার একটি বিবরণ চ্যাটের জন্য বেছে নেওয়া প্রোভাইডারের ({provider}) কাছে পাঠানো হয়। এটি ওই প্রোভাইডারে আপনার প্ল্যান বা কী-র হিসাবে গণনা হয়। বন্ধ থাকলে: তার কাছে কিছুই পাঠানো হয় না।",
-   "pt-BR": "Quando o modelo local não consegue lidar com um pedido, a frase e uma descrição do estado do Coucou são enviadas ao provedor escolhido para o chat ({provider}). Isso conta no seu plano ou na sua chave com esse provedor. Desligado: nada é enviado a ele.",
-   "ru": "Когда локальная модель не справляется с запросом, фраза и описание состояния Coucou отправляются провайдеру, выбранному для чата ({provider}). Это расходует ваш тариф или ключ у этого провайдера. Выключено: ему ничего не отправляется.",
-   "id": "Saat model lokal tidak sanggup menangani permintaan, kalimat itu dan deskripsi keadaan Coucou dikirim ke penyedia yang dipilih untuk obrolan ({provider}). Ini dihitung pada paket atau kunci Anda di penyedia tersebut. Mati: tidak ada yang dikirim ke sana."
+  "When the local model cannot handle a request, the sentence and a description of Peika's state are sent to the provider chosen for chat ({provider}). It counts against your plan or key with that provider. Off: nothing is sent to it.": {
+   "zh-Hans": "当本地模型无法处理某个请求时，这句话和对 Peika 状态的描述会发送给为聊天选择的提供商（{provider}）。这会计入你在该提供商的套餐或密钥用量。关闭时：不会向它发送任何内容。",
+   "hi": "जब लोकल मॉडल कोई अनुरोध नहीं संभाल पाता, तो वाक्य और Peika की स्थिति का विवरण चैट के लिए चुने गए प्रदाता ({provider}) को भेजा जाता है। यह उस प्रदाता के आपके प्लान या कुंजी में गिना जाता है। बंद: उसे कुछ नहीं भेजा जाता।",
+   "es": "Cuando el modelo local no puede con una petición, la frase y una descripción del estado de Peika se envían al proveedor elegido para el chat ({provider}). Cuenta para tu plan o tu clave con ese proveedor. Desactivado: no se le envía nada.",
+   "ar": "عندما لا يستطيع النموذج المحلي معالجة طلب، تُرسل الجملة ووصف لحالة Peika إلى المزوّد المختار للدردشة ({provider}). يُحتسب ذلك من خطتك أو مفتاحك لدى ذلك المزوّد. عند الإيقاف: لا يُرسل إليه شيء.",
+   "fr": "Quand le modèle local ne sait pas traiter une demande, la phrase et une description de l’état de Peika sont envoyées au fournisseur choisi pour le chat ({provider}). Cela compte dans votre forfait ou votre clé chez ce fournisseur. Désactivé : rien ne lui est envoyé.",
+   "bn": "লোকাল মডেল কোনো অনুরোধ সামলাতে না পারলে বাক্যটি এবং Peika-র অবস্থার একটি বিবরণ চ্যাটের জন্য বেছে নেওয়া প্রোভাইডারের ({provider}) কাছে পাঠানো হয়। এটি ওই প্রোভাইডারে আপনার প্ল্যান বা কী-র হিসাবে গণনা হয়। বন্ধ থাকলে: তার কাছে কিছুই পাঠানো হয় না।",
+   "pt-BR": "Quando o modelo local não consegue lidar com um pedido, a frase e uma descrição do estado do Peika são enviadas ao provedor escolhido para o chat ({provider}). Isso conta no seu plano ou na sua chave com esse provedor. Desligado: nada é enviado a ele.",
+   "ru": "Когда локальная модель не справляется с запросом, фраза и описание состояния Peika отправляются провайдеру, выбранному для чата ({provider}). Это расходует ваш тариф или ключ у этого провайдера. Выключено: ему ничего не отправляется.",
+   "id": "Saat model lokal tidak sanggup menangani permintaan, kalimat itu dan deskripsi keadaan Peika dikirim ke penyedia yang dipilih untuk obrolan ({provider}). Ini dihitung pada paket atau kunci Anda di penyedia tersebut. Mati: tidak ada yang dikirim ke sana."
   },
   "Web answers": {
    "zh-Hans": "网络回答",
@@ -166,38 +166,38 @@
    "ru": "Никто: открывается браузер",
    "id": "Tidak ada: browser dibuka"
   },
-  "Coucou sends nothing: your browser opens on the search.": {
-   "zh-Hans": "Coucou 不发送任何内容：浏览器会打开搜索页面。",
-   "hi": "Coucou कुछ नहीं भेजता: आपका ब्राउज़र खोज पर खुलता है।",
-   "es": "Coucou no envía nada: tu navegador se abre en la búsqueda.",
-   "ar": "لا يرسل Coucou شيئًا: يفتح متصفحك على البحث.",
-   "fr": "Coucou n’envoie rien : votre navigateur s’ouvre sur la recherche.",
-   "bn": "Coucou কিছুই পাঠায় না: আপনার ব্রাউজার সার্চে খোলে।",
-   "pt-BR": "O Coucou não envia nada: seu navegador abre na busca.",
-   "ru": "Coucou ничего не отправляет: браузер открывается на поиске.",
-   "id": "Coucou tidak mengirim apa pun: browser Anda dibuka pada pencarian."
+  "Peika sends nothing: your browser opens on the search.": {
+   "zh-Hans": "Peika 不发送任何内容：浏览器会打开搜索页面。",
+   "hi": "Peika कुछ नहीं भेजता: आपका ब्राउज़र खोज पर खुलता है।",
+   "es": "Peika no envía nada: tu navegador se abre en la búsqueda.",
+   "ar": "لا يرسل Peika شيئًا: يفتح متصفحك على البحث.",
+   "fr": "Peika n’envoie rien : votre navigateur s’ouvre sur la recherche.",
+   "bn": "Peika কিছুই পাঠায় না: আপনার ব্রাউজার সার্চে খোলে।",
+   "pt-BR": "O Peika não envia nada: seu navegador abre na busca.",
+   "ru": "Peika ничего не отправляет: браузер открывается на поиске.",
+   "id": "Peika tidak mengirim apa pun: browser Anda dibuka pada pencarian."
   },
-  "What you ask is sent to Brave Search with your own key, and the results are read on this computer. Coucou keeps nothing.": {
-   "zh-Hans": "你的问题会用你自己的密钥发送给 Brave Search，结果在这台电脑上读取。Coucou 不保留任何内容。",
-   "hi": "आप जो पूछते हैं वह आपकी अपनी कुंजी के साथ Brave Search को भेजा जाता है, और नतीजे इसी कंप्यूटर पर पढ़े जाते हैं। Coucou कुछ नहीं रखता।",
-   "es": "Lo que preguntas se envía a Brave Search con tu propia clave, y los resultados se leen en este ordenador. Coucou no guarda nada.",
-   "ar": "يُرسل ما تسأل عنه إلى Brave Search بمفتاحك الخاص، وتُقرأ النتائج على هذا الحاسوب. لا يحتفظ Coucou بشيء.",
-   "fr": "Ce que vous demandez est envoyé à Brave Search avec votre propre clé, et les résultats sont lus sur cet ordinateur. Coucou ne garde rien.",
-   "bn": "আপনি যা জিজ্ঞাসা করেন তা আপনার নিজের কী দিয়ে Brave Search-এ পাঠানো হয়, আর ফলাফল এই কম্পিউটারেই পড়া হয়। Coucou কিছুই রাখে না।",
-   "pt-BR": "O que você pergunta é enviado ao Brave Search com a sua própria chave, e os resultados são lidos neste computador. O Coucou não guarda nada.",
-   "ru": "Ваш вопрос отправляется в Brave Search с вашим собственным ключом, а результаты читаются на этом компьютере. Coucou ничего не хранит.",
-   "id": "Yang Anda tanyakan dikirim ke Brave Search dengan kunci Anda sendiri, dan hasilnya dibaca di komputer ini. Coucou tidak menyimpan apa pun."
+  "What you ask is sent to Brave Search with your own key, and the results are read on this computer. Peika keeps nothing.": {
+   "zh-Hans": "你的问题会用你自己的密钥发送给 Brave Search，结果在这台电脑上读取。Peika 不保留任何内容。",
+   "hi": "आप जो पूछते हैं वह आपकी अपनी कुंजी के साथ Brave Search को भेजा जाता है, और नतीजे इसी कंप्यूटर पर पढ़े जाते हैं। Peika कुछ नहीं रखता।",
+   "es": "Lo que preguntas se envía a Brave Search con tu propia clave, y los resultados se leen en este ordenador. Peika no guarda nada.",
+   "ar": "يُرسل ما تسأل عنه إلى Brave Search بمفتاحك الخاص، وتُقرأ النتائج على هذا الحاسوب. لا يحتفظ Peika بشيء.",
+   "fr": "Ce que vous demandez est envoyé à Brave Search avec votre propre clé, et les résultats sont lus sur cet ordinateur. Peika ne garde rien.",
+   "bn": "আপনি যা জিজ্ঞাসা করেন তা আপনার নিজের কী দিয়ে Brave Search-এ পাঠানো হয়, আর ফলাফল এই কম্পিউটারেই পড়া হয়। Peika কিছুই রাখে না।",
+   "pt-BR": "O que você pergunta é enviado ao Brave Search com a sua própria chave, e os resultados são lidos neste computador. O Peika não guarda nada.",
+   "ru": "Ваш вопрос отправляется в Brave Search с вашим собственным ключом, а результаты читаются на этом компьютере. Peika ничего не хранит.",
+   "id": "Yang Anda tanyakan dikirim ke Brave Search dengan kunci Anda sendiri, dan hasilnya dibaca di komputer ini. Peika tidak menyimpan apa pun."
   },
-  "What you ask and the last few turns are sent to Anthropic, which searches the web. It counts against your Claude plan or key. Coucou keeps nothing.": {
-   "zh-Hans": "你的问题和最近几轮对话会发送给 Anthropic，由它搜索网络。这会计入你的 Claude 套餐或密钥用量。Coucou 不保留任何内容。",
-   "hi": "आप जो पूछते हैं वह और पिछली कुछ बातें Anthropic को भेजी जाती हैं, जो वेब पर खोजता है। यह आपके Claude प्लान या कुंजी में गिना जाता है। Coucou कुछ नहीं रखता।",
-   "es": "Lo que preguntas y los últimos turnos se envían a Anthropic, que busca en la web. Cuenta para tu plan o tu clave de Claude. Coucou no guarda nada.",
-   "ar": "يُرسل ما تسأل عنه وآخر بضع جولات إلى Anthropic التي تبحث في الويب. يُحتسب ذلك من خطة Claude أو مفتاحك. لا يحتفظ Coucou بشيء.",
-   "fr": "Ce que vous demandez et les derniers échanges sont envoyés à Anthropic, qui cherche sur le web. Cela compte dans votre forfait ou votre clé Claude. Coucou ne garde rien.",
-   "bn": "আপনি যা জিজ্ঞাসা করেন তা এবং শেষ কয়েকটি কথোপকথন Anthropic-এ পাঠানো হয়, যা ওয়েবে খোঁজে। এটি আপনার Claude প্ল্যান বা কী-র হিসাবে গণনা হয়। Coucou কিছুই রাখে না।",
-   "pt-BR": "O que você pergunta e as últimas trocas são enviados à Anthropic, que pesquisa na web. Isso conta no seu plano ou na sua chave do Claude. O Coucou não guarda nada.",
-   "ru": "Ваш вопрос и несколько последних реплик отправляются в Anthropic, которая ищет в интернете. Это расходует ваш тариф или ключ Claude. Coucou ничего не хранит.",
-   "id": "Yang Anda tanyakan dan beberapa giliran terakhir dikirim ke Anthropic, yang mencari di web. Ini dihitung pada paket atau kunci Claude Anda. Coucou tidak menyimpan apa pun."
+  "What you ask and the last few turns are sent to Anthropic, which searches the web. It counts against your Claude plan or key. Peika keeps nothing.": {
+   "zh-Hans": "你的问题和最近几轮对话会发送给 Anthropic，由它搜索网络。这会计入你的 Claude 套餐或密钥用量。Peika 不保留任何内容。",
+   "hi": "आप जो पूछते हैं वह और पिछली कुछ बातें Anthropic को भेजी जाती हैं, जो वेब पर खोजता है। यह आपके Claude प्लान या कुंजी में गिना जाता है। Peika कुछ नहीं रखता।",
+   "es": "Lo que preguntas y los últimos turnos se envían a Anthropic, que busca en la web. Cuenta para tu plan o tu clave de Claude. Peika no guarda nada.",
+   "ar": "يُرسل ما تسأل عنه وآخر بضع جولات إلى Anthropic التي تبحث في الويب. يُحتسب ذلك من خطة Claude أو مفتاحك. لا يحتفظ Peika بشيء.",
+   "fr": "Ce que vous demandez et les derniers échanges sont envoyés à Anthropic, qui cherche sur le web. Cela compte dans votre forfait ou votre clé Claude. Peika ne garde rien.",
+   "bn": "আপনি যা জিজ্ঞাসা করেন তা এবং শেষ কয়েকটি কথোপকথন Anthropic-এ পাঠানো হয়, যা ওয়েবে খোঁজে। এটি আপনার Claude প্ল্যান বা কী-র হিসাবে গণনা হয়। Peika কিছুই রাখে না।",
+   "pt-BR": "O que você pergunta e as últimas trocas são enviados à Anthropic, que pesquisa na web. Isso conta no seu plano ou na sua chave do Claude. O Peika não guarda nada.",
+   "ru": "Ваш вопрос и несколько последних реплик отправляются в Anthropic, которая ищет в интернете. Это расходует ваш тариф или ключ Claude. Peika ничего не хранит.",
+   "id": "Yang Anda tanyakan dan beberapa giliran terakhir dikirim ke Anthropic, yang mencari di web. Ini dihitung pada paket atau kunci Claude Anda. Peika tidak menyimpan apa pun."
   },
   "Brave Search key": {
    "zh-Hans": "Brave Search 密钥",
@@ -287,16 +287,16 @@
    "ru": "+ субагент",
    "id": "+ subagen"
   },
-  "A hook group named \"coucou\" that Coucou did not write is already there — Coucou has not touched it.": {
-   "zh-Hans": "已存在一个并非 Coucou 写入的名为“coucou”的 hook 组 — Coucou 没有修改它。",
-   "hi": "“coucou” नाम का एक hook समूह पहले से है जिसे Coucou ने नहीं लिखा — Coucou ने इसे नहीं छुआ।",
-   "es": "Ya existe un grupo de hooks llamado «coucou» que no escribió Coucou — Coucou no lo ha tocado.",
-   "ar": "توجد بالفعل مجموعة hooks باسم «coucou» لم يكتبها Coucou — لم يمسّها Coucou.",
-   "fr": "Un groupe de hooks nommé « coucou » que Coucou n'a pas écrit existe déjà — Coucou n'y a pas touché.",
-   "bn": "“coucou” নামে একটি hook গ্রুপ আগে থেকেই আছে যা Coucou লেখেনি — Coucou এতে হাত দেয়নি।",
-   "pt-BR": "Já existe um grupo de hooks chamado “coucou” que não foi escrito pelo Coucou — o Coucou não mexeu nele.",
-   "ru": "Уже есть группа хуков «coucou», которую написал не Coucou, — Coucou её не трогал.",
-   "id": "Sudah ada grup hook bernama “coucou” yang tidak ditulis Coucou — Coucou tidak menyentuhnya."
+  "A hook group named \"peika\" that Peika did not write is already there — Peika has not touched it.": {
+   "zh-Hans": "已存在一个并非 Peika 写入的名为“peika”的 hook 组 — Peika 没有修改它。",
+   "hi": "“peika” नाम का एक hook समूह पहले से है जिसे Peika ने नहीं लिखा — Peika ने इसे नहीं छुआ।",
+   "es": "Ya existe un grupo de hooks llamado «peika» que no escribió Peika — Peika no lo ha tocado.",
+   "ar": "توجد بالفعل مجموعة hooks باسم «peika» لم يكتبها Peika — لم يمسّها Peika.",
+   "fr": "Un groupe de hooks nommé « peika » que Peika n'a pas écrit existe déjà — Peika n'y a pas touché.",
+   "bn": "“peika” নামে একটি hook গ্রুপ আগে থেকেই আছে যা Peika লেখেনি — Peika এতে হাত দেয়নি।",
+   "pt-BR": "Já existe um grupo de hooks chamado “peika” que não foi escrito pelo Peika — o Peika não mexeu nele.",
+   "ru": "Уже есть группа хуков «peika», которую написал не Peika, — Peika её не трогал.",
+   "id": "Sudah ada grup hook bernama “peika” yang tidak ditulis Peika — Peika tidak menyentuhnya."
   },
   "AI for the chat": {
    "zh-Hans": "聊天用的 AI",
@@ -793,38 +793,38 @@
    "ru": "Копировать изображения здесь нельзя — используйте «Сохранить изображение».",
    "id": "Menyalin gambar tidak tersedia di sini — gunakan Simpan gambar."
   },
-  "Coucou could not list the agents.": {
-   "zh-Hans": "Coucou 无法列出代理。",
-   "hi": "Coucou एजेंटों की सूची नहीं बना सका।",
-   "es": "Coucou no pudo listar los agentes.",
-   "ar": "تعذّر على Coucou سرد الوكلاء.",
-   "fr": "Coucou n'a pas pu lister les agents.",
-   "bn": "Coucou এজেন্টদের তালিকা করতে পারেনি।",
-   "pt-BR": "O Coucou não conseguiu listar os agentes.",
-   "ru": "Coucou не удалось получить список агентов.",
-   "id": "Coucou tidak dapat menampilkan daftar agen."
+  "Peika could not list the agents.": {
+   "zh-Hans": "Peika 无法列出代理。",
+   "hi": "Peika एजेंटों की सूची नहीं बना सका।",
+   "es": "Peika no pudo listar los agentes.",
+   "ar": "تعذّر على Peika سرد الوكلاء.",
+   "fr": "Peika n'a pas pu lister les agents.",
+   "bn": "Peika এজেন্টদের তালিকা করতে পারেনি।",
+   "pt-BR": "O Peika não conseguiu listar os agentes.",
+   "ru": "Peika не удалось получить список агентов.",
+   "id": "Peika tidak dapat menampilkan daftar agen."
   },
-  "Coucou counts your agent sessions as they happen — check back next Monday.": {
-   "zh-Hans": "Coucou 会实时统计你的代理会话 — 下周一再来看看吧。",
-   "hi": "Coucou आपके एजेंट सत्रों को होते-होते गिनता है — अगले सोमवार फिर देखें।",
-   "es": "Coucou cuenta tus sesiones de agentes a medida que ocurren — vuelve el próximo lunes.",
-   "ar": "يحسب Coucou جلسات وكلائك أثناء حدوثها — عُد يوم الاثنين القادم.",
-   "fr": "Coucou compte tes sessions d'agents au fil de l'eau — reviens lundi prochain.",
-   "bn": "Coucou আপনার এজেন্ট সেশন ঘটার সঙ্গে সঙ্গে গোনে — পরের সোমবার আবার দেখুন।",
-   "pt-BR": "O Coucou conta suas sessões de agentes conforme acontecem — volte na próxima segunda-feira.",
-   "ru": "Coucou считает ваши сессии агентов по ходу дела — загляните в следующий понедельник.",
-   "id": "Coucou menghitung sesi agen Anda saat berlangsung — cek lagi Senin depan."
+  "Peika counts your agent sessions as they happen — check back next Monday.": {
+   "zh-Hans": "Peika 会实时统计你的代理会话 — 下周一再来看看吧。",
+   "hi": "Peika आपके एजेंट सत्रों को होते-होते गिनता है — अगले सोमवार फिर देखें।",
+   "es": "Peika cuenta tus sesiones de agentes a medida que ocurren — vuelve el próximo lunes.",
+   "ar": "يحسب Peika جلسات وكلائك أثناء حدوثها — عُد يوم الاثنين القادم.",
+   "fr": "Peika compte tes sessions d'agents au fil de l'eau — reviens lundi prochain.",
+   "bn": "Peika আপনার এজেন্ট সেশন ঘটার সঙ্গে সঙ্গে গোনে — পরের সোমবার আবার দেখুন।",
+   "pt-BR": "O Peika conta suas sessões de agentes conforme acontecem — volte na próxima segunda-feira.",
+   "ru": "Peika считает ваши сессии агентов по ходу дела — загляните в следующий понедельник.",
+   "id": "Peika menghitung sesi agen Anda saat berlangsung — cek lagi Senin depan."
   },
-  "Coucou is hooked into your Claude Code sessions. Tool calls, questions and permission requests show up in the island, and you can answer them there.": {
-   "zh-Hans": "Coucou 已接入你的 Claude Code 会话。工具调用、问题和权限请求都会显示在岛中，你可以直接在那里回应。",
-   "hi": "Coucou आपके Claude Code सत्रों से जुड़ा है। टूल कॉल, प्रश्न और अनुमति अनुरोध आइलैंड में दिखते हैं, और आप वहीं उनका जवाब दे सकते हैं।",
-   "es": "Coucou está conectado a tus sesiones de Claude Code. Las llamadas a herramientas, las preguntas y las solicitudes de permiso aparecen en la isla y puedes responderlas ahí.",
-   "ar": "Coucou متصل بجلسات Claude Code لديك. تظهر استدعاءات الأدوات والأسئلة وطلبات الإذن في الشريط، ويمكنك الرد عليها من هناك.",
-   "fr": "Coucou est branché sur tes sessions Claude Code. Les appels d'outils, les questions et les demandes de permission s'affichent dans l'île, et tu peux y répondre directement.",
-   "bn": "Coucou আপনার Claude Code সেশনের সঙ্গে যুক্ত। টুল কল, প্রশ্ন আর অনুমতির অনুরোধ আইল্যান্ডে দেখা যায়, এবং আপনি সেখানেই উত্তর দিতে পারেন।",
-   "pt-BR": "O Coucou está conectado às suas sessões do Claude Code. Chamadas de ferramentas, perguntas e pedidos de permissão aparecem na ilha, e você pode respondê-los ali.",
-   "ru": "Coucou подключён к вашим сессиям Claude Code. Вызовы инструментов, вопросы и запросы разрешений появляются в острове, и отвечать можно прямо там.",
-   "id": "Coucou terhubung ke sesi Claude Code Anda. Panggilan alat, pertanyaan, dan permintaan izin muncul di pulau, dan Anda bisa menjawabnya di sana."
+  "Peika is hooked into your Claude Code sessions. Tool calls, questions and permission requests show up in the island, and you can answer them there.": {
+   "zh-Hans": "Peika 已接入你的 Claude Code 会话。工具调用、问题和权限请求都会显示在岛中，你可以直接在那里回应。",
+   "hi": "Peika आपके Claude Code सत्रों से जुड़ा है। टूल कॉल, प्रश्न और अनुमति अनुरोध आइलैंड में दिखते हैं, और आप वहीं उनका जवाब दे सकते हैं।",
+   "es": "Peika está conectado a tus sesiones de Claude Code. Las llamadas a herramientas, las preguntas y las solicitudes de permiso aparecen en la isla y puedes responderlas ahí.",
+   "ar": "Peika متصل بجلسات Claude Code لديك. تظهر استدعاءات الأدوات والأسئلة وطلبات الإذن في الشريط، ويمكنك الرد عليها من هناك.",
+   "fr": "Peika est branché sur tes sessions Claude Code. Les appels d'outils, les questions et les demandes de permission s'affichent dans l'île, et tu peux y répondre directement.",
+   "bn": "Peika আপনার Claude Code সেশনের সঙ্গে যুক্ত। টুল কল, প্রশ্ন আর অনুমতির অনুরোধ আইল্যান্ডে দেখা যায়, এবং আপনি সেখানেই উত্তর দিতে পারেন।",
+   "pt-BR": "O Peika está conectado às suas sessões do Claude Code. Chamadas de ferramentas, perguntas e pedidos de permissão aparecem na ilha, e você pode respondê-los ali.",
+   "ru": "Peika подключён к вашим сессиям Claude Code. Вызовы инструментов, вопросы и запросы разрешений появляются в острове, и отвечать можно прямо там.",
+   "id": "Peika terhubung ke sesi Claude Code Anda. Panggilan alat, pertanyaan, dan permintaan izin muncul di pulau, dan Anda bisa menjawabnya di sana."
   },
   "Could not remove {path}: {error}": {
    "zh-Hans": "无法删除 {path}：{error}",
@@ -1497,16 +1497,16 @@
    "ru": "Без звука",
    "id": "Bisukan"
   },
-  "Mute or unmute Mochi": {
-   "zh-Hans": "静音或取消静音 Mochi",
-   "hi": "Mochi को म्यूट या अनम्यूट करें",
-   "es": "Silenciar o activar a Mochi",
-   "ar": "كتم صوت Mochi أو إلغاء كتمه",
-   "fr": "Couper ou remettre le son de Mochi",
-   "bn": "Mochi-কে মিউট বা আনমিউট করুন",
-   "pt-BR": "Silenciar ou ativar o som do Mochi",
-   "ru": "Выключить или включить звук Mochi",
-   "id": "Bisukan atau bunyikan Mochi"
+  "Mute or unmute Peika": {
+   "zh-Hans": "静音或取消静音 Peika",
+   "hi": "Peika को म्यूट या अनम्यूट करें",
+   "es": "Silenciar o activar a Peika",
+   "ar": "كتم صوت Peika أو إلغاء كتمه",
+   "fr": "Couper ou remettre le son de Peika",
+   "bn": "Peika-কে মিউট বা আনমিউট করুন",
+   "pt-BR": "Silenciar ou ativar o som do Peika",
+   "ru": "Выключить или включить звук Peika",
+   "id": "Bisukan atau bunyikan Peika"
   },
   "Network error: {error}": {
    "zh-Hans": "网络错误：{error}",
@@ -1904,16 +1904,16 @@
    "ru": "Выберите модель {name} над полем чата.",
    "id": "Pilih model {name} di atas kotak obrolan."
   },
-  "Pick up to {max} pills to show next to Mochi — {used}/{max} in use. Keys are stored in the {store}, never on disk.": {
-   "zh-Hans": "最多选择 {max} 个标签显示在 Mochi 旁边 — 已用 {used}/{max}。密钥保存在 {store} 中，绝不写入磁盘。",
-   "hi": "Mochi के बगल में दिखाने के लिए अधिकतम {max} टैब चुनें — {used}/{max} उपयोग में। कुंजियाँ {store} में रखी जाती हैं, डिस्क पर कभी नहीं।",
-   "es": "Elige hasta {max} pestañas para mostrar junto a Mochi — {used}/{max} en uso. Las claves se guardan en {store}, nunca en el disco.",
-   "ar": "اختر حتى {max} تبويبات لعرضها بجانب Mochi — {used}/{max} مستخدمة. تُحفظ المفاتيح في {store}، ولا تُكتب على القرص أبدًا.",
-   "fr": "Choisis jusqu'à {max} onglets à afficher à côté de Mochi — {used}/{max} utilisés. Les clés sont stockées dans {store}, jamais sur le disque.",
-   "bn": "Mochi-র পাশে দেখাতে সর্বোচ্চ {max}টি ট্যাব বেছে নিন — {used}/{max} ব্যবহৃত। কী {store}-এ রাখা হয়, কখনো ডিস্কে নয়।",
-   "pt-BR": "Escolha até {max} abas para mostrar ao lado do Mochi — {used}/{max} em uso. As chaves ficam em {store}, nunca no disco.",
-   "ru": "Выберите до {max} вкладок рядом с Mochi — занято {used}/{max}. Ключи хранятся в {store}, никогда на диске.",
-   "id": "Pilih hingga {max} tab untuk ditampilkan di samping Mochi — {used}/{max} terpakai. Kunci disimpan di {store}, tidak pernah di disk."
+  "Pick up to {max} pills to show next to Peika — {used}/{max} in use. Keys are stored in the {store}, never on disk.": {
+   "zh-Hans": "最多选择 {max} 个标签显示在 Peika 旁边 — 已用 {used}/{max}。密钥保存在 {store} 中，绝不写入磁盘。",
+   "hi": "Peika के बगल में दिखाने के लिए अधिकतम {max} टैब चुनें — {used}/{max} उपयोग में। कुंजियाँ {store} में रखी जाती हैं, डिस्क पर कभी नहीं।",
+   "es": "Elige hasta {max} pestañas para mostrar junto a Peika — {used}/{max} en uso. Las claves se guardan en {store}, nunca en el disco.",
+   "ar": "اختر حتى {max} تبويبات لعرضها بجانب Peika — {used}/{max} مستخدمة. تُحفظ المفاتيح في {store}، ولا تُكتب على القرص أبدًا.",
+   "fr": "Choisis jusqu'à {max} onglets à afficher à côté de Peika — {used}/{max} utilisés. Les clés sont stockées dans {store}, jamais sur le disque.",
+   "bn": "Peika-র পাশে দেখাতে সর্বোচ্চ {max}টি ট্যাব বেছে নিন — {used}/{max} ব্যবহৃত। কী {store}-এ রাখা হয়, কখনো ডিস্কে নয়।",
+   "pt-BR": "Escolha até {max} abas para mostrar ao lado do Peika — {used}/{max} em uso. As chaves ficam em {store}, nunca no disco.",
+   "ru": "Выберите до {max} вкладок рядом с Peika — занято {used}/{max}. Ключи хранятся в {store}, никогда на диске.",
+   "id": "Pilih hingga {max} tab untuk ditampilkan di samping Peika — {used}/{max} terpakai. Kunci disimpan di {store}, tidak pernah di disk."
   },
   "Press keys…": {
    "zh-Hans": "请按键…",
@@ -2212,16 +2212,16 @@
    "ru": "Секретный ключ",
    "id": "Kunci rahasia"
   },
-  "Send Mochi to the desktop": {
-   "zh-Hans": "把 Mochi 送到桌面",
-   "hi": "Mochi को डेस्कटॉप पर भेजें",
-   "es": "Enviar a Mochi al escritorio",
-   "ar": "إرسال Mochi إلى سطح المكتب",
-   "fr": "Envoyer Mochi sur le bureau",
-   "bn": "Mochi-কে ডেস্কটপে পাঠান",
-   "pt-BR": "Enviar o Mochi para a área de trabalho",
-   "ru": "Отправить Mochi на рабочий стол",
-   "id": "Kirim Mochi ke desktop"
+  "Send Peika to the desktop": {
+   "zh-Hans": "把 Peika 送到桌面",
+   "hi": "Peika को डेस्कटॉप पर भेजें",
+   "es": "Enviar a Peika al escritorio",
+   "ar": "إرسال Peika إلى سطح المكتب",
+   "fr": "Envoyer Peika sur le bureau",
+   "bn": "Peika-কে ডেস্কটপে পাঠান",
+   "pt-BR": "Enviar o Peika para a área de trabalho",
+   "ru": "Отправить Peika на рабочий стол",
+   "id": "Kirim Peika ke desktop"
   },
   "Send the message": {
    "zh-Hans": "发送消息",
@@ -2333,38 +2333,38 @@
    "ru": "Показать в папке",
    "id": "Tampilkan di folder"
   },
-  "Show other coding agents in the island. Coucou adds its entries to each agent's own config: you see the exact change and where the backup goes before anything is written, and uninstalling removes only what Coucou added.": {
-   "zh-Hans": "在岛中显示其他编程代理。Coucou 会把自己的条目添加到各代理的配置中：写入之前，你会看到确切的改动和备份位置；卸载只会移除 Coucou 添加的内容。",
-   "hi": "दूसरे कोडिंग एजेंटों को आइलैंड में दिखाएँ। Coucou हर एजेंट की अपनी कॉन्फ़िग में अपनी प्रविष्टियाँ जोड़ता है: कुछ भी लिखे जाने से पहले आप सटीक बदलाव और बैकअप की जगह देखते हैं, और अनइंस्टॉल करने पर केवल वही हटता है जो Coucou ने जोड़ा था।",
-   "es": "Muestra otros agentes de programación en la isla. Coucou añade sus entradas a la configuración de cada agente: ves el cambio exacto y dónde va la copia de seguridad antes de que se escriba nada, y al desinstalar solo se quita lo que añadió Coucou.",
-   "ar": "اعرض وكلاء البرمجة الآخرين في الشريط. يضيف Coucou إدخالاته إلى إعدادات كل وكيل: ترى التغيير بالضبط ومكان النسخة الاحتياطية قبل كتابة أي شيء، وإلغاء التثبيت يزيل فقط ما أضافه Coucou.",
-   "fr": "Affiche les autres agents de code dans l'île. Coucou ajoute ses entrées à la configuration de chaque agent : tu vois la modification exacte et l'emplacement de la sauvegarde avant que quoi que ce soit soit écrit, et la désinstallation ne retire que ce que Coucou a ajouté.",
-   "bn": "অন্যান্য কোডিং এজেন্টকে আইল্যান্ডে দেখান। Coucou প্রতিটি এজেন্টের নিজস্ব কনফিগে তার এন্ট্রি যোগ করে: কিছু লেখার আগে আপনি সঠিক পরিবর্তন এবং ব্যাকআপ কোথায় যাবে তা দেখতে পান, আর আনইনস্টল করলে শুধু Coucou যা যোগ করেছিল তা-ই সরানো হয়।",
-   "pt-BR": "Mostre outros agentes de programação na ilha. O Coucou adiciona as próprias entradas à configuração de cada agente: você vê a alteração exata e para onde vai o backup antes de qualquer gravação, e desinstalar remove só o que o Coucou adicionou.",
-   "ru": "Показывайте другие агенты для кода в острове. Coucou добавляет свои записи в конфигурацию каждого агента: до любой записи вы видите точное изменение и куда пойдёт резервная копия, а удаление убирает только то, что добавил Coucou.",
-   "id": "Tampilkan agen coding lain di pulau. Coucou menambahkan entrinya ke konfigurasi masing-masing agen: Anda melihat perubahan persisnya dan lokasi cadangan sebelum apa pun ditulis, dan mencopot pemasangan hanya menghapus yang ditambahkan Coucou."
+  "Show other coding agents in the island. Peika adds its entries to each agent's own config: you see the exact change and where the backup goes before anything is written, and uninstalling removes only what Peika added.": {
+   "zh-Hans": "在岛中显示其他编程代理。Peika 会把自己的条目添加到各代理的配置中：写入之前，你会看到确切的改动和备份位置；卸载只会移除 Peika 添加的内容。",
+   "hi": "दूसरे कोडिंग एजेंटों को आइलैंड में दिखाएँ। Peika हर एजेंट की अपनी कॉन्फ़िग में अपनी प्रविष्टियाँ जोड़ता है: कुछ भी लिखे जाने से पहले आप सटीक बदलाव और बैकअप की जगह देखते हैं, और अनइंस्टॉल करने पर केवल वही हटता है जो Peika ने जोड़ा था।",
+   "es": "Muestra otros agentes de programación en la isla. Peika añade sus entradas a la configuración de cada agente: ves el cambio exacto y dónde va la copia de seguridad antes de que se escriba nada, y al desinstalar solo se quita lo que añadió Peika.",
+   "ar": "اعرض وكلاء البرمجة الآخرين في الشريط. يضيف Peika إدخالاته إلى إعدادات كل وكيل: ترى التغيير بالضبط ومكان النسخة الاحتياطية قبل كتابة أي شيء، وإلغاء التثبيت يزيل فقط ما أضافه Peika.",
+   "fr": "Affiche les autres agents de code dans l'île. Peika ajoute ses entrées à la configuration de chaque agent : tu vois la modification exacte et l'emplacement de la sauvegarde avant que quoi que ce soit soit écrit, et la désinstallation ne retire que ce que Peika a ajouté.",
+   "bn": "অন্যান্য কোডিং এজেন্টকে আইল্যান্ডে দেখান। Peika প্রতিটি এজেন্টের নিজস্ব কনফিগে তার এন্ট্রি যোগ করে: কিছু লেখার আগে আপনি সঠিক পরিবর্তন এবং ব্যাকআপ কোথায় যাবে তা দেখতে পান, আর আনইনস্টল করলে শুধু Peika যা যোগ করেছিল তা-ই সরানো হয়।",
+   "pt-BR": "Mostre outros agentes de programação na ilha. O Peika adiciona as próprias entradas à configuração de cada agente: você vê a alteração exata e para onde vai o backup antes de qualquer gravação, e desinstalar remove só o que o Peika adicionou.",
+   "ru": "Показывайте другие агенты для кода в острове. Peika добавляет свои записи в конфигурацию каждого агента: до любой записи вы видите точное изменение и куда пойдёт резервная копия, а удаление убирает только то, что добавил Peika.",
+   "id": "Tampilkan agen coding lain di pulau. Peika menambahkan entrinya ke konfigurasi masing-masing agen: Anda melihat perubahan persisnya dan lokasi cadangan sebelum apa pun ditulis, dan mencopot pemasangan hanya menghapus yang ditambahkan Peika."
   },
-  "Shows your Claude plan usage (5-hour and weekly limits) in the island's header. Coucou adds a status line relay in ~/.claude/settings.json. If you already have a status line, it keeps working as before. Pro and Max plans only.": {
-   "zh-Hans": "在岛的顶栏显示你的 Claude 套餐用量（5 小时和每周限额）。Coucou 会在 ~/.claude/settings.json 中添加一个状态栏中继。如果你已有状态栏，它会照常工作。仅限 Pro 和 Max 套餐。",
-   "hi": "आइलैंड के हेडर में आपके Claude प्लान का उपयोग (5 घंटे और साप्ताहिक सीमा) दिखाता है। Coucou ~/.claude/settings.json में एक स्टेटस लाइन रिले जोड़ता है। अगर आपके पास पहले से स्टेटस लाइन है, तो वह पहले की तरह चलती रहेगी। केवल Pro और Max प्लान।",
-   "es": "Muestra el uso de tu plan de Claude (límites de 5 horas y semanal) en la cabecera de la isla. Coucou añade un relay de línea de estado en ~/.claude/settings.json. Si ya tienes una línea de estado, sigue funcionando como antes. Solo planes Pro y Max.",
-   "ar": "يعرض استخدام خطة Claude (حدّا الخمس ساعات والأسبوع) في رأس الشريط. يضيف Coucou مُرحِّلًا لسطر الحالة في ~/.claude/settings.json. إن كان لديك سطر حالة فسيستمر في العمل كما كان. لخطتَي Pro وMax فقط.",
-   "fr": "Affiche l'utilisation de ton forfait Claude (limites sur 5 heures et à la semaine) dans l'en-tête de l'île. Coucou ajoute un relais de ligne d'état dans ~/.claude/settings.json. Si tu as déjà une ligne d'état, elle continue de fonctionner comme avant. Forfaits Pro et Max uniquement.",
-   "bn": "আইল্যান্ডের হেডারে আপনার Claude প্ল্যানের ব্যবহার (৫ ঘণ্টা ও সাপ্তাহিক সীমা) দেখায়। Coucou ~/.claude/settings.json-এ একটি স্ট্যাটাস লাইন রিলে যোগ করে। আপনার আগে থেকে স্ট্যাটাস লাইন থাকলে সেটি আগের মতোই চলবে। শুধু Pro ও Max প্ল্যান।",
-   "pt-BR": "Mostra o uso do seu plano Claude (limites de 5 horas e semanal) no cabeçalho da ilha. O Coucou adiciona um relay de linha de status em ~/.claude/settings.json. Se você já tem uma linha de status, ela continua funcionando como antes. Apenas planos Pro e Max.",
-   "ru": "Показывает использование тарифа Claude (лимиты на 5 часов и на неделю) в заголовке острова. Coucou добавляет ретранслятор строки состояния в ~/.claude/settings.json. Если у вас уже есть строка состояния, она работает как прежде. Только тарифы Pro и Max.",
-   "id": "Menampilkan pemakaian paket Claude Anda (batas 5 jam dan mingguan) di header pulau. Coucou menambahkan relay baris status di ~/.claude/settings.json. Jika Anda sudah punya baris status, baris itu tetap berjalan seperti biasa. Khusus paket Pro dan Max."
+  "Shows your Claude plan usage (5-hour and weekly limits) in the island's header. Peika adds a status line relay in ~/.claude/settings.json. If you already have a status line, it keeps working as before. Pro and Max plans only.": {
+   "zh-Hans": "在岛的顶栏显示你的 Claude 套餐用量（5 小时和每周限额）。Peika 会在 ~/.claude/settings.json 中添加一个状态栏中继。如果你已有状态栏，它会照常工作。仅限 Pro 和 Max 套餐。",
+   "hi": "आइलैंड के हेडर में आपके Claude प्लान का उपयोग (5 घंटे और साप्ताहिक सीमा) दिखाता है। Peika ~/.claude/settings.json में एक स्टेटस लाइन रिले जोड़ता है। अगर आपके पास पहले से स्टेटस लाइन है, तो वह पहले की तरह चलती रहेगी। केवल Pro और Max प्लान।",
+   "es": "Muestra el uso de tu plan de Claude (límites de 5 horas y semanal) en la cabecera de la isla. Peika añade un relay de línea de estado en ~/.claude/settings.json. Si ya tienes una línea de estado, sigue funcionando como antes. Solo planes Pro y Max.",
+   "ar": "يعرض استخدام خطة Claude (حدّا الخمس ساعات والأسبوع) في رأس الشريط. يضيف Peika مُرحِّلًا لسطر الحالة في ~/.claude/settings.json. إن كان لديك سطر حالة فسيستمر في العمل كما كان. لخطتَي Pro وMax فقط.",
+   "fr": "Affiche l'utilisation de ton forfait Claude (limites sur 5 heures et à la semaine) dans l'en-tête de l'île. Peika ajoute un relais de ligne d'état dans ~/.claude/settings.json. Si tu as déjà une ligne d'état, elle continue de fonctionner comme avant. Forfaits Pro et Max uniquement.",
+   "bn": "আইল্যান্ডের হেডারে আপনার Claude প্ল্যানের ব্যবহার (৫ ঘণ্টা ও সাপ্তাহিক সীমা) দেখায়। Peika ~/.claude/settings.json-এ একটি স্ট্যাটাস লাইন রিলে যোগ করে। আপনার আগে থেকে স্ট্যাটাস লাইন থাকলে সেটি আগের মতোই চলবে। শুধু Pro ও Max প্ল্যান।",
+   "pt-BR": "Mostra o uso do seu plano Claude (limites de 5 horas e semanal) no cabeçalho da ilha. O Peika adiciona um relay de linha de status em ~/.claude/settings.json. Se você já tem uma linha de status, ela continua funcionando como antes. Apenas planos Pro e Max.",
+   "ru": "Показывает использование тарифа Claude (лимиты на 5 часов и на неделю) в заголовке острова. Peika добавляет ретранслятор строки состояния в ~/.claude/settings.json. Если у вас уже есть строка состояния, она работает как прежде. Только тарифы Pro и Max.",
+   "id": "Menampilkan pemakaian paket Claude Anda (batas 5 jam dan mingguan) di header pulau. Peika menambahkan relay baris status di ~/.claude/settings.json. Jika Anda sudah punya baris status, baris itu tetap berjalan seperti biasa. Khusus paket Pro dan Max."
   },
-  "Shows your Codex plan usage (weekly limit and free resets left) in the island's header. Coucou asks the Codex CLI (codex app-server) when the pill shows; nothing is installed. Codex must be signed in with ChatGPT.": {
-   "zh-Hans": "在岛的顶栏显示你的 Codex 套餐用量（每周限额和剩余的免费重置次数）。标签显示时，Coucou 会询问 Codex CLI（codex app-server），不会安装任何东西。Codex 必须已用 ChatGPT 登录。",
-   "hi": "आइलैंड के हेडर में आपके Codex प्लान का उपयोग (साप्ताहिक सीमा और बचे मुफ़्त रीसेट) दिखाता है। टैब दिखने पर Coucou Codex CLI (codex app-server) से पूछता है; कुछ भी इंस्टॉल नहीं होता। Codex में ChatGPT से साइन इन होना ज़रूरी है।",
-   "es": "Muestra el uso de tu plan de Codex (límite semanal y reinicios gratuitos restantes) en la cabecera de la isla. Coucou consulta a la CLI de Codex (codex app-server) cuando aparece la pestaña; no se instala nada. Codex debe tener la sesión iniciada con ChatGPT.",
-   "ar": "يعرض استخدام خطة Codex (الحد الأسبوعي وإعادات التعيين المجانية المتبقية) في رأس الشريط. يسأل Coucou واجهة Codex CLI (codex app-server) عند ظهور التبويب، ولا يُثبَّت أي شيء. يجب تسجيل الدخول إلى Codex بحساب ChatGPT.",
-   "fr": "Affiche l'utilisation de ton forfait Codex (limite hebdomadaire et réinitialisations gratuites restantes) dans l'en-tête de l'île. Coucou interroge la CLI Codex (codex app-server) quand l'onglet s'affiche ; rien n'est installé. Codex doit être connecté avec ChatGPT.",
-   "bn": "আইল্যান্ডের হেডারে আপনার Codex প্ল্যানের ব্যবহার (সাপ্তাহিক সীমা ও বাকি ফ্রি রিসেট) দেখায়। ট্যাব দেখা গেলে Coucou Codex CLI (codex app-server)-কে জিজ্ঞেস করে; কিছুই ইনস্টল হয় না। Codex-এ ChatGPT দিয়ে সাইন ইন থাকতে হবে।",
-   "pt-BR": "Mostra o uso do seu plano Codex (limite semanal e redefinições grátis restantes) no cabeçalho da ilha. O Coucou consulta a CLI do Codex (codex app-server) quando a aba aparece; nada é instalado. O Codex precisa estar conectado com o ChatGPT.",
-   "ru": "Показывает использование тарифа Codex (недельный лимит и оставшиеся бесплатные сбросы) в заголовке острова. Coucou спрашивает Codex CLI (codex app-server), когда видна вкладка; ничего не устанавливается. В Codex нужно войти через ChatGPT.",
-   "id": "Menampilkan pemakaian paket Codex Anda (batas mingguan dan sisa reset gratis) di header pulau. Coucou menanyakan Codex CLI (codex app-server) saat tab tampil; tidak ada yang dipasang. Codex harus masuk dengan ChatGPT."
+  "Shows your Codex plan usage (weekly limit and free resets left) in the island's header. Peika asks the Codex CLI (codex app-server) when the pill shows; nothing is installed. Codex must be signed in with ChatGPT.": {
+   "zh-Hans": "在岛的顶栏显示你的 Codex 套餐用量（每周限额和剩余的免费重置次数）。标签显示时，Peika 会询问 Codex CLI（codex app-server），不会安装任何东西。Codex 必须已用 ChatGPT 登录。",
+   "hi": "आइलैंड के हेडर में आपके Codex प्लान का उपयोग (साप्ताहिक सीमा और बचे मुफ़्त रीसेट) दिखाता है। टैब दिखने पर Peika Codex CLI (codex app-server) से पूछता है; कुछ भी इंस्टॉल नहीं होता। Codex में ChatGPT से साइन इन होना ज़रूरी है।",
+   "es": "Muestra el uso de tu plan de Codex (límite semanal y reinicios gratuitos restantes) en la cabecera de la isla. Peika consulta a la CLI de Codex (codex app-server) cuando aparece la pestaña; no se instala nada. Codex debe tener la sesión iniciada con ChatGPT.",
+   "ar": "يعرض استخدام خطة Codex (الحد الأسبوعي وإعادات التعيين المجانية المتبقية) في رأس الشريط. يسأل Peika واجهة Codex CLI (codex app-server) عند ظهور التبويب، ولا يُثبَّت أي شيء. يجب تسجيل الدخول إلى Codex بحساب ChatGPT.",
+   "fr": "Affiche l'utilisation de ton forfait Codex (limite hebdomadaire et réinitialisations gratuites restantes) dans l'en-tête de l'île. Peika interroge la CLI Codex (codex app-server) quand l'onglet s'affiche ; rien n'est installé. Codex doit être connecté avec ChatGPT.",
+   "bn": "আইল্যান্ডের হেডারে আপনার Codex প্ল্যানের ব্যবহার (সাপ্তাহিক সীমা ও বাকি ফ্রি রিসেট) দেখায়। ট্যাব দেখা গেলে Peika Codex CLI (codex app-server)-কে জিজ্ঞেস করে; কিছুই ইনস্টল হয় না। Codex-এ ChatGPT দিয়ে সাইন ইন থাকতে হবে।",
+   "pt-BR": "Mostra o uso do seu plano Codex (limite semanal e redefinições grátis restantes) no cabeçalho da ilha. O Peika consulta a CLI do Codex (codex app-server) quando a aba aparece; nada é instalado. O Codex precisa estar conectado com o ChatGPT.",
+   "ru": "Показывает использование тарифа Codex (недельный лимит и оставшиеся бесплатные сбросы) в заголовке острова. Peika спрашивает Codex CLI (codex app-server), когда видна вкладка; ничего не устанавливается. В Codex нужно войти через ChatGPT.",
+   "id": "Menampilkan pemakaian paket Codex Anda (batas mingguan dan sisa reset gratis) di header pulau. Peika menanyakan Codex CLI (codex app-server) saat tab tampil; tidak ada yang dipasang. Codex harus masuk dengan ChatGPT."
   },
   "Start a new Antigravity conversation to pick the hooks up.": {
    "zh-Hans": "开启新的 Antigravity 对话即可启用 hooks。",
@@ -2531,16 +2531,16 @@
    "ru": "Ретранслятор ещё не установлен.",
    "id": "Relay belum terpasang."
   },
-  "The relay isn't installed yet. Restart Coucou.": {
-   "zh-Hans": "中继尚未安装。请重启 Coucou。",
-   "hi": "रिले अभी इंस्टॉल नहीं है। Coucou को फिर से शुरू करें।",
-   "es": "El relay aún no está instalado. Reinicia Coucou.",
-   "ar": "المُرحِّل غير مثبَّت بعد. أعد تشغيل Coucou.",
-   "fr": "Le relais n'est pas encore installé. Redémarre Coucou.",
-   "bn": "রিলে এখনো ইনস্টল হয়নি। Coucou আবার চালু করুন।",
-   "pt-BR": "O relay ainda não está instalado. Reinicie o Coucou.",
-   "ru": "Ретранслятор ещё не установлен. Перезапустите Coucou.",
-   "id": "Relay belum terpasang. Mulai ulang Coucou."
+  "The relay isn't installed yet. Restart Peika.": {
+   "zh-Hans": "中继尚未安装。请重启 Peika。",
+   "hi": "रिले अभी इंस्टॉल नहीं है। Peika को फिर से शुरू करें।",
+   "es": "El relay aún no está instalado. Reinicia Peika.",
+   "ar": "المُرحِّل غير مثبَّت بعد. أعد تشغيل Peika.",
+   "fr": "Le relais n'est pas encore installé. Redémarre Peika.",
+   "bn": "রিলে এখনো ইনস্টল হয়নি। Peika আবার চালু করুন।",
+   "pt-BR": "O relay ainda não está instalado. Reinicie o Peika.",
+   "ru": "Ретранслятор ещё не установлен. Перезапустите Peika.",
+   "id": "Relay belum terpasang. Mulai ulang Peika."
   },
   "The server refused the key. Check it, then connect again.": {
    "zh-Hans": "服务器拒绝了该密钥。请检查后重新连接。",
@@ -2619,16 +2619,16 @@
    "ru": "Вот что именно изменится в вашем settings.json. Ваши собственные хуки не затрагиваются.",
    "id": "Inilah persisnya yang akan berubah di settings.json Anda. Hooks milik Anda tidak disentuh."
   },
-  "This is exactly what will change: only the status line. If you already have one it keeps working, Coucou's relay runs it for you.": {
-   "zh-Hans": "这正是将发生的改动：只涉及状态栏。如果你已有状态栏，它会照常工作，由 Coucou 的中继替你运行。",
-   "hi": "ठीक यही बदलेगा: केवल स्टेटस लाइन। अगर आपके पास पहले से एक है तो वह चलती रहेगी, Coucou का रिले उसे आपके लिए चलाता है।",
-   "es": "Esto es exactamente lo que cambiará: solo la línea de estado. Si ya tienes una, sigue funcionando: el relay de Coucou la ejecuta por ti.",
-   "ar": "هذا بالضبط ما سيتغيّر: سطر الحالة فقط. إن كان لديك سطر حالة فسيستمر في العمل، إذ يشغّله مُرحِّل Coucou نيابةً عنك.",
-   "fr": "Voici exactement ce qui va changer : seulement la ligne d'état. Si tu en as déjà une, elle continue de fonctionner, le relais de Coucou la lance pour toi.",
-   "bn": "ঠিক এটাই বদলাবে: শুধু স্ট্যাটাস লাইন। আপনার আগে থেকে একটি থাকলে সেটি চলতেই থাকবে, Coucou-র রিলে আপনার হয়ে সেটি চালায়।",
-   "pt-BR": "Isto é exatamente o que vai mudar: apenas a linha de status. Se você já tem uma, ela continua funcionando: o relay do Coucou a executa para você.",
-   "ru": "Вот что именно изменится: только строка состояния. Если она у вас уже есть, она продолжит работать — её запускает ретранслятор Coucou.",
-   "id": "Inilah persisnya yang akan berubah: hanya baris status. Jika Anda sudah punya, baris itu tetap berjalan, relay Coucou menjalankannya untuk Anda."
+  "This is exactly what will change: only the status line. If you already have one it keeps working, Peika's relay runs it for you.": {
+   "zh-Hans": "这正是将发生的改动：只涉及状态栏。如果你已有状态栏，它会照常工作，由 Peika 的中继替你运行。",
+   "hi": "ठीक यही बदलेगा: केवल स्टेटस लाइन। अगर आपके पास पहले से एक है तो वह चलती रहेगी, Peika का रिले उसे आपके लिए चलाता है।",
+   "es": "Esto es exactamente lo que cambiará: solo la línea de estado. Si ya tienes una, sigue funcionando: el relay de Peika la ejecuta por ti.",
+   "ar": "هذا بالضبط ما سيتغيّر: سطر الحالة فقط. إن كان لديك سطر حالة فسيستمر في العمل، إذ يشغّله مُرحِّل Peika نيابةً عنك.",
+   "fr": "Voici exactement ce qui va changer : seulement la ligne d'état. Si tu en as déjà une, elle continue de fonctionner, le relais de Peika la lance pour toi.",
+   "bn": "ঠিক এটাই বদলাবে: শুধু স্ট্যাটাস লাইন। আপনার আগে থেকে একটি থাকলে সেটি চলতেই থাকবে, Peika-র রিলে আপনার হয়ে সেটি চালায়।",
+   "pt-BR": "Isto é exatamente o que vai mudar: apenas a linha de status. Se você já tem uma, ela continua funcionando: o relay do Peika a executa para você.",
+   "ru": "Вот что именно изменится: только строка состояния. Если она у вас уже есть, она продолжит работать — её запускает ретранслятор Peika.",
+   "id": "Inilah persisnya yang akan berubah: hanya baris status. Jika Anda sudah punya, baris itu tetap berjalan, relay Peika menjalankannya untuk Anda."
   },
   "This puts your previous status line back, or removes the entry if there was none.": {
    "zh-Hans": "这会恢复你之前的状态栏；如果之前没有，则移除该条目。",
@@ -2641,27 +2641,27 @@
    "ru": "Возвращается ваша прежняя строка состояния, а если её не было — запись удаляется.",
    "id": "Ini mengembalikan baris status Anda sebelumnya, atau menghapus entri jika sebelumnya tidak ada."
   },
-  "This removes Coucou's entries only. Everything else stays.": {
-   "zh-Hans": "这只会移除 Coucou 的条目，其余内容保持不变。",
-   "hi": "यह केवल Coucou की प्रविष्टियाँ हटाता है। बाकी सब वैसा ही रहता है।",
-   "es": "Esto solo quita las entradas de Coucou. Todo lo demás se queda.",
-   "ar": "يزيل هذا إدخالات Coucou فقط. يبقى كل شيء آخر كما هو.",
-   "fr": "Seules les entrées de Coucou sont retirées. Tout le reste est conservé.",
-   "bn": "এটি শুধু Coucou-র এন্ট্রি সরায়। বাকি সব থেকে যায়।",
-   "pt-BR": "Isto remove apenas as entradas do Coucou. O resto continua.",
-   "ru": "Удаляются только записи Coucou. Всё остальное остаётся.",
-   "id": "Ini hanya menghapus entri Coucou. Yang lain tetap ada."
+  "This removes Peika's entries only. Everything else stays.": {
+   "zh-Hans": "这只会移除 Peika 的条目，其余内容保持不变。",
+   "hi": "यह केवल Peika की प्रविष्टियाँ हटाता है। बाकी सब वैसा ही रहता है।",
+   "es": "Esto solo quita las entradas de Peika. Todo lo demás se queda.",
+   "ar": "يزيل هذا إدخالات Peika فقط. يبقى كل شيء آخر كما هو.",
+   "fr": "Seules les entrées de Peika sont retirées. Tout le reste est conservé.",
+   "bn": "এটি শুধু Peika-র এন্ট্রি সরায়। বাকি সব থেকে যায়।",
+   "pt-BR": "Isto remove apenas as entradas do Peika. O resto continua.",
+   "ru": "Удаляются только записи Peika. Всё остальное остаётся.",
+   "id": "Ini hanya menghapus entri Peika. Yang lain tetap ada."
   },
-  "This removes Coucou's entries only. Your own hooks are left untouched.": {
-   "zh-Hans": "这只会移除 Coucou 的条目。你自己的 hooks 不会被触碰。",
-   "hi": "यह केवल Coucou की प्रविष्टियाँ हटाता है। आपके अपने hooks नहीं छुए जाते।",
-   "es": "Esto solo quita las entradas de Coucou. Tus propios hooks no se tocan.",
-   "ar": "يزيل هذا إدخالات Coucou فقط. لن تُمسّ hooks الخاصة بك.",
-   "fr": "Seules les entrées de Coucou sont retirées. Tes propres hooks ne sont pas touchés.",
-   "bn": "এটি শুধু Coucou-র এন্ট্রি সরায়। আপনার নিজের hooks-এ হাত দেওয়া হয় না।",
-   "pt-BR": "Isto remove apenas as entradas do Coucou. Seus próprios hooks não são alterados.",
-   "ru": "Удаляются только записи Coucou. Ваши собственные хуки не затрагиваются.",
-   "id": "Ini hanya menghapus entri Coucou. Hooks milik Anda tidak disentuh."
+  "This removes Peika's entries only. Your own hooks are left untouched.": {
+   "zh-Hans": "这只会移除 Peika 的条目。你自己的 hooks 不会被触碰。",
+   "hi": "यह केवल Peika की प्रविष्टियाँ हटाता है। आपके अपने hooks नहीं छुए जाते।",
+   "es": "Esto solo quita las entradas de Peika. Tus propios hooks no se tocan.",
+   "ar": "يزيل هذا إدخالات Peika فقط. لن تُمسّ hooks الخاصة بك.",
+   "fr": "Seules les entrées de Peika sont retirées. Tes propres hooks ne sont pas touchés.",
+   "bn": "এটি শুধু Peika-র এন্ট্রি সরায়। আপনার নিজের hooks-এ হাত দেওয়া হয় না।",
+   "pt-BR": "Isto remove apenas as entradas do Peika. Seus próprios hooks não são alterados.",
+   "ru": "Удаляются только записи Peika. Ваши собственные хуки не затрагиваются.",
+   "id": "Ini hanya menghapus entri Peika. Hooks milik Anda tidak disentuh."
   },
   "Thursday": {
    "zh-Hans": "星期四",
@@ -2729,16 +2729,16 @@
    "ru": "Вторник",
    "id": "Selasa"
   },
-  "Turn it on once with `hermes plugins enable coucou`, then start a new Hermes session.": {
-   "zh-Hans": "先用 `hermes plugins enable coucou` 启用一次，然后开启新的 Hermes 会话。",
-   "hi": "इसे एक बार `hermes plugins enable coucou` से चालू करें, फिर Hermes का नया सत्र शुरू करें।",
-   "es": "Actívalo una vez con `hermes plugins enable coucou` y luego abre una nueva sesión de Hermes.",
-   "ar": "فعّله مرة واحدة بالأمر `hermes plugins enable coucou`، ثم ابدأ جلسة Hermes جديدة.",
-   "fr": "Active-le une fois avec `hermes plugins enable coucou`, puis lance une nouvelle session Hermes.",
-   "bn": "একবার `hermes plugins enable coucou` দিয়ে চালু করুন, তারপর Hermes-এর নতুন সেশন শুরু করুন।",
-   "pt-BR": "Ative uma vez com `hermes plugins enable coucou` e depois inicie uma nova sessão do Hermes.",
-   "ru": "Включите его один раз командой `hermes plugins enable coucou`, затем начните новую сессию Hermes.",
-   "id": "Aktifkan sekali dengan `hermes plugins enable coucou`, lalu mulai sesi Hermes baru."
+  "Turn it on once with `hermes plugins enable peika`, then start a new Hermes session.": {
+   "zh-Hans": "先用 `hermes plugins enable peika` 启用一次，然后开启新的 Hermes 会话。",
+   "hi": "इसे एक बार `hermes plugins enable peika` से चालू करें, फिर Hermes का नया सत्र शुरू करें।",
+   "es": "Actívalo una vez con `hermes plugins enable peika` y luego abre una nueva sesión de Hermes.",
+   "ar": "فعّله مرة واحدة بالأمر `hermes plugins enable peika`، ثم ابدأ جلسة Hermes جديدة.",
+   "fr": "Active-le une fois avec `hermes plugins enable peika`, puis lance une nouvelle session Hermes.",
+   "bn": "একবার `hermes plugins enable peika` দিয়ে চালু করুন, তারপর Hermes-এর নতুন সেশন শুরু করুন।",
+   "pt-BR": "Ative uma vez com `hermes plugins enable peika` e depois inicie uma nova sessão do Hermes.",
+   "ru": "Включите его один раз командой `hermes plugins enable peika`, затем начните новую сессию Hermes.",
+   "id": "Aktifkan sekali dengan `hermes plugins enable peika`, lalu mulai sesi Hermes baru."
   },
   "Types “{char}”": {
    "zh-Hans": "输入“{char}”",
@@ -3015,16 +3015,16 @@
    "ru": "всё зелёное",
    "id": "semua hijau"
   },
-  "coucou-hook.exe is not in place yet. Restart Coucou; if it still fails, build it with `cargo build -p coucou-hook`.": {
-   "zh-Hans": "coucou-hook.exe 尚未就位。请重启 Coucou；如果仍然失败，请用 `cargo build -p coucou-hook` 构建它。",
-   "hi": "coucou-hook.exe अभी अपनी जगह पर नहीं है। Coucou फिर से शुरू करें; अगर फिर भी न हो, तो इसे `cargo build -p coucou-hook` से बनाएँ।",
-   "es": "coucou-hook.exe aún no está en su sitio. Reinicia Coucou; si sigue fallando, compílalo con `cargo build -p coucou-hook`.",
-   "ar": "coucou-hook.exe ليس في مكانه بعد. أعد تشغيل Coucou؛ وإن استمر الفشل فابنِه بالأمر `cargo build -p coucou-hook`.",
-   "fr": "coucou-hook.exe n'est pas encore en place. Redémarre Coucou ; si ça échoue encore, compile-le avec `cargo build -p coucou-hook`.",
-   "bn": "coucou-hook.exe এখনো জায়গামতো নেই। Coucou আবার চালু করুন; তবুও না হলে `cargo build -p coucou-hook` দিয়ে এটি বানান।",
-   "pt-BR": "O coucou-hook.exe ainda não está no lugar. Reinicie o Coucou; se continuar falhando, compile-o com `cargo build -p coucou-hook`.",
-   "ru": "coucou-hook.exe ещё не на месте. Перезапустите Coucou; если не поможет, соберите его командой `cargo build -p coucou-hook`.",
-   "id": "coucou-hook.exe belum ada di tempatnya. Mulai ulang Coucou; jika masih gagal, build dengan `cargo build -p coucou-hook`."
+  "peika-hook.exe is not in place yet. Restart Peika; if it still fails, build it with `cargo build -p peika-hook`.": {
+   "zh-Hans": "peika-hook.exe 尚未就位。请重启 Peika；如果仍然失败，请用 `cargo build -p peika-hook` 构建它。",
+   "hi": "peika-hook.exe अभी अपनी जगह पर नहीं है। Peika फिर से शुरू करें; अगर फिर भी न हो, तो इसे `cargo build -p peika-hook` से बनाएँ।",
+   "es": "peika-hook.exe aún no está en su sitio. Reinicia Peika; si sigue fallando, compílalo con `cargo build -p peika-hook`.",
+   "ar": "peika-hook.exe ليس في مكانه بعد. أعد تشغيل Peika؛ وإن استمر الفشل فابنِه بالأمر `cargo build -p peika-hook`.",
+   "fr": "peika-hook.exe n'est pas encore en place. Redémarre Peika ; si ça échoue encore, compile-le avec `cargo build -p peika-hook`.",
+   "bn": "peika-hook.exe এখনো জায়গামতো নেই। Peika আবার চালু করুন; তবুও না হলে `cargo build -p peika-hook` দিয়ে এটি বানান।",
+   "pt-BR": "O peika-hook.exe ainda não está no lugar. Reinicie o Peika; se continuar falhando, compile-o com `cargo build -p peika-hook`.",
+   "ru": "peika-hook.exe ещё не на месте. Перезапустите Peika; если не поможет, соберите его командой `cargo build -p peika-hook`.",
+   "id": "peika-hook.exe belum ada di tempatnya. Mulai ulang Peika; jika masih gagal, build dengan `cargo build -p peika-hook`."
   },
   "failing": {
    "zh-Hans": "失败",
@@ -3158,16 +3158,16 @@
    "ru": "секунд после ухода с острова",
    "id": "detik setelah Anda meninggalkan pulau"
   },
-  "settings.json: {what} has an unexpected type — Coucou has not touched it.": {
-   "zh-Hans": "settings.json：{what} 的类型不符合预期 — Coucou 没有修改它。",
-   "hi": "settings.json: {what} का प्रकार अपेक्षित नहीं है — Coucou ने इसे नहीं छुआ।",
-   "es": "settings.json: {what} tiene un tipo inesperado — Coucou no lo ha tocado.",
-   "ar": "settings.json: {what} من نوع غير متوقع — لم يمسّه Coucou.",
-   "fr": "settings.json : {what} a un type inattendu — Coucou n'y a pas touché.",
-   "bn": "settings.json: {what}-এর ধরন অপ্রত্যাশিত — Coucou এতে হাত দেয়নি।",
-   "pt-BR": "settings.json: {what} tem um tipo inesperado — o Coucou não mexeu nele.",
-   "ru": "settings.json: у {what} неожиданный тип — Coucou его не трогал.",
-   "id": "settings.json: {what} bertipe tak terduga — Coucou tidak menyentuhnya."
+  "settings.json: {what} has an unexpected type — Peika has not touched it.": {
+   "zh-Hans": "settings.json：{what} 的类型不符合预期 — Peika 没有修改它。",
+   "hi": "settings.json: {what} का प्रकार अपेक्षित नहीं है — Peika ने इसे नहीं छुआ।",
+   "es": "settings.json: {what} tiene un tipo inesperado — Peika no lo ha tocado.",
+   "ar": "settings.json: {what} من نوع غير متوقع — لم يمسّه Peika.",
+   "fr": "settings.json : {what} a un type inattendu — Peika n'y a pas touché.",
+   "bn": "settings.json: {what}-এর ধরন অপ্রত্যাশিত — Peika এতে হাত দেয়নি।",
+   "pt-BR": "settings.json: {what} tem um tipo inesperado — o Peika não mexeu nele.",
+   "ru": "settings.json: у {what} неожиданный тип — Peika его не трогал.",
+   "id": "settings.json: {what} bertipe tak terduga — Peika tidak menyentuhnya."
   },
   "unknown": {
    "zh-Hans": "未知",
@@ -3317,38 +3317,38 @@
     "other": "{count} repositori"
    }
   },
-  "{file} isn't UTF-8 text — Coucou won't touch it.": {
-   "zh-Hans": "{file} 不是 UTF-8 文本 — Coucou 不会修改它。",
-   "hi": "{file} UTF-8 टेक्स्ट नहीं है — Coucou इसे नहीं छुएगा।",
-   "es": "{file} no es texto UTF-8 — Coucou no lo tocará.",
-   "ar": "{file} ليس نصًا بترميز UTF-8 — لن يمسّه Coucou.",
-   "fr": "{file} n'est pas du texte UTF-8 — Coucou n'y touchera pas.",
-   "bn": "{file} UTF-8 টেক্সট নয় — Coucou এতে হাত দেবে না।",
-   "pt-BR": "{file} não é texto UTF-8 — o Coucou não vai mexer nele.",
-   "ru": "{file} — не текст в UTF-8, Coucou его не тронет.",
-   "id": "{file} bukan teks UTF-8 — Coucou tidak akan menyentuhnya."
+  "{file} isn't UTF-8 text — Peika won't touch it.": {
+   "zh-Hans": "{file} 不是 UTF-8 文本 — Peika 不会修改它。",
+   "hi": "{file} UTF-8 टेक्स्ट नहीं है — Peika इसे नहीं छुएगा।",
+   "es": "{file} no es texto UTF-8 — Peika no lo tocará.",
+   "ar": "{file} ليس نصًا بترميز UTF-8 — لن يمسّه Peika.",
+   "fr": "{file} n'est pas du texte UTF-8 — Peika n'y touchera pas.",
+   "bn": "{file} UTF-8 টেক্সট নয় — Peika এতে হাত দেবে না।",
+   "pt-BR": "{file} não é texto UTF-8 — o Peika não vai mexer nele.",
+   "ru": "{file} — не текст в UTF-8, Peika его не тронет.",
+   "id": "{file} bukan teks UTF-8 — Peika tidak akan menyentuhnya."
   },
-  "{file} isn't a JSON object — Coucou won't touch it.": {
-   "zh-Hans": "{file} 不是 JSON 对象 — Coucou 不会修改它。",
-   "hi": "{file} JSON ऑब्जेक्ट नहीं है — Coucou इसे नहीं छुएगा।",
-   "es": "{file} no es un objeto JSON — Coucou no lo tocará.",
-   "ar": "{file} ليس كائن JSON — لن يمسّه Coucou.",
-   "fr": "{file} n'est pas un objet JSON — Coucou n'y touchera pas.",
-   "bn": "{file} JSON অবজেক্ট নয় — Coucou এতে হাত দেবে না।",
-   "pt-BR": "{file} não é um objeto JSON — o Coucou não vai mexer nele.",
-   "ru": "{file} — не объект JSON, Coucou его не тронет.",
-   "id": "{file} bukan objek JSON — Coucou tidak akan menyentuhnya."
+  "{file} isn't a JSON object — Peika won't touch it.": {
+   "zh-Hans": "{file} 不是 JSON 对象 — Peika 不会修改它。",
+   "hi": "{file} JSON ऑब्जेक्ट नहीं है — Peika इसे नहीं छुएगा।",
+   "es": "{file} no es un objeto JSON — Peika no lo tocará.",
+   "ar": "{file} ليس كائن JSON — لن يمسّه Peika.",
+   "fr": "{file} n'est pas un objet JSON — Peika n'y touchera pas.",
+   "bn": "{file} JSON অবজেক্ট নয় — Peika এতে হাত দেবে না।",
+   "pt-BR": "{file} não é um objeto JSON — o Peika não vai mexer nele.",
+   "ru": "{file} — не объект JSON, Peika его не тронет.",
+   "id": "{file} bukan objek JSON — Peika tidak akan menyentuhnya."
   },
-  "{file} isn't valid JSON ({error}). Fix or move it, then try again — Coucou won't overwrite it.": {
-   "zh-Hans": "{file} 不是有效的 JSON（{error}）。请修复或移走它后重试 — Coucou 不会覆盖它。",
-   "hi": "{file} मान्य JSON नहीं है ({error})। इसे ठीक करें या हटाएँ, फिर दोबारा कोशिश करें — Coucou इसे ओवरराइट नहीं करेगा।",
-   "es": "{file} no es un JSON válido ({error}). Corrígelo o muévelo y vuelve a intentarlo — Coucou no lo sobrescribirá.",
-   "ar": "{file} ليس JSON صالحًا ({error}). أصلحه أو انقله ثم حاول مجددًا — لن يكتب Coucou فوقه.",
-   "fr": "{file} n'est pas un JSON valide ({error}). Corrige-le ou déplace-le, puis réessaie — Coucou ne l'écrasera pas.",
-   "bn": "{file} বৈধ JSON নয় ({error})। এটি ঠিক করুন বা সরান, তারপর আবার চেষ্টা করুন — Coucou এটি ওভাররাইট করবে না।",
-   "pt-BR": "{file} não é um JSON válido ({error}). Corrija ou mova o arquivo e tente de novo — o Coucou não vai sobrescrevê-lo.",
-   "ru": "{file} — некорректный JSON ({error}). Исправьте или переместите его и попробуйте снова — Coucou не будет его перезаписывать.",
-   "id": "{file} bukan JSON yang valid ({error}). Perbaiki atau pindahkan, lalu coba lagi — Coucou tidak akan menimpanya."
+  "{file} isn't valid JSON ({error}). Fix or move it, then try again — Peika won't overwrite it.": {
+   "zh-Hans": "{file} 不是有效的 JSON（{error}）。请修复或移走它后重试 — Peika 不会覆盖它。",
+   "hi": "{file} मान्य JSON नहीं है ({error})। इसे ठीक करें या हटाएँ, फिर दोबारा कोशिश करें — Peika इसे ओवरराइट नहीं करेगा।",
+   "es": "{file} no es un JSON válido ({error}). Corrígelo o muévelo y vuelve a intentarlo — Peika no lo sobrescribirá.",
+   "ar": "{file} ليس JSON صالحًا ({error}). أصلحه أو انقله ثم حاول مجددًا — لن يكتب Peika فوقه.",
+   "fr": "{file} n'est pas un JSON valide ({error}). Corrige-le ou déplace-le, puis réessaie — Peika ne l'écrasera pas.",
+   "bn": "{file} বৈধ JSON নয় ({error})। এটি ঠিক করুন বা সরান, তারপর আবার চেষ্টা করুন — Peika এটি ওভাররাইট করবে না।",
+   "pt-BR": "{file} não é um JSON válido ({error}). Corrija ou mova o arquivo e tente de novo — o Peika não vai sobrescrevê-lo.",
+   "ru": "{file} — некорректный JSON ({error}). Исправьте или переместите его и попробуйте снова — Peika не будет его перезаписывать.",
+   "id": "{file} bukan JSON yang valid ({error}). Perbaiki atau pindahkan, lalu coba lagi — Peika tidak akan menimpanya."
   },
   "{h}h {m}m": {
    "zh-Hans": "{h} 小时 {m} 分钟",
@@ -3416,16 +3416,16 @@
    "ru": "{name} отклонил API-ключ ({status}). Проверьте его в настройках.",
    "id": "{name} menolak kunci API ({status}). Periksa di Pengaturan."
   },
-  "{name} wasn't written by Coucou — Coucou has not touched it.": {
-   "zh-Hans": "{name} 不是由 Coucou 写入的 — Coucou 没有修改它。",
-   "hi": "{name} Coucou ने नहीं लिखा था — Coucou ने इसे नहीं छुआ।",
-   "es": "{name} no lo escribió Coucou — Coucou no lo ha tocado.",
-   "ar": "لم يكتب Coucou الملف {name} — لم يمسّه Coucou.",
-   "fr": "{name} n'a pas été écrit par Coucou — Coucou n'y a pas touché.",
-   "bn": "{name} Coucou লেখেনি — Coucou এতে হাত দেয়নি।",
-   "pt-BR": "{name} não foi escrito pelo Coucou — o Coucou não mexeu nele.",
-   "ru": "{name} записан не Coucou — Coucou его не трогал.",
-   "id": "{name} tidak ditulis oleh Coucou — Coucou tidak menyentuhnya."
+  "{name} wasn't written by Peika — Peika has not touched it.": {
+   "zh-Hans": "{name} 不是由 Peika 写入的 — Peika 没有修改它。",
+   "hi": "{name} Peika ने नहीं लिखा था — Peika ने इसे नहीं छुआ।",
+   "es": "{name} no lo escribió Peika — Peika no lo ha tocado.",
+   "ar": "لم يكتب Peika الملف {name} — لم يمسّه Peika.",
+   "fr": "{name} n'a pas été écrit par Peika — Peika n'y a pas touché.",
+   "bn": "{name} Peika লেখেনি — Peika এতে হাত দেয়নি।",
+   "pt-BR": "{name} não foi escrito pelo Peika — o Peika não mexeu nele.",
+   "ru": "{name} записан не Peika — Peika его не трогал.",
+   "id": "{name} tidak ditulis oleh Peika — Peika tidak menyentuhnya."
   },
   "{name} — {width}×{height} at {x},{y}": {
    "zh-Hans": "{name} — {width}×{height}，位于 {x},{y}",
@@ -3548,16 +3548,16 @@
    "ru": "Занято мест: {used}/{max} — основной инструмент место не занимает.",
    "id": "{used}/{max} slot terpakai — alat utama tidak memakai slot."
   },
-  "{what} has an unexpected type — Coucou has not touched it.": {
-   "zh-Hans": "{what} 的类型不符合预期 — Coucou 没有修改它。",
-   "hi": "{what} का प्रकार अपेक्षित नहीं है — Coucou ने इसे नहीं छुआ।",
-   "es": "{what} tiene un tipo inesperado — Coucou no lo ha tocado.",
-   "ar": "{what} من نوع غير متوقع — لم يمسّه Coucou.",
-   "fr": "{what} a un type inattendu — Coucou n'y a pas touché.",
-   "bn": "{what}-এর ধরন অপ্রত্যাশিত — Coucou এতে হাত দেয়নি।",
-   "pt-BR": "{what} tem um tipo inesperado — o Coucou não mexeu nele.",
-   "ru": "У {what} неожиданный тип — Coucou его не трогал.",
-   "id": "{what} bertipe tak terduga — Coucou tidak menyentuhnya."
+  "{what} has an unexpected type — Peika has not touched it.": {
+   "zh-Hans": "{what} 的类型不符合预期 — Peika 没有修改它。",
+   "hi": "{what} का प्रकार अपेक्षित नहीं है — Peika ने इसे नहीं छुआ।",
+   "es": "{what} tiene un tipo inesperado — Peika no lo ha tocado.",
+   "ar": "{what} من نوع غير متوقع — لم يمسّه Peika.",
+   "fr": "{what} a un type inattendu — Peika n'y a pas touché.",
+   "bn": "{what}-এর ধরন অপ্রত্যাশিত — Peika এতে হাত দেয়নি।",
+   "pt-BR": "{what} tem um tipo inesperado — o Peika não mexeu nele.",
+   "ru": "У {what} неожиданный тип — Peika его не трогал.",
+   "id": "{what} bertipe tak terduga — Peika tidak menyentuhnya."
   },
   "• subagent done": {
    "zh-Hans": "• 子代理完成",
@@ -4206,16 +4206,16 @@
    "ru": "На передний план",
    "id": "Bawa ke depan"
   },
-  "Ask Mochi anything": {
-   "zh-Hans": "向 Mochi 提问任何事",
-   "hi": "Mochi से कुछ भी पूछें",
-   "es": "Pregúntale lo que quieras a Mochi",
-   "ar": "اسأل Mochi أي شيء",
-   "fr": "Demande ce que tu veux à Mochi",
-   "bn": "Mochi-কে যেকোনো কিছু জিজ্ঞেস করুন",
-   "pt-BR": "Pergunte qualquer coisa ao Mochi",
-   "ru": "Спроси Mochi о чём угодно",
-   "id": "Tanyakan apa saja ke Mochi"
+  "Ask Peika anything": {
+   "zh-Hans": "向 Peika 提问任何事",
+   "hi": "Peika से कुछ भी पूछें",
+   "es": "Pregúntale lo que quieras a Peika",
+   "ar": "اسأل Peika أي شيء",
+   "fr": "Demande ce que tu veux à Peika",
+   "bn": "Peika-কে যেকোনো কিছু জিজ্ঞেস করুন",
+   "pt-BR": "Pergunte qualquer coisa ao Peika",
+   "ru": "Спроси Peika о чём угодно",
+   "id": "Tanyakan apa saja ke Peika"
   },
   "Pick a model below, or just start typing.": {
    "zh-Hans": "在下方选择模型，或直接开始输入。",
@@ -4305,16 +4305,16 @@
    "ru": "Ожидание сочетания клавиш",
    "id": "Menunggu pintasan"
   },
-  "Listen for « OK Coucou »": {
-   "zh-Hans": "监听« OK Coucou »",
-   "hi": "« OK Coucou » सुनें",
-   "es": "Escuchar « OK Coucou »",
-   "ar": "الاستماع إلى « OK Coucou »",
-   "fr": "Écouter « OK Coucou »",
-   "bn": "« OK Coucou » শুনুন",
-   "pt-BR": "Ouvir « OK Coucou »",
-   "ru": "Слушать « OK Coucou »",
-   "id": "Dengarkan « OK Coucou »"
+  "Listen for « OK Peika »": {
+   "zh-Hans": "监听« OK Peika »",
+   "hi": "« OK Peika » सुनें",
+   "es": "Escuchar « OK Peika »",
+   "ar": "الاستماع إلى « OK Peika »",
+   "fr": "Écouter « OK Peika »",
+   "bn": "« OK Peika » শুনুন",
+   "pt-BR": "Ouvir « OK Peika »",
+   "ru": "Слушать « OK Peika »",
+   "id": "Dengarkan « OK Peika »"
   },
   "Voice is not on Linux yet.": {
    "zh-Hans": "语音功能尚不支持 Linux。",
@@ -4349,27 +4349,27 @@
    "ru": "Микрофона нет, или Windows запрещает доступ к нему. Проверьте Параметры Windows → Конфиденциальность и защита → Микрофон.",
    "id": "Tidak ada mikrofon, atau Windows menolaknya. Periksa Pengaturan Windows → Privasi & keamanan → Mikrofon."
   },
-  "Say « OK Coucou », then your command. Coucou listens on this computer only: nothing is recorded and no audio leaves it. English only for now.": {
-   "zh-Hans": "说« OK Coucou »，然后说出命令。Coucou 只在这台电脑上监听：不录音，音频也不会离开电脑。目前仅支持英语。",
-   "hi": "« OK Coucou » कहें, फिर अपना आदेश। Coucou केवल इसी कंप्यूटर पर सुनता है: कुछ भी रिकॉर्ड नहीं होता और कोई ऑडियो बाहर नहीं जाता। अभी केवल अंग्रेज़ी।",
-   "es": "Di « OK Coucou » y luego tu orden. Coucou solo escucha en este equipo: no se graba nada y ningún audio sale de él. Por ahora solo en inglés.",
-   "ar": "قل « OK Coucou » ثم أمرك. يستمع Coucou على هذا الحاسوب فقط: لا يُسجَّل شيء ولا يغادره أي صوت. بالإنجليزية فقط حاليًا.",
-   "fr": "Dites « OK Coucou », puis votre commande. Coucou écoute uniquement sur cet ordinateur : rien n’est enregistré et aucun audio ne le quitte. En anglais seulement pour l’instant.",
-   "bn": "« OK Coucou » বলুন, তারপর আপনার কমান্ড। Coucou শুধু এই কম্পিউটারেই শোনে: কিছুই রেকর্ড হয় না এবং কোনো অডিও বাইরে যায় না। আপাতত শুধু ইংরেজি।",
-   "pt-BR": "Diga « OK Coucou » e depois o seu comando. O Coucou escuta apenas neste computador: nada é gravado e nenhum áudio sai dele. Apenas em inglês por enquanto.",
-   "ru": "Скажите « OK Coucou », затем команду. Coucou слушает только на этом компьютере: ничего не записывается, и звук его не покидает. Пока только на английском.",
-   "id": "Ucapkan « OK Coucou », lalu perintah Anda. Coucou hanya mendengarkan di komputer ini: tidak ada yang direkam dan tidak ada audio yang keluar. Untuk saat ini hanya bahasa Inggris."
+  "Say « OK Peika », then your command. Peika listens on this computer only: nothing is recorded and no audio leaves it. English only for now.": {
+   "zh-Hans": "说« OK Peika »，然后说出命令。Peika 只在这台电脑上监听：不录音，音频也不会离开电脑。目前仅支持英语。",
+   "hi": "« OK Peika » कहें, फिर अपना आदेश। Peika केवल इसी कंप्यूटर पर सुनता है: कुछ भी रिकॉर्ड नहीं होता और कोई ऑडियो बाहर नहीं जाता। अभी केवल अंग्रेज़ी।",
+   "es": "Di « OK Peika » y luego tu orden. Peika solo escucha en este equipo: no se graba nada y ningún audio sale de él. Por ahora solo en inglés.",
+   "ar": "قل « OK Peika » ثم أمرك. يستمع Peika على هذا الحاسوب فقط: لا يُسجَّل شيء ولا يغادره أي صوت. بالإنجليزية فقط حاليًا.",
+   "fr": "Dites « OK Peika », puis votre commande. Peika écoute uniquement sur cet ordinateur : rien n’est enregistré et aucun audio ne le quitte. En anglais seulement pour l’instant.",
+   "bn": "« OK Peika » বলুন, তারপর আপনার কমান্ড। Peika শুধু এই কম্পিউটারেই শোনে: কিছুই রেকর্ড হয় না এবং কোনো অডিও বাইরে যায় না। আপাতত শুধু ইংরেজি।",
+   "pt-BR": "Diga « OK Peika » e depois o seu comando. O Peika escuta apenas neste computador: nada é gravado e nenhum áudio sai dele. Apenas em inglês por enquanto.",
+   "ru": "Скажите « OK Peika », затем команду. Peika слушает только на этом компьютере: ничего не записывается, и звук его не покидает. Пока только на английском.",
+   "id": "Ucapkan « OK Peika », lalu perintah Anda. Peika hanya mendengarkan di komputer ini: tidak ada yang direkam dan tidak ada audio yang keluar. Untuk saat ini hanya bahasa Inggris."
   },
-  "Off: the microphone opens only for the “Talk to Coucou” shortcut. While it listens, Windows shows a microphone in the taskbar.": {
-   "zh-Hans": "关闭时：仅在使用“与 Coucou 对话”快捷键时打开麦克风。监听期间，Windows 会在任务栏显示麦克风图标。",
-   "hi": "बंद: माइक्रोफ़ोन केवल “Coucou से बात करें” शॉर्टकट के लिए खुलता है। सुनते समय Windows टास्कबार में माइक्रोफ़ोन दिखाता है।",
-   "es": "Desactivado: el micrófono solo se abre con el atajo “Hablar con Coucou”. Mientras escucha, Windows muestra un micrófono en la barra de tareas.",
-   "ar": "عند الإيقاف: يُفتح الميكروفون فقط عند استخدام اختصار “التحدث إلى Coucou”. أثناء الاستماع يعرض Windows ميكروفونًا في شريط المهام.",
-   "fr": "Désactivé : le microphone ne s’ouvre que pour le raccourci « Parler à Coucou ». Pendant l’écoute, Windows affiche un microphone dans la barre des tâches.",
-   "bn": "বন্ধ থাকলে: মাইক্রোফোন শুধু “Coucou-এর সাথে কথা বলুন” শর্টকাটের জন্য খোলে। শোনার সময় Windows টাস্কবারে একটি মাইক্রোফোন দেখায়।",
-   "pt-BR": "Desativado: o microfone só abre com o atalho “Falar com o Coucou”. Enquanto escuta, o Windows mostra um microfone na barra de tarefas.",
-   "ru": "Выключено: микрофон включается только по сочетанию клавиш «Поговорить с Coucou». Пока идёт прослушивание, Windows показывает микрофон на панели задач.",
-   "id": "Mati: mikrofon hanya terbuka untuk pintasan “Bicara dengan Coucou”. Selama mendengarkan, Windows menampilkan mikrofon di bilah tugas."
+  "Off: the microphone opens only for the “Talk to Peika” shortcut. While it listens, Windows shows a microphone in the taskbar.": {
+   "zh-Hans": "关闭时：仅在使用“与 Peika 对话”快捷键时打开麦克风。监听期间，Windows 会在任务栏显示麦克风图标。",
+   "hi": "बंद: माइक्रोफ़ोन केवल “Peika से बात करें” शॉर्टकट के लिए खुलता है। सुनते समय Windows टास्कबार में माइक्रोफ़ोन दिखाता है।",
+   "es": "Desactivado: el micrófono solo se abre con el atajo “Hablar con Peika”. Mientras escucha, Windows muestra un micrófono en la barra de tareas.",
+   "ar": "عند الإيقاف: يُفتح الميكروفون فقط عند استخدام اختصار “التحدث إلى Peika”. أثناء الاستماع يعرض Windows ميكروفونًا في شريط المهام.",
+   "fr": "Désactivé : le microphone ne s’ouvre que pour le raccourci « Parler à Peika ». Pendant l’écoute, Windows affiche un microphone dans la barre des tâches.",
+   "bn": "বন্ধ থাকলে: মাইক্রোফোন শুধু “Peika-এর সাথে কথা বলুন” শর্টকাটের জন্য খোলে। শোনার সময় Windows টাস্কবারে একটি মাইক্রোফোন দেখায়।",
+   "pt-BR": "Desativado: o microfone só abre com o atalho “Falar com o Peika”. Enquanto escuta, o Windows mostra um microfone na barra de tarefas.",
+   "ru": "Выключено: микрофон включается только по сочетанию клавиш «Поговорить с Peika». Пока идёт прослушивание, Windows показывает микрофон на панели задач.",
+   "id": "Mati: mikrofon hanya terbuka untuk pintasan “Bicara dengan Peika”. Selama mendengarkan, Windows menampilkan mikrofon di bilah tugas."
   },
   "Thinking…": {
    "zh-Hans": "思考中…",
@@ -4481,16 +4481,16 @@
    "ru": "Понимать свободную речь с помощью",
    "id": "Pahami ucapan bebas dengan"
   },
-  "A sentence Coucou does not know is put to this model, with the tools Coucou offers. The model proposes; Coucou checks before acting, and never approves a permission. Connect a server in Local models first.": {
-   "zh-Hans": "Coucou 不认识的句子会连同它提供的工具一起交给这个模型。模型提出建议；Coucou 在执行前检查，并且绝不批准权限请求。请先在“本地模型”中连接服务器。",
-   "hi": "जो वाक्य Coucou नहीं जानता, वह Coucou के टूल्स के साथ इस मॉडल को दिया जाता है। मॉडल सुझाव देता है; Coucou कार्रवाई से पहले जाँचता है और कभी अनुमति स्वीकृत नहीं करता। पहले «स्थानीय मॉडल» में सर्वर कनेक्ट करें।",
-   "es": "Una frase que Coucou no conoce se envía a este modelo, con las herramientas que Coucou ofrece. El modelo propone; Coucou comprueba antes de actuar y nunca aprueba un permiso. Conecta primero un servidor en Modelos locales.",
-   "ar": "الجملة التي لا يعرفها Coucou تُعرض على هذا النموذج مع الأدوات التي يوفّرها Coucou. النموذج يقترح، و Coucou يتحقق قبل التنفيذ ولا يوافق أبدًا على إذن. اربط خادمًا في «النماذج المحلية» أولًا.",
-   "fr": "Une phrase que Coucou ne connaît pas est soumise à ce modèle, avec les outils que Coucou propose. Le modèle propose ; Coucou vérifie avant d’agir et n’approuve jamais une autorisation. Connectez d’abord un serveur dans Modèles locaux.",
-   "bn": "Coucou যে বাক্য চেনে না, তা Coucou-এর টুলসহ এই মডেলকে দেওয়া হয়। মডেল প্রস্তাব করে; Coucou কাজ করার আগে যাচাই করে এবং কখনও অনুমতি অনুমোদন করে না। আগে «লোকাল মডেল»-এ একটি সার্ভার সংযুক্ত করুন।",
-   "pt-BR": "Uma frase que o Coucou não conhece é enviada a este modelo, com as ferramentas que o Coucou oferece. O modelo propõe; o Coucou verifica antes de agir e nunca aprova uma permissão. Conecte primeiro um servidor em Modelos locais.",
-   "ru": "Фраза, которую Coucou не знает, передаётся этой модели вместе с инструментами Coucou. Модель предлагает; Coucou проверяет перед действием и никогда не одобряет разрешение. Сначала подключите сервер в разделе «Локальные модели».",
-   "id": "Kalimat yang tidak dikenal Coucou diberikan ke model ini, beserta alat yang disediakan Coucou. Model mengusulkan; Coucou memeriksa sebelum bertindak dan tidak pernah menyetujui izin. Hubungkan server di Model lokal terlebih dahulu."
+  "A sentence Peika does not know is put to this model, with the tools Peika offers. The model proposes; Peika checks before acting, and never approves a permission. Connect a server in Local models first.": {
+   "zh-Hans": "Peika 不认识的句子会连同它提供的工具一起交给这个模型。模型提出建议；Peika 在执行前检查，并且绝不批准权限请求。请先在“本地模型”中连接服务器。",
+   "hi": "जो वाक्य Peika नहीं जानता, वह Peika के टूल्स के साथ इस मॉडल को दिया जाता है। मॉडल सुझाव देता है; Peika कार्रवाई से पहले जाँचता है और कभी अनुमति स्वीकृत नहीं करता। पहले «स्थानीय मॉडल» में सर्वर कनेक्ट करें।",
+   "es": "Una frase que Peika no conoce se envía a este modelo, con las herramientas que Peika ofrece. El modelo propone; Peika comprueba antes de actuar y nunca aprueba un permiso. Conecta primero un servidor en Modelos locales.",
+   "ar": "الجملة التي لا يعرفها Peika تُعرض على هذا النموذج مع الأدوات التي يوفّرها Peika. النموذج يقترح، و Peika يتحقق قبل التنفيذ ولا يوافق أبدًا على إذن. اربط خادمًا في «النماذج المحلية» أولًا.",
+   "fr": "Une phrase que Peika ne connaît pas est soumise à ce modèle, avec les outils que Peika propose. Le modèle propose ; Peika vérifie avant d’agir et n’approuve jamais une autorisation. Connectez d’abord un serveur dans Modèles locaux.",
+   "bn": "Peika যে বাক্য চেনে না, তা Peika-এর টুলসহ এই মডেলকে দেওয়া হয়। মডেল প্রস্তাব করে; Peika কাজ করার আগে যাচাই করে এবং কখনও অনুমতি অনুমোদন করে না। আগে «লোকাল মডেল»-এ একটি সার্ভার সংযুক্ত করুন।",
+   "pt-BR": "Uma frase que o Peika não conhece é enviada a este modelo, com as ferramentas que o Peika oferece. O modelo propõe; o Peika verifica antes de agir e nunca aprova uma permissão. Conecte primeiro um servidor em Modelos locais.",
+   "ru": "Фраза, которую Peika не знает, передаётся этой модели вместе с инструментами Peika. Модель предлагает; Peika проверяет перед действием и никогда не одобряет разрешение. Сначала подключите сервер в разделе «Локальные модели».",
+   "id": "Kalimat yang tidak dikenal Peika diberikan ke model ini, beserta alat yang disediakan Peika. Model mengusulkan; Peika memeriksa sebelum bertindak dan tidak pernah menyetujui izin. Hubungkan server di Model lokal terlebih dahulu."
   },
   "Spotify is off in Settings": {
    "zh-Hans": "Spotify 已在设置中关闭",
@@ -4569,27 +4569,27 @@
    "ru": "Продолжать слушать после команды",
    "id": "Tetap mendengarkan setelah perintah"
   },
-  "For a few seconds after a command, another can be said without « OK Coucou ». Only with free speech.": {
-   "zh-Hans": "命令之后的几秒内，无需说« OK Coucou »即可再说一条命令。仅适用于自由语音。",
-   "hi": "आदेश के बाद कुछ सेकंड तक, « OK Coucou » कहे बिना दूसरा आदेश दिया जा सकता है। केवल खुली बातचीत के साथ।",
-   "es": "Durante unos segundos tras una orden, se puede decir otra sin « OK Coucou ». Solo con habla libre.",
-   "ar": "لبضع ثوانٍ بعد الأمر، يمكن قول أمر آخر دون « OK Coucou ». مع الكلام الحر فقط.",
-   "fr": "Pendant quelques secondes après une commande, une autre peut être dite sans « OK Coucou ». Seulement avec la parole libre.",
-   "bn": "কমান্ডের পরে কয়েক সেকেন্ড, « OK Coucou » ছাড়াই আরেকটি বলা যায়। শুধু মুক্ত কথার সাথে।",
-   "pt-BR": "Por alguns segundos após um comando, outro pode ser dito sem « OK Coucou ». Apenas com fala livre.",
-   "ru": "Несколько секунд после команды можно произнести следующую без « OK Coucou ». Только со свободной речью.",
-   "id": "Selama beberapa detik setelah perintah, perintah lain dapat diucapkan tanpa « OK Coucou ». Hanya dengan ucapan bebas."
+  "For a few seconds after a command, another can be said without « OK Peika ». Only with free speech.": {
+   "zh-Hans": "命令之后的几秒内，无需说« OK Peika »即可再说一条命令。仅适用于自由语音。",
+   "hi": "आदेश के बाद कुछ सेकंड तक, « OK Peika » कहे बिना दूसरा आदेश दिया जा सकता है। केवल खुली बातचीत के साथ।",
+   "es": "Durante unos segundos tras una orden, se puede decir otra sin « OK Peika ». Solo con habla libre.",
+   "ar": "لبضع ثوانٍ بعد الأمر، يمكن قول أمر آخر دون « OK Peika ». مع الكلام الحر فقط.",
+   "fr": "Pendant quelques secondes après une commande, une autre peut être dite sans « OK Peika ». Seulement avec la parole libre.",
+   "bn": "কমান্ডের পরে কয়েক সেকেন্ড, « OK Peika » ছাড়াই আরেকটি বলা যায়। শুধু মুক্ত কথার সাথে।",
+   "pt-BR": "Por alguns segundos após um comando, outro pode ser dito sem « OK Peika ». Apenas com fala livre.",
+   "ru": "Несколько секунд после команды можно произнести следующую без « OK Peika ». Только со свободной речью.",
+   "id": "Selama beberapa detik setelah perintah, perintah lain dapat diucapkan tanpa « OK Peika ». Hanya dengan ucapan bebas."
   },
-  "Mochi answers out loud": {
-   "zh-Hans": "Mochi 出声回答",
-   "hi": "Mochi बोलकर जवाब देता है",
-   "es": "Mochi responde en voz alta",
-   "ar": "Mochi يجيب بصوت مسموع",
-   "fr": "Mochi répond à voix haute",
-   "bn": "Mochi জোরে উত্তর দেয়",
-   "pt-BR": "Mochi responde em voz alta",
-   "ru": "Mochi отвечает вслух",
-   "id": "Mochi menjawab dengan suara"
+  "Peika answers out loud": {
+   "zh-Hans": "Peika 出声回答",
+   "hi": "Peika बोलकर जवाब देता है",
+   "es": "Peika responde en voz alta",
+   "ar": "Peika يجيب بصوت مسموع",
+   "fr": "Peika répond à voix haute",
+   "bn": "Peika জোরে উত্তর দেয়",
+   "pt-BR": "Peika responde em voz alta",
+   "ru": "Peika отвечает вслух",
+   "id": "Peika menjawab dengan suara"
   },
   "Female voice": {
    "zh-Hans": "女声",
@@ -4613,16 +4613,16 @@
    "ru": "Мужской голос",
    "id": "Suara laki-laki"
   },
-  "Mochi says what a command did, in a calm voice made on this computer (Supertonic, downloaded from GitHub when you ask). In English, and quiet when Sound is off.": {
-   "zh-Hans": "Mochi 会用平静的声音说出命令的结果，声音在这台电脑上生成（Supertonic，在你要求时从 GitHub 下载）。使用英语；关闭声音时保持安静。",
-   "hi": "Mochi शांत आवाज़ में बताता है कि आदेश ने क्या किया; आवाज़ इसी कंप्यूटर पर बनती है (Supertonic, आपके कहने पर GitHub से डाउनलोड होता है)। अंग्रेज़ी में, और ध्वनि बंद होने पर चुप।",
-   "es": "Mochi dice lo que hizo una orden, con una voz tranquila generada en este equipo (Supertonic, descargado de GitHub cuando lo pides). En inglés, y en silencio cuando el sonido está apagado.",
-   "ar": "يقول Mochi ما فعله الأمر بصوت هادئ يُولَّد على هذا الحاسوب (Supertonic، يُنزَّل من GitHub عند طلبك). بالإنجليزية، ويصمت عند إيقاف الصوت.",
-   "fr": "Mochi dit ce qu’une commande a fait, d’une voix calme produite sur cet ordinateur (Supertonic, téléchargé depuis GitHub quand vous le demandez). En anglais, et silencieux quand le son est coupé.",
-   "bn": "Mochi শান্ত কণ্ঠে বলে কমান্ডটি কী করল; কণ্ঠটি এই কম্পিউটারেই তৈরি হয় (Supertonic, আপনি চাইলে GitHub থেকে ডাউনলোড হয়)। ইংরেজিতে, আর সাউন্ড বন্ধ থাকলে চুপ।",
-   "pt-BR": "O Mochi diz o que um comando fez, com uma voz calma gerada neste computador (Supertonic, baixado do GitHub quando você pede). Em inglês, e em silêncio quando o som está desligado.",
-   "ru": "Mochi спокойным голосом сообщает, что сделала команда; голос создаётся на этом компьютере (Supertonic, скачивается с GitHub по вашей просьбе). На английском; молчит, когда звук выключен.",
-   "id": "Mochi mengucapkan hasil perintah dengan suara tenang yang dibuat di komputer ini (Supertonic, diunduh dari GitHub saat Anda memintanya). Dalam bahasa Inggris, dan diam saat Suara dimatikan."
+  "Peika says what a command did, in a calm voice made on this computer (Supertonic, downloaded from GitHub when you ask). In English, and quiet when Sound is off.": {
+   "zh-Hans": "Peika 会用平静的声音说出命令的结果，声音在这台电脑上生成（Supertonic，在你要求时从 GitHub 下载）。使用英语；关闭声音时保持安静。",
+   "hi": "Peika शांत आवाज़ में बताता है कि आदेश ने क्या किया; आवाज़ इसी कंप्यूटर पर बनती है (Supertonic, आपके कहने पर GitHub से डाउनलोड होता है)। अंग्रेज़ी में, और ध्वनि बंद होने पर चुप।",
+   "es": "Peika dice lo que hizo una orden, con una voz tranquila generada en este equipo (Supertonic, descargado de GitHub cuando lo pides). En inglés, y en silencio cuando el sonido está apagado.",
+   "ar": "يقول Peika ما فعله الأمر بصوت هادئ يُولَّد على هذا الحاسوب (Supertonic، يُنزَّل من GitHub عند طلبك). بالإنجليزية، ويصمت عند إيقاف الصوت.",
+   "fr": "Peika dit ce qu’une commande a fait, d’une voix calme produite sur cet ordinateur (Supertonic, téléchargé depuis GitHub quand vous le demandez). En anglais, et silencieux quand le son est coupé.",
+   "bn": "Peika শান্ত কণ্ঠে বলে কমান্ডটি কী করল; কণ্ঠটি এই কম্পিউটারেই তৈরি হয় (Supertonic, আপনি চাইলে GitHub থেকে ডাউনলোড হয়)। ইংরেজিতে, আর সাউন্ড বন্ধ থাকলে চুপ।",
+   "pt-BR": "O Peika diz o que um comando fez, com uma voz calma gerada neste computador (Supertonic, baixado do GitHub quando você pede). Em inglês, e em silêncio quando o som está desligado.",
+   "ru": "Peika спокойным голосом сообщает, что сделала команда; голос создаётся на этом компьютере (Supertonic, скачивается с GitHub по вашей просьбе). На английском; молчит, когда звук выключен.",
+   "id": "Peika mengucapkan hasil perintah dengan suara tenang yang dibuat di komputer ini (Supertonic, diunduh dari GitHub saat Anda memintanya). Dalam bahasa Inggris, dan diam saat Suara dimatikan."
   },
   "Speech model": {
    "zh-Hans": "语音模型",
@@ -4734,16 +4734,16 @@
    "ru": "Телефон Android",
    "id": "Ponsel Android"
   },
-  "Send your agents' sessions to Coucou for Android and answer permission requests from the phone. Off by default; it only listens on your local network.": {
-   "zh-Hans": "把你的智能体会话发送到 Coucou for Android，并在手机上回应权限请求。默认关闭；仅在本地网络中监听。",
-   "hi": "अपने एजेंट के सत्र Coucou for Android को भेजें और फ़ोन से अनुमति के अनुरोधों का जवाब दें। डिफ़ॉल्ट रूप से बंद; यह केवल आपके स्थानीय नेटवर्क पर सुनता है।",
-   "es": "Envía las sesiones de tus agentes a Coucou for Android y responde a las solicitudes de permiso desde el teléfono. Desactivado por defecto; solo escucha en tu red local.",
-   "ar": "أرسل جلسات وكلائك إلى Coucou for Android وردّ على طلبات الإذن من الهاتف. معطّل افتراضيًا؛ ويستمع فقط على شبكتك المحلية.",
-   "fr": "Envoie les sessions de tes agents à Coucou for Android et réponds aux demandes d'autorisation depuis le téléphone. Désactivé par défaut ; il n'écoute que sur ton réseau local.",
-   "bn": "আপনার এজেন্টদের সেশন Coucou for Android-এ পাঠান এবং ফোন থেকে অনুমতির অনুরোধের উত্তর দিন। ডিফল্টে বন্ধ; এটি শুধু আপনার লোকাল নেটওয়ার্কে শোনে।",
-   "pt-BR": "Envie as sessões dos seus agentes ao Coucou for Android e responda a pedidos de permissão pelo celular. Desativado por padrão; só escuta na sua rede local.",
-   "ru": "Отправляйте сессии ваших агентов в Coucou for Android и отвечайте на запросы разрешений с телефона. По умолчанию выключено; слушает только в вашей локальной сети.",
-   "id": "Kirim sesi agen Anda ke Coucou for Android dan jawab permintaan izin dari ponsel. Nonaktif secara default; hanya mendengarkan di jaringan lokal Anda."
+  "Send your agents' sessions to Peika for Android and answer permission requests from the phone. Off by default; it only listens on your local network.": {
+   "zh-Hans": "把你的智能体会话发送到 Peika for Android，并在手机上回应权限请求。默认关闭；仅在本地网络中监听。",
+   "hi": "अपने एजेंट के सत्र Peika for Android को भेजें और फ़ोन से अनुमति के अनुरोधों का जवाब दें। डिफ़ॉल्ट रूप से बंद; यह केवल आपके स्थानीय नेटवर्क पर सुनता है।",
+   "es": "Envía las sesiones de tus agentes a Peika for Android y responde a las solicitudes de permiso desde el teléfono. Desactivado por defecto; solo escucha en tu red local.",
+   "ar": "أرسل جلسات وكلائك إلى Peika for Android وردّ على طلبات الإذن من الهاتف. معطّل افتراضيًا؛ ويستمع فقط على شبكتك المحلية.",
+   "fr": "Envoie les sessions de tes agents à Peika for Android et réponds aux demandes d'autorisation depuis le téléphone. Désactivé par défaut ; il n'écoute que sur ton réseau local.",
+   "bn": "আপনার এজেন্টদের সেশন Peika for Android-এ পাঠান এবং ফোন থেকে অনুমতির অনুরোধের উত্তর দিন। ডিফল্টে বন্ধ; এটি শুধু আপনার লোকাল নেটওয়ার্কে শোনে।",
+   "pt-BR": "Envie as sessões dos seus agentes ao Peika for Android e responda a pedidos de permissão pelo celular. Desativado por padrão; só escuta na sua rede local.",
+   "ru": "Отправляйте сессии ваших агентов в Peika for Android и отвечайте на запросы разрешений с телефона. По умолчанию выключено; слушает только в вашей локальной сети.",
+   "id": "Kirim sesi agen Anda ke Peika for Android dan jawab permintaan izin dari ponsel. Nonaktif secara default; hanya mendengarkan di jaringan lokal Anda."
   },
   "Allow on the phone asks for the fingerprint or the screen lock. Deny does not.": {
    "zh-Hans": "在手机上点“允许”需要指纹或锁屏验证；“拒绝”则不需要。",
@@ -4800,16 +4800,16 @@
    "ru": "Подключённые телефоны: {count}",
    "id": "Ponsel terhubung: {count}"
   },
-  "In Coucou for Android, scan this code with the camera or paste the link.": {
-   "zh-Hans": "在 Coucou for Android 中，用相机扫描此码，或粘贴链接。",
-   "hi": "Coucou for Android में कैमरे से यह कोड स्कैन करें या लिंक पेस्ट करें।",
-   "es": "En Coucou for Android, escanea este código con la cámara o pega el enlace.",
-   "ar": "في Coucou for Android، امسح هذا الرمز بالكاميرا أو الصق الرابط.",
-   "fr": "Dans Coucou for Android, scanne ce code avec l'appareil photo ou colle le lien.",
-   "bn": "Coucou for Android-এ ক্যামেরা দিয়ে এই কোড স্ক্যান করুন বা লিংক পেস্ট করুন।",
-   "pt-BR": "No Coucou for Android, escaneie este código com a câmera ou cole o link.",
-   "ru": "В Coucou for Android отсканируйте этот код камерой или вставьте ссылку.",
-   "id": "Di Coucou for Android, pindai kode ini dengan kamera atau tempel tautannya."
+  "In Peika for Android, scan this code with the camera or paste the link.": {
+   "zh-Hans": "在 Peika for Android 中，用相机扫描此码，或粘贴链接。",
+   "hi": "Peika for Android में कैमरे से यह कोड स्कैन करें या लिंक पेस्ट करें।",
+   "es": "En Peika for Android, escanea este código con la cámara o pega el enlace.",
+   "ar": "في Peika for Android، امسح هذا الرمز بالكاميرا أو الصق الرابط.",
+   "fr": "Dans Peika for Android, scanne ce code avec l'appareil photo ou colle le lien.",
+   "bn": "Peika for Android-এ ক্যামেরা দিয়ে এই কোড স্ক্যান করুন বা লিংক পেস্ট করুন।",
+   "pt-BR": "No Peika for Android, escaneie este código com a câmera ou cole o link.",
+   "ru": "В Peika for Android отсканируйте этот код камерой или вставьте ссылку.",
+   "id": "Di Peika for Android, pindai kode ini dengan kamera atau tempel tautannya."
   },
   "Copy link": {
    "zh-Hans": "复制链接",
@@ -4844,16 +4844,16 @@
    "ru": "Сопряжённый телефон отключится, и ему понадобится новый код.",
    "id": "Ponsel yang tersandingkan akan terputus dan memerlukan kode baru."
   },
-  "If Windows asks about the firewall, allow Coucou on private networks. The phone and this computer must be on the same Wi-Fi.": {
-   "zh-Hans": "如果 Windows 询问防火墙，请允许 Coucou 在专用网络上通信。手机和这台电脑必须连接同一个 Wi-Fi。",
-   "hi": "अगर Windows फ़ायरवॉल के बारे में पूछे, तो Coucou को निजी नेटवर्क पर अनुमति दें। फ़ोन और यह कंप्यूटर एक ही Wi-Fi पर होने चाहिए।",
-   "es": "Si Windows pregunta por el firewall, permite Coucou en redes privadas. El teléfono y este equipo deben estar en la misma Wi-Fi.",
-   "ar": "إذا سأل Windows عن جدار الحماية، فاسمح لـ Coucou على الشبكات الخاصة. يجب أن يكون الهاتف وهذا الكمبيوتر على شبكة Wi-Fi نفسها.",
-   "fr": "Si Windows te interroge sur le pare-feu, autorise Coucou sur les réseaux privés. Le téléphone et cet ordinateur doivent être sur le même Wi-Fi.",
-   "bn": "Windows ফায়ারওয়াল নিয়ে জিজ্ঞেস করলে Coucou-কে প্রাইভেট নেটওয়ার্কে অনুমতি দিন। ফোন ও এই কম্পিউটার একই Wi-Fi-তে থাকতে হবে।",
-   "pt-BR": "Se o Windows perguntar sobre o firewall, permita o Coucou em redes privadas. O celular e este computador precisam estar no mesmo Wi-Fi.",
-   "ru": "Если Windows спросит про брандмауэр, разрешите Coucou в частных сетях. Телефон и этот компьютер должны быть в одной сети Wi-Fi.",
-   "id": "Jika Windows menanyakan firewall, izinkan Coucou di jaringan pribadi. Ponsel dan komputer ini harus berada di Wi-Fi yang sama."
+  "If Windows asks about the firewall, allow Peika on private networks. The phone and this computer must be on the same Wi-Fi.": {
+   "zh-Hans": "如果 Windows 询问防火墙，请允许 Peika 在专用网络上通信。手机和这台电脑必须连接同一个 Wi-Fi。",
+   "hi": "अगर Windows फ़ायरवॉल के बारे में पूछे, तो Peika को निजी नेटवर्क पर अनुमति दें। फ़ोन और यह कंप्यूटर एक ही Wi-Fi पर होने चाहिए।",
+   "es": "Si Windows pregunta por el firewall, permite Peika en redes privadas. El teléfono y este equipo deben estar en la misma Wi-Fi.",
+   "ar": "إذا سأل Windows عن جدار الحماية، فاسمح لـ Peika على الشبكات الخاصة. يجب أن يكون الهاتف وهذا الكمبيوتر على شبكة Wi-Fi نفسها.",
+   "fr": "Si Windows te interroge sur le pare-feu, autorise Peika sur les réseaux privés. Le téléphone et cet ordinateur doivent être sur le même Wi-Fi.",
+   "bn": "Windows ফায়ারওয়াল নিয়ে জিজ্ঞেস করলে Peika-কে প্রাইভেট নেটওয়ার্কে অনুমতি দিন। ফোন ও এই কম্পিউটার একই Wi-Fi-তে থাকতে হবে।",
+   "pt-BR": "Se o Windows perguntar sobre o firewall, permita o Peika em redes privadas. O celular e este computador precisam estar no mesmo Wi-Fi.",
+   "ru": "Если Windows спросит про брандмауэр, разрешите Peika в частных сетях. Телефон и этот компьютер должны быть в одной сети Wi-Fi.",
+   "id": "Jika Windows menanyakan firewall, izinkan Peika di jaringan pribadi. Ponsel dan komputer ini harus berada di Wi-Fi yang sama."
   },
   "The phone connects to {address}": {
    "zh-Hans": "手机连接的地址：{address}",
@@ -5372,16 +5372,16 @@
    "ru": "Голос выключен",
    "id": "Suara mati"
   },
-  "Coucou no longer listens. Turn it back on here, or in Settings.": {
-   "zh-Hans": "Coucou 不再聆听。可在此处或设置中重新开启。",
-   "hi": "Coucou अब नहीं सुन रहा। यहाँ या सेटिंग्स में फिर चालू करें।",
-   "es": "Coucou ya no escucha. Vuelve a activarlo aquí o en Ajustes.",
-   "ar": "لم يعد Coucou يستمع. أعد تشغيله من هنا أو من الإعدادات.",
-   "fr": "Coucou n’écoute plus. Réactivez-le ici ou dans les Réglages.",
-   "bn": "Coucou আর শুনছে না। এখানে বা সেটিংসে আবার চালু করুন।",
-   "pt-BR": "O Coucou não está mais ouvindo. Reative aqui ou nos Ajustes.",
-   "ru": "Coucou больше не слушает. Включите снова здесь или в настройках.",
-   "id": "Coucou tidak lagi mendengarkan. Nyalakan kembali di sini atau di Pengaturan."
+  "Peika no longer listens. Turn it back on here, or in Settings.": {
+   "zh-Hans": "Peika 不再聆听。可在此处或设置中重新开启。",
+   "hi": "Peika अब नहीं सुन रहा। यहाँ या सेटिंग्स में फिर चालू करें।",
+   "es": "Peika ya no escucha. Vuelve a activarlo aquí o en Ajustes.",
+   "ar": "لم يعد Peika يستمع. أعد تشغيله من هنا أو من الإعدادات.",
+   "fr": "Peika n’écoute plus. Réactivez-le ici ou dans les Réglages.",
+   "bn": "Peika আর শুনছে না। এখানে বা সেটিংসে আবার চালু করুন।",
+   "pt-BR": "O Peika não está mais ouvindo. Reative aqui ou nos Ajustes.",
+   "ru": "Peika больше не слушает. Включите снова здесь или в настройках.",
+   "id": "Peika tidak lagi mendengarkan. Nyalakan kembali di sini atau di Pengaturan."
   },
   "Turn back on": {
    "zh-Hans": "重新开启",
@@ -5680,16 +5680,16 @@
    "ru": "Пока нет бесед",
    "id": "Belum ada percakapan"
   },
-  "Mochi stays in the island on this desktop": {
-   "zh-Hans": "在此桌面上，Mochi 只待在灵动岛里",
-   "hi": "इस डेस्कटॉप पर Mochi आइलैंड में ही रहता है",
-   "es": "En este escritorio, Mochi se queda en la isla",
-   "ar": "على سطح المكتب هذا يبقى Mochi في الجزيرة",
-   "fr": "Sur ce bureau, Mochi reste dans l'île",
-   "bn": "এই ডেস্কটপে Mochi আইল্যান্ডেই থাকে",
-   "pt-BR": "Nesta área de trabalho, Mochi fica na ilha",
-   "ru": "На этом рабочем столе Mochi остаётся в острове",
-   "id": "Di desktop ini, Mochi tetap di pulau"
+  "Peika stays in the island on this desktop": {
+   "zh-Hans": "在此桌面上，Peika 只待在灵动岛里",
+   "hi": "इस डेस्कटॉप पर Peika आइलैंड में ही रहता है",
+   "es": "En este escritorio, Peika se queda en la isla",
+   "ar": "على سطح المكتب هذا يبقى Peika في الجزيرة",
+   "fr": "Sur ce bureau, Peika reste dans l'île",
+   "bn": "এই ডেস্কটপে Peika আইল্যান্ডেই থাকে",
+   "pt-BR": "Nesta área de trabalho, Peika fica na ilha",
+   "ru": "На этом рабочем столе Peika остаётся в острове",
+   "id": "Di desktop ini, Peika tetap di pulau"
   },
   "On the desktop": {
    "zh-Hans": "在桌面上",
@@ -5757,49 +5757,49 @@
    "ru": "Отправить этот ответ?",
    "id": "Kirim jawaban ini?"
   },
-  "Coucou is not paused": {
-   "zh-Hans": "Coucou 没有暂停",
-   "hi": "Coucou रुका हुआ नहीं है",
-   "es": "Coucou no está en pausa",
-   "ar": "Coucou ليس متوقفًا مؤقتًا",
-   "fr": "Coucou n'est pas en pause",
-   "bn": "Coucou বিরতিতে নেই",
-   "pt-BR": "Coucou não está em pausa",
-   "ru": "Coucou не на паузе",
-   "id": "Coucou tidak sedang dijeda"
+  "Peika is not paused": {
+   "zh-Hans": "Peika 没有暂停",
+   "hi": "Peika रुका हुआ नहीं है",
+   "es": "Peika no está en pausa",
+   "ar": "Peika ليس متوقفًا مؤقتًا",
+   "fr": "Peika n'est pas en pause",
+   "bn": "Peika বিরতিতে নেই",
+   "pt-BR": "Peika não está em pausa",
+   "ru": "Peika не на паузе",
+   "id": "Peika tidak sedang dijeda"
   },
-  "Coucou is back": {
-   "zh-Hans": "Coucou 回来了",
-   "hi": "Coucou वापस आ गया",
-   "es": "Coucou ha vuelto",
-   "ar": "عاد Coucou",
-   "fr": "Coucou est de retour",
-   "bn": "Coucou ফিরে এসেছে",
-   "pt-BR": "Coucou voltou",
-   "ru": "Coucou снова здесь",
-   "id": "Coucou kembali"
+  "Peika is back": {
+   "zh-Hans": "Peika 回来了",
+   "hi": "Peika वापस आ गया",
+   "es": "Peika ha vuelto",
+   "ar": "عاد Peika",
+   "fr": "Peika est de retour",
+   "bn": "Peika ফিরে এসেছে",
+   "pt-BR": "Peika voltou",
+   "ru": "Peika снова здесь",
+   "id": "Peika kembali"
   },
-  "Quit Coucou?": {
-   "zh-Hans": "退出 Coucou？",
-   "hi": "Coucou बंद करें?",
-   "es": "¿Salir de Coucou?",
-   "ar": "إنهاء Coucou؟",
-   "fr": "Quitter Coucou ?",
-   "bn": "Coucou বন্ধ করবেন?",
-   "pt-BR": "Sair do Coucou?",
-   "ru": "Выйти из Coucou?",
-   "id": "Keluar dari Coucou?"
+  "Quit Peika?": {
+   "zh-Hans": "退出 Peika？",
+   "hi": "Peika बंद करें?",
+   "es": "¿Salir de Peika?",
+   "ar": "إنهاء Peika؟",
+   "fr": "Quitter Peika ?",
+   "bn": "Peika বন্ধ করবেন?",
+   "pt-BR": "Sair do Peika?",
+   "ru": "Выйти из Peika?",
+   "id": "Keluar dari Peika?"
   },
-  "Coucou closes until you start it again.": {
-   "zh-Hans": "Coucou 将关闭，直到你再次启动它。",
-   "hi": "Coucou तब तक बंद रहेगा जब तक आप इसे फिर से शुरू नहीं करते।",
-   "es": "Coucou se cierra hasta que lo vuelvas a abrir.",
-   "ar": "سيُغلق Coucou إلى أن تشغّله من جديد.",
-   "fr": "Coucou se ferme jusqu'à ce que vous le relanciez.",
-   "bn": "আপনি আবার চালু না করা পর্যন্ত Coucou বন্ধ থাকবে।",
-   "pt-BR": "O Coucou fecha até você abri-lo de novo.",
-   "ru": "Coucou закроется, пока вы не запустите его снова.",
-   "id": "Coucou ditutup sampai Anda membukanya lagi."
+  "Peika closes until you start it again.": {
+   "zh-Hans": "Peika 将关闭，直到你再次启动它。",
+   "hi": "Peika तब तक बंद रहेगा जब तक आप इसे फिर से शुरू नहीं करते।",
+   "es": "Peika se cierra hasta que lo vuelvas a abrir.",
+   "ar": "سيُغلق Peika إلى أن تشغّله من جديد.",
+   "fr": "Peika se ferme jusqu'à ce que vous le relanciez.",
+   "bn": "আপনি আবার চালু না করা পর্যন্ত Peika বন্ধ থাকবে।",
+   "pt-BR": "O Peika fecha até você abri-lo de novo.",
+   "ru": "Peika закроется, пока вы не запустите его снова.",
+   "id": "Peika ditutup sampai Anda membukanya lagi."
   },
   "Quitting": {
    "zh-Hans": "正在退出",
@@ -5933,16 +5933,16 @@
    "ru": "Продолжать слушать",
    "id": "Tetap mendengarkan"
   },
-  "Pause Coucou?": {
-   "zh-Hans": "暂停 Coucou？",
-   "hi": "Coucou को रोकें?",
-   "es": "¿Pausar Coucou?",
-   "ar": "إيقاف Coucou مؤقتاً؟",
-   "fr": "Mettre Coucou en pause ?",
-   "bn": "Coucou-কে বিরতি দেবেন?",
-   "pt-BR": "Pausar o Coucou?",
-   "ru": "Приостановить Coucou?",
-   "id": "Jeda Coucou?"
+  "Pause Peika?": {
+   "zh-Hans": "暂停 Peika？",
+   "hi": "Peika को रोकें?",
+   "es": "¿Pausar Peika?",
+   "ar": "إيقاف Peika مؤقتاً؟",
+   "fr": "Mettre Peika en pause ?",
+   "bn": "Peika-কে বিরতি দেবেন?",
+   "pt-BR": "Pausar o Peika?",
+   "ru": "Приостановить Peika?",
+   "id": "Jeda Peika?"
   },
   "Keep going": {
    "zh-Hans": "继续运行",
@@ -6010,16 +6010,16 @@
    "ru": "Чтобы понять команду, голосу нужен сервер моделей с моделью и моделью эмбеддингов, а также загруженный речевой движок.",
    "id": "Untuk memahami perintah, suara memerlukan server model dengan sebuah model dan model embedding, serta mesin suara yang sudah diunduh."
   },
-  "Voice needs an embedding model: it is what finds which of Coucou's commands a sentence is about. mxbai-embed-large chose best in our measurements.": {
-   "zh-Hans": "语音需要一个嵌入模型：它负责找出一句话对应 Coucou 的哪个指令。在我们的测试中，mxbai-embed-large 选得最准。",
-   "hi": "आवाज़ को एक एम्बेडिंग मॉडल चाहिए: वही पता लगाता है कि कोई वाक्य Coucou के किस आदेश के बारे में है। हमारे मापों में mxbai-embed-large ने सबसे अच्छा चुना।",
-   "es": "La voz necesita un modelo de embeddings: es lo que encuentra a qué orden de Coucou se refiere una frase. En nuestras mediciones, mxbai-embed-large fue el que mejor eligió.",
-   "ar": "يحتاج الصوت إلى نموذج تضمين: فهو ما يجد أيّ أوامر Coucou تقصده الجملة. في قياساتنا، كان mxbai-embed-large الأفضل اختيارًا.",
-   "fr": "La voix a besoin d'un modèle d'embedding : c'est lui qui trouve de quelle commande de Coucou parle une phrase. Dans nos mesures, mxbai-embed-large a le mieux choisi.",
-   "bn": "ভয়েসের একটি এমবেডিং মডেল দরকার: এটিই খুঁজে বের করে একটি বাক্য Coucou-র কোন কমান্ড নিয়ে। আমাদের পরিমাপে mxbai-embed-large সবচেয়ে ভালো বেছেছে।",
-   "pt-BR": "A voz precisa de um modelo de embeddings: é ele que encontra a qual comando do Coucou uma frase se refere. Nas nossas medições, o mxbai-embed-large foi o que melhor escolheu.",
-   "ru": "Голосу нужна модель эмбеддингов: именно она находит, к какой команде Coucou относится фраза. В наших замерах лучше всех выбирала mxbai-embed-large.",
-   "id": "Suara memerlukan model embedding: dialah yang menemukan perintah Coucou mana yang dimaksud sebuah kalimat. Dalam pengukuran kami, mxbai-embed-large memilih paling baik."
+  "Voice needs an embedding model: it is what finds which of Peika's commands a sentence is about. mxbai-embed-large chose best in our measurements.": {
+   "zh-Hans": "语音需要一个嵌入模型：它负责找出一句话对应 Peika 的哪个指令。在我们的测试中，mxbai-embed-large 选得最准。",
+   "hi": "आवाज़ को एक एम्बेडिंग मॉडल चाहिए: वही पता लगाता है कि कोई वाक्य Peika के किस आदेश के बारे में है। हमारे मापों में mxbai-embed-large ने सबसे अच्छा चुना।",
+   "es": "La voz necesita un modelo de embeddings: es lo que encuentra a qué orden de Peika se refiere una frase. En nuestras mediciones, mxbai-embed-large fue el que mejor eligió.",
+   "ar": "يحتاج الصوت إلى نموذج تضمين: فهو ما يجد أيّ أوامر Peika تقصده الجملة. في قياساتنا، كان mxbai-embed-large الأفضل اختيارًا.",
+   "fr": "La voix a besoin d'un modèle d'embedding : c'est lui qui trouve de quelle commande de Peika parle une phrase. Dans nos mesures, mxbai-embed-large a le mieux choisi.",
+   "bn": "ভয়েসের একটি এমবেডিং মডেল দরকার: এটিই খুঁজে বের করে একটি বাক্য Peika-র কোন কমান্ড নিয়ে। আমাদের পরিমাপে mxbai-embed-large সবচেয়ে ভালো বেছেছে।",
+   "pt-BR": "A voz precisa de um modelo de embeddings: é ele que encontra a qual comando do Peika uma frase se refere. Nas nossas medições, o mxbai-embed-large foi o que melhor escolheu.",
+   "ru": "Голосу нужна модель эмбеддингов: именно она находит, к какой команде Peika относится фраза. В наших замерах лучше всех выбирала mxbai-embed-large.",
+   "id": "Suara memerlukan model embedding: dialah yang menemukan perintah Peika mana yang dimaksud sebuah kalimat. Dalam pengukuran kami, mxbai-embed-large memilih paling baik."
   },
   "Debugging": {
    "zh-Hans": "调试",

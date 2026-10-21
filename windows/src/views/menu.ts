@@ -1,4 +1,4 @@
-// The right-click menu — Coucou's own, in place of the webview's.
+// The right-click menu — Peika's own, in place of the webview's.
 //
 // Nothing is listed here: an element says what it offers with provideMenu(),
 // and a right-click gathers what the element under the pointer and each of its
@@ -43,7 +43,7 @@ export interface Rect {
 }
 
 export interface MenuHost {
-  /** True where a right-click is someone else's (Mochi's is the wardrobe). */
+  /** True where a right-click is someone else's (Peika's is the wardrobe). */
   skip?(event: MouseEvent): boolean;
   /** The clipboard's text, for Paste: the page may not read it itself. */
   clipboardText?(): Promise<string | null>;
@@ -143,7 +143,7 @@ export function placeMenu(x: number, y: number, w: number, h: number, viewW: num
   return { x: fit(x, w, viewW), y: fit(y, h, viewH) };
 }
 
-/** Coucou's menu on `root`'s right-clicks, and never the webview's. */
+/** Peika's menu on `root`'s right-clicks, and never the webview's. */
 export function installContextMenu(root: HTMLElement, host: MenuHost = {}): ContextMenu {
   let el: HTMLElement | null = null;
   let rect: Rect | null = null;
