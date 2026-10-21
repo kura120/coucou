@@ -1,10 +1,10 @@
 import AppIntents
 import WidgetKit
 
-// The Team widget's settings: which Mochi sits in each of the four spots.
-// "Automatic" fills a spot with the most urgent Mochi not already shown.
+// The Team widget's settings: which Peika sits in each of the four spots.
+// "Automatic" fills a spot with the most urgent Peika not already shown.
 
-enum MochiChoice: String, AppEnum {
+enum PeikaChoice: String, AppEnum {
     case automatic
     case vscode = "integration_claude"
     case cursor = "agent_cursor"
@@ -19,9 +19,9 @@ enum MochiChoice: String, AppEnum {
     case n8n = "integration_n8n"
     case notion = "integration_notion"
 
-    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Mochi"
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Peika"
 
-    static let caseDisplayRepresentations: [MochiChoice: DisplayRepresentation] = [
+    static let caseDisplayRepresentations: [PeikaChoice: DisplayRepresentation] = [
         .automatic: "Automatic",
         .vscode: "VS Code",
         .cursor: "Cursor",
@@ -43,12 +43,12 @@ enum MochiChoice: String, AppEnum {
 
 struct TeamConfiguration: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Team"
-    static let description = IntentDescription("Pick the Mochi in each spot.")
+    static let description = IntentDescription("Pick the Peika in each spot.")
 
-    @Parameter(title: "Top left", default: .automatic) var spot1: MochiChoice
-    @Parameter(title: "Top right", default: .automatic) var spot2: MochiChoice
-    @Parameter(title: "Bottom left", default: .automatic) var spot3: MochiChoice
-    @Parameter(title: "Bottom right", default: .automatic) var spot4: MochiChoice
+    @Parameter(title: "Top left", default: .automatic) var spot1: PeikaChoice
+    @Parameter(title: "Top right", default: .automatic) var spot2: PeikaChoice
+    @Parameter(title: "Bottom left", default: .automatic) var spot3: PeikaChoice
+    @Parameter(title: "Bottom right", default: .automatic) var spot4: PeikaChoice
 
     var picks: [String?] { [spot1.pillId, spot2.pillId, spot3.pillId, spot4.pillId] }
 }

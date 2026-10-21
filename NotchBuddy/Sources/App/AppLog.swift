@@ -25,7 +25,7 @@ func appendAppLog(_ fileName: String, _ message: String,
 }
 
 private enum AppLogWriter {
-    static let queue = DispatchQueue(label: "fr.louisraille.NotchBuddy.applog", qos: .utility)
+    static let queue = DispatchQueue(label: "dev.kura120.peika.direct.applog", qos: .utility)
     static let maxLogBytes = 1_048_576 // 1 MB
 
     // Touched only on `queue`.

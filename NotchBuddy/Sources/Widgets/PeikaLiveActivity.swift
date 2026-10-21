@@ -2,12 +2,12 @@ import ActivityKit
 import SwiftUI
 import WidgetKit
 
-// Mochi's Live Activity: on the Lock Screen and in the Dynamic Island while
+// Peika's Live Activity: on the Lock Screen and in the Dynamic Island while
 // the Mac is locked and an agent is working. The Mac drives it (step 8).
 
-struct MochiLiveActivity: Widget {
+struct PeikaLiveActivity: Widget {
     var body: some WidgetConfiguration {
-        ActivityConfiguration(for: MochiActivityAttributes.self) { context in
+        ActivityConfiguration(for: PeikaActivityAttributes.self) { context in
             LockScreenActivityView(state: context.state, stale: context.isStale)
                 .activityBackgroundTint(Color(white: 0.08))
                 .activitySystemActionForegroundColor(.white)
@@ -15,7 +15,7 @@ struct MochiLiveActivity: Widget {
             let state = context.state
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    MochiSwap(state: state)
+                    PeikaSwap(state: state)
                         .frame(width: 44, height: 44)
                         .padding(.leading, 4)
                 }
@@ -63,7 +63,7 @@ struct MochiLiveActivity: Widget {
                     }
                 }
             } compactLeading: {
-                MochiSwap(state: state)
+                PeikaSwap(state: state)
                     .frame(width: 24, height: 24)
             } compactTrailing: {
                 Text(state.compactText)
@@ -73,7 +73,7 @@ struct MochiLiveActivity: Widget {
                     .contentTransition(.numericText())
                     .animation(.phaseChange, value: state.compactText)
             } minimal: {
-                MochiSwap(state: state)
+                PeikaSwap(state: state)
                     .frame(width: 22, height: 22)
             }
             .keylineTint(state.toneColor)
@@ -82,15 +82,15 @@ struct MochiLiveActivity: Widget {
 }
 
 struct LockScreenActivityView: View {
-    let state: MochiActivityState
+    let state: PeikaActivityState
     let stale: Bool
 
     var body: some View {
         HStack(spacing: 14) {
-            MochiSwap(state: state)
+            PeikaSwap(state: state)
                 .padding(6)
                 .frame(width: 52, height: 52)
-                .background(Color.mochiTile(hex: state.color), in: RoundedRectangle(cornerRadius: 14))
+                .background(Color.peikaTile(hex: state.color), in: RoundedRectangle(cornerRadius: 14))
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(state.agent).font(.headline)
@@ -133,29 +133,29 @@ struct LockScreenActivityView: View {
     }
 }
 
-/// Mochi with a little pop when his state changes: the old face fades, the
+/// Peika with a little pop when his state changes: the old face fades, the
 /// new one grows in.
-struct MochiSwap: View {
-    let state: MochiActivityState
+struct PeikaSwap: View {
+    let state: PeikaActivityState
 
     var body: some View {
         ZStack {
-            MochiStill(state: state.botState)
+            PeikaStill(state: state.botState)
                 .id(state.state)
-                .transition(.mochiSwap)
+                .transition(.peikaSwap)
         }
         .animation(.phaseChange, value: state.state)
     }
 }
 
 extension Animation {
-    /// Mochi's phase changes: a soft spring, inside the 2 s iOS allows.
+    /// Peika's phase changes: a soft spring, inside the 2 s iOS allows.
     static var phaseChange: Animation { .spring(duration: 0.6, bounce: 0.3) }
 }
 
 extension AnyTransition {
     /// The old face fades out a little bigger, the new one grows in.
-    static var mochiSwap: AnyTransition {
+    static var peikaSwap: AnyTransition {
         .asymmetric(insertion: .scale(scale: 0.55).combined(with: .opacity),
                     removal: .scale(scale: 1.15).combined(with: .opacity))
     }
@@ -166,7 +166,7 @@ extension AnyTransition {
     }
 }
 
-/// Deny answers right away; Allow opens Coucou on the command, where Face ID
+/// Deny answers right away; Allow opens Peika on the command, where Face ID
 /// confirms before anything is sent.
 struct ApprovalButtons: View {
     let fingerprint: String
@@ -209,7 +209,7 @@ struct StepsBar: View {
     }
 }
 
-extension MochiActivityState {
+extension PeikaActivityState {
     var sinceDate: Date? { since.map { Date(timeIntervalSince1970: TimeInterval($0)) } }
 
     var toneColor: Color {

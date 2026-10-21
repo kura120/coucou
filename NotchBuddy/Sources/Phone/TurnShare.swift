@@ -16,7 +16,7 @@ extension TurnSnapshot {
     }
 }
 
-/// A finished turn as a picture: Mochi, what you asked, what changed, the
+/// A finished turn as a picture: Peika, what you asked, what changed, the
 /// answer. Made on the iPhone when you tap Share; nothing is sent anywhere else.
 struct TurnShareCard: View {
     let turn: TurnSnapshot
@@ -28,10 +28,10 @@ struct TurnShareCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 14) {
-                MochiStill(state: .finished, bodyHex: color, showBadge: false)
+                PeikaStill(state: .finished, bodyHex: color, showBadge: false)
                     .padding(8)
                     .frame(width: 64, height: 64)
-                    .background(Color.mochiTile(hex: color), in: RoundedRectangle(cornerRadius: 16))
+                    .background(Color.peikaTile(hex: color), in: RoundedRectangle(cornerRadius: 16))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(turn.project.isEmpty ? "Claude Code" : turn.project)
                         .font(.title3.weight(.bold))
@@ -83,8 +83,8 @@ struct TurnShareCard: View {
             }
             HStack(spacing: 6) {
                 Spacer()
-                MochiStill(state: .idle, showBadge: false).frame(width: 18, height: 18)
-                Text("Coucou").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                PeikaStill(state: .idle, showBadge: false).frame(width: 18, height: 18)
+                Text("Peika").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
             }
         }
         .padding(24)

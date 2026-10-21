@@ -7,7 +7,7 @@ import Foundation
 // service, so it holds no project name, step text, command or path: only the
 // agent, its state and counts.
 
-struct MochiActivityState: Codable, Hashable, Sendable {
+struct PeikaActivityState: Codable, Hashable, Sendable {
     var pillId: String
     var agent: String       // "VS Code", "Codex"…
     var color: String       // agent color, hex
@@ -17,7 +17,7 @@ struct MochiActivityState: Codable, Hashable, Sendable {
     var stepIndex: Int
     var stepCount: Int
     var others: Int         // other sessions still going
-    /// When Mochi left for the iPhone (Unix seconds): the iPhone counts the
+    /// When Peika left for the iPhone (Unix seconds): the iPhone counts the
     /// time from it, live. Optional so older pushes still decode.
     var since: Int? = nil
     /// The fingerprint of the command waiting for your OK (an opaque hash,
@@ -62,7 +62,7 @@ struct MochiActivityState: Codable, Hashable, Sendable {
         }
     }
 
-    static let placeholder = MochiActivityState(
+    static let placeholder = PeikaActivityState(
         pillId: "integration_claude", agent: "VS Code", color: "#4A86E8",
         state: "working", statusText: "working · 3/7", tone: "working",
         stepIndex: 2, stepCount: 7, others: 1)

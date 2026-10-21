@@ -81,7 +81,7 @@ extension Array where Element == SessionItem {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    /// The state Mochi shows in the notch: the most urgent session's.
+    /// The state Peika shows in the notch: the most urgent session's.
     var leadState: BotState {
         guard let lead = sortedByUrgency().first else { return .sleeping }
         if lead.isWaitingForYou { return lead.needsApproval ? .approval : .question }

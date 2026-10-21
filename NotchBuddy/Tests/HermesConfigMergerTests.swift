@@ -48,7 +48,7 @@ func mergedHermesConfig(_ base: String, enableApprovals: Bool) -> String? {
         return sectionIdx ..< end
     }
 
-    let transportLine = "\(ind2)transport: coucou"
+    let transportLine = "\(ind2)transport: peika"
     let fallbackLine  = "\(ind2)transport_fallback: builtin"
 
     func ensureApprovalTransport() {
@@ -88,11 +88,11 @@ func mergedHermesConfig(_ base: String, enableApprovals: Bool) -> String? {
     func removeApprovalTransport() {
         lines.removeAll { line in
             let t = line.trimmingCharacters(in: .whitespaces)
-            return t == "transport: coucou" || t == "transport_fallback: builtin"
+            return t == "transport: peika" || t == "transport_fallback: builtin"
         }
     }
 
-    func ensureCoucouPlugin() {
+    func ensurePeikaPlugin() {
         if let pluginsIdx = topLevelIndex(key: "plugins") {
             let pluginsRange = sectionRange(from: pluginsIdx)
             if let enabledIdx = (pluginsRange.lowerBound + 1 ..< pluginsRange.upperBound)
@@ -100,35 +100,35 @@ func mergedHermesConfig(_ base: String, enableApprovals: Bool) -> String? {
                 let enabledLine = lines[enabledIdx]
                 let trimmed = enabledLine.trimmingCharacters(in: .whitespaces)
                 if trimmed.contains("[") && trimmed.contains("]") {
-                    if trimmed.contains("coucou") { return }
+                    if trimmed.contains("peika") { return }
                     if trimmed == "enabled: []" || trimmed == "enabled:[]" {
                         let prefix = enabledLine.prefix(while: { $0 == " " })
                         lines[enabledIdx] = "\(prefix)enabled:"
-                        lines.insert("\(prefix)\(ind)- coucou", at: enabledIdx + 1)
+                        lines.insert("\(prefix)\(ind)- peika", at: enabledIdx + 1)
                     } else {
-                        lines[enabledIdx] = enabledLine.replacingOccurrences(of: "]", with: ", coucou]")
+                        lines[enabledIdx] = enabledLine.replacingOccurrences(of: "]", with: ", peika]")
                     }
                 } else {
                     let enabledRange = sectionRange(from: enabledIdx)
                     let alreadyPresent = (enabledRange.lowerBound + 1 ..< enabledRange.upperBound)
-                        .contains { lines[$0].trimmingCharacters(in: .whitespaces) == "- coucou" }
+                        .contains { lines[$0].trimmingCharacters(in: .whitespaces) == "- peika" }
                     if alreadyPresent { return }
                     let prefix = enabledLine.prefix(while: { $0 == " " })
-                    lines.insert("\(prefix)\(ind)- coucou", at: enabledIdx + 1)
+                    lines.insert("\(prefix)\(ind)- peika", at: enabledIdx + 1)
                 }
             } else {
                 lines.insert("\(ind)enabled:", at: pluginsIdx + 1)
-                lines.insert("\(ind)\(ind)- coucou", at: pluginsIdx + 2)
+                lines.insert("\(ind)\(ind)- peika", at: pluginsIdx + 2)
             }
         } else {
             if lines.last != "" { lines.append("") }
             lines.append("plugins:")
             lines.append("\(ind)enabled:")
-            lines.append("\(ind)\(ind)- coucou")
+            lines.append("\(ind)\(ind)- peika")
         }
     }
 
-    func removeCoucouPlugin() {
+    func removePeikaPlugin() {
         guard let pluginsIdx = topLevelIndex(key: "plugins") else { return }
         let pluginsRange = sectionRange(from: pluginsIdx)
         guard let enabledIdx = (pluginsRange.lowerBound + 1 ..< pluginsRange.upperBound)
@@ -138,20 +138,20 @@ func mergedHermesConfig(_ base: String, enableApprovals: Bool) -> String? {
         let trimmed = enabledLine.trimmingCharacters(in: .whitespaces)
         if trimmed.contains("[") && trimmed.contains("]") {
             let cleaned = trimmed
-                .replacingOccurrences(of: ", coucou", with: "")
-                .replacingOccurrences(of: "coucou, ", with: "")
-                .replacingOccurrences(of: "coucou",   with: "")
+                .replacingOccurrences(of: ", peika", with: "")
+                .replacingOccurrences(of: "peika, ", with: "")
+                .replacingOccurrences(of: "peika",   with: "")
             let prefix = enabledLine.prefix(while: { $0 == " " })
             lines[enabledIdx] = "\(prefix)\(cleaned)"
         } else {
             let enabledRange = sectionRange(from: enabledIdx)
             let toRemove = (enabledRange.lowerBound + 1 ..< enabledRange.upperBound)
-                .filter { lines[$0].trimmingCharacters(in: .whitespaces) == "- coucou" }
+                .filter { lines[$0].trimmingCharacters(in: .whitespaces) == "- peika" }
             for i in toRemove.reversed() { lines.remove(at: i) }
         }
     }
 
-    ensureCoucouPlugin()
+    ensurePeikaPlugin()
     if enableApprovals { ensureApprovalTransport() } else { removeApprovalTransport() }
     return lines.joined(separator: "\n")
 }
@@ -241,44 +241,44 @@ func check(_ name: String, _ result: String?, contains: [String] = [], notContai
 print("HermesConfigMergerTests")
 print("=======================")
 
-// 1. Empty file → adds plugins.enabled.coucou
-check("1. empty file → adds plugins/enabled/coucou",
+// 1. Empty file → adds plugins.enabled.peika
+check("1. empty file → adds plugins/enabled/peika",
       mergedHermesConfig("", enableApprovals: false),
-      contains: ["plugins:", "enabled:", "- coucou"])
+      contains: ["plugins:", "enabled:", "- peika"])
 
-// 2. plugins: exists but no enabled: → adds enabled with coucou
-check("2. plugins without enabled → adds enabled/coucou",
+// 2. plugins: exists but no enabled: → adds enabled with peika
+check("2. plugins without enabled → adds enabled/peika",
       mergedHermesConfig("plugins:\n  disabled: []\n", enableApprovals: false),
-      contains: ["enabled:", "- coucou"])
+      contains: ["enabled:", "- peika"])
 
-// 3. plugins.enabled with other item → adds coucou
-check("3. plugins.enabled other items → adds coucou",
+// 3. plugins.enabled with other item → adds peika
+check("3. plugins.enabled other items → adds peika",
       mergedHermesConfig("plugins:\n  enabled:\n    - other\n", enableApprovals: false),
-      contains: ["- other", "- coucou"])
+      contains: ["- other", "- peika"])
 
-// 4. coucou already in plugins.enabled → no duplicate
-let case4 = mergedHermesConfig("plugins:\n  enabled:\n    - coucou\n", enableApprovals: false)
-check("4. coucou already present → no duplicate",
+// 4. peika already in plugins.enabled → no duplicate
+let case4 = mergedHermesConfig("plugins:\n  enabled:\n    - peika\n", enableApprovals: false)
+check("4. peika already present → no duplicate",
       case4,
-      contains: ["- coucou"],
+      contains: ["- peika"],
       notContains: [])
-// Verify only one occurrence of "- coucou"
+// Verify only one occurrence of "- peika"
 if let r4 = case4 {
-    let count = r4.components(separatedBy: "- coucou").count - 1
-    if count == 1 { print("  PASS 4b. no duplicate coucou entry"); passed += 1 }
-    else { print("  FAIL 4b. got \(count) coucou entries"); failed += 1 }
+    let count = r4.components(separatedBy: "- peika").count - 1
+    if count == 1 { print("  PASS 4b. no duplicate peika entry"); passed += 1 }
+    else { print("  FAIL 4b. got \(count) peika entries"); failed += 1 }
 }
 
-// 5. enabled: [] (empty inline list) → expands to block list with coucou
-check("5. enabled: [] → expands to block with coucou",
+// 5. enabled: [] (empty inline list) → expands to block list with peika
+check("5. enabled: [] → expands to block with peika",
       mergedHermesConfig("plugins:\n  enabled: []\n", enableApprovals: false),
-      contains: ["- coucou"],
+      contains: ["- peika"],
       notContains: ["enabled: []"])
 
-// 6. enabled: [other] inline list → adds coucou to inline list
-check("6. enabled: [other] inline → adds coucou",
+// 6. enabled: [other] inline list → adds peika to inline list
+check("6. enabled: [other] inline → adds peika",
       mergedHermesConfig("plugins:\n  enabled: [other]\n", enableApprovals: false),
-      contains: ["coucou"])
+      contains: ["peika"])
 
 // 7. Another section with its own enabled: key → only modifies under plugins:
 let case7 = """
@@ -290,42 +290,42 @@ plugins:
 """
 check("7. another section's enabled: not modified",
       mergedHermesConfig(case7, enableApprovals: false),
-      contains: ["features:", "enabled: [x]", "- coucou"])
+      contains: ["features:", "enabled: [x]", "- peika"])
 
-// 8. coucou in disabled: → still adds to enabled:
-check("8. coucou in disabled → also adds to enabled",
-      mergedHermesConfig("plugins:\n  disabled:\n    - coucou\n  enabled:\n    - other\n", enableApprovals: false),
-      contains: ["- coucou", "- other"])
+// 8. peika in disabled: → still adds to enabled:
+check("8. peika in disabled → also adds to enabled",
+      mergedHermesConfig("plugins:\n  disabled:\n    - peika\n  enabled:\n    - other\n", enableApprovals: false),
+      contains: ["- peika", "- other"])
 
 // 9. security: without approval: → adds approval with transport keys
 check("9. security without approval → adds transport keys",
       mergedHermesConfig("security:\n  allow_private_urls: false\n", enableApprovals: true),
-      contains: ["approval:", "transport: coucou", "transport_fallback: builtin"])
+      contains: ["approval:", "transport: peika", "transport_fallback: builtin"])
 
-// 10a. Uninstall: removes - coucou from enabled
+// 10a. Uninstall: removes - peika from enabled
 let case10a = """
 plugins:
   enabled:
-    - coucou
+    - peika
     - other
 security:
   approval:
-    transport: coucou
+    transport: peika
     transport_fallback: builtin
 """
-check("10a. uninstall: removes coucou from enabled, transport keys",
+check("10a. uninstall: removes peika from enabled, transport keys",
       mergedHermesConfig(case10a, enableApprovals: false),
-      notContains: ["transport: coucou", "transport_fallback: builtin"])
+      notContains: ["transport: peika", "transport_fallback: builtin"])
 
 // 10b. After uninstall (disable approvals), transport keys removed
 check("10b. disable approvals: transport keys removed",
-      mergedHermesConfig("security:\n  approval:\n    transport: coucou\n    transport_fallback: builtin\n",
+      mergedHermesConfig("security:\n  approval:\n    transport: peika\n    transport_fallback: builtin\n",
                          enableApprovals: false),
-      notContains: ["transport: coucou", "transport_fallback: builtin"])
+      notContains: ["transport: peika", "transport_fallback: builtin"])
 
 // 11. Flow map → returns nil
 check("11. flow map { } → returns nil",
-      mergedHermesConfig("{plugins: {enabled: [coucou]}}", enableApprovals: false),
+      mergedHermesConfig("{plugins: {enabled: [peika]}}", enableApprovals: false),
       expectNil: true)
 
 // 12. 4-space indentation → uses 4 spaces
@@ -337,12 +337,12 @@ plugins:
 """
 check("12. 4-space indent → uses 4 spaces",
       mergedHermesConfig(base12, enableApprovals: false),
-      contains: ["        - coucou"])   // 8 spaces = 2 levels of 4
+      contains: ["        - peika"])   // 8 spaces = 2 levels of 4
 
 // 13. Enable approvals: adds both transport keys
 check("13. enableApprovals=true adds both transport keys",
       mergedHermesConfig("", enableApprovals: true),
-      contains: ["transport: coucou", "transport_fallback: builtin"])
+      contains: ["transport: peika", "transport_fallback: builtin"])
 
 // 14. security.approval already has transport → update, not duplicate
 let case14 = """
@@ -353,7 +353,7 @@ security:
 """
 check("14. existing transport → updated, no duplicate",
       mergedHermesConfig(case14, enableApprovals: true),
-      contains: ["transport: coucou", "transport_fallback: builtin"],
+      contains: ["transport: peika", "transport_fallback: builtin"],
       notContains: ["transport: terminal", "transport_fallback: deny"])
 
 print("")

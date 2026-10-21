@@ -27,8 +27,8 @@ jobs:
       - name: Test display choice
         run: bash scripts/test-display-choice.sh
 
-      - name: Desktop Mochi and gaze tests
-        run: bash scripts/test-desktop-mochi.sh
+      - name: Desktop Peika and gaze tests
+        run: bash scripts/test-desktop-peika.sh
 
       - name: Test auto-close timing
         run: bash scripts/test-auto-close.sh
@@ -132,7 +132,7 @@ jobs:
         run: |
           xcodebuild \
             -project NotchBuddy/NotchBuddy.xcodeproj \
-            -scheme CoucouAppStore \
+            -scheme PeikaAppStore \
             -configuration Debug \
             build \
             CODE_SIGNING_ALLOWED=NO \
@@ -162,7 +162,7 @@ jobs:
         run: |
           xcodebuild \
             -project NotchBuddy/NotchBuddy.xcodeproj \
-            -scheme CoucouPhone \
+            -scheme PeikaPhone \
             -destination 'generic/platform=iOS' \
             build \
             CODE_SIGNING_ALLOWED=NO

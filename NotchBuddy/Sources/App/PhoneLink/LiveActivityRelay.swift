@@ -3,16 +3,16 @@ import AppKit
 import CloudKit
 import Combine
 
-// MARK: - iPhone plan, step 8: Mochi leaves for the iPhone
+// MARK: - iPhone plan, step 8: Peika leaves for the iPhone
 //
-// When the Mac locks while an agent is working, Mochi moves to the iPhone's
+// When the Mac locks while an agent is working, Peika moves to the iPhone's
 // Dynamic Island and Lock Screen (a Live Activity), and comes back when the
 // Mac unlocks. Live Activity pushes need the APNs key, which can't ship in the
 // app, so they go through the user's relay (relay/ in this repo, a stateless
 // Cloudflare Worker). The iPhone's push tokens come from iCloud (`PhoneToken`
 // records, written by LiveActivityLink on the iPhone).
 //
-// Sent to the relay: the iPhone's token and MochiActivityState (agent, state,
+// Sent to the relay: the iPhone's token and PeikaActivityState (agent, state,
 // counts). Never a project name, a step, a command or a path.
 // Runs only while the Mac is locked with an agent going: lock notifications
 // and AppState changes, no timer at rest.
@@ -22,10 +22,10 @@ final class LiveActivityRelay {
     static let shared = LiveActivityRelay()
 
     static let enabledKey = "iPhoneLiveActivityEnabled"
-    /// Overrides the relay address (defaults write fr.louisraille.NotchBuddy phoneRelayURL <url>).
+    /// Overrides the relay address (defaults write dev.kura120.peika.direct phoneRelayURL <url>).
     static let relayURLKey = "phoneRelayURL"
     /// The deployed relay (relay/README.md).
-    static let defaultRelayURL = "https://coucou-relay.raillelouis.workers.dev"
+    static let defaultRelayURL = "https://peika-relay.example.workers.dev"
 
     static var isEnabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
 
@@ -43,14 +43,14 @@ final class LiveActivityRelay {
     private var changeToken: CKServerChangeToken?
 
     private var locked = false
-    private var latest: MochiActivityState?
+    private var latest: PeikaActivityState?
     /// Set while a Live Activity runs on the iPhone(s).
     private var startedAt: Date?
     /// Sent with every push of an activity, so the iPhone shows the time since.
     private var activitySince: Int?
     /// The startedAt whose start push actually went out.
     private var startSent: Date?
-    private var sent: MochiActivityState?
+    private var sent: PeikaActivityState?
     private var sending = false
     private var retryTask: Task<Void, Never>?
     private var retries = 0
@@ -131,7 +131,7 @@ final class LiveActivityRelay {
             log("Mac unlocked")
             lockTask?.cancel(); lockTask = nil
             guard startedAt != nil else { return }
-            // Mochi comes back to the notch, unless the Mac locks again within 30 s.
+            // Peika comes back to the notch, unless the Mac locks again within 30 s.
             unlockTask = Task {
                 try? await Task.sleep(for: .seconds(30))
                 guard !Task.isCancelled, !locked else { return }
@@ -143,7 +143,7 @@ final class LiveActivityRelay {
 
     /// Starts right away when an agent needs you; otherwise once the Mac has
     /// stayed locked for 20 s.
-    private func beginSoon(_ state: MochiActivityState) {
+    private func beginSoon(_ state: PeikaActivityState) {
         if state.tone == "waiting" || state.tone == "question" {
             lockTask?.cancel(); lockTask = nil
             begin(state)
@@ -158,7 +158,7 @@ final class LiveActivityRelay {
         }
     }
 
-    private func stateChanged(_ lead: MochiActivityState?) {
+    private func stateChanged(_ lead: PeikaActivityState?) {
         if lead?.tone != latest?.tone, let lead { log("phase: \(lead.agent) \(lead.statusText)\(locked ? "" : " (Mac unlocked, stays on the Mac)")") }
         latest = lead
         guard locked else { return }
@@ -185,7 +185,7 @@ final class LiveActivityRelay {
 
     // MARK: Sending
 
-    private func begin(_ state: MochiActivityState) {
+    private func begin(_ state: PeikaActivityState) {
         guard !DemoEngine.shared.isActive else { return }
         let start = Date()
         activitySince = Int(start.timeIntervalSince1970)
@@ -199,7 +199,7 @@ final class LiveActivityRelay {
             startSent = start
             let targets = phones.filter { !$0.value.startToken.isEmpty }
             if targets.isEmpty {
-                log("no iPhone token yet: open Coucou on the iPhone once, with Live Activities allowed")
+                log("no iPhone token yet: open Peika on the iPhone once, with Live Activities allowed")
                 return
             }
             var reached = 0
@@ -209,9 +209,9 @@ final class LiveActivityRelay {
                 }
             }
             if reached > 0 {
-                log("Mochi left for the iPhone (\(state.agent), \(state.statusText))")
+                log("Peika left for the iPhone (\(state.agent), \(state.statusText))")
             } else {
-                log("Mochi couldn't reach the iPhone (see the relay line above)")
+                log("Peika couldn't reach the iPhone (see the relay line above)")
             }
         }
     }
@@ -266,7 +266,7 @@ final class LiveActivityRelay {
         sent = nil
         guard startSent == startedAt else {
             // The start never went out: nothing to end on the iPhone.
-            log("Mochi is back on the Mac")
+            log("Peika is back on the Mac")
             return
         }
         Task {
@@ -281,7 +281,7 @@ final class LiveActivityRelay {
                 await post(event: "end", token: phone.updateToken, env: phone.env, state: last,
                            dismissAfter: dismissAfter, phoneID: id)
             }
-            log(dismissAfter == 0 ? "Mochi is back on the Mac" : "agents done, the iPhone shows it for \(dismissAfter / 60) min")
+            log(dismissAfter == 0 ? "Peika is back on the Mac" : "agents done, the iPhone shows it for \(dismissAfter / 60) min")
         }
     }
 
@@ -308,7 +308,7 @@ final class LiveActivityRelay {
 
     /// Sends one push through the relay. Returns true when Apple accepted it.
     @discardableResult
-    private func post(event: String, token: String, env: String, state: MochiActivityState,
+    private func post(event: String, token: String, env: String, state: PeikaActivityState,
                       urgent: Bool = false, dismissAfter: Int? = nil, phoneID: String) async -> Bool {
         guard let url = relayURL else { return false }
         var state = state
@@ -382,11 +382,11 @@ final class LiveActivityRelay {
     // MARK: State
 
     /// The most urgent session, as the iPhone's Live Activity shows it.
-    nonisolated static func leadState(tasks: [AgentTask], approval: ApprovalInfo?) -> MochiActivityState? {
+    nonisolated static func leadState(tasks: [AgentTask], approval: ApprovalInfo?) -> PeikaActivityState? {
         let ranked = tasks
             .filter { $0.source != .n8n && PillCatalog.isSession($0.id) }   // same sessions as SessionPublisher
             .map { task -> (AgentTask, Int) in
-                let urgency = MochiActivityState.urgency(state: task.state,
+                let urgency = PeikaActivityState.urgency(state: task.state,
                                                          waitingForOK: approval?.pillId == task.id,
                                                          hasQuestion: task.state == .question)
                 return (task, urgency)
@@ -394,14 +394,14 @@ final class LiveActivityRelay {
         guard let lead = ranked.min(by: { $0.1 < $1.1 }) else { return nil }
         let (task, urgency) = lead
         let others = ranked.filter { $0.0.id != task.id && $0.1 <= 3 }.count
-        return MochiActivityState(
+        return PeikaActivityState(
             pillId: task.id,
             agent: PillCatalog.definition(for: task.id)?.name ?? "Agent",
             color: task.color,
             state: (urgency == 0 ? BotState.approval : task.state).rawValue,
-            statusText: MochiActivityState.statusText(state: task.state, urgency: urgency,
+            statusText: PeikaActivityState.statusText(state: task.state, urgency: urgency,
                                                       stepIndex: task.stepIndex, stepCount: task.steps.count),
-            tone: MochiActivityState.tone(urgency: urgency),
+            tone: PeikaActivityState.tone(urgency: urgency),
             stepIndex: max(0, task.stepIndex),
             stepCount: task.steps.count,
             others: others,

@@ -42,9 +42,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupMenuBarItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         guard let button = statusItem?.button else { return }
-        button.image = NSImage(named: "MenuBarIcon") ?? NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "Coucou")
+        button.image = NSImage(named: "MenuBarIcon") ?? NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "Peika")
         button.image?.size = NSSize(width: 24, height: 18)
-        button.image?.accessibilityDescription = "Coucou"
+        button.image?.accessibilityDescription = "Peika"
         button.image?.isTemplate = true
 
         let menu = NSMenu()
@@ -53,7 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         demoMenuItem = demoItem
         menu.addItem(demoItem)
         menu.addItem(.separator())
-        menu.addItem(withTitle: NSLocalizedString("Open Coucou", comment: ""), action: #selector(openIsland), keyEquivalent: "")
+        menu.addItem(withTitle: NSLocalizedString("Open Peika", comment: ""), action: #selector(openIsland), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: NSLocalizedString("Weekly recap", comment: ""), action: #selector(openWeeklyRecap), keyEquivalent: "")
         menu.addItem(withTitle: NSLocalizedString("Settings…", comment: ""), action: #selector(openSettings), keyEquivalent: ",")
@@ -135,7 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             filesChanged: 31, linesAdded: 1217, linesRemoved: 312,
             commandsRun: 54, questionsAnswered: 11,
             permissionsAllowed: 4, permissionsDenied: 1,
-            topAgent: "Claude Code", topProject: "coucou",
+            topAgent: "Claude Code", topProject: "peika",
             busiestDay: "Friday", longestSessionMinutes: 300
         )
         let view = RecapShareImageView(summary: summary, hideProjects: false)
@@ -145,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let cg = renderer.cgImage else { return }
         let img = NSImage(cgImage: cg, size: NSSize(width: 1080, height: 1920))
         let url = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Desktop/coucou-recap-debug.png")
+            .appendingPathComponent("Desktop/peika-recap-debug.png")
         if let tiff = img.tiffRepresentation,
            let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
@@ -201,9 +201,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotionPoller.shared.start()
         NotificationCenter.default.addObserver(self, selector: #selector(openSettingsFromNotification(_:)),
                                                name: .openFullSettings, object: nil)
-        // After the greeting ends, fly Mochi back to the desktop if it was there at last quit
+        // After the greeting ends, fly Peika back to the desktop if it was there at last quit
         NotificationCenter.default.addObserver(forName: .greetComplete, object: nil, queue: .main) { [weak self] _ in
-            DesktopMochiController.shared.launchFlyIfNeeded()
+            DesktopPeikaController.shared.launchFlyIfNeeded()
             self?.checkMondayRecap()
         }
         // Check for Monday recap on wake and when a new session/prompt arrives

@@ -33,7 +33,7 @@ enum BotEmote: String, CaseIterable {
 
 // MARK: - Voice sub-state
 
-/// What Mochi is doing during a voice exchange (compact island or expanded).
+/// What Peika is doing during a voice exchange (compact island or expanded).
 /// Driven by IslandWindowController; read by BotEngine each frame.
 enum BotVoiceSubState: Equatable {
     case none       // voice not active
@@ -81,7 +81,7 @@ struct AgentTask: Identifiable, Equatable {
 enum AgentSource: Equatable {
     case claudeCode
     case n8n
-    case agent   // third-party agent via coucou_agent field
+    case agent   // third-party agent via peika_agent field
 }
 
 // MARK: - Chat provider
@@ -206,9 +206,9 @@ enum IslandConst {
         .greeting:  ViewLayout(height: 150, botX: 320, botY: 90,  botDiameter: 0,  agentMode: .none),
         .wardrobe:  ViewLayout(height: 160, botX: 68,  botY: nil, botDiameter: 58, agentMode: .none),
         .recap:     ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 58, agentMode: .column),
-        // Voice listening: Mochi (listening emote) on left, transcript on right
+        // Voice listening: Peika (listening emote) on left, transcript on right
         .listening:    ViewLayout(height: 160, botX: 68,  botY: nil, botDiameter: 58, agentMode: .none),
-        // Voice result: same layout as listening — Mochi on left, ✓/✗ on right
+        // Voice result: same layout as listening — Peika on left, ✓/✗ on right
         .voiceResult:  ViewLayout(height: 160, botX: 68,  botY: nil, botDiameter: 58, agentMode: .none),
     ]
 
@@ -219,8 +219,8 @@ enum IslandConst {
         "morning ai brief":  "#F29B38",
         "publication ig":    "#7C5CFF",
         "ig post":           "#7C5CFF",
-        "louisraille.fr":    "#38BDF8",
-        "louisraille":       "#38BDF8",
+        "example.com":    "#38BDF8",
+        "example":           "#38BDF8",
         "notch buddy":       "#EC4899",
         "notch-buddy":       "#EC4899",
         "notchbuddy":        "#EC4899",

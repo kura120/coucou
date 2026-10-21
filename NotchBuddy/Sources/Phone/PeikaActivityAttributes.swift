@@ -4,6 +4,6 @@ import ActivityKit
 // extension (the views). Started and updated only from the Mac, through the
 // relay: the iPhone never starts one itself.
 
-struct MochiActivityAttributes: ActivityAttributes {
-    typealias ContentState = MochiActivityState
+struct PeikaActivityAttributes: ActivityAttributes {
+    typealias ContentState = PeikaActivityState
 }

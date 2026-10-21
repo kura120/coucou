@@ -10,7 +10,7 @@
     <true/>
     <key>com.apple.developer.icloud-container-identifiers</key>
     <array>
-        <string>iCloud.fr.louisraille.Coucou</string>
+        <string>iCloud.dev.kura120.peika</string>
     </array>
     <key>com.apple.developer.icloud-services</key>
     <array>

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Every service Mochi, connected on the Mac or not.
+/// Every service Peika, connected on the Mac or not.
 struct ServicesList: View {
     let services: [String: ServiceSnapshot]
 
@@ -36,7 +36,7 @@ struct ServiceRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            ServiceMochi(pillId: pillId, tone: snapshot?.tone)
+            ServicePeika(pillId: pillId, tone: snapshot?.tone)
                 .frame(width: 40, height: 40)
             VStack(alignment: .leading, spacing: 2) {
                 Text(pill?.name ?? pillId)
@@ -69,15 +69,15 @@ struct ServiceRow: View {
     }
 }
 
-/// A service Mochi in his own color, like the little ones in the Mac's notch.
-struct ServiceMochi: View {
+/// A service Peika in his own color, like the little ones in the Mac's notch.
+struct ServicePeika: View {
     let pillId: String
     let tone: ServiceTone?
     var corner: CGFloat = 11
 
     var body: some View {
         let color = PillCatalog.definition(for: pillId)?.color ?? "#C0C4CC"
-        MochiLive(state: tone?.botState ?? .sleeping, bodyHex: color, fps: 60)
+        PeikaLive(state: tone?.botState ?? .sleeping, bodyHex: color, fps: 60)
             .padding(4)
             .background(Color(white: 0.16), in: RoundedRectangle(cornerRadius: corner))
     }
@@ -144,7 +144,7 @@ struct ServiceDetailView: View {
 
     private var header: some View {
         HStack(spacing: 16) {
-            ServiceMochi(pillId: pillId, tone: snapshot?.tone, corner: 22)
+            ServicePeika(pillId: pillId, tone: snapshot?.tone, corner: 22)
                 .frame(width: 84, height: 84)
             VStack(alignment: .leading, spacing: 4) {
                 Text(pill?.name ?? pillId).font(.headline)
@@ -236,7 +236,7 @@ struct ServiceDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Connect \(pill?.name ?? "it") on your Mac")
                 .font(.subheadline.weight(.semibold))
-            Text("Add its key in Coucou's Settings on your Mac and keep the iPhone switch on (Settings → General → iPhone). What the Mac sees shows up here: no key is stored on your iPhone.")
+            Text("Add its key in Peika's Settings on your Mac and keep the iPhone switch on (Settings → General → iPhone). What the Mac sees shows up here: no key is stored on your iPhone.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }

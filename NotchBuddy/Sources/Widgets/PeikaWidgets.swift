@@ -1,19 +1,19 @@
 import SwiftUI
 import WidgetKit
 
-// Coucou widgets: Solo, Team and List on the Home Screen, plus the Lock
+// Peika widgets: Solo, Team and List on the Home Screen, plus the Lock
 // Screen accessories. They show the sessions the iPhone app last saved to the
 // App Group; the app reloads them whenever a session changes.
 
 @main
-struct CoucouWidgetBundle: WidgetBundle {
+struct PeikaWidgetBundle: WidgetBundle {
     var body: some Widget {
         SoloWidget()
         TeamWidget()
         ListWidget()
         LockScreenWidget()
-        MochiLiveActivity()
-        CoucouControl()
+        PeikaLiveActivity()
+        PeikaControl()
     }
 }
 
@@ -22,7 +22,7 @@ struct CoucouWidgetBundle: WidgetBundle {
 struct SessionsEntry: TimelineEntry {
     let date: Date
     let sessions: [SharedSession]   // most urgent first
-    /// Changes every minute so idle Mochi look around (MochiPose).
+    /// Changes every minute so idle Peika look around (PeikaPose).
     var tick: Int = 0
 }
 
@@ -38,7 +38,7 @@ struct SessionsProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SessionsEntry>) -> Void) {
         // The sessions come from the app, which calls reloadAllTimelines() on
-        // every change. The entries only give idle Mochi a new pose each
+        // every change. The entries only give idle Peika a new pose each
         // minute for an hour; no network, nothing read again.
         let sessions = SharedSessions.load()
         let start = Date.now
@@ -54,7 +54,7 @@ struct SessionsProvider: TimelineProvider {
 
 struct SoloWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "CoucouSolo", provider: SessionsProvider()) { entry in
+        StaticConfiguration(kind: "PeikaSolo", provider: SessionsProvider()) { entry in
             SoloView(session: entry.sessions.first)
         }
         .configurationDisplayName("Solo")
@@ -65,7 +65,7 @@ struct SoloWidget: Widget {
 
 struct TeamWidget: Widget {
     var body: some WidgetConfiguration {
-        AppIntentConfiguration(kind: "CoucouTeam", intent: TeamConfiguration.self, provider: TeamProvider()) { entry in
+        AppIntentConfiguration(kind: "PeikaTeam", intent: TeamConfiguration.self, provider: TeamProvider()) { entry in
             TeamView(sessions: entry.sessions, picks: entry.picks, tick: entry.tick)
         }
         .configurationDisplayName("Team")
@@ -76,7 +76,7 @@ struct TeamWidget: Widget {
 
 struct ListWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "CoucouList", provider: SessionsProvider()) { entry in
+        StaticConfiguration(kind: "PeikaList", provider: SessionsProvider()) { entry in
             ListView(sessions: Array(entry.sessions.prefix(4)))
         }
         .configurationDisplayName("List")
@@ -87,11 +87,11 @@ struct ListWidget: Widget {
 
 struct LockScreenWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "CoucouLock", provider: SessionsProvider()) { entry in
+        StaticConfiguration(kind: "PeikaLock", provider: SessionsProvider()) { entry in
             LockScreenView(sessions: entry.sessions)
         }
-        .configurationDisplayName("Coucou")
-        .description("Mochi on your Lock Screen.")
+        .configurationDisplayName("Peika")
+        .description("Peika on your Lock Screen.")
         .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }
@@ -131,9 +131,9 @@ struct SoloView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack {
-                WidgetMochi(state: session?.botState ?? .sleeping)
+                WidgetPeika(state: session?.botState ?? .sleeping)
                     .id(session?.state ?? "sleeping")
-                    .transition(.mochiSwap)
+                    .transition(.peikaSwap)
             }
             .frame(width: 56, height: 56)
             Spacer(minLength: 0)
@@ -171,7 +171,7 @@ struct SoloView: View {
 
 struct TeamView: View {
     let sessions: [SharedSession]
-    /// The Mochi picked for each spot in the widget's settings, nil = automatic.
+    /// The Peika picked for each spot in the widget's settings, nil = automatic.
     var picks: [String?] = [nil, nil, nil, nil]
     var tick: Int = 0
 
@@ -183,7 +183,7 @@ struct TeamView: View {
         .containerBackground(for: .widget) { Color(white: 0.08) }
     }
 
-    /// The picked Mochi in their spots, then the most urgent ones from the
+    /// The picked Peika in their spots, then the most urgent ones from the
     /// Mac, then the team's regulars, so the four spots are always taken.
     private var team: [SharedSession] {
         let chosen = Set(picks.compactMap { $0 })
@@ -208,7 +208,7 @@ struct TeamView: View {
         let team = team
         if team.indices.contains(index) {
             let member = team[index]
-            // A tap opens that Mochi in the app.
+            // A tap opens that Peika in the app.
             Link(destination: SharedSession.url(for: member.id)) {
                 TeamTile(session: member, tick: tick)
             }
@@ -218,26 +218,26 @@ struct TeamView: View {
     }
 }
 
-/// One Mochi of the team: his face, his name, and a dot for his state.
+/// One Peika of the team: his face, his name, and a dot for his state.
 struct TeamTile: View {
     let session: SharedSession
     var tick: Int = 0
 
-    /// Calm Mochi look around; one who needs you keeps his state's face.
-    private var pose: MochiPose {
+    /// Calm Peika look around; one who needs you keeps his state's face.
+    private var pose: PeikaPose {
         switch session.tone {
-        case .idle, .done, .working, .info, .warning: MochiPose.idle(id: session.id, tick: tick)
+        case .idle, .done, .working, .info, .warning: PeikaPose.idle(id: session.id, tick: tick)
         default: .neutral
         }
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // In his own color, like the little Mochi in the Mac's notch.
+            // In his own color, like the little Peika in the Mac's notch.
             ZStack {
-                WidgetMochi(state: session.botState, bodyHex: session.color, pose: pose)
+                WidgetPeika(state: session.botState, bodyHex: session.color, pose: pose)
                     .id(session.state)
-                    .transition(.mochiSwap)
+                    .transition(.peikaSwap)
             }
             .padding(.horizontal, 4)
             .padding(.top, 2)
@@ -270,14 +270,14 @@ struct TeamTile: View {
     }
 }
 
-/// A free spot: Mochi asleep, faded, instead of an empty square.
+/// A free spot: Peika asleep, faded, instead of an empty square.
 struct EmptyTeamTile: View {
     var tick: Int = 0
     var slot: Int = 0
 
     var body: some View {
-        WidgetMochi(state: .sleeping, showBadge: false,
-                   pose: MochiPose(tilt: (tick + slot) % 2 == 0 ? -0.06 : 0.06))
+        WidgetPeika(state: .sleeping, showBadge: false,
+                   pose: PeikaPose(tilt: (tick + slot) % 2 == 0 ? -0.06 : 0.06))
             .padding(14)
             .opacity(0.18)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -292,17 +292,17 @@ struct ListView: View {
         VStack(alignment: .leading, spacing: 6) {
             if sessions.isEmpty {
                 HStack(spacing: 10) {
-                    WidgetMochi(state: .sleeping).frame(width: 34, height: 34)
+                    WidgetPeika(state: .sleeping).frame(width: 34, height: 34)
                     Text("All quiet: no agent session").font(.subheadline).opacity(0.7)
                 }
                 .frame(maxHeight: .infinity)
             }
             ForEach(sessions) { session in
                 HStack(spacing: 8) {
-                    WidgetMochi(state: session.botState)
+                    WidgetPeika(state: session.botState)
                         .padding(2)
                         .frame(width: 24, height: 24)
-                        .background { TileBackground(color: Color.mochiTile(hex: session.color)).clipShape(RoundedRectangle(cornerRadius: 7)) }
+                        .background { TileBackground(color: Color.peikaTile(hex: session.color)).clipShape(RoundedRectangle(cornerRadius: 7)) }
                     Text(session.title)
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
@@ -338,7 +338,7 @@ struct LockScreenView: View {
     var body: some View {
         switch family {
         case .accessoryCircular:
-            // The Lock Screen keeps only brightness: Mochi drawn like in the
+            // The Lock Screen keeps only brightness: Peika drawn like in the
             // tinted Home Screen, so his face shows.
             ZStack {
                 AccessoryWidgetBackground()
@@ -346,13 +346,13 @@ struct LockScreenView: View {
                     Gauge(value: progress) { EmptyView() }
                         .gaugeStyle(.accessoryCircularCapacity)
                 }
-                WidgetMochi(state: sessions.leadState, showBadge: false).padding(progress == nil ? 7 : 10)
+                WidgetPeika(state: sessions.leadState, showBadge: false).padding(progress == nil ? 7 : 10)
             }
             .widgetURL(sessions.first.map { SharedSession.url(for: $0.id) })
             .containerBackground(for: .widget) { Color.clear }
         case .accessoryRectangular:
             HStack(spacing: 6) {
-                WidgetMochi(state: sessions.leadState, showBadge: false).frame(width: 32, height: 32)
+                WidgetPeika(state: sessions.leadState, showBadge: false).frame(width: 32, height: 32)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(sessions.summary ?? "All quiet")
                         .font(.headline)
@@ -371,7 +371,7 @@ struct LockScreenView: View {
             .widgetURL(sessions.first.map { SharedSession.url(for: $0.id) })
             .containerBackground(for: .widget) { Color.clear }
         default:
-            Text(sessions.summary.map { "Coucou · \($0)" } ?? "Coucou · all quiet")
+            Text(sessions.summary.map { "Peika · \($0)" } ?? "Peika · all quiet")
                 .containerBackground(for: .widget) { Color.clear }
         }
     }
@@ -380,7 +380,7 @@ struct LockScreenView: View {
 // MARK: - Samples (widget gallery)
 
 extension SharedSession {
-    /// A calm Mochi from the catalog, for a free spot of the Team widget.
+    /// A calm Peika from the catalog, for a free spot of the Team widget.
     static func regular(id: String) -> SharedSession? {
         guard let pill = PillCatalog.definition(for: id) else { return nil }
         return SharedSession(id: pill.id, title: pill.name, agent: pill.name, color: pill.color,
@@ -389,7 +389,7 @@ extension SharedSession {
     }
 
     static let samples: [SharedSession] = [
-        SharedSession(id: "integration_claude", title: "coucou", agent: "VS Code", color: "#4A86E8",
+        SharedSession(id: "integration_claude", title: "peika", agent: "VS Code", color: "#4A86E8",
                       state: "approval", statusText: "waiting for your OK", tone: .waiting, urgency: 0,
                       stepIndex: 2, stepCount: 7, currentStep: "npm run test", updatedAt: .now),
         SharedSession(id: "agent_codex", title: "site-perso", agent: "Codex", color: "#D9663A",
@@ -406,27 +406,27 @@ extension SharedSession {
 
 // MARK: - Tinted Home Screen
 
-/// Mochi in a widget. In the tinted (and clear) Home Screen styles iOS keeps
-/// only each pixel's opacity, so a white Mochi with black eyes turns into a
+/// Peika in a widget. In the tinted (and clear) Home Screen styles iOS keeps
+/// only each pixel's opacity, so a white Peika with black eyes turns into a
 /// blank shape; on the Lock Screen it keeps only brightness. There he is drawn
 /// as a white shape with his eyes cut out, which reads in both.
-struct WidgetMochi: View {
+struct WidgetPeika: View {
     @Environment(\.widgetRenderingMode) private var renderingMode
     var state: BotState = .idle
     var bodyHex: String = "#FFFFFF"
     var showBadge: Bool = true
-    var pose: MochiPose = .neutral
+    var pose: PeikaPose = .neutral
 
     var body: some View {
         if renderingMode == .fullColor {
-            MochiStill(state: state, bodyHex: bodyHex, showBadge: showBadge, pose: pose)
+            PeikaStill(state: state, bodyHex: bodyHex, showBadge: showBadge, pose: pose)
         } else {
-            // White where Mochi is bright, see-through where he is dark (his
+            // White where Peika is bright, see-through where he is dark (his
             // eyes). The Lock Screen shows brightness, so the mask is filled
             // with white rather than left black.
             Color.white
                 .mask {
-                    MochiStill(state: state, bodyHex: "#FFFFFF", showBadge: showBadge, pose: pose)
+                    PeikaStill(state: state, bodyHex: "#FFFFFF", showBadge: showBadge, pose: pose)
                         .luminanceToAlpha()
                 }
                 .widgetAccentable()
@@ -434,7 +434,7 @@ struct WidgetMochi: View {
     }
 }
 
-/// A tile behind a Mochi: its color normally, a faint wash when tinted so it
+/// A tile behind a Peika: its color normally, a faint wash when tinted so it
 /// doesn't become a solid block that hides him.
 struct TileBackground: View {
     @Environment(\.widgetRenderingMode) private var renderingMode
