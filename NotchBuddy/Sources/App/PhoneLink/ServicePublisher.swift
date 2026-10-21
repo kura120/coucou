@@ -5,7 +5,7 @@ import Combine
 
 // MARK: - Services on the iPhone
 //
-// One `Service` record per service Mochi (GitHub, Stripe, Vercel, Resend,
+// One `Service` record per service Peika (GitHub, Stripe, Vercel, Resend,
 // Cal.com, n8n, Notion), built from the data the Mac's pollers already keep in
 // AppState: no extra API call, no key sent anywhere. The whole snapshot
 // (amounts, titles, emails, links) is one field encrypted with the user's

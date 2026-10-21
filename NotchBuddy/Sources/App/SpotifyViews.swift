@@ -29,7 +29,7 @@ struct SpotifyPill: View {
                 .stroke(Color(hex: task.color).opacity(isHovered ? 0.55 : 0.14), lineWidth: 1)
                 .allowsHitTesting(false)
 
-            // Mini Mochi at leading edge
+            // Mini Peika at leading edge
             HStack(spacing: 0) {
                 MiniBotCanvasView(task: task, isDancing: controller.isPlaying)
                     .frame(width: 22 / 0.6, height: 22 / 0.6)
@@ -222,7 +222,7 @@ struct SpotifyCardView: View {
     private var deniedView: some View {
         VStack(alignment: .leading, spacing: 4) {
             header(dot: Color(hex: "#F4505E"))
-            Text("Allow Coucou to control Spotify")
+            Text("Allow Peika to control Spotify")
                 .font(.system(size: 11))
                 .foregroundColor(Color(hex: "#8E939C"))
                 .padding(.leading, 108)

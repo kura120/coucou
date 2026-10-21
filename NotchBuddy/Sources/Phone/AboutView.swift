@@ -7,7 +7,7 @@ struct AboutView: View {
     let link: PhoneLink
     @State private var showGuide = false
     @AppStorage(PhoneSettings.notifyDoneKey) private var notifyDone = true
-    @AppStorage(PhoneSettings.mochiSoundsKey) private var mochiSounds = true
+    @AppStorage(PhoneSettings.peikaSoundsKey) private var peikaSounds = true
     @AppStorage(PhoneSettings.quietHoursKey) private var quietHours = false
     @AppStorage(PhoneSettings.quietFromKey) private var quietFrom = 22 * 60
     @AppStorage(PhoneSettings.quietToKey) private var quietTo = 8 * 60
@@ -25,12 +25,12 @@ struct AboutView: View {
         List {
             Section {
                 HStack(spacing: 14) {
-                    MochiLive(state: .idle)
+                    PeikaLive(state: .idle)
                         .padding(6)
                         .frame(width: 64, height: 64)
                         .background(Color(white: 0.16), in: RoundedRectangle(cornerRadius: 16))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Coucou").font(.title3.weight(.semibold))
+                        Text("Peika").font(.title3.weight(.semibold))
                         Text("Version \(version)").font(.footnote).foregroundStyle(.secondary)
                     }
                 }
@@ -60,8 +60,8 @@ struct AboutView: View {
 
             Section {
                 Toggle("When an agent finishes or fails", isOn: $notifyDone)
-                Toggle("Mochi's sounds", isOn: $mochiSounds)
-                    .onChange(of: mochiSounds) { link.soundsChanged() }
+                Toggle("Peika's sounds", isOn: $peikaSounds)
+                    .onChange(of: peikaSounds) { link.soundsChanged() }
                 Toggle("Quiet hours", isOn: $quietHours)
                 if quietHours {
                     DatePicker("From", selection: time($quietFrom), displayedComponents: .hourAndMinute)
@@ -72,7 +72,7 @@ struct AboutView: View {
             } footer: {
                 Text(quietHours
                      ? "In the quiet hours, only what waits on you (a command to allow, a question) makes a sound. The rest arrives silently."
-                     : "Approvals and questions always notify you. Mochi's sounds are the ones he makes in your Mac's notch.")
+                     : "Approvals and questions always notify you. Peika's sounds are the ones he makes in your Mac's notch.")
             }
 
             Section {
@@ -108,11 +108,11 @@ struct AboutView: View {
                 Text("The Home Screen icon follows your choice; dark and tinted icons follow the Home Screen style. Spotlight's index stays on this iPhone.")
             }
 
-            Section("Coucou") {
-                Link("Website", destination: URL(string: "https://louis-cfm.github.io/coucou/")!)
-                Link("Support", destination: URL(string: "https://louis-cfm.github.io/coucou/support.html")!)
-                Link("Privacy Policy", destination: URL(string: "https://louis-cfm.github.io/coucou/privacy.html")!)
-                Link("Terms", destination: URL(string: "https://louis-cfm.github.io/coucou/terms.html")!)
+            Section("Peika") {
+                Link("Website", destination: URL(string: "https://github.com/kura120/peika")!)
+                Link("Support", destination: URL(string: "https://github.com/kura120/peika/issues")!)
+                Link("Privacy Policy", destination: URL(string: "https://github.com/kura120/peika/blob/main/docs/privacy.html")!)
+                Link("Terms", destination: URL(string: "https://github.com/kura120/peika/blob/main/docs/terms.html")!)
             }
 
             Section {
@@ -146,7 +146,7 @@ struct AboutView: View {
     }
 }
 
-/// First launch: what Coucou needs on the Mac to show anything here.
+/// First launch: what Peika needs on the Mac to show anything here.
 struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -154,26 +154,26 @@ struct OnboardingView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 VStack(alignment: .leading, spacing: 12) {
-                    MochiLive(state: .finished)
+                    PeikaLive(state: .finished)
                         .frame(width: 88, height: 88)
                     Text("Your agents, in your pocket")
                         .font(.largeTitle.weight(.bold))
-                    Text("Coucou on iPhone shows what Claude Code, Cursor, Codex and your services are doing on your Mac. Three things to set up, once.")
+                    Text("Peika on iPhone shows what Claude Code, Cursor, Codex and your services are doing on your Mac. Three things to set up, once.")
                         .font(.body)
                         .foregroundStyle(.secondary)
                 }
-                step(1, "Coucou on your Mac",
-                     "Install Coucou for Mac (Mac App Store or the website) and set up its Claude Code hooks.",
+                step(1, "Peika on your Mac",
+                     "Install Peika for Mac (Mac App Store or the website) and set up its Claude Code hooks.",
                      icon: "laptopcomputer")
                 step(2, "Turn on the iPhone switch",
-                     "On the Mac: Coucou Settings → General → iPhone → \"Show my agent sessions on my iPhone\".",
+                     "On the Mac: Peika Settings → General → iPhone → \"Show my agent sessions on my iPhone\".",
                      icon: "switch.2")
                 step(3, "Same Apple Account",
                      "Sign in to iCloud with the same Apple Account on both. Your sessions go through your private iCloud, encrypted.",
                      icon: "icloud")
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Then, from here").font(.headline)
-                    Text("• Allow or deny a command, right from the Lock Screen\n• Answer Claude's questions\n• See what Claude did, file by file\n• Write or dictate the next instruction, or ask Siri (GitHub version on the Mac)\n• Mochi in your Dynamic Island when your Mac is locked")
+                    Text("• Allow or deny a command, right from the Lock Screen\n• Answer Claude's questions\n• See what Claude did, file by file\n• Write or dictate the next instruction, or ask Siri (GitHub version on the Mac)\n• Peika in your Dynamic Island when your Mac is locked")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -210,7 +210,7 @@ struct OnboardingView: View {
     }
 }
 
-/// Mochi's colors for the Home Screen icon (alternate app icons).
+/// Peika's colors for the Home Screen icon (alternate app icons).
 enum AppIconChoice: String, CaseIterable, Identifiable {
     case orange = "", blue = "AppIcon-Blue", green = "AppIcon-Green", purple = "AppIcon-Purple",
          pink = "AppIcon-Pink", graphite = "AppIcon-Graphite"

@@ -4,7 +4,7 @@ import SwiftUI
 // MARK: - VoiceResultView
 
 /// Card shown for ~2 s after a voice command executes.
-/// Displayed as `IslandView.voiceResult` (Mochi on left, result on right).
+/// Displayed as `IslandView.voiceResult` (Peika on left, result on right).
 struct VoiceResultView: View {
     @ObservedObject private var state = AppState.shared
 
@@ -15,7 +15,7 @@ struct VoiceResultView: View {
                            : .red)
 
             HStack(spacing: 0) {
-                Spacer().frame(width: 110)   // Mochi lives here (BotCanvasView)
+                Spacer().frame(width: 110)   // Peika lives here (BotCanvasView)
 
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 6) {

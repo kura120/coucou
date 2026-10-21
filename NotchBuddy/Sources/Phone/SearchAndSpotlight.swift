@@ -63,10 +63,10 @@ struct SearchTab: View {
     private func row(_ hit: Hit) -> some View {
         let pill = PillCatalog.definition(for: hit.turn.pillId)
         return HStack(alignment: .top, spacing: 12) {
-            MochiStill(state: .idle, bodyHex: pill?.color ?? "#FFFFFF")
+            PeikaStill(state: .idle, bodyHex: pill?.color ?? "#FFFFFF")
                 .padding(4)
                 .frame(width: 34, height: 34)
-                .background(Color.mochiTile(hex: pill?.color ?? "#3B4A6B"), in: RoundedRectangle(cornerRadius: 9))
+                .background(Color.peikaTile(hex: pill?.color ?? "#3B4A6B"), in: RoundedRectangle(cornerRadius: 9))
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
                     Text(hit.turn.project.isEmpty ? hit.agent : "\(hit.turn.project) · \(hit.agent)")
@@ -110,7 +110,7 @@ enum SpotlightIndex {
         attributes.title = turn.project.isEmpty ? agent : "\(turn.project) · \(agent)"
         let answer = turn.finalMessage.isEmpty ? "" : "\n" + String(turn.finalMessage.prefix(300))
         attributes.contentDescription = turn.headline + answer
-        attributes.keywords = [agent, turn.project, "Coucou"] + turn.files.map(\.name)
+        attributes.keywords = [agent, turn.project, "Peika"] + turn.files.map(\.name)
         let item = CSSearchableItem(uniqueIdentifier: "\(turn.pillId)|\(Int(turn.startedAt.timeIntervalSince1970))",
                                     domainIdentifier: "turns", attributeSet: attributes)
         item.expirationDate = Date().addingTimeInterval(30 * 24 * 3600)

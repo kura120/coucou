@@ -1,13 +1,13 @@
-# « OK Coucou » : commande vocale mains libres (Mac)
+# « OK Peika » : commande vocale mains libres (Mac)
 
 Plan de travail pour Claude Code. Mac uniquement : ne toucher ni à `windows/`, ni à l'app iPhone (`Sources/Phone/`).
 Chaque phase = une PR, avec ses tests, et rien ne sort de ce qui est demandé dans la phase.
 
 ## L'idée
 
-Coucou écoute en permanence (si l'utilisateur l'a activé). On dit « OK Coucou » : l'île compacte s'ouvre, Mochi fait
-une petite émote d'écoute et affiche « À l'écoute… » avec la transcription en direct. On dit ce qu'on veut, Coucou le fait,
-Mochi réagit (content, ou « je n'ai pas compris »), l'île se referme. Coucou ne parle pas (pas de synthèse vocale pour l'instant).
+Peika écoute en permanence (si l'utilisateur l'a activé). On dit « OK Peika » : l'île compacte s'ouvre, Peika fait
+une petite émote d'écoute et affiche « À l'écoute… » avec la transcription en direct. On dit ce qu'on veut, Peika le fait,
+Peika réagit (content, ou « je n'ai pas compris »), l'île se referme. Peika ne parle pas (pas de synthèse vocale pour l'instant).
 
 ## Règles non négociables
 
@@ -32,23 +32,23 @@ Nouveau dossier `NotchBuddy/Sources/App/Voice/` :
 
 | Fichier | Rôle |
 |---|---|
-| `VoiceSettings.swift` | Interrupteur, phrase de réveil (« OK Coucou » par défaut, « Dis Coucou », « Hey Coucou »), langues (réutiliser `MacDictation.automaticLocales()`), raccourci pour couper le micro. |
+| `VoiceSettings.swift` | Interrupteur, phrase de réveil (« OK Peika » par défaut, « Dis Peika », « Hey Peika »), langues (réutiliser `MacDictation.automaticLocales()`), raccourci pour couper le micro. |
 | `VoiceAudio.swift` | `AVAudioEngine`, entrée 16 kHz mono. Détection de voix par énergie (seuil adaptatif au bruit de fond) qui ne réveille la reconnaissance que quand quelqu'un parle. |
-| `WakeSpotter.swift` | Protocole + implémentations : `SpeechWakeSpotter` (SFSpeechRecognizer, macOS 15, `contextualStrings = ["Coucou", "OK Coucou"]`) et `AnalyzerWakeSpotter` (SpeechAnalyzer, macOS 26). Correspondance tolérante : « ok coucou », « okay coucou », « OK cuckoo », « ok kuku »… |
+| `WakeSpotter.swift` | Protocole + implémentations : `SpeechWakeSpotter` (SFSpeechRecognizer, macOS 15, `contextualStrings = ["Peika", "OK Peika"]`) et `AnalyzerWakeSpotter` (SpeechAnalyzer, macOS 26). Correspondance tolérante : « ok peika », « okay peika », « OK cuckoo », « ok kuku »… |
 | `CommandListener.swift` | Après le réveil : capture la commande, transcription partielle en direct, fin sur 1,2 s de silence ou 10 s max. « Annule » / « laisse tomber » ferme. |
 | `VoiceIntent.swift` | L'enum des actions (voir les 10 fonctions) avec leurs paramètres typés. C'est le seul contrat entre compréhension et exécution. |
 | `IntentParser.swift` | Analyseur déterministe FR + EN (expressions + listes de synonymes). Instantané, prévisible, testable. |
 | `EntityResolver.swift` | Relie les mots aux vraies choses : pilules (noms + alias de `PillCatalog`, sans jamais changer les IDs), tenues, apps installées, contacts, fichiers (Spotlight limité à Téléchargements / Bureau / Documents). Correspondance floue + score. |
 | `VoiceBrain.swift` | macOS 26 + Apple Intelligence : `LanguageModelSession` avec des `Tool` qui renvoient des `VoiceIntent` (génération guidée `@Generable`). Le modèle n'exécute rien lui-même : il propose, `VoiceActionRunner` décide. Utilisé seulement si l'analyseur déterministe n'a rien trouvé, et pour les questions. |
-| `VoiceActionRunner.swift` | Exécute un `VoiceIntent` selon sa politique : direct (musique, pilules…) ou carte de confirmation (e-mail, consigne à un agent). Renvoie un résultat pour la réaction de Mochi. |
-| `VoiceIslandViews.swift` | État « écoute » de l'île : émote de Mochi, « À l'écoute… », transcription, puis résultat / carte de confirmation. |
+| `VoiceActionRunner.swift` | Exécute un `VoiceIntent` selon sa politique : direct (musique, pilules…) ou carte de confirmation (e-mail, consigne à un agent). Renvoie un résultat pour la réaction de Peika. |
+| `VoiceIslandViews.swift` | État « écoute » de l'île : émote de Peika, « À l'écoute… », transcription, puis résultat / carte de confirmation. |
 
 Chaîne : micro → détection de voix → réveil → commande → `IntentParser` → (sinon `VoiceBrain`) → `EntityResolver` → `VoiceActionRunner` → île.
 
 Pause automatique de l'écoute : écran verrouillé ou en veille, mode Économie d'énergie, dictée du chat en cours
 (`MacDictation` utilise déjà le micro), raccourci « couper le micro ». Reprise automatique.
 
-Machine d'état de l'île : ajouter un état `listening` à `IslandStateMachine` (à côté de `petit` / `home` / `coucou`),
+Machine d'état de l'île : ajouter un état `listening` à `IslandStateMachine` (à côté de `petit` / `home` / `peika`),
 avec ses tests comme les autres transitions.
 
 ## Les 10 fonctions de base
@@ -56,17 +56,17 @@ avec ses tests comme les autres transitions.
 | # | Fonction | Exemples (FR / EN) | Exécution | Confirmation |
 |---|---|---|---|---|
 | 1 | **Musique** | « lance Apple Music », « mets ma playlist Focus », « pause », « suivant », « mets du Daft Punk », « monte le son » | `MusicController` (AppleScript déjà autorisé) ; Spotify via `SpotifyController` si c'est lui qui joue | Non |
-| 2 | **Pilules actives** | « ajoute Vercel », « enlève Stripe », « remplace n8n par GitHub », « garde seulement GitHub et Vercel » | `AppState.activeIntegrations`, même logique que Réglages (limite de 4) | Non. Si c'est plein : Mochi demande laquelle retirer |
+| 2 | **Pilules actives** | « ajoute Vercel », « enlève Stripe », « remplace n8n par GitHub », « garde seulement GitHub et Vercel » | `AppState.activeIntegrations`, même logique que Réglages (limite de 4) | Non. Si c'est plein : Peika demande laquelle retirer |
 | 3 | **Pilule principale** | « passe la pilule principale sur Cursor », « main pill Terminal » | `AppState.mainPillId`, même enchaînement que le Picker des réglages | Non |
 | 4 | **Envoyer un fichier par mail** | « envoie le fichier facture octobre de mes téléchargements à Tana » | Spotlight trouve le fichier, Contacts trouve l'adresse, `NSSharingService(.composeEmail)` avec destinataire, objet et pièce jointe | **Toujours** : carte « facture-octobre.pdf → Tana (tana@…) », puis l'envoi se fait d'un clic dans Mail. Si plusieurs fichiers ou contacts : choix dans la carte |
-| 5 | **Ouvrir** | « ouvre Figma », « ouvre le dossier Coucou », « ouvre le dernier fichier téléchargé », « ouvre github.com » | `NSWorkspace` + Spotlight ; URL seulement en http(s) (`SafeWebURL`) | Non |
+| 5 | **Ouvrir** | « ouvre Figma », « ouvre le dossier Peika », « ouvre le dernier fichier téléchargé », « ouvre github.com » | `NSWorkspace` + Spotlight ; URL seulement en http(s) (`SafeWebURL`) | Non |
 | 6 | **Où en sont mes agents** | « qu'est-ce que fait Claude ? », « ouvre la session Codex », « montre-moi le terminal de Claude » | Focus de la pilule + `TerminalTarget` pour sauter au terminal | Non |
 | 7 | **Dicter une consigne à un agent** | « dis à Claude de lancer les tests », « demande à Cursor de corriger le lint » | Même chemin que les consignes de l'iPhone (`InstructionRunner`), Claude Code et Cursor seulement | **Oui** : carte avec le texte exact, un clic pour envoyer |
 | 8 | **Demandes d'autorisation** | « c'est quoi la demande ? », « refuse » | Ouvre la carte d'approbation existante. Refuser à la voix : oui. Autoriser : jamais, le clic reste obligatoire | Autoriser = clic, toujours |
-| 9 | **Minuteurs et rappels** | « rappelle-moi dans 20 minutes de sortir le linge », « minuteur 5 minutes » | Rappel local, Mochi l'annonce dans le notch (+ notification) | Non |
-| 10 | **Questions** | « est-ce que la CI est verte ? », « combien j'ai vendu aujourd'hui ? », « il me reste combien sur mon plan Claude ? », « c'est quoi la commande pour annuler un commit ? » | État de Coucou et des services déjà lus (GitHub, Vercel, Stripe, Resend, n8n, usage Claude) ; questions générales par `VoiceBrain` sur l'appareil | Non. Réponse en texte dans l'île |
+| 9 | **Minuteurs et rappels** | « rappelle-moi dans 20 minutes de sortir le linge », « minuteur 5 minutes » | Rappel local, Peika l'annonce dans le notch (+ notification) | Non |
+| 10 | **Questions** | « est-ce que la CI est verte ? », « combien j'ai vendu aujourd'hui ? », « il me reste combien sur mon plan Claude ? », « c'est quoi la commande pour annuler un commit ? » | État de Peika et des services déjà lus (GitHub, Vercel, Stripe, Resend, n8n, usage Claude) ; questions générales par `VoiceBrain` sur l'appareil | Non. Réponse en texte dans l'île |
 
-**E-mail guidé (fonction 4, version actuelle).** « Envoie un mail » → Coucou demande à qui (nom de contact ou
+**E-mail guidé (fonction 4, version actuelle).** « Envoie un mail » → Peika demande à qui (nom de contact ou
 adresse épelée), l'objet, le texte (ou « écris-lui que… » : le modèle local rédige), puis « une pièce jointe ? » : on glisse
 le fichier sur le notch (ou « non »). Les étapes déjà dites dans la première phrase sont sautées ; « annule » arrête tout.
 La carte mail de l'île s'ouvre remplie et reste ouverte jusqu'au clic : Envoyer passe par Apple Mail (AppleScript),
@@ -76,22 +76,22 @@ Annuler ferme. Rien ne part sans ce clic.
 Anthropic. Une question que ni les pilules ni les services ne couvrent (« qui a gagné hier ? », « c'est quoi… ») ou une
 demande explicite (« cherche sur internet… », « search the web for… ») part chez Claude (Haiku, outil `web_search`)
 avec les derniers échanges de la conversation, en mémoire seulement, oubliés après 90 s. Réponse courte lue à voix haute ;
-quand il y a plus à dire, elle finit par une question et Coucou réécoute : on peut continuer le sujet.
+quand il y a plus à dire, elle finit par une question et Peika réécoute : on peut continuer le sujet.
 
-Bonus (après les 10) : Mochi et l'app à la voix (« mets-toi en pirate », « coupe les sons », « ne pas déranger »),
+Bonus (après les 10) : Peika et l'app à la voix (« mets-toi en pirate », « coupe les sons », « ne pas déranger »),
 routines (« mode focus » = playlist + ne pas déranger + pilules de travail).
 
 ## Phases (une PR chacune)
 
 **Phase 1 : écoute et réveil.** Réglages → Voix (désactivé par défaut, explication du point orange), permission micro
 et reconnaissance vocale, `VoiceAudio` + détection de voix, `SpeechWakeSpotter`, état `listening` de l'île avec
-l'émote de Mochi et la transcription. Pas encore d'actions : la commande s'affiche, c'est tout.
-Critères : réveil en moins de ~1 s après « OK Coucou », pas de déclenchement sur « coucou » tout seul dans une phrase,
+l'émote de Peika et la transcription. Pas encore d'actions : la commande s'affiche, c'est tout.
+Critères : réveil en moins de ~1 s après « OK Peika », pas de déclenchement sur « peika » tout seul dans une phrase,
 CPU au repos mesuré et < 1 %, 0 % et micro fermé quand c'est éteint, pause écran verrouillé / Économie d'énergie / dictée du chat.
 Tests : correspondance de la phrase de réveil (table de variantes), transitions de l'île.
 
 **Phase 2 : comprendre et agir (fonctions 1, 2, 3).** `VoiceIntent`, `IntentParser` FR + EN, `EntityResolver` pour les
-pilules, `VoiceActionRunner`, réaction de Mochi (réussi / pas compris / impossible).
+pilules, `VoiceActionRunner`, réaction de Peika (réussi / pas compris / impossible).
 Tests : table d'au moins 60 phrases FR + EN → intention attendue, résolution floue des noms de pilules, limite de 4.
 
 **Phase 3 : fichiers, apps, contacts (fonctions 4, 5).** Spotlight limité aux trois dossiers, Contacts (permission demandée
@@ -109,7 +109,7 @@ Passer aussi la détection sur `SpeechAnalyzer` quand macOS 26 est là.
 
 **Phase 7 : finitions.** Réglage de la sensibilité, liste des faux déclenchements, traductions (le catalogue de chaînes
 existant), `docs/SPEC.md`, section README, CHANGELOG, puis release (règles de release de CLAUDE.md).
-Piste pour plus tard : un petit modèle Core ML dédié à « OK Coucou » sur le Neural Engine, pour descendre encore le CPU.
+Piste pour plus tard : un petit modèle Core ML dédié à « OK Peika » sur le Neural Engine, pour descendre encore le CPU.
 
 ## Build App Store (sandbox)
 

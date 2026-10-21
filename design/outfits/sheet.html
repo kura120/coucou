@@ -1,6 +1,6 @@
 <!doctype html><html><body style="margin:0;background:#1b1c1f">
 <div id="sheet" style="display:inline-block;background:#0B0C0E;padding:12px"></div>
-<script src="mochi-outfits.js"></script>
+<script src="peika-outfits.js"></script>
 <script>
 const outfits = (new URLSearchParams(location.search).get('o')||'none,beanie,santaHat,partyHat,crown,witchHat,sunglasses,roundGlasses,scarf,pumpkin,bow').split(',');
 const cols = [
@@ -20,11 +20,11 @@ for (const o of outfits) {
   for (const c of cols) {
     const cv = document.createElement('canvas'); cv.width=W*2; cv.height=W*2; cv.style.width=W+'px'; cv.style.height=W+'px'; cv.style.background='#15171b'; cv.style.borderRadius='10px';
     const ctx = cv.getContext('2d'); ctx.scale(2,2);
-    drawMochi(ctx, W, {...c, scale:0.62, outfit: o==='none'?null:o});
+    drawPeika(ctx, W, {...c, scale:0.62, outfit: o==='none'?null:o});
     row.appendChild(cv);
   }
   const cv = document.createElement('canvas'); cv.width=small*2; cv.height=small*2; cv.style.width=small+'px'; cv.style.height=small+'px'; cv.style.background='#000';
-  const ctx = cv.getContext('2d'); ctx.scale(2,2); drawMochi(ctx, small, {scale:0.62, outfit:o==='none'?null:o});
+  const ctx = cv.getContext('2d'); ctx.scale(2,2); drawPeika(ctx, small, {scale:0.62, outfit:o==='none'?null:o});
   row.appendChild(cv);
   S.appendChild(row);
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# iPhone plan, step 2: builds the GitHub app (fr.louisraille.NotchBuddy) the
+# iPhone plan, step 2: builds the GitHub app (dev.kura120.peika.direct) the
 # way release.sh does — Release optimizations, Developer ID signature — plus
-# the "Coucou Developer ID" provisioning profile, the iCloud entitlements and
+# the "Peika Developer ID" provisioning profile, the iCloud entitlements and
 # the PHONE_LINK probe. Not notarized, not published: it only proves that a
 # Developer ID build can talk to iCloud. A Developer ID profile only allows the
 # Production CloudKit environment: the Ping/Pong schema must be deployed to
@@ -13,11 +13,11 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD_DIR="/tmp/coucou-cloud-test"
-APP="$BUILD_DIR/Coucou.app"
-PROFILE_NAME="Coucou Developer ID"
-APP_ID="256AUJ9555.fr.louisraille.NotchBuddy"
-CONTAINER="iCloud.fr.louisraille.Coucou"
+BUILD_DIR="/tmp/peika-cloud-test"
+APP="$BUILD_DIR/Peika.app"
+PROFILE_NAME="Peika Developer ID"
+APP_ID="YOURTEAMID.dev.kura120.peika.direct"
+CONTAINER="iCloud.dev.kura120.peika"
 
 die() { echo "error: $*" >&2; exit 1; }
 
@@ -44,7 +44,7 @@ for dir in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$HOME
   done
 done
 [ -n "$FOUND" ] || die "no provisioning profile named '$PROFILE_NAME' is installed.
-  developer.apple.com → Profiles → + → Developer ID → App ID fr.louisraille.NotchBuddy,
+  developer.apple.com → Profiles → + → Developer ID → App ID dev.kura120.peika.direct,
   name it exactly '$PROFILE_NAME' and download it. Then copy it for Xcode:
   mkdir -p ~/Library/Developer/Xcode/UserData/Provisioning\\ Profiles
   cp ~/Downloads/*.provisionprofile ~/Library/Developer/Xcode/UserData/Provisioning\\ Profiles/"
@@ -53,7 +53,7 @@ echo "Profile: $FOUND"
 PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.application-identifier" "$TMP_PLIST" 2>/dev/null || true)
 [ "$PROFILE_APP_ID" = "$APP_ID" ] || die "the profile is for '$PROFILE_APP_ID', not $APP_ID"
 /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-container-identifiers" "$TMP_PLIST" 2>/dev/null | grep -q "$CONTAINER" \
-  || die "the profile has no iCloud container $CONTAINER. Turn on iCloud (CloudKit, with that container) on the App ID fr.louisraille.NotchBuddy, then regenerate and reinstall the profile."
+  || die "the profile has no iCloud container $CONTAINER. Turn on iCloud (CloudKit, with that container) on the App ID dev.kura120.peika.direct, then regenerate and reinstall the profile."
 EXPIRY=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$TMP_PLIST")
 echo "Profile expires: $EXPIRY"
 
@@ -82,8 +82,8 @@ echo
 echo "✓ Built $APP (Developer ID, not notarized)."
 echo
 echo "To test:"
-echo "  1. Quit any other Coucou (menu bar icon → Quit) and stop it in Xcode."
+echo "  1. Quit any other Peika (menu bar icon → Quit) and stop it in Xcode."
 echo "  2. open $APP"
 echo "  3. tail -f ~/Library/Logs/NotchBuddy/nb.log | grep PhoneLink"
 echo "  4. Developer ID builds use the Production CloudKit environment: run the iPhone"
-echo "     app with the CoucouPhoneProduction scheme, pull to refresh, then tap Send pong."
+echo "     app with the PeikaPhoneProduction scheme, pull to refresh, then tap Send pong."

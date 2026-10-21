@@ -3,11 +3,11 @@ import UIKit
 
 /// The tabs, in glass on iOS 26: the agents, the services, the decisions you
 /// took, and a search through every turn.
-enum CoucouTab: Hashable { case agents, services, history, search }
+enum PeikaTab: Hashable { case agents, services, history, search }
 
 struct HomeView: View {
     let link: PhoneLink
-    @State private var tab: CoucouTab = .agents
+    @State private var tab: PeikaTab = .agents
     @State private var agentsPath: [String] = []
     @State private var servicesPath: [String] = []
     @State private var introDone = false
@@ -15,20 +15,20 @@ struct HomeView: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            Tab("Agents", systemImage: "sparkles", value: CoucouTab.agents) {
+            Tab("Agents", systemImage: "sparkles", value: PeikaTab.agents) {
                 AgentsTab(link: link, path: $agentsPath)
             }
-            Tab("Services", systemImage: "square.grid.2x2", value: CoucouTab.services) {
+            Tab("Services", systemImage: "square.grid.2x2", value: PeikaTab.services) {
                 ServicesTab(link: link, path: $servicesPath)
             }
-            Tab("History", systemImage: "clock.arrow.circlepath", value: CoucouTab.history) {
+            Tab("History", systemImage: "clock.arrow.circlepath", value: PeikaTab.history) {
                 NavigationStack { HistoryView(link: link) }
             }
-            Tab(value: CoucouTab.search, role: .search) {
+            Tab(value: PeikaTab.search, role: .search) {
                 SearchTab(link: link)
             }
         }
-        // A widget tile was tapped: open that Mochi.
+        // A widget tile was tapped: open that Peika.
         .onOpenURL { url in
             if let id = SharedSession.sessionId(from: url) { open(id) }
         }
@@ -51,7 +51,7 @@ struct HomeView: View {
         .fullScreenCover(isPresented: Binding(get: { !onboardingDone }, set: { if !$0 { onboardingDone = true } })) {
             OnboardingView()
         }
-        // The opening: Mochi alone while the app loads, then he flies to his tile.
+        // The opening: Peika alone while the app loads, then he flies to his tile.
         .overlay {
             if !introDone {
                 IntroView(ready: link.firstSyncDone) { introDone = true }
@@ -148,11 +148,11 @@ struct AgentsTab: View {
             .animation(.spring(duration: 0.5, bounce: 0.2),
                        value: link.sessions.map { "\($0.id)|\($0.statusText)" })
             .refreshable { await link.refresh() }
-            .navigationTitle("Coucou")
+            .navigationTitle("Peika")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { id in
                 SessionDetailView(link: link, sessionId: id)
-                    // The Mochi tile grows into the session, and shrinks back.
+                    // The Peika tile grows into the session, and shrinks back.
                     .navigationTransition(.zoom(sourceID: id, in: zoom))
             }
             .toolbar {
@@ -178,7 +178,7 @@ struct AgentsTab: View {
     }
 }
 
-/// The service Mochi (GitHub, Stripe…), each with what it saw.
+/// The service Peika (GitHub, Stripe…), each with what it saw.
 struct ServicesTab: View {
     let link: PhoneLink
     @Binding var path: [String]
@@ -273,10 +273,10 @@ struct SessionPeek: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                MochiStill(state: session.state, bodyHex: session.color)
+                PeikaStill(state: session.state, bodyHex: session.color)
                     .padding(6)
                     .frame(width: 48, height: 48)
-                    .background(Color.mochiTile(hex: session.color), in: RoundedRectangle(cornerRadius: 13))
+                    .background(Color.peikaTile(hex: session.color), in: RoundedRectangle(cornerRadius: 13))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(session.title).font(.headline)
                     Text(session.statusText).font(.subheadline.weight(.semibold)).foregroundStyle(session.statusColor)
@@ -315,7 +315,7 @@ struct SessionPeek: View {
     }
 }
 
-/// The black island at the top: Mochi with the most urgent state and a
+/// The black island at the top: Peika with the most urgent state and a
 /// summary. When a command waits for your OK, Allow and Deny grow out of it
 /// (Liquid Glass morphing on iOS 26) and fold back once answered.
 struct NotchHeader: View {
@@ -395,7 +395,7 @@ struct NotchHeader: View {
 
     private var summary: some View {
         HStack(spacing: 14) {
-            MochiLive(state: sessions.leadState)
+            PeikaLive(state: sessions.leadState)
                 .frame(width: 52, height: 52)
                 .introLanding(.header)
             VStack(alignment: .leading, spacing: 3) {
@@ -470,10 +470,10 @@ struct SessionRow: View {
     }
 
     @ViewBuilder private var tile: some View {
-        let base = mochi
+        let base = peika
             .padding(4)
             .frame(width: 40, height: 40)
-            .background(Color.mochiTile(hex: session.color), in: RoundedRectangle(cornerRadius: 11))
+            .background(Color.peikaTile(hex: session.color), in: RoundedRectangle(cornerRadius: 11))
         if let zoom {
             base.matchedTransitionSource(id: session.id, in: zoom)
         } else {
@@ -481,12 +481,12 @@ struct SessionRow: View {
         }
     }
 
-    /// VS Code's Mochi is where the intro's Mochi lands.
-    @ViewBuilder private var mochi: some View {
+    /// VS Code's Peika is where the intro's Peika lands.
+    @ViewBuilder private var peika: some View {
         if session.id == "integration_claude" {
-            MochiLive(state: session.state, fps: 60).introLanding(.tile)
+            PeikaLive(state: session.state, fps: 60).introLanding(.tile)
         } else {
-            MochiLive(state: session.state, fps: 60)
+            PeikaLive(state: session.state, fps: 60)
         }
     }
 }
@@ -510,7 +510,7 @@ struct EmptySessionsView: View {
         switch status {
         case .starting: "Connecting to iCloud…"
         case .noAccount(let reason): "\(reason) Sign in to iCloud with the same account as your Mac."
-        case .zoneMissing: "Open Coucou on your Mac: your sessions will show up here."
+        case .zoneMissing: "Open Peika on your Mac: your sessions will show up here."
         case .failed(let message): message
         case .ready: "No session yet. Start Claude Code, Cursor or Codex on your Mac."
         }

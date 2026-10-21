@@ -1,6 +1,6 @@
-// RenderOutfits.swift — standalone planche renderer for Mochi outfits
+// RenderOutfits.swift — standalone planche renderer for Peika outfits
 // Compile + run via: bash scripts/render-outfits.sh
-// Output: /tmp/coucou-outfits.png
+// Output: /tmp/peika-outfits.png
 
 import Foundation
 import SwiftUI
@@ -47,7 +47,7 @@ extension Color {
 
 // MARK: - Cell view — one outfit at one pose
 
-struct MochiCell: View {
+struct PeikaCell: View {
     let outfit: Outfit
     let yaw: CGFloat
     let pitch: CGFloat
@@ -69,7 +69,7 @@ struct MochiCell: View {
             let sx: CGFloat = 1, sy: CGFloat = 1
             let morph: CGFloat = 0
 
-            let mH = MochiH(R: R, yaw: yaw, pitch: pitch, physDx: phys.dx, physDy: phys.dy, roll: roll)
+            let mH = PeikaH(R: R, yaw: yaw, pitch: pitch, physDx: phys.dx, physDy: phys.dy, roll: roll)
 
             // 1. Behind-body outfit
             drawOutfitBehindStatic(
@@ -83,7 +83,7 @@ struct MochiCell: View {
             bCtx.translateBy(x: cx, y: cy)
             if tilt != 0 { bCtx.rotate(by: .radians(tilt)) }
             bCtx.scaleBy(x: sx, y: sy)
-            let body = mochiOutfitPath(rx, ry)
+            let body = peikaOutfitPath(rx, ry)
 
             // Base gradient (pumpkin-aware)
             let pumpkin = outfit == .pumpkin
@@ -195,7 +195,7 @@ struct OutfitGrid: View {
                         .frame(width: labelW, alignment: .trailing)
                     ForEach(poses.indices, id: \.self) { pi in
                         let p = poses[pi]
-                        MochiCell(outfit: outfit, yaw: p.yaw, pitch: p.pitch,
+                        PeikaCell(outfit: outfit, yaw: p.yaw, pitch: p.pitch,
                                   tilt: p.tilt, phys: p.phys, cellSize: p.size)
                             .background(pi == poses.count - 1
                                         ? Color.black
@@ -240,7 +240,7 @@ struct RollGrid: View {
                         .foregroundColor(.white)
                         .frame(width: labelW, alignment: .trailing)
                     ForEach(rollValues.indices, id: \.self) { ri in
-                        MochiCell(outfit: outfit, yaw: 0, pitch: 0, tilt: 0, phys: (0, 0),
+                        PeikaCell(outfit: outfit, yaw: 0, pitch: 0, tilt: 0, phys: (0, 0),
                                   cellSize: 120, roll: rollValues[ri])
                             .background(Color(red: 0.083, green: 0.090, blue: 0.106))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -279,7 +279,7 @@ struct TransitionGrid: View {
                         .foregroundColor(.white)
                         .frame(width: labelW, alignment: .trailing)
                     ForEach(presenceValues.indices, id: \.self) { pi in
-                        MochiCell(outfit: outfit, yaw: 0, pitch: 0, tilt: 0, phys: (0, 0),
+                        PeikaCell(outfit: outfit, yaw: 0, pitch: 0, tilt: 0, phys: (0, 0),
                                   cellSize: 120, presence: presenceValues[pi])
                             .background(Color(red: 0.083, green: 0.090, blue: 0.106))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -323,9 +323,9 @@ private func renderAndSave<V: View>(_ view: V, path: String) {
 struct RenderOutfits {
     static func main() {
         MainActor.assumeIsolated {
-            renderAndSave(OutfitGrid(),      path: "/tmp/coucou-outfits.png")
-            renderAndSave(RollGrid(),        path: "/tmp/coucou-roll.png")
-            renderAndSave(TransitionGrid(),  path: "/tmp/coucou-transition.png")
+            renderAndSave(OutfitGrid(),      path: "/tmp/peika-outfits.png")
+            renderAndSave(RollGrid(),        path: "/tmp/peika-roll.png")
+            renderAndSave(TransitionGrid(),  path: "/tmp/peika-transition.png")
         }
     }
 }

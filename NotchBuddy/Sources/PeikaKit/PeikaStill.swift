@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Mochi in a fixed pose: one frame of BotEngine, no animation, no timer.
+/// Peika in a fixed pose: one frame of BotEngine, no animation, no timer.
 /// For surfaces that can't animate (widgets, lists on the iPhone). The Mac
 /// island keeps its animated BotCanvasView / MiniBotCanvasView.
-struct MochiStill: View {
+struct PeikaStill: View {
     var state: BotState = .idle
     /// Overrides the state's eyes (e.g. .closed for a sleeping agent).
     var eye: EyeShape? = nil
@@ -11,7 +11,7 @@ struct MochiStill: View {
     var bodyHex: String = "#FFFFFF"
     var showBadge: Bool = true
     /// Where he looks and how his eyes are, for a still that isn't always the same.
-    var pose: MochiPose = .neutral
+    var pose: PeikaPose = .neutral
 
     var body: some View {
         Canvas { context, size in
@@ -40,34 +40,34 @@ struct MochiStill: View {
     }
 }
 
-/// One frame of the little life the Mac's mini Mochi have: looking around,
+/// One frame of the little life the Mac's mini Peika have: looking around,
 /// blinking, a happy squint. Widgets can't animate, so each refresh of the
-/// timeline picks a new pose per Mochi; the system cross-fades between them.
-struct MochiPose: Equatable, Sendable {
+/// timeline picks a new pose per Peika; the system cross-fades between them.
+struct PeikaPose: Equatable, Sendable {
     var yaw: CGFloat = 0
     var pitch: CGFloat = 0
     var tilt: CGFloat = 0
     var open: CGFloat = 1
     var eye: EyeShape? = nil
 
-    static let neutral = MochiPose()
+    static let neutral = PeikaPose()
 
-    static let idlePoses: [MochiPose] = [
-        MochiPose(),
-        MochiPose(yaw: -0.45),
-        MochiPose(yaw: 0.45),
-        MochiPose(yaw: -0.3, pitch: -0.25),
-        MochiPose(yaw: 0.35, pitch: 0.2, tilt: 0.08),
-        MochiPose(pitch: -0.3, tilt: -0.06),
-        MochiPose(eye: .closed),                 // blink
-        MochiPose(yaw: 0.2, eye: .happy),
-        MochiPose(yaw: -0.5, tilt: -0.1),
-        MochiPose(yaw: 0.15, pitch: 0.25),
+    static let idlePoses: [PeikaPose] = [
+        PeikaPose(),
+        PeikaPose(yaw: -0.45),
+        PeikaPose(yaw: 0.45),
+        PeikaPose(yaw: -0.3, pitch: -0.25),
+        PeikaPose(yaw: 0.35, pitch: 0.2, tilt: 0.08),
+        PeikaPose(pitch: -0.3, tilt: -0.06),
+        PeikaPose(eye: .closed),                 // blink
+        PeikaPose(yaw: 0.2, eye: .happy),
+        PeikaPose(yaw: -0.5, tilt: -0.1),
+        PeikaPose(yaw: 0.15, pitch: 0.25),
     ]
 
-    /// A pose that differs per Mochi and per tick, the same every time for a
+    /// A pose that differs per Peika and per tick, the same every time for a
     /// given pair (so a widget redraw doesn't jump).
-    static func idle(id: String, tick: Int) -> MochiPose {
+    static func idle(id: String, tick: Int) -> PeikaPose {
         var hash: UInt64 = 5381
         for byte in id.utf8 { hash = (hash &* 33) &+ UInt64(byte) }
         hash = (hash &* 31) &+ UInt64(truncatingIfNeeded: tick &* 7919)
@@ -77,9 +77,9 @@ struct MochiPose: Equatable, Sendable {
 }
 
 extension Color {
-    /// Background for a white Mochi on an agent's color. Very light colors
+    /// Background for a white Peika on an agent's color. Very light colors
     /// (VS Code's is near-white) would hide him, so they get a dark gray tile.
-    static func mochiTile(hex: String) -> Color {
+    static func peikaTile(hex: String) -> Color {
         guard let c = cgColorFromHex(hex), let comps = c.components, comps.count >= 3 else {
             return Color(hex: hex)
         }

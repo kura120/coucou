@@ -324,7 +324,7 @@ private func gRR(_ ctx: CGContext, _ x: CGFloat, _ y: CGFloat,
     ctx.closePath()
 }
 
-private func mochiPath(hw: CGFloat, hh: CGFloat) -> CGPath {
+private func peikaPath(hw: CGFloat, hh: CGFloat) -> CGPath {
     let n: CGFloat = 3.2
     let path = CGMutablePath()
     let steps = 96
@@ -404,7 +404,7 @@ private func drawHandR(_ ctx: CGContext, hw: CGFloat, hh: CGFloat, p: GreetPose)
     ctx.restoreGState()
 }
 
-private func drawMochi(_ ctx: CGContext, p: GreetPose) {
+private func drawPeika(_ ctx: CGContext, p: GreetPose) {
     let hh = CGFloat(p.hb/2), hw = hh*GASP; guard hh > 0.4 else { return }
 
     // Halo (golden → blue)
@@ -447,7 +447,7 @@ private func drawMochi(_ ctx: CGContext, p: GreetPose) {
     drawHandL(ctx, hw: hw, hh: hh, p: p)
     drawHandR(ctx, hw: hw, hh: hh, p: p)
 
-    let mpath = mochiPath(hw: hw, hh: hh)
+    let mpath = peikaPath(hw: hw, hh: hh)
     whiteFill(ctx, mpath, x0: hw*0.6, y0: -hh, x1: -hw*0.6, y1: hh)
 
     if p.tint > 0 {
@@ -596,7 +596,7 @@ private func drawMinis(_ ctx: CGContext, alpha: Double, compact: IslandRestingLa
         let scale = CGFloat(alpha) * compact.miniGridScale
         ctx.scaleBy(x: scale, y: scale)
         ctx.setFillColor(gHex(miniColors[i]))
-        ctx.addPath(mochiPath(hw: 5.3, hh: 4)); ctx.fillPath()
+        ctx.addPath(peikaPath(hw: 5.3, hh: 4)); ctx.fillPath()
         ctx.restoreGState()
     }
 }
@@ -626,7 +626,7 @@ private func drawGreeting(_ ctx: CGContext, size: CGSize, t: Double,
     }
 
     drawMinis(ctx, alpha: p.minis, compact: compact)
-    drawMochi(ctx, p: p)
+    drawPeika(ctx, p: p)
 }
 
 // MARK: - SwiftUI View

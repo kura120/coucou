@@ -9,12 +9,12 @@
     <key>com.apple.security.automation.apple-events</key>
     <true/>
     <key>com.apple.application-identifier</key>
-    <string>256AUJ9555.fr.louisraille.NotchBuddy</string>
+    <string>$(AppIdentifierPrefix)dev.kura120.peika.direct</string>
     <key>com.apple.developer.team-identifier</key>
-    <string>256AUJ9555</string>
+    <string>$(DEVELOPMENT_TEAM)</string>
     <key>com.apple.developer.icloud-container-identifiers</key>
     <array>
-        <string>iCloud.fr.louisraille.Coucou</string>
+        <string>iCloud.dev.kura120.peika</string>
     </array>
     <key>com.apple.developer.icloud-services</key>
     <array>

@@ -56,7 +56,7 @@ struct VoiceActionResult: Equatable {
     enum Outcome: Equatable {
         case success
         case failure
-        /// Mochi asks a follow-up question and re-listens for 6 s.
+        /// Peika asks a follow-up question and re-listens for 6 s.
         case question(text: String)
     }
     let outcome: Outcome
@@ -77,7 +77,7 @@ struct PendingVoiceQuestion {
     enum MailField: Equatable { case recipient, subject, body, attachment }
     let kind: Kind
     let text: String
-    /// True once Coucou has asked the question a second time (it never asks a third time).
+    /// True once Peika has asked the question a second time (it never asks a third time).
     var askedAgain: Bool = false
 }
 #endif

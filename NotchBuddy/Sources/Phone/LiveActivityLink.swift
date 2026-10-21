@@ -2,7 +2,7 @@ import ActivityKit
 import CloudKit
 import UIKit
 
-// MARK: - iPhone plan, step 8: Mochi in the Dynamic Island
+// MARK: - iPhone plan, step 8: Peika in the Dynamic Island
 //
 // The Mac starts, updates and ends the Live Activity through the relay, which
 // needs this iPhone's push tokens:
@@ -26,7 +26,7 @@ final class LiveActivityLink {
     /// "development" for builds run from Xcode, "production" for TestFlight and
     /// the App Store (set per configuration in project.yml).
     private var apnsEnvironment: String {
-        Bundle.main.object(forInfoDictionaryKey: "CoucouAPNsEnvironment") as? String ?? "production"
+        Bundle.main.object(forInfoDictionaryKey: "PeikaAPNsEnvironment") as? String ?? "production"
     }
 
     private var recordID: CKRecord.ID {
@@ -40,21 +40,21 @@ final class LiveActivityLink {
         guard !started else { return }
         started = true
         Task {
-            for await data in Activity<MochiActivityAttributes>.pushToStartTokenUpdates {
+            for await data in Activity<PeikaActivityAttributes>.pushToStartTokenUpdates {
                 startToken = data.hexString
                 await save()
             }
         }
         Task {
-            for await activity in Activity<MochiActivityAttributes>.activityUpdates {
+            for await activity in Activity<PeikaActivityAttributes>.activityUpdates {
                 watch(activity)
             }
         }
         // Activities already running when the app launches.
-        for activity in Activity<MochiActivityAttributes>.activities { watch(activity) }
+        for activity in Activity<PeikaActivityAttributes>.activities { watch(activity) }
     }
 
-    private func watch(_ activity: Activity<MochiActivityAttributes>) {
+    private func watch(_ activity: Activity<PeikaActivityAttributes>) {
         guard watched.insert(activity.id).inserted else { return }
         Task {
             for await data in activity.pushTokenUpdates {

@@ -1,8 +1,8 @@
-// Mochi outfit reference renderer (Canvas 2D).
+// Peika outfit reference renderer (Canvas 2D).
 // Coordinates mirror BotEngine.draw(): origin at body centre, y down on screen,
 // R = W*0.3, rx = 1.14R, ry = 0.88R. Head "3D" model: superellipsoid whose
 // horizontal radius at height y (y up, -1..1) is r(y) = (1-|y|^2.7)^(1/2.7),
-// so that its silhouette matches mochiPath at yaw = pitch = 0.
+// so that its silhouette matches peikaPath at yaw = pitch = 0.
 
 const EXP = 2.7;
 // Accessories are seen slightly from above (and hats sit tipped forward): rings show as ellipses.
@@ -30,7 +30,7 @@ function proj(H, p) {
 // point on the head surface at height y, longitude lon (0 = facing viewer), scaled by s
 function surf(y, lon, s = 1) { const r = ringR(y) * s; return [r * Math.sin(lon), y, r * Math.cos(lon)]; }
 
-function mochiPath(rx, ry) {
+function peikaPath(rx, ry) {
   const p = new Path2D(); const n = 96, e = 2 / EXP;
   for (let i = 0; i <= n; i++) {
     const a = i / n * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
@@ -52,7 +52,7 @@ function rad(ctx, x, y, r0, r1, stops) {
 
 // ---------- Body + eyes (faithful to BotEngine) ----------
 function drawBody(ctx, H, colors) {
-  const { rx, ry, R } = H; const path = mochiPath(rx, ry);
+  const { rx, ry, R } = H; const path = peikaPath(rx, ry);
   const top = colors ? colors[0] : '#EDEDEF', bot = colors ? colors[1] : '#C4C5CA';
   ctx.fillStyle = lin(ctx, rx * 0.7, -ry * 0.85, -rx * 0.8, ry * 0.9, [[0, top], [1, bot]]);
   ctx.fill(path);
@@ -179,7 +179,7 @@ const OUTFITS = {};
 OUTFITS.beanie = {
   front(ctx, H, path) {
     const s = 1.035, yEdge = 0.42, yCuff = 0.58;
-    const head = mochiPath(H.rx * s, H.ry * s);
+    const head = peikaPath(H.rx * s, H.ry * s);
     // shadow on the head under the cuff
     ctx.save(); ctx.clip(path); ctx.clip(capClip(H, yEdge - 0.12, 1));
     ctx.fillStyle = 'rgba(30,40,70,0.10)'; ctx.fill(path); ctx.restore();
@@ -199,7 +199,7 @@ OUTFITS.beanie = {
     ctx.restore();
     // cuff (folded band)
     ctx.save(); ctx.clip(capClip(H, yEdge, s * 1.04)); ctx.clip(invert(capClip(H, yCuff, s * 1.04), H));
-    const cuffHead = mochiPath(H.rx * s * 1.04, H.ry * s * 1.04);
+    const cuffHead = peikaPath(H.rx * s * 1.04, H.ry * s * 1.04);
     ctx.fillStyle = lin(ctx, 0, -H.ry * 0.6, 0, -H.ry * 0.2, [[0, '#3C7BEA'], [1, '#2257C4']]);
     ctx.fill(cuffHead);
     ctx.clip(cuffHead);
@@ -507,7 +507,7 @@ OUTFITS.scarf = {
     top.forEach((q, i) => i ? band.lineTo(q.x, q.y) : band.moveTo(q.x, q.y));
     for (let i = bot.length - 1; i >= 0; i--) band.lineTo(bot[i].x, bot[i].y);
     band.closePath();
-    ctx.save(); ctx.clip(mochiPath(H.rx * s, H.ry * s));
+    ctx.save(); ctx.clip(peikaPath(H.rx * s, H.ry * s));
     ctx.fillStyle = lin(ctx, 0, -H.ry * 0.2, 0, H.ry * 0.7, [[0, '#F87171'], [1, '#B91C1C']]); ctx.fill(band);
     ctx.clip(band);
     // stripes along meridians
@@ -604,7 +604,7 @@ OUTFITS.bow = {
 };
 
 // ---------- composite draw ----------
-function drawMochi(ctx, W, opts) {
+function drawPeika(ctx, W, opts) {
   const R = W * (opts.scale || 1) * 0.3;
   const H = { R, rx: R * 1.14, ry: R * 0.88, view: VIEW_TILT, yaw: opts.yaw || 0, pitch: opts.pitch || 0, phys: opts.phys || { dx: 0, dy: 0 } };
   const o = opts.outfit ? OUTFITS[opts.outfit] : null;

@@ -93,10 +93,10 @@ struct ReviewSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     if let session {
                         HStack(spacing: 12) {
-                            MochiLive(state: session.state)
+                            PeikaLive(state: session.state)
                                 .padding(6)
                                 .frame(width: 52, height: 52)
-                                .background(Color.mochiTile(hex: session.color), in: RoundedRectangle(cornerRadius: 14))
+                                .background(Color.peikaTile(hex: session.color), in: RoundedRectangle(cornerRadius: 14))
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(session.pillName) · \(session.title)").font(.headline)
                                 if !session.macName.isEmpty {
@@ -140,7 +140,7 @@ struct HistoryView: View {
         List {
             if link.history.isEmpty {
                 VStack(spacing: 10) {
-                    MochiLive(state: .sleeping).frame(width: 56, height: 56)
+                    PeikaLive(state: .sleeping).frame(width: 56, height: 56)
                     Text("No decision yet").font(.headline)
                     Text("Commands you allow or deny from your iPhone show up here. They stay on this iPhone.")
                         .font(.footnote)
@@ -163,7 +163,7 @@ struct HistoryView: View {
     private func row(_ log: DecisionLog) -> some View {
         let pill = PillCatalog.definition(for: log.pillId)
         return HStack(alignment: .top, spacing: 12) {
-            MochiStill(state: log.decision == .allow ? .finished : .error, bodyHex: pill?.color ?? "#FFFFFF")
+            PeikaStill(state: log.decision == .allow ? .finished : .error, bodyHex: pill?.color ?? "#FFFFFF")
                 .padding(3)
                 .frame(width: 34, height: 34)
                 .background(Color(white: 0.16), in: RoundedRectangle(cornerRadius: 9))

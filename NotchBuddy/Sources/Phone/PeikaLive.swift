@@ -1,14 +1,14 @@
 import QuartzCore
 import SwiftUI
 
-/// Mochi alive, as in the Mac's notch: he blinks, looks around and reacts to
+/// Peika alive, as in the Mac's notch: he blinks, looks around and reacts to
 /// his state (a hop when a task finishes). Same BotEngine as the Mac. Draws
 /// only while on screen, at the screen's own rate (up to 120 Hz on ProMotion)
 /// unless capped.
-struct MochiLive: View {
+struct PeikaLive: View {
     let state: BotState
     var bodyHex: String = "#FFFFFF"
-    /// A cap for small, numerous Mochi (list rows); nil = the screen's rate.
+    /// A cap for small, numerous Peika (list rows); nil = the screen's rate.
     var fps: Double? = nil
 
     @StateObject private var engine = BotEngine()

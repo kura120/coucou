@@ -1,7 +1,7 @@
 import SwiftUI
 import QuartzCore
 
-// The opening: Mochi alone on black while the app loads. He pops in and looks
+// The opening: Peika alone on black while the app loads. He pops in and looks
 // around like the greeting on the Mac (without the hands): quick glances and
 // slow ones, eyes that pop round, shrink or squint to a bar, his body leaning,
 // hopping and squashing along. It hides the first iCloud fetch: as soon as
@@ -9,7 +9,7 @@ import QuartzCore
 // screen, the VS Code session's tile (or the island at the top), and the home
 // screen behind is already up to date.
 
-/// Where the intro's Mochi lands. The tile reports its frame on screen.
+/// Where the intro's Peika lands. The tile reports its frame on screen.
 @MainActor
 @Observable
 final class IntroLanding {
@@ -17,7 +17,7 @@ final class IntroLanding {
 
     var tileFrame: CGRect?
     var headerFrame: CGRect?
-    /// The intro is over: the real Mochi on the home screen show again.
+    /// The intro is over: the real Peika on the home screen show again.
     var landed = false
 
     var target: CGRect? { tileFrame ?? headerFrame }
@@ -163,7 +163,7 @@ private struct Motion {
     static let ease = Motion(k: 90, c: 17)
 }
 
-/// Mochi's face and body for the opening, drawn by the same engine as
+/// Peika's face and body for the opening, drawn by the same engine as
 /// everywhere else, driven here by a little show of moves. Each move has its
 /// own speed, his body follows where he looks (leans, drifts, tilts with the
 /// motion) and hops land with a squash, so it never feels mechanical. The

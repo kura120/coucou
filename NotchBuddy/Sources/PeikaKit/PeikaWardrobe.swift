@@ -57,14 +57,14 @@ enum Outfit: String, CaseIterable {
         selection == .auto ? seasonal(for: date, calendar: calendar) : selection
     }
 
-    // UserDefaults key "mochiOutfit", default "auto", unknown value → .auto
+    // UserDefaults key "peikaOutfit", default "auto", unknown value → .auto
     static var stored: Outfit {
         get {
-            let raw = UserDefaults.standard.string(forKey: "mochiOutfit") ?? "auto"
+            let raw = UserDefaults.standard.string(forKey: "peikaOutfit") ?? "auto"
             return Outfit(rawValue: raw) ?? .auto
         }
         set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: "mochiOutfit")
+            UserDefaults.standard.set(newValue.rawValue, forKey: "peikaOutfit")
         }
     }
 }

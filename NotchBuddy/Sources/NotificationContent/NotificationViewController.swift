@@ -4,7 +4,7 @@ import UserNotifications
 import UserNotificationsUI
 import CloudKit
 
-// The expanded approval notification (long press): Mochi alive, waiting for
+// The expanded approval notification (long press): Peika alive, waiting for
 // your OK, with the agent and the command. The Review and Deny buttons stay
 // the system's, under this view.
 
@@ -39,7 +39,7 @@ final class NotificationViewController: UIViewController, @preconcurrency UNNoti
     }
 }
 
-/// Mochi in his agent's color, waiting; who asks and the exact command.
+/// Peika in his agent's color, waiting; who asks and the exact command.
 struct ApprovalNotificationView: View {
     let pillId: String
     let title: String
@@ -58,12 +58,12 @@ struct ApprovalNotificationView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 14) {
-                MochiLive(state: .approval, bodyHex: color)
+                PeikaLive(state: .approval, bodyHex: color)
                     .padding(7)
                     .frame(width: 60, height: 60)
-                    .background(Color.mochiTile(hex: color), in: RoundedRectangle(cornerRadius: 16))
+                    .background(Color.peikaTile(hex: color), in: RoundedRectangle(cornerRadius: 16))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title.isEmpty || title == "Coucou" ? (pill?.name ?? "Coucou") : title)
+                    Text(title.isEmpty || title == "Peika" ? (pill?.name ?? "Peika") : title)
                         .font(.headline)
                         .foregroundStyle(.white)
                         .lineLimit(1)

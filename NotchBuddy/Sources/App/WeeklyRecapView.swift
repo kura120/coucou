@@ -156,7 +156,7 @@ private struct RecapSharePanelView: View {
                 Button("Save…") {
                     guard let img = nsImage else { return }
                     let panel = NSSavePanel()
-                    panel.nameFieldStringValue = "coucou-weekly-recap.png"
+                    panel.nameFieldStringValue = "peika-weekly-recap.png"
                     panel.allowedContentTypes = [.png]
                     panel.begin { result in
                         guard result == .OK, let url = panel.url else { return }
@@ -199,8 +199,8 @@ struct RecapShareImageView: View {
     let summary: WeeklySummary
     let hideProjects: Bool
 
-    // Static BotEngine for the Mochi snapshot — idle state, no animation needed.
-    @StateObject private var mochiEngine = BotEngine()
+    // Static BotEngine for the Peika snapshot — idle state, no animation needed.
+    @StateObject private var peikaEngine = BotEngine()
 
     var body: some View {
         ZStack {
@@ -217,14 +217,14 @@ struct RecapShareImageView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                // Mochi character
+                // Peika character
                 Canvas { context, size in
-                    mochiEngine.draw(context: context, size: size)
+                    peikaEngine.draw(context: context, size: size)
                 }
                 .frame(width: 200, height: 200)
                 .padding(.bottom, 20)
 
-                Text("Coucou")
+                Text("Peika")
                     .font(.system(size: 52, weight: .black, design: .rounded))
                     .foregroundColor(Color(hex: "#F1F2F4"))
                 Text(String(localized: "recap.title"))
@@ -302,7 +302,7 @@ struct RecapShareImageView: View {
 
                 Spacer()
 
-                Text("Coucou · github.com/Louis-CFM/coucou")
+                Text("Peika · github.com/kura120/peika")
                     .font(.system(size: 20, weight: .medium, design: .monospaced))
                     .foregroundColor(Color(hex: "#8E939C").opacity(0.6))
                     .padding(.bottom, 60)

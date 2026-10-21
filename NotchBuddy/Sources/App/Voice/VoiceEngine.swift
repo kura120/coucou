@@ -5,7 +5,7 @@ import Speech
 
 // MARK: - VoiceEngine
 //
-// Coordinator for the «OK Coucou» voice feature.
+// Coordinator for the «OK Peika» voice feature.
 //
 // Reliability features:
 // - Backoff: onWakeWindowEnded reopens with WakeWindowBackoff (0.5 → 5 s exp.);
@@ -31,7 +31,7 @@ final class VoiceEngine: ObservableObject {
     @Published private(set) var commandTranscript: String = ""
     @Published private(set) var recognizerUnavailable: Bool = false
     @Published private(set) var audioError: String? = nil
-    /// Read by Mochi's canvas every frame; not published, so ~20 updates/s while I talk
+    /// Read by Peika's canvas every frame; not published, so ~20 updates/s while I talk
     /// don't re-render Settings or the island views.
     private(set) var micLevel: Double = 0
 
@@ -109,7 +109,7 @@ final class VoiceEngine: ObservableObject {
 
     private init() {
         lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
-        let buildHash = Bundle.main.object(forInfoDictionaryKey: "CoucouGitHash") as? String ?? "unknown"
+        let buildHash = Bundle.main.object(forInfoDictionaryKey: "PeikaGitHash") as? String ?? "unknown"
         appendAppLog("nb.log", "[Voice] build \(buildHash)")
         observeSystemEvents()
         if isEnabled && !isPaused { startAudioPipeline() }
@@ -279,8 +279,8 @@ final class VoiceEngine: ObservableObject {
         a.onVoiceStart = { [weak self] in
             guard let self else { return }
             guard !VoiceSpeaker.shared.isBusy else {
-                // Coucou's own voice. But with music playing the sound never "ends", so
-                // this start would be the last one: open the window once Coucou is quiet.
+                // Peika's own voice. But with music playing the sound never "ends", so
+                // this start would be the last one: open the window once Peika is quiet.
                 appendAppLog("nb.log", "[Voice] vad start deferred (speaker active)")
                 self.openWindowWhenSpeakerQuiet(audio: a, spotter: s, locale: loc)
                 return
@@ -427,8 +427,8 @@ final class VoiceEngine: ObservableObject {
 
     private var deferredStartWork: DispatchWorkItem?
 
-    /// A voice start swallowed while Coucou was talking: with continuous sound (music on
-    /// the speakers) the VAD never ends and never starts again, so without this Coucou
+    /// A voice start swallowed while Peika was talking: with continuous sound (music on
+    /// the speakers) the VAD never ends and never starts again, so without this Peika
     /// stayed deaf until the music stopped. Checks every 0.3 s, then opens the window.
     private func openWindowWhenSpeakerQuiet(audio: VoiceAudio, spotter: WakeSpotter, locale: Locale) {
         guard deferredStartWork == nil else { return }
@@ -462,7 +462,7 @@ final class VoiceEngine: ObservableObject {
     private var deafWindows = 0
 
     private static func describe(_ st: WakeSpotter.WindowStats) -> String {
-        "partials=\(st.partials) words=\(st.maxWords) coucou-like=\(st.nearWake ? "yes" : "no")"
+        "partials=\(st.partials) words=\(st.maxWords) peika-like=\(st.nearWake ? "yes" : "no")"
     }
 
     private func checkDeafRecognizer(_ st: WakeSpotter.WindowStats, elapsed: TimeInterval) {
@@ -593,7 +593,7 @@ final class VoiceEngine: ObservableObject {
         isListeningForCommand = true
         commandTranscript     = ""
         lastWordCount         = 0
-        // After "OK Coucou", leave time to start the sentence (the island no longer
+        // After "OK Peika", leave time to start the sentence (the island no longer
         // opens, the caption shows "Je t'écoute…" instead). 3 s was too short.
         directInitialTimeout  = Self.wakeFirstWordTimeout
         audio?.bypassVAD      = true
@@ -609,12 +609,12 @@ final class VoiceEngine: ObservableObject {
     }
 
     private func commandUpdate(_ command: String) {
-        // Semi-duplex: ignore updates while Coucou is speaking.
+        // Semi-duplex: ignore updates while Peika is speaking.
         guard !VoiceSpeaker.shared.isBusy else {
             // Logged once per turn (no words): helps when an answer seems unheard.
             if !loggedDropWhileSpeaking {
                 loggedDropWhileSpeaking = true
-                appendAppLog("nb.log", "[Voice] words heard while Coucou was speaking: ignored")
+                appendAppLog("nb.log", "[Voice] words heard while Peika was speaking: ignored")
             }
             return
         }

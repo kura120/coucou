@@ -28,7 +28,7 @@ cd windows && npm install && npm run tauri dev
 
 Peika started as a fork of [Coucou](https://github.com/Louis-CFM/coucou) by Louis Raillé and has been renamed and redrawn since: the character is a new cloud, drawn in code on the same animation engine. The Windows and Linux code is under the MIT License; keep the copyright notices in [LICENSE](LICENSE).
 
-The repository still carries inherited folders (`NotchBuddy/` for macOS and iPhone, `relay/`, `design/`, `docs/`) and some of the original's sounds and media, which are being removed or replaced. [LICENSE-ASSETS.md](LICENSE-ASSETS.md) describes what the original author reserves; none of it is Peika's.
+The repository also holds the macOS and iPhone app (`NotchBuddy/`, Swift, MIT) and the iPhone push relay (`relay/`), renamed to Peika but not built since: there is no Mac or Xcode in the loop yet, and the Apple team id is cleared (set `DEVELOPMENT_TEAM` in `NotchBuddy/project.yml` and run `xcodegen`). Some of the original's sounds and media are still here until they are replaced. [LICENSE-ASSETS.md](LICENSE-ASSETS.md) describes what the original author reserves; none of it is Peika's.
 
 ## License
 
