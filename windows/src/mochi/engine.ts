@@ -39,7 +39,7 @@ interface Tween {
 type PropKey =
   | "yaw" | "pitch" | "roll" | "tilt" | "open" | "sx" | "sy"
   | "oy" | "ox" | "tint" | "morph" | "hands" | "blush" | "es" | "badgeS"
-  | "outfitPresence" | "listenHand";
+  | "outfitPresence" | "listenHand" | "cover";
 
 interface BotStateCfg {
   color: RGB;
@@ -67,9 +67,20 @@ const EYE_W = 0.25;
 const EYE_H = 0.27;
 const EYE_SP = 0.37;
 const EYE_P = -0.12;
-const BASE_TOP: RGB = [0.929, 0.929, 0.937]; // #EDEDEF
-const BASE_BOTTOM: RGB = [0.769, 0.773, 0.792]; // #C4C5CA
+const BASE_TOP: RGB = [1, 1, 1]; // #FFFFFF, sunlit cloud top
+const BASE_BOTTOM: RGB = [0.78, 0.855, 0.945]; // #C7DAF1, shaded underside
 const INK = "rgb(26,20,18)"; // #1A1412
+
+/** The cloud's puffs as [x, y, radius] in units of R. */
+const CLOUD_PUFFS: readonly (readonly [number, number, number])[] = [
+  [0, -0.3, 0.52],
+  [-0.46, -0.12, 0.38],
+  [0.46, -0.12, 0.38],
+  [-0.72, 0.18, 0.36],
+  [0.72, 0.18, 0.36],
+  [-0.32, 0.36, 0.38],
+  [0.32, 0.36, 0.38],
+];
 const MINI_INK = "rgb(16,19,26)"; // #10131A
 
 const C = {
@@ -287,12 +298,19 @@ export class BotEngine {
   private greetToken = 0;
   private lastAmbient = 0;
   private slapTimes: number[] = [];
+  private pokeTimes: number[] = [];
   private miniLookTarget = { x: 0, y: 0 };
   private miniLookNextTime = 0;
 
   // Listening ("OK Coucou"): head tilted, eyes wide, right hand to the ear.
   /** 0 = at rest, 1 = raised beside the head. */
   listenHand = 0;
+  /** Peekaboo: 0 = puffs away, 1 = both puffs over the eyes. */
+  cover = 0;
+  /** A peekaboo is under way (cover, duck, or the pop that follows). */
+  peeking = false;
+  /** Trembling under the puffs. */
+  private shaking = false;
   isListening = false;
   /** Words are coming: he stops swaying and looks at who is speaking. */
   listeningHasWords = false;
@@ -398,51 +416,80 @@ export class BotEngine {
     }
   }
 
+  /**
+   * A click on the character is peekaboo, and a click while it is peeking
+   * starts it over. Three clicks within 1.7 s are the old gag: a slap that
+   * makes it dizzy. While listening or dizzy, clicks do nothing.
+   */
+  poke() {
+    if (this.isListening || this.state === "dizzy") return;
+    const t = now();
+    this.pokeTimes = this.pokeTimes.filter((c) => t - c < 1.7);
+    this.pokeTimes.push(t);
+    if (this.pokeTimes.length >= 3) {
+      this.pokeTimes = [];
+      // Two earlier slaps make this one the third, which is what dizzies it.
+      this.slapTimes = [t, t];
+      this.slap();
+      return;
+    }
+    this.peekaboo();
+  }
+
   doRoll(durationMs: number, turns: number) {
     this.roll = 0;
     this.anim("roll", [[Math.PI * 2 * turns, durationMs, Ease.inOut]], () => { this.roll = 0; });
   }
 
-  /** Peek wave — the "coucou". Timings from BotEngine.greet(). */
-  greet() {
-    const t = now();
+  /**
+   * Peekaboo, the name's own game: the cloud covers its eyes with two puffs,
+   * shrinks and trembles, then jumps back to full size with wide eyes.
+   */
+  peekaboo() {
     const tok = ++this.greetToken;
-    this.waveStart = t + 0.45;
-    this.waveUntil = t + 1.55;
-    this.physVx += 0.2;
-
-    this.eyeOverride = "happy";
-    this.eyeOverrideUntil = t + 2.0;
-    this.anim("oy", [[-0.06, 220, Ease.out], [0.0, 220, Ease.back]]);
-
-    setTimeout(() => {
+    const hold = 900;
+    const down = 220;
+    this.peeking = true;
+    // Starting over mid-peek: nothing of the previous one may linger.
+    this.shaking = false;
+    this.ox = 0;
+    // The hiding is tweens with a hold in them, so the engine stays `busy`
+    // (the island's loop keeps running) until the jump, which they trigger.
+    this.anim("cover", [[1, down, Ease.out], [1, hold, Ease.lin], [0, 160, Ease.out]]);
+    this.anim("sx", [[0.8, down, Ease.out], [0.8, hold, Ease.lin]]);
+    this.anim("sy", [[0.8, down, Ease.out], [0.8, hold, Ease.lin]], () => {
       if (this.greetToken !== tok) return;
-      this.anim("hands", [[1, 280, Ease.out]]);
-      this.anim("sy", [[0.95, 100, Ease.out], [1.0, 260, Ease.back]]);
-      this.anim("sx", [[1.04, 100, Ease.out], [1.0, 260, Ease.back]]);
+      this.shaking = false;
+      this.ox = 0;
       Sound.play("greet");
-    }, 250);
-
-    setTimeout(() => { if (this.greetToken === tok) this.blink(); }, 550);
-    setTimeout(() => { if (this.greetToken === tok) this.blink(); }, 1500);
-    setTimeout(() => {
-      if (this.greetToken !== tok) return;
-      this.waveUntil = 0;
-      this.anim("hands", [[0, 200, Ease.inOut]]);
-    }, 1550);
-    setTimeout(() => {
-      if (this.greetToken !== tok) return;
-      this.eyeOverride = "happy";
-      this.eyeOverrideUntil = now() + 0.3;
-    }, 1750);
+      this.eyeOverride = "wide";
+      this.eyeOverrideUntil = now() + 1.2;
+      this.anim("es", [[1.2, 120, Ease.out], [1, 420, Ease.inOut]]);
+      this.anim("oy", [[-0.22, 130, Ease.out], [0, 320, Ease.back]]);
+      this.anim("sx", [[1.1, 130, Ease.out], [1, 320, Ease.back]]);
+      this.anim("sy", [[1.14, 130, Ease.out], [1, 320, Ease.back]], () => {
+        if (this.greetToken === tok) this.peeking = false;
+      });
+      this.anim("blush", [[0.9, 200, Ease.out], [0.9, 500, Ease.lin], [0, 400, Ease.inOut]]);
+      this.emit("heart", 2);
+    });
+    setTimeout(() => { if (this.greetToken === tok) this.shaking = true; }, down);
   }
 
   interruptGreet() {
-    if (this.hands <= 0.01 && now() >= this.waveUntil) return;
+    if (this.hands <= 0.01 && !this.peeking && now() >= this.waveUntil) return;
     this.greetToken++;
+    if (this.peeking) {
+      this.peeking = false;
+      this.shaking = false;
+      this.ox = 0;
+      this.anim("cover", [[0, 150, Ease.inOut]]);
+      this.anim("sx", [[1, 150, Ease.inOut]]);
+      this.anim("sy", [[1, 150, Ease.inOut]]);
+    }
     this.waveUntil = 0;
     this.waveStart = 0;
-    this.anim("hands", [[0, 150, Ease.inOut]]);
+    if (!this.isListening) this.anim("hands", [[0, 150, Ease.inOut]]);
   }
 
   /** The island opens on the listening view (BotEngine.enterListening). */
@@ -654,6 +701,8 @@ export class BotEngine {
       }
     }
 
+    if (this.shaking) this.ox = Math.sin(n * 70) * 0.035;
+
     const t = n - this.t0;
     let ty = this.lookX * 0.62;
     let tp = this.lookY * 0.5;
@@ -842,8 +891,8 @@ export class BotEngine {
    */
   draw(x: CanvasRenderingContext2D, W: number, H: number) {
     const R = W * 0.3;
-    const rx = R * 1.14;
-    const ry = R * 0.88;
+    const rx = R * 1.0;
+    const ry = R * 0.8;
     const cx = W / 2 + this.ox * R;
     const cy = H / 2 + this.particleOverhang / 2 + this.oy * R + R * 0.06;
 
@@ -888,6 +937,8 @@ export class BotEngine {
     this.drawEyes(x, body, R, rx, ry);
     if (this.morph > 0.05) this.drawMouth(x, body, R);
 
+    if (this.cover > 0.01 && !this.isMini) this.drawCover(x, R, rx, ry);
+
     if (head) drawOutfitFront(x, this.outfit, head, outfitState);
 
     x.restore();
@@ -907,12 +958,15 @@ export class BotEngine {
     const tr = R * 0.42;
     const p = new Path2D();
     const m = this.morph;
+    const core = 0.8 + 0.2 * m;
     for (let i = 0; i <= n; i++) {
       const a = (i / n) * Math.PI * 2;
       const ca = Math.cos(a);
       const sa = Math.sin(a);
-      const px0 = rx * (ca >= 0 ? Math.pow(ca, expN) : -Math.pow(-ca, expN));
-      const py0 = ry * (sa >= 0 ? Math.pow(sa, expN) : -Math.pow(-sa, expN));
+      // The squircle is the cloud's core, kept inside the puffs and grown to
+      // the box when the body morphs into the mailbox.
+      const px0 = core * rx * (ca >= 0 ? Math.pow(ca, expN) : -Math.pow(-ca, expN));
+      const py0 = core * ry * (sa >= 0 ? Math.pow(sa, expN) : -Math.pow(-sa, expN));
       let px = px0;
       let py = py0;
       if (m >= 0.005) {
@@ -924,6 +978,15 @@ export class BotEngine {
       else p.lineTo(px, py);
     }
     p.closePath();
+    // The puffs: overlapping circles unite with the core (non-zero fill). They
+    // shrink away as the body turns into a box.
+    const k = 1 - m;
+    if (k > 0.01) {
+      for (const [px, py, pr] of CLOUD_PUFFS) {
+        p.moveTo((px + pr * k) * R, py * R);
+        p.arc(px * R, py * R, pr * R * k, 0, Math.PI * 2);
+      }
+    }
     return p;
   }
 
@@ -983,6 +1046,35 @@ export class BotEngine {
     x.restore();
   }
 
+  /** Two little cloud puffs that rise over the eyes for peekaboo. */
+  private drawCover(x: CanvasRenderingContext2D, R: number, rx: number, ry: number) {
+    const c = this.cover;
+    const eyeY = ry * 0.12;
+    for (const sd of [-1, 1]) {
+      const px = sd * rx * lerp(0.78, 0.37, c) + Math.sin(this.yaw) * rx * 0.4 * c;
+      const py = lerp(ry * 1.15, eyeY, c);
+      const r = R * 0.27;
+      x.save();
+      x.translate(px, py);
+      x.rotate(sd * 0.25 * (1 - c));
+      const g = x.createLinearGradient(0, -r, 0, r);
+      g.addColorStop(0, rgba(BASE_TOP));
+      g.addColorStop(1, rgba(BASE_BOTTOM));
+      x.fillStyle = g;
+      x.strokeStyle = "rgba(120,150,190,0.35)";
+      x.lineWidth = 1;
+      for (const [dx, dy, k] of [[-0.55, 0.1, 0.7], [0.55, 0.1, 0.7], [0, -0.35, 0.85], [0, 0.3, 0.9]] as const) {
+        x.beginPath();
+        x.arc(dx * r, dy * r, r * k, 0, Math.PI * 2);
+        x.fill();
+      }
+      x.beginPath();
+      x.arc(0, -0.35 * r, r * 0.85, Math.PI * 1.1, Math.PI * 1.9);
+      x.stroke();
+      x.restore();
+    }
+  }
+
   private drawEyes(x: CanvasRenderingContext2D, body: Path2D, R: number, rx: number, ry: number) {
     let shape: EyeShape = this.eyeOverride ?? this.cfg.eye;
     // Dancing: happy eyes in the calm states.
@@ -997,6 +1089,7 @@ export class BotEngine {
     x.save();
     x.clip(body);
     const ink = this.isMini ? MINI_INK : INK;
+
     x.fillStyle = ink;
     x.strokeStyle = ink;
 
@@ -1038,6 +1131,13 @@ export class BotEngine {
         const hh = Math.max(h * this.open, w * 0.3);
         roundRectPath(x, -w / 2, -hh / 2, w, hh, Math.min(w / 2, hh / 2));
         x.fill();
+        if (!this.isMini && this.open > 0.5) {
+          x.fillStyle = "rgba(255,255,255,0.92)";
+          x.beginPath();
+          x.arc(-w * 0.14, -hh * 0.2, w * 0.17, 0, Math.PI * 2);
+          x.fill();
+          x.fillStyle = ink;
+        }
         break;
       }
       case "dot":
@@ -1230,21 +1330,22 @@ export class BotEngine {
       x.save();
       x.translate(worldX, worldY);
       if (handRot !== 0) x.rotate(handRot);
-      const g = x.createLinearGradient(hew * 0.7, -heh * 0.85, -hew * 0.8, heh * 0.9);
+      const hr = Math.max(hew, heh);
+      const grad = x.createLinearGradient(hr * 0.7, -hr * 0.85, -hr * 0.8, hr * 0.9);
       if (this.bodyColor) {
-        g.addColorStop(0, rgba(mix3(this.bodyColor, [1, 1, 1], 0.35)));
-        g.addColorStop(1, rgba(this.bodyColor));
+        grad.addColorStop(0, rgba(mix3(this.bodyColor, [1, 1, 1], 0.35)));
+        grad.addColorStop(1, rgba(this.bodyColor));
       } else {
-        g.addColorStop(0, rgba(BASE_TOP));
-        g.addColorStop(1, rgba(BASE_BOTTOM));
+        grad.addColorStop(0, rgba(BASE_TOP));
+        grad.addColorStop(1, rgba(BASE_BOTTOM));
       }
-      x.beginPath();
-      x.ellipse(0, 0, hew, heh, 0, 0, Math.PI * 2);
-      x.fillStyle = g;
-      x.fill();
-      x.strokeStyle = "rgba(0,0,0,0.08)";
-      x.lineWidth = 1;
-      x.stroke();
+      x.fillStyle = grad;
+      // A little cloud: three overlapping puffs, like the body.
+      for (const [dx, dy, k] of [[-0.5, 0.15, 0.62], [0.5, 0.15, 0.62], [0, -0.2, 0.75]] as const) {
+        x.beginPath();
+        x.arc(dx * hr, dy * hr, hr * k, 0, Math.PI * 2);
+        x.fill();
+      }
       x.restore();
     }
   }

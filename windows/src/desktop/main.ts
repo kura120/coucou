@@ -267,7 +267,7 @@ class DesktopMochi {
         this.pokeTimer = null;
         this.lastAgentActive = performance.now();
         this.wake();
-        this.engine.slap();
+        this.engine.poke();
         this.schedule();
       }, DOUBLE_CLICK_MS);
     });

@@ -1383,7 +1383,7 @@ export class Island {
       }
       if (this.isBotHit(e.clientX, e.clientY)) {
         this.cancelBotHover();
-        this.engine.slap();
+        this.engine.poke();
       }
     });
 

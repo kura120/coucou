@@ -43,7 +43,7 @@ export interface Head {
 }
 
 export function makeHead(R: number, yaw = 0, pitch = 0, physDx = 0, physDy = 0): Head {
-  return { R, rx: R * 1.14, ry: R * 0.88, yaw, pitch, physDx, physDy };
+  return { R, rx: R * 1.0, ry: R * 0.8, yaw, pitch, physDx, physDy };
 }
 
 // ── 3D helpers ────────────────────────────────────────────────────────────────

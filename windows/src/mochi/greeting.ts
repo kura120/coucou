@@ -365,6 +365,12 @@ function rr(x: CanvasRenderingContext2D, X: number, Y: number, W: number, H: num
   x.closePath();
 }
 
+/** The cloud's puffs as [x, y, radius] in units of the body's half-width. */
+const PUFFS: readonly (readonly [number, number, number])[] = [
+  [0, -0.3, 0.52], [-0.46, -0.12, 0.38], [0.46, -0.12, 0.38],
+  [-0.72, 0.18, 0.36], [0.72, 0.18, 0.36], [-0.32, 0.36, 0.38], [0.32, 0.36, 0.38],
+];
+
 function mochiPath(hw: number, hh: number): Path2D {
   const n = 3.2;
   const p = new Path2D();
@@ -373,12 +379,28 @@ function mochiPath(hw: number, hh: number): Path2D {
     const a = (i / steps) * 2 * Math.PI;
     const ca = Math.cos(a);
     const sa = Math.sin(a);
-    const px = hw * (ca < 0 ? -1 : 1) * Math.pow(Math.abs(ca), 2 / n);
-    const py = hh * (sa < 0 ? -1 : 1) * Math.pow(Math.abs(sa), 2 / n);
+    const px = 0.8 * hw * (ca < 0 ? -1 : 1) * Math.pow(Math.abs(ca), 2 / n);
+    const py = 0.8 * hh * (sa < 0 ? -1 : 1) * Math.pow(Math.abs(sa), 2 / n);
     if (i === 0) p.moveTo(px, py);
     else p.lineTo(px, py);
   }
   p.closePath();
+  // The puffs unite with the core (non-zero fill).
+  const sy = hh / (0.8 * hw);
+  for (const [px, py, pr] of PUFFS) {
+    p.moveTo((px + pr) * hw, py * hw * sy);
+    p.ellipse(px * hw, py * hw * sy, pr * hw, pr * hw * sy, 0, 0, Math.PI * 2);
+  }
+  return p;
+}
+
+/** A hand: three little puffs. */
+function puffHand(r: number): Path2D {
+  const p = new Path2D();
+  for (const [dx, dy, k] of [[-0.5, 0.15, 0.62], [0.5, 0.15, 0.62], [0, -0.2, 0.75]] as const) {
+    p.moveTo((dx + k) * r, dy * r);
+    p.arc(dx * r, dy * r, k * r, 0, Math.PI * 2);
+  }
   return p;
 }
 
@@ -388,8 +410,8 @@ function whiteFill(
   x0: number, y0: number, x1: number, y1: number,
 ) {
   const g = x.createLinearGradient(x0, y0, x1, y1);
-  g.addColorStop(0, "rgb(251,251,252)");
-  g.addColorStop(1, "rgb(231,233,236)");
+  g.addColorStop(0, "rgb(255,255,255)");
+  g.addColorStop(1, "rgb(199,218,241)");
   x.fillStyle = g;
   x.fill(path);
 }
@@ -399,12 +421,7 @@ function drawHandL(x: CanvasRenderingContext2D, hw: number, hh: number, p: Pose)
   const { x: hx, y: hy, r } = handLPos(hw, hh, p);
   x.save();
   x.translate(hx, hy);
-  const circ = new Path2D();
-  circ.ellipse(0, 0, r, r, 0, 0, Math.PI * 2);
-  whiteFill(x, circ, r, -r, -r, r);
-  x.strokeStyle = "rgba(0,0,0,0.08)";
-  x.lineWidth = 0.8;
-  x.stroke(circ);
+  whiteFill(x, puffHand(r), r, -r, -r, r);
   x.restore();
 }
 
@@ -414,15 +431,8 @@ function drawHandR(x: CanvasRenderingContext2D, hw: number, hh: number, p: Pose)
   x.save();
   x.translate(h.x, h.y);
   x.rotate(h.ang);
-  rr(x, -h.L / 2, -h.T / 2, h.L, h.T, h.T / 2);
-  const g = x.createLinearGradient(h.L / 2, -h.T / 2, -h.L / 2, h.T / 2);
-  g.addColorStop(0, "rgb(251,251,252)");
-  g.addColorStop(1, "rgb(231,233,236)");
-  x.fillStyle = g;
-  x.fill();
-  x.strokeStyle = "rgba(0,0,0,0.08)";
-  x.lineWidth = 0.8;
-  x.stroke();
+  const r = h.T * 0.8;
+  whiteFill(x, puffHand(r), r, -r, -r, r);
   x.restore();
 }
 
