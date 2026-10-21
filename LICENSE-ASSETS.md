@@ -11,6 +11,10 @@ The [MIT License](LICENSE) covers the **source code** of Coucou. It does **not**
 - the **images, GIFs and videos** in `docs/media/` and `design/`.
 - the copies of these assets anywhere else in this repository, such as the sounds in `windows/`.
 
+## What has been removed or replaced in this repository
+
+The original app icons and menu bar icon (macOS and iPhone) are replaced by the fork's own cloud (drawn in code by `windows/scripts/gen-icons.mjs`), and the Mochi character stills and the outfit reference sheet (`design/captures/char_*.png`, `design/outfits/mochi-outfits-reference.png`, `docs/media/dizzy.png`) are deleted. Still here, until replaced with the fork's own: the sounds, the other images, GIFs and videos in `docs/media/` and `design/`, and the screenshots in `windows/`. Do not distribute a build of this repository with them.
+
 ## The phone link
 
 The phone link in `windows/src-tauri/src/phone_link/` is © Rhytam Biswas under the MIT License ([`LICENSE`](windows/src-tauri/src/phone_link/LICENSE)); the assets stay under this file.

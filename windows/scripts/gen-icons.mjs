@@ -45,9 +45,9 @@ function insidePill(x, y, w, h) {
   return (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
 }
 
-function renderCloud(size) {
+function renderCloud(size, scale = 0.34) {
   const px = new Uint8Array(size * size * 4);
-  const R = size * 0.34;
+  const R = size * scale;
   const rx = R * 1.0;
   const ry = R * 0.8;
   const cx = size / 2;
@@ -145,14 +145,14 @@ function chunk(type, data) {
   return Buffer.concat([len, body, crc]);
 }
 
-function encodePNG(size, rgba) {
+function encodePNG(size, rgba, height = size) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(size, 0);
-  ihdr.writeUInt32BE(size, 4);
+  ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 8; // bit depth
   ihdr[9] = 6; // RGBA
-  const raw = Buffer.alloc(size * (size * 4 + 1));
-  for (let y = 0; y < size; y++) {
+  const raw = Buffer.alloc(height * (size * 4 + 1));
+  for (let y = 0; y < height; y++) {
     raw[y * (size * 4 + 1)] = 0; // filter: none
     Buffer.from(rgba.buffer, y * size * 4, size * 4).copy(raw, y * (size * 4 + 1) + 1);
   }
@@ -208,3 +208,99 @@ for (const [name, data] of Object.entries(files)) {
 const ico = encodeICO([16, 24, 32, 48, 64, 128, 256].map((size) => ({ size, png: png(size) })));
 writeFileSync(join(OUT, "icon.ico"), ico);
 console.log(`icon.ico — ${ico.length} bytes`);
+
+// ── Apple icons (macOS app, iPhone app and its alternates, menu bar) ──────────
+//
+//   node scripts/gen-icons.mjs --apple
+//
+// The cloud on a coloured tile, written into NotchBuddy's asset catalogs.
+
+if (process.argv.includes("--apple")) {
+  const CAT = join(OUT, "..", "..", "..", "NotchBuddy");
+  const lerp3 = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+
+  /** The cloud over a vertical gradient; `radius` rounds the tile (0 = full bleed). */
+  function tile(size, top, bottom, radius, scale = 0.3) {
+    const cloud = renderCloud(size, scale);
+    const out = new Uint8Array(size * size * 4);
+    const r = size * radius;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const o = (y * size + x) * 4;
+        const bg = lerp3(top, bottom, y / size);
+        const a = cloud[o + 3] / 255;
+        let ta = 1;
+        if (radius > 0) {
+          const cx = Math.min(Math.max(x + 0.5, r), size - r);
+          const cy = Math.min(Math.max(y + 0.5, r), size - r);
+          ta = Math.min(1, Math.max(0, r - Math.hypot(x + 0.5 - cx, y + 0.5 - cy) + 0.5));
+        }
+        for (let i = 0; i < 3; i++) out[o + i] = Math.round(cloud[o + i] * a + bg[i] * (1 - a));
+        out[o + 3] = Math.round(ta * 255);
+      }
+    }
+    return out;
+  }
+
+  /** A black silhouette with the eyes cut out, for the menu bar (a template image). */
+  function menubar(w, h) {
+    const out = new Uint8Array(w * h * 4);
+    const R = h * 0.46;
+    const ex = R * 0.37, ew = R * 0.11, eh = R * 0.16;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let hits = 0;
+        for (let sy = 0; sy < SS; sy++) {
+          for (let sx = 0; sx < SS; sx++) {
+            const px0 = x + (sx + 0.5) / SS - w / 2;
+            const py0 = y + (sy + 0.5) / SS - h / 2;
+            if (!insideCloud(px0, py0, R, 0)) continue;
+            if (insidePill(px0 + ex, py0 - R * 0.1, ew, eh) || insidePill(px0 - ex, py0 - R * 0.1, ew, eh)) continue;
+            hits++;
+          }
+        }
+        out[(y * w + x) * 4 + 3] = Math.round((hits / (SS * SS)) * 255);
+      }
+    }
+    return out;
+  }
+
+  const write = (rel, data) => {
+    writeFileSync(join(CAT, rel), data);
+    console.log(rel);
+  };
+  const SKY = [[176, 208, 247], [120, 168, 236]];
+  const ORANGE = [[255, 196, 130], [246, 134, 64]];
+  const VARIANTS = {
+    Blue: [[140, 190, 250], [70, 120, 222]],
+    Green: [[160, 228, 176], [66, 168, 108]],
+    Purple: [[196, 168, 244], [128, 92, 212]],
+    Pink: [[252, 184, 210], [226, 108, 160]],
+    Graphite: [[128, 134, 146], [52, 56, 64]],
+  };
+
+  const mac = "Assets.xcassets/AppIcon.appiconset";
+  for (const [name, px] of [
+    ["16x16", 16], ["16x16@2x", 32], ["32x32", 32], ["32x32@2x", 64], ["128x128", 128],
+    ["128x128@2x", 256], ["256x256", 256], ["256x256@2x", 512], ["512x512", 512], ["512x512@2x", 1024],
+  ]) {
+    write(`${mac}/icon_${name}.png`, encodePNG(px, tile(px, ...SKY, 0.2237)));
+  }
+  for (const [n, w, h] of [["menubar", 24, 18], ["menubar@2x", 48, 36], ["menubar@3x", 72, 54]]) {
+    write(`Assets.xcassets/MenuBarIcon.imageset/${n}.png`, encodePNG(w, menubar(w, h), h));
+  }
+
+  const phone = "PhoneAssets.xcassets";
+  write(`${phone}/AppIcon.appiconset/icon-1024.png`, encodePNG(1024, tile(1024, ...ORANGE, 0)));
+  write(`${phone}/AppIcon.appiconset/icon-1024-dark.png`, encodePNG(1024, tile(1024, [44, 48, 76], [18, 20, 38], 0)));
+  write(`${phone}/AppIcon.appiconset/icon-1024-tinted.png`, encodePNG(1024, tile(1024, [60, 60, 64], [30, 30, 34], 0)));
+  for (const [name, [top, bottom]] of Object.entries(VARIANTS)) {
+    write(`${phone}/AppIcon-${name}.appiconset/icon-1024.png`, encodePNG(1024, tile(1024, top, bottom, 0)));
+    write(`${phone}/IconPreview-${name}.imageset/preview.png`, encodePNG(180, tile(180, top, bottom, 0)));
+  }
+  write(`${phone}/IconPreview-Orange.imageset/preview.png`, encodePNG(180, tile(180, ...ORANGE, 0)));
+
+  // The same cloud on the sky tile, for the site.
+  writeFileSync(join(OUT, "..", "..", "..", "docs", "media", "icon.png"), encodePNG(256, tile(256, ...SKY, 0.2237)));
+  console.log("docs/media/icon.png");
+}
