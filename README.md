@@ -28,9 +28,9 @@ cd windows && npm install && npm run tauri dev
 
 Peika started as a fork of [Coucou](https://github.com/Louis-CFM/coucou) by Louis Raillé and has been renamed and redrawn since: the character is a new cloud, drawn in code on the same animation engine. The Windows and Linux code is under the MIT License; keep the copyright notices in [LICENSE](LICENSE).
 
-The repository still carries inherited folders (`NotchBuddy/` for macOS and iPhone, `android/`, `relay/`, `design/`, `docs/`) and some of the original's sounds and media, which are being removed or replaced. [LICENSE-ASSETS.md](LICENSE-ASSETS.md) describes what the original author reserves; none of it is Peika's.
+The repository still carries inherited folders (`NotchBuddy/` for macOS and iPhone, `relay/`, `design/`, `docs/`) and some of the original's sounds and media, which are being removed or replaced. [LICENSE-ASSETS.md](LICENSE-ASSETS.md) describes what the original author reserves; none of it is Peika's.
 
 ## License
 
-- **Code:** [MIT](LICENSE). The Android app and the phone link are © Rhytam Biswas, also MIT ([android/LICENSE](android/LICENSE)).
+- **Code:** [MIT](LICENSE). The phone link (`windows/src-tauri/src/phone_link/`) is © Rhytam Biswas, also MIT ([LICENSE](windows/src-tauri/src/phone_link/LICENSE)).
 - **Peika's own work** (the cloud character, the icon, the name) is by [kura120](https://github.com/kura120).
