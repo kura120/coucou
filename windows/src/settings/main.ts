@@ -20,7 +20,6 @@ import {
 import { h, clear } from "../views/dom";
 import { installContextMenu } from "../views/menu";
 import { agentsSection } from "./agents";
-import { phoneSection } from "./phone";
 import { colorDot } from "./colors";
 import { initMotion } from "./motion";
 import { renderDiff, statusDot } from "./parts";
@@ -1808,7 +1807,6 @@ async function render() {
   // One page per leaf of the tree; only the one picked is shown (drawShell).
   const pages: Record<string, HTMLElement> = {
     "general": page(generalSection()),
-    "phone": page(phoneSection(settings.phoneLink ?? false, toggle, settings)),
     "claude-code": page(claudeSection(status)),
     "agents": page(agentsSection(agents)),
     "plan-usage": page(planSection(status)),
@@ -1839,7 +1837,7 @@ function page(...children: HTMLElement[]): HTMLElement {
 
 /** The tree on the left: each group and the pages under it. */
 const TREE: [string, [string, string][]][] = [
-  [N_("General"), [["general", N_("General")], ["phone", N_("Phone link")]]],
+  [N_("General"), [["general", N_("General")]]],
   // Product names stay as they are in every language, like the Claude Code section's heading.
   ["Claude", [["claude-code", "Claude Code"], ["agents", N_("Agents")], ["plan-usage", N_("Plan usage")], ["claude-api", "Claude API"]]],
   [N_("AI models"), [["chat-providers", N_("Chat providers")], ["local-models", N_("Local models")]]],

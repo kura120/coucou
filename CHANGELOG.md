@@ -3,10 +3,10 @@
 ## Unreleased
 
 - The original app icons and menu bar icon are replaced by the cloud, and the Mochi character stills and outfit sheet are removed. The sounds and the other media stay until Peika has its own.
-- The Android app is removed from the repository (its code is © Rhytam Biswas, the original's side project, not Peika's), along with its workflows, its docs and its Pages section. The phone link in the desktop app stays for now, with its MIT notice in `windows/src-tauri/src/phone_link/LICENSE`.
+- The Android app is removed from the repository (its code is © Rhytam Biswas, the original's side project, not Peika's), along with its workflows, its docs and its Pages section. The phone link goes with it (see below).
 - **Coucou is now Peika** (Windows and Linux) — a new name and a new character: a small cloud instead of the blob. Click it and it plays peekaboo (covers its eyes, shrinks and trembles, then jumps back); three quick clicks make it dizzy. Its hands are puffs, the wardrobe is refitted to it, and the app icon is the cloud. The wake phrase is « OK Peika ».
 - Peika starts fresh: settings live in `%APPDATA%\Peika` (`~/.config/peika` on Linux), the hook is `peika-hook`, environment variables are `PEIKA_*`, and the Tauri identifier is `dev.kura120.peika`. Reinstall the agent hooks from Settings (and remove the old `coucou-hook` entries from `~/.claude/settings.json`), and enter your API keys again.
-- The phone-link wire constants (`coucou://pair`, the relay key label) are unchanged, so existing phone apps still pair.
+- The phone link is removed from the desktop app: the Rust module and its crates (rustls, mdns-sd, WebSocket, QR code), the Settings → Phone link page, the island's publishing, and their strings and tests. It only served the Android app.
 
 - **Coucou for Android**, by @Rhytam23 — your agents, Allow and Deny with your fingerprint or screen lock (even on a locked phone), answers to Claude's questions, chat through the computer's own keys, plan usage and services, an optional island over other apps, a widget, a quick-settings tile and an ongoing notification. It pairs with Coucou 0.4.0 or later on Windows or Linux. Android 11 or later, English only; the first signed APK is on its way. Build it today from [`android/`](android/README.md) (#501 by @Rhytam23)
 

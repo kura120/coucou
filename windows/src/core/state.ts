@@ -157,17 +157,6 @@ export interface Settings {
    * else English), or one of src/i18n's ten codes ("fr", "pt-BR", "zh-Hans"…).
    */
   language: string;
-  /**
-   * The phone link for Peika for Android is on. Rust owns it (only the switch in
-   * Settings → Android phone turns it on): whatever the page sends back is ignored.
-   */
-  phoneLink?: boolean;
-  /** The phone may chat through this computer's API keys. Rust owns it too. */
-  phoneChat?: boolean;
-  /** The phone may see session details (steps, last line, folder name, colour). Rust owns it too. */
-  phoneDetails?: boolean;
-  /** Which models the phone may use, "provider/model". Rust owns it too. */
-  phoneChatModels?: string[];
   /** Peika on the desktop. Rust owns it: whatever the page sends back is ignored. */
   /**
    * "OK Peika": off by default. `wake` listens for the wake phrase all the

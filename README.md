@@ -32,5 +32,5 @@ The repository still carries inherited folders (`NotchBuddy/` for macOS and iPho
 
 ## License
 
-- **Code:** [MIT](LICENSE). The phone link (`windows/src-tauri/src/phone_link/`) is © Rhytam Biswas, also MIT ([LICENSE](windows/src-tauri/src/phone_link/LICENSE)).
+- **Code:** [MIT](LICENSE).
 - **Peika's own work** (the cloud character, the icon, the name) is by [kura120](https://github.com/kura120).
