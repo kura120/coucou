@@ -14,7 +14,7 @@ import { activeModel, providerDef } from "../core/providers";
 import { SPOTIFY_ID, Spotify } from "../core/spotify";
 import { State, type AgentTask } from "../core/state";
 import { t } from "../i18n/i18n";
-import { OUTFIT_KEYS, parseOutfit } from "../mochi/wardrobe";
+import { OUTFIT_KEYS, parseOutfit } from "../peika/wardrobe";
 import { Recap } from "../recap/recap";
 import { weekRangeLabel } from "../recap/summary";
 import { ChatControls } from "../views/chat";
@@ -79,7 +79,7 @@ export const VIEW_SCREENS: Partial<Record<IslandViewName, () => Shown>> = {
     return { subjects, summary: parts.join("; ") };
   },
   wardrobe() {
-    const worn = parseOutfit(State.settings.mochiOutfit);
+    const worn = parseOutfit(State.settings.peikaOutfit);
     return { subjects: [{ kind: "outfit", id: worn, label: t(OUTFIT_KEYS[worn]) }] };
   },
   recap() {

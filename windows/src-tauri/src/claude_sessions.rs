@@ -2,12 +2,12 @@
 // ~/.claude/projects/<folder>/<session id>.jsonl, one JSON line per event.
 //
 // This is what lets the chat's list show the conversations held in a terminal
-// or in the Claude app next to Coucou's own (conversations.rs), and open one:
+// or in the Claude app next to Peika's own (conversations.rs), and open one:
 // its text comes from the transcript, and the next question resumes the
 // session itself. Reading is all that happens here — nothing of Claude Code's
 // is ever written, moved or deleted.
 //
-// The other way round needs no code: a conversation Coucou holds in a folder
+// The other way round needs no code: a conversation Peika holds in a folder
 // is a Claude Code session from its first turn (claude_code.rs), so it is in
 // this same store for `claude --resume` to find.
 
@@ -42,7 +42,7 @@ pub struct Found {
 }
 
 /// A session opened: the same, with its conversation as plain turns. An answer
-/// during which files were edited carries them as `"edits"`, the way Coucou's
+/// during which files were edited carries them as `"edits"`, the way Peika's
 /// own conversations keep them (claude_code::kept_edit).
 #[derive(Debug, PartialEq)]
 pub struct Transcript {
@@ -324,7 +324,7 @@ mod tests {
     const ID: &str = "0a1b2c3d-0000-4000-8000-000000000001";
 
     fn store(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("coucou-sessions-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("peika-sessions-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("C--work-app")).unwrap();
         dir

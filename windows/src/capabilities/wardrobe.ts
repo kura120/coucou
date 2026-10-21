@@ -1,4 +1,4 @@
-// Mochi's wardrobe: what he wears, picked as a click in the wardrobe picks it.
+// Peika's wardrobe: what he wears, picked as a click in the wardrobe picks it.
 
 import { t } from "../i18n/i18n";
 import { done, failed } from "../voice/result";
@@ -14,7 +14,7 @@ export function wardrobe(host: AppHost): Area {
     sources: [
       {
         kind: "outfit",
-        description: "What Mochi can wear, with the one that follows the seasons and none at all.",
+        description: "What Peika can wear, with the one that follows the seasons and none at all.",
         list: () => host.outfits().map(({ id, label }) => ({ id, label, ...(id === host.outfit() ? { hint: "worn now" } : {}) })),
       },
     ],
@@ -22,7 +22,7 @@ export function wardrobe(host: AppHost): Area {
       capability({
         name: "list_outfits",
         area: AREA,
-        description: "Reads what Mochi can wear and what he wears now.",
+        description: "Reads what Peika can wear and what he wears now.",
         args: {},
         tier: "read",
         async run() {
@@ -32,13 +32,13 @@ export function wardrobe(host: AppHost): Area {
       capability({
         name: "wear_outfit",
         area: AREA,
-        description: "Dresses Mochi in one of his outfits, or in none, or lets him follow the seasons. To look at the outfits instead, it is show_view with the wardrobe.",
+        description: "Dresses Peika in one of his outfits, or in none, or lets him follow the seasons. To look at the outfits instead, it is show_view with the wardrobe.",
         args: { outfit: { type: "entity", kind: "outfit", description: "The outfit to wear." } },
         tier: "reversible",
         inverse: (args) => (host.outfit() === str(args.outfit) ? null : { name: "wear_outfit", arguments: { outfit: host.outfit() } }),
         async run(args) {
           const id = str(args.outfit);
-          if (!host.outfits().some((o) => o.id === id)) return failed(t("Not found: {0}", { 0: cut(id, 40) }), "Mochi has no outfit by that name.");
+          if (!host.outfits().some((o) => o.id === id)) return failed(t("Not found: {0}", { 0: cut(id, 40) }), "Peika has no outfit by that name.");
           if (!host.wearOutfit(id)) return failed(t("That did not change"), "The outfit was not kept.");
           return done(label(id), host.outfit() === id);
         },

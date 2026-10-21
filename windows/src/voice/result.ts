@@ -1,4 +1,4 @@
-// What a capability gives back, and how Mochi asks. Every capability returns
+// What a capability gives back, and how Peika asks. Every capability returns
 // a ToolResult: what really happened, in a line for the card and in words a
 // model can reason on. Nothing here does anything; the executor runs the
 // capabilities (core/capabilities/registry.ts) and island/voice.ts shows the
@@ -101,7 +101,7 @@ export function forModel(result: ToolResult): Record<string, unknown> {
 /** An answer is a few sentences at most; it is shown whole, and said whole. */
 export const MAX_SPOKEN = 600;
 
-/** What Mochi says: the model's words when it has some, else the tool's line. */
+/** What Peika says: the model's words when it has some, else the tool's line. */
 export function spoken(words: string | null | undefined, fallback: string): string {
   const said = (words ?? "").replace(/\s+/g, " ").trim();
   if (!said) return fallback;

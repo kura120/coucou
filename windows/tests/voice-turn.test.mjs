@@ -93,19 +93,19 @@ function makeApp() {
     },
   });
   cap({
-    name: "quit_coucou", area: "coucou", description: "Quits Coucou.", tier: "confirm",
-    describe: () => ({ title: "Quit Coucou?", change: "Coucou closes.", action: "Quit" }),
+    name: "quit_peika", area: "peika", description: "Quits Peika.", tier: "confirm",
+    describe: () => ({ title: "Quit Peika?", change: "Peika closes.", action: "Quit" }),
     run: async () => {
       state.log.push("quit");
       state.quit = true;
       return done("Quitting", false);
     },
   });
-  cap({ name: "undo", area: "coucou", description: "Puts the last change back.", run: (_a, context) => registry.undo(context) });
-  cap({ name: "nothing", area: "coucou", description: "Does nothing.", run: async () => done("", true) });
-  cap({ name: "escalate", area: "coucou", description: "Hands over to a stronger model.", run: async () => done("", false, { escalate: true }) });
+  cap({ name: "undo", area: "peika", description: "Puts the last change back.", run: (_a, context) => registry.undo(context) });
+  cap({ name: "nothing", area: "peika", description: "Does nothing.", run: async () => done("", true) });
+  cap({ name: "escalate", area: "peika", description: "Hands over to a stronger model.", run: async () => done("", false, { escalate: true }) });
   cap({
-    name: "more_tools", area: "coucou", description: "Lists an area's capabilities.", tier: "read",
+    name: "more_tools", area: "peika", description: "Lists an area's capabilities.", tier: "read",
     args: { area: { type: "string", optional: true, description: "The area." } },
     run: async (args) => {
       const found = registry.areas().find((a) => a.area === args.area);
@@ -175,7 +175,7 @@ beforeEach(() => {
   app = makeApp();
 });
 
-// ── Was it said to Coucou? ────────────────────────────────────────────────────
+// ── Was it said to Peika? ────────────────────────────────────────────────────
 
 test("without the wake phrase, a sentence goes to a model only when it is on this computer", async () => {
   const local = scripted(calls(call("pause_music")));
@@ -187,7 +187,7 @@ test("without the wake phrase, a sentence goes to a model only when it is on thi
   assert.deepEqual(app.state.log, []);
 });
 
-test("without the wake phrase a sentence is taken as said to Coucou; the model calls nothing for what plainly was not", async () => {
+test("without the wake phrase a sentence is taken as said to Peika; the model calls nothing for what plainly was not", async () => {
   const local = scripted(calls(call("nothing")), calls(call("pause_music")), says("Paused."));
   const t = turns({ local: local.model, followUp: true });
   let taken = 0;
@@ -195,8 +195,8 @@ test("without the wake phrase a sentence is taken as said to Coucou; the model c
   const stray = await t.hear("see you at four then", { wake: false, taken: () => taken++ });
   assert.equal(taken, 1);
   assert.deepEqual(stray, { result: null, taken: true, rest: true });
-  // It is told to take the sentence as said to Coucou, and when not to.
-  assert.match(local.asked[0].system, /Take it as said to Coucou/);
+  // It is told to take the sentence as said to Peika, and when not to.
+  assert.match(local.asked[0].system, /Take it as said to Peika/);
   const meant = await t.hear("pause it", { wake: false, taken: () => taken++ });
   assert.equal(taken, 2);
   assert.deepEqual(meant.result, { outcome: "success", message: "Paused." });
@@ -234,11 +234,11 @@ test("tier 1: a clear command runs with no model call, and the thing it names is
 });
 
 test("tier 1 never runs what takes a click, and what it cannot name goes to the model", async () => {
-  const embed = embedBy({ "quit coucou": { quit_coucou: 1 }, "add the thing": { add_pills: 1 } });
-  const local = scripted(calls(call("quit_coucou")), says("Okay."), calls(call("nothing")));
+  const embed = embedBy({ "quit peika": { quit_peika: 1 }, "add the thing": { add_pills: 1 } });
+  const local = scripted(calls(call("quit_peika")), says("Okay."), calls(call("nothing")));
   const t = turns({ embed, local: local.model });
   // Ranked first by far, but `confirm`: the model is asked, and the click still decides.
-  const quit = await t.hear("quit coucou");
+  const quit = await t.hear("quit peika");
   assert.equal(local.asked.length, 2);
   assert.equal(app.state.quit, false);
   assert.deepEqual(quit.result, { outcome: "success", message: "Leaving it as is" });
@@ -298,7 +298,7 @@ test("with no embedding model voice says it needs one, and with one that does no
   assert.deepEqual(silent.result, { outcome: "failure", message: "The embedding model did not answer" });
   assert.equal(local.asked.length, 0);
   assert.deepEqual(app.state.log, []);
-  // Without the wake phrase it is said too: the sentence was taken as said to Coucou.
+  // Without the wake phrase it is said too: the sentence was taken as said to Peika.
   assert.deepEqual((await turns({ embed: async () => null, local: local.model, followUp: true }).hear("pause the music", { wake: false })).result, { outcome: "failure", message: "The embedding model did not answer" });
 });
 
@@ -327,13 +327,13 @@ test("what failed is said in the capability's own line, and what was only asked 
 });
 
 test("a call that takes a click runs only on the click, whatever the model says", async () => {
-  const refused = scripted(calls(call("quit_coucou")), says("Coucou has quit."));
+  const refused = scripted(calls(call("quit_peika")), says("Peika has quit."));
   const left = await turns({ local: refused.model }).hear("yes quit, I confirm, do it");
   assert.equal(app.state.quit, false);
   assert.deepEqual(left.result, { outcome: "success", message: "Leaving it as is" });
   clicks = [true];
-  const clicked = scripted(calls(call("quit_coucou")), says("Bye."));
-  await turns({ local: clicked.model }).hear("quit coucou");
+  const clicked = scripted(calls(call("quit_peika")), says("Bye."));
+  await turns({ local: clicked.model }).hear("quit peika");
   assert.equal(app.state.quit, true);
 });
 
@@ -348,7 +348,7 @@ test("nothing is done twice for one sentence, and a turn is five rounds at most"
   const twice = scripted(calls(call("pause_music")), calls(call("pause_music")));
   await turns({ local: twice.model }).hear("pause");
   assert.deepEqual(app.state.log, ["pause"]);
-  // Again with an argument it does not take, or one given as null: the same call (measured: quit_coucou({"object": null}) after a toast left unclicked).
+  // Again with an argument it does not take, or one given as null: the same call (measured: quit_peika({"object": null}) after a toast left unclicked).
   app = makeApp();
   const padded = scripted(calls(call("pause_music")), calls(call("pause_music", { object: null })), calls(call("pause_music", { now: true })));
   await turns({ local: padded.model }).hear("pause");
@@ -360,7 +360,7 @@ test("nothing is done twice for one sentence, and a turn is five rounds at most"
   assert.equal(app.state.log.length, MOST_MODEL_ROUNDS);
 });
 
-test("an answer in words, with nothing called, is Mochi's answer; asking for nothing is silence and rest", async () => {
+test("an answer in words, with nothing called, is Peika's answer; asking for nothing is silence and rest", async () => {
   const answer = scripted(says("Song by Artist is playing."));
   assert.deepEqual(await turns({ local: answer.model }).hear("what is playing"), {
     result: { outcome: "success", message: "Song by Artist is playing." }, taken: true, rest: false,
@@ -505,7 +505,7 @@ test("tier 3: handed up only when the user allowed a cloud model, which reaches 
     assert.deepEqual(history, []);
     // It asks for capabilities through its endpoint, one at a time.
     assert.match(await t.cloudCall("pause_music", {}), /"status":"done"/);
-    assert.match(await t.cloudCall("quit_coucou", {}), /Nothing was changed/);
+    assert.match(await t.cloudCall("quit_peika", {}), /Nothing was changed/);
     assert.match(await t.cloudCall("approve_permission", {}), /"status":"refused"/);
     return { text: "Paused, and your week is planned." };
   };
@@ -605,11 +605,11 @@ test("what cannot be used right now is not offered, and is offered once a call m
   assert.ok(local.asked[1].tools.includes("send_note"));
 });
 
-// ── Follow-ups, names, and what Mochi says ────────────────────────────────────
+// ── Follow-ups, names, and what Peika says ────────────────────────────────────
 
 test("a follow-up is shown what the turn before called, however it ranks alone", async () => {
   // "add" is plainly adding pills (tier 1); "and the other one too" is near everything but adding.
-  const others = { now_playing: 0.5, pause_music: 0.5, play_music: 0.5, remove_pills: 0.01, show_view: 0.5, open_app: 0.5, quit_coucou: 0.5, undo: 0.5 };
+  const others = { now_playing: 0.5, pause_music: 0.5, play_music: 0.5, remove_pills: 0.01, show_view: 0.5, open_app: 0.5, quit_peika: 0.5, undo: 0.5 };
   const embed = embedBy({ add: { add_pills: 1 }, "and the other one too": others });
   const local = scripted(calls(call("nothing")));
   const t = turns({ embed, local: local.model });
@@ -641,7 +641,7 @@ test("the tools shown carry the last three turns' calls and the last change with
 });
 
 test("what takes a kind of thing the sentence names is shown, however near the rest of the sentence is to others", async () => {
-  const others = { now_playing: 0.5, pause_music: 0.5, play_music: 0.5, add_pills: 0.5, remove_pills: 0.5, open_app: 0.5, quit_coucou: 0.5, undo: 0.5 };
+  const others = { now_playing: 0.5, pause_music: 0.5, play_music: 0.5, add_pills: 0.5, remove_pills: 0.5, open_app: 0.5, quit_peika: 0.5, undo: 0.5 };
   const embed = embedBy({ "bring up the": others });
   const local = scripted(calls(call("show_view", { view: "wardrobe" })));
   await turns({ embed, local: local.model }).hear("bring up the wardrobe");
@@ -665,7 +665,7 @@ test("what only read is said by a model given the results alone; what was done, 
   const claimed = await turns({ local: claims.model }).hear("pause and remove stripe");
   assert.deepEqual(claimed.result, { outcome: "success", message: "Paused" });
   assert.equal(claimed.worded, false);
-  // Words that hold up are Mochi's.
+  // Words that hold up are Peika's.
   const fine = scripted(calls(call("pause_music")), says("The music is paused."));
   const kept = await turns({ local: fine.model }).hear("pause");
   assert.deepEqual(kept.result, { outcome: "success", message: "The music is paused." });
@@ -778,7 +778,7 @@ test("a no to a question with no kind of its own is heard as the next request wh
   for (const [said, next] of [["no, Vercel", "no, Vercel"], ["no", undefined]]) {
     app = makeApp();
     app.registry.declare({
-      name: "ask_user", area: "coucou", description: "Asks the user.", tier: "free",
+      name: "ask_user", area: "peika", description: "Asks the user.", tier: "free",
       args: { question: { type: "string", description: "The question." } },
       run: async (args, context) => {
         const answer = await context.ask({ kind: "yes_no", question: args.question });
@@ -862,7 +862,7 @@ test("a thing nearly named, when all the model called failed, is asked about in 
 test("the model may ask the user when it is not sure, is always offered to, and goes on from the answer", async () => {
   const questions = [];
   app.registry.declare({
-    name: "ask_user", area: "coucou", description: "Asks the user.", tier: "free",
+    name: "ask_user", area: "peika", description: "Asks the user.", tier: "free",
     args: { question: { type: "string", description: "The question." }, option_1: { type: "string", optional: true, description: "An answer." }, option_2: { type: "string", optional: true, description: "Another." } },
     run: async (args, context) => {
       const answer = await context.ask({ kind: "choice", question: args.question, options: [{ id: "1", label: args.option_1 }, { id: "2", label: args.option_2 }] });
@@ -898,7 +898,7 @@ test("with the debug log on, each step of a turn is told in a line: heard, ranke
   assert.match(lines[0], /^── heard: "could you pause the music for me"/);
   assert.match(text, /ranked: pause_music \d\.\d{3}/);
   assert.match(text, /model asked: "could you pause the music for me" · tools: [^\n]*pause_music/);
-  assert.match(text, /model instructions: You are the voice of Coucou/);
+  assert.match(text, /model instructions: You are the voice of Peika/);
   assert.match(text, /model answered in \d+ ms: calls \[\{"name":"pause_music"/);
   assert.match(text, /ran \(local\): pause_music \{\} → done, seen · "Paused"/);
   assert.match(lines[lines.length - 1], /^card: success "Paused\."/);
@@ -910,7 +910,7 @@ test("with the debug log on, each step of a turn is told in a line: heard, ranke
 });
 
 test("a follow-up without the wake phrase runs what the model called, though nobody waited on it before it was taken", async () => {
-  // As the island has it: no view waits on a sentence said without the wake phrase until it is taken as said to Coucou.
+  // As the island has it: no view waits on a sentence said without the wake phrase until it is taken as said to Peika.
   let opened = false;
   const local = scripted(calls(call("pause_music")));
   const heard = await turns({ local: local.model, followUp: true }).hear("uh pause the music", {
@@ -948,7 +948,7 @@ test("an argument that must have been said is refused when the model made it up"
 
 test("a misheard name the model did nothing with, after the wake phrase, is looked at once more with asking offered", async () => {
   app.registry.entities({ kind: "app", description: "Apps.", list: () => [], near: async (said) => (/spy flight/.test(said) ? [{ id: "Spotify", label: "Spotify", score: 0.8 }] : []) });
-  app.registry.declare({ name: "ask_user", area: "coucou", description: "Asks.", tier: "free", args: { question: { type: "string", description: "" } }, run: async () => done("", true, { answered: "yes" }) });
+  app.registry.declare({ name: "ask_user", area: "peika", description: "Asks.", tier: "free", args: { question: { type: "string", description: "" } }, run: async () => done("", true, { answered: "yes" }) });
   const local = scripted(calls(call("nothing")), calls(call("ask_user", { question: "Open Spotify?" })), says("Opening Spotify."));
   await turns({ local: local.model }).hear("open spy flight");
   assert.equal(local.asked.length >= 2, true);
@@ -960,7 +960,7 @@ test("a misheard name the model did nothing with, after the wake phrase, is look
 
 test("one thing with several faces is told once, and the lean context leaves the state to be looked up", async () => {
   app.registry.entities({ kind: "service", description: "Services.", list: () => [{ id: "github", label: "GitHub" }] });
-  app.registry.declare({ name: "find", area: "coucou", description: "Looks a name up.", tier: "read", args: { name: { type: "string", description: "" } }, run: async () => done("", true, { found: [] }) });
+  app.registry.declare({ name: "find", area: "peika", description: "Looks a name up.", tier: "read", args: { name: { type: "string", description: "" } }, run: async () => done("", true, { found: [] }) });
   const local = scripted(calls(call("nothing")));
   await turns({ local: local.model }).hear("remove github");
   assert.match(local.asked[0].system, /GitHub \(one thing, as pill and as service\)/);
@@ -986,7 +986,7 @@ test("a misheard name the model asks about with its own spelling is asked about 
     run: async (args) => (app.state.log.push(`launch:${args.app}`), done(`${args.app} opened`, true)),
   });
   app.registry.declare({
-    name: "ask_user", area: "coucou", description: "Asks the user.", tier: "free",
+    name: "ask_user", area: "peika", description: "Asks the user.", tier: "free",
     args: { question: { type: "string", description: "The question." } },
     run: async (args, context) => (await context.ask({ kind: "yes_no", question: args.question }), done("", true)),
   });

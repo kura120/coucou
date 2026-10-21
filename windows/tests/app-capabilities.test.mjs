@@ -71,7 +71,7 @@ function fake(change = {}) {
     chat: { provider: "anthropic", model: "claude-opus-5", busy: false, draft: "", conversationId: "c1", messages: 2 },
     outfit: "auto",
     recap: { enabled: true, hideProjects: false },
-    mochi: { supported: true, onDesktop: false, asleep: false },
+    peika: { supported: true, onDesktop: false, asleep: false },
     paused: false,
     quit: false,
     // A copy: the cases below are data, and stay as they are written.
@@ -168,17 +168,17 @@ function fake(change = {}) {
     recapLines: async () => (s.refuse ? null : ["12 sessions", "Busiest day: Tuesday"]),
     setRecapOption: async (option, on) => act(`recap:${option}=${on}`, () => (s.recap[option] = on)),
 
-    mochi: () => ({ ...s.mochi }),
-    mochiFlyOut: async () => act("mochi:out", () => (s.mochi.onDesktop = true)),
-    mochiFlyHome: async () => act("mochi:home", () => (s.mochi.onDesktop = false)),
-    setMochiAsleep: (asleep) => act(`mochi:asleep=${asleep}`, () => (s.mochi.asleep = asleep)),
+    peika: () => ({ ...s.peika }),
+    peikaFlyOut: async () => act("peika:out", () => (s.peika.onDesktop = true)),
+    peikaFlyHome: async () => act("peika:home", () => (s.peika.onDesktop = false)),
+    setPeikaAsleep: (asleep) => act(`peika:asleep=${asleep}`, () => (s.peika.asleep = asleep)),
 
     services: () => [{ id: "integration_github", name: "GitHub", line: "main: passing" }, { id: "integration_vercel", name: "Vercel", line: "" }],
     serviceInfo: (id) => (id === "integration_github" ? ["main: passing", "2 open pull requests"] : []),
     refreshService: async (id) => act(`refresh:${id}`, () => {}),
 
     webSearch: async (query) => (act(`search:${query}`, () => {})
-      ? { results: [{ title: "Mochi", url: "https://example.org/mochi", snippet: "A rice cake." }] }
+      ? { results: [{ title: "Peika", url: "https://example.org/peika", snippet: "A rice cake." }] }
       : { error: "No search key is stored." }),
     openWebSearch: (query) => act(`browse:${query}`, () => {}),
 
@@ -300,22 +300,22 @@ const CASES = [
   { name: "set_recap_enabled", args: { on: false }, refused: "failed" },
   { name: "set_recap_hide_projects", args: { on: true }, refused: "failed" },
 
-  { name: "read_mochi" },
-  { name: "mochi_to_desktop", refused: "failed" },
-  { name: "mochi_come_home", with: { mochi: { supported: true, onDesktop: true, asleep: false } }, refused: "failed" },
-  { name: "set_mochi_asleep", with: { mochi: { supported: true, onDesktop: true, asleep: false } }, args: { asleep: true }, refused: "failed" },
+  { name: "read_peika" },
+  { name: "peika_to_desktop", refused: "failed" },
+  { name: "peika_come_home", with: { peika: { supported: true, onDesktop: true, asleep: false } }, refused: "failed" },
+  { name: "set_peika_asleep", with: { peika: { supported: true, onDesktop: true, asleep: false } }, args: { asleep: true }, refused: "failed" },
 
   { name: "list_services" },
   { name: "service_report", args: { service: "integration_github" } },
   { name: "refresh_service", args: { service: "integration_github" }, refused: "failed", unverified: true },
 
-  { name: "web_search", args: { query: "what is mochi" }, refused: "failed" },
-  { name: "open_web_search", args: { query: "what is mochi" }, refused: "failed", unverified: true },
+  { name: "web_search", args: { query: "what is peika" }, refused: "failed" },
+  { name: "open_web_search", args: { query: "what is peika" }, refused: "failed", unverified: true },
 
   { name: "stop_listening", refused: "failed" },
-  { name: "pause_coucou", refused: "failed" },
-  { name: "resume_coucou", with: { paused: true }, refused: "failed" },
-  { name: "quit_coucou", unverified: true },
+  { name: "pause_peika", refused: "failed" },
+  { name: "resume_peika", with: { paused: true }, refused: "failed" },
+  { name: "quit_peika", unverified: true },
   { name: "notify", args: { text: "Stand up" }, unverified: true },
   { name: "undo" },
   { name: "nothing" },
@@ -369,16 +369,16 @@ test("the tiers: a click for what cannot be put back, an inverse for what can", 
   const { registry: reg } = app();
   const tiers = Object.fromEntries(reg.all().filter((c) => typeof c.tier === "string").map((c) => [c.name, c.tier]));
   const of = (tier) => Object.keys(tiers).filter((name) => tiers[name] === tier).sort();
-  assert.deepEqual(of("confirm"), ["answer_agent_question", "decline_permission", "quit_coucou", "send_chat_message"]);
+  assert.deepEqual(of("confirm"), ["answer_agent_question", "decline_permission", "quit_peika", "send_chat_message"]);
   assert.deepEqual(of("reversible"), [
-    "add_pills", "cancel_timer", "keep_only_pills", "mochi_come_home", "mochi_to_desktop", "new_chat", "pause_coucou", "pause_music",
-    "pick_chat_model", "play_music", "remove_pills", "replace_pill", "resume_coucou", "set_main_pill", "set_mochi_asleep", "set_music_volume",
-    "set_recap_enabled", "set_recap_hide_projects", "set_repeat", "set_shuffle", "set_timer", "wear_outfit",
+    "add_pills", "cancel_timer", "keep_only_pills", "new_chat", "pause_music", "pause_peika", "peika_come_home", "peika_to_desktop",
+    "pick_chat_model", "play_music", "remove_pills", "replace_pill", "resume_peika", "set_main_pill", "set_music_volume",
+    "set_peika_asleep", "set_recap_enabled", "set_recap_hide_projects", "set_repeat", "set_shuffle", "set_timer", "wear_outfit",
   ]);
   assert.deepEqual(of("read"), [
-    "current_view", "find", "get_setting", "list_conversations", "list_outfits", "list_pills", "list_services", "list_sessions", "more_tools",
-    "now_playing", "read_agent_question", "read_chat", "read_mochi", "read_permission_request", "read_recap", "read_session_output",
-    "read_timer", "service_report", "web_search",
+    "current_view", "find", "get_setting", "list_conversations", "list_outfits", "list_pills", "list_services", "list_sessions",
+    "more_tools", "now_playing", "read_agent_question", "read_chat", "read_peika", "read_permission_request", "read_recap",
+    "read_session_output", "read_timer", "service_report", "web_search",
   ]);
   // The one whose tier depends on its arguments: a setting's own.
   assert.deepEqual(reg.all().filter((c) => typeof c.tier === "function").map((c) => c.name), ["set_setting"]);
@@ -476,7 +476,7 @@ test("nothing to put back: no inverse", () => {
   assert.equal(get("set_main_pill").inverse({ pill: "integration_claude" }), null);
   assert.equal(get("cancel_timer").inverse({}), null);
   assert.equal(get("wear_outfit").inverse({ outfit: "auto" }), null);
-  assert.equal(get("resume_coucou").inverse({}), null);
+  assert.equal(get("resume_peika").inverse({}), null);
   // A chat that is not saved cannot be opened again.
   assert.equal(app({ chat: { provider: "anthropic", model: "m", busy: false, draft: "", conversationId: null, messages: 3 } }).get("new_chat").inverse({}), null);
 });
@@ -701,14 +701,14 @@ test("only an http(s) address is opened", async () => {
   assert.deepEqual(log, []);
 });
 
-test("Mochi: where the desktop cannot have him, and asleep only out there", async () => {
-  const stuck = app({ mochi: { supported: false, onDesktop: false, asleep: false } });
-  for (const name of ["mochi_to_desktop", "mochi_come_home", "set_mochi_asleep"]) {
+test("Peika: where the desktop cannot have him, and asleep only out there", async () => {
+  const stuck = app({ peika: { supported: false, onDesktop: false, asleep: false } });
+  for (const name of ["peika_to_desktop", "peika_come_home", "set_peika_asleep"]) {
     assert.equal(typeof stuck.get(name).available(), "string", name);
     assert.equal((await stuck.get(name).run({ asleep: true }, context())).status, "failed", name);
   }
   const home = app();
-  assert.equal((await home.get("set_mochi_asleep").run({ asleep: true }, context())).status, "failed");
+  assert.equal((await home.get("set_peika_asleep").run({ asleep: true }, context())).status, "failed");
   assert.deepEqual([...stuck.log, ...home.log], []);
 });
 
@@ -716,7 +716,7 @@ test("more_tools lists the areas, then one area's capabilities with what each do
   const { get, registry: reg } = app();
   const areas = (await get("more_tools").run({}, context())).data.areas;
   assert.deepEqual(areas.map((a) => a.area), [
-    "music", "pills", "sessions", "permissions", "timer", "apps", "views", "settings", "chat", "wardrobe", "recap", "mochi", "services", "web", "coucou",
+    "music", "pills", "sessions", "permissions", "timer", "apps", "views", "settings", "chat", "wardrobe", "recap", "peika", "services", "web", "app",
   ]);
   assert.deepEqual(get("more_tools").args.area.enum, areas.map((a) => a.area));
   assert.equal(areas.flatMap((a) => a.capabilities).length, reg.all().length);
@@ -748,9 +748,9 @@ function real(made) {
 }
 
 const turned = (name, s) => (name === "stop_listening" ? !s.settings.voice.enabled : s.paused);
-const ASKED = { stop_listening: ["Turn voice off?", "Turn off", "Keep listening"], pause_coucou: ["Pause Coucou?", "Pause", "Keep going"] };
+const ASKED = { stop_listening: ["Turn voice off?", "Turn off", "Keep listening"], pause_peika: ["Pause Peika?", "Pause", "Keep going"] };
 
-for (const name of ["stop_listening", "pause_coucou"]) {
+for (const name of ["stop_listening", "pause_peika"]) {
   test(`${name}: asked first, and done on a yes`, async () => {
     const made = app();
     const asked = [];
@@ -781,19 +781,19 @@ for (const name of ["stop_listening", "pause_coucou"]) {
   });
 }
 
-test("a no to pause_coucou remembers nothing: the last change is what it was", async () => {
+test("a no to pause_peika remembers nothing: the last change is what it was", async () => {
   const made = app();
   const reg = real(made);
   await reg.execute({ name: "add_pills", arguments: { pills: ["integration_stripe"] } }, context());
   const before = reg.lastChange();
   assert.equal(before.call.name, "add_pills");
-  await reg.execute({ name: "pause_coucou", arguments: {} }, context({ kind: "yes_no", yes: false }));
+  await reg.execute({ name: "pause_peika", arguments: {} }, context({ kind: "yes_no", yes: false }));
   assert.equal(made.s.paused, false);
   assert.deepEqual(reg.lastChange(), before);
   // A yes does it, and that is what is put back.
-  await reg.execute({ name: "pause_coucou", arguments: {} }, context({ kind: "yes_no", yes: true }));
+  await reg.execute({ name: "pause_peika", arguments: {} }, context({ kind: "yes_no", yes: true }));
   assert.equal(made.s.paused, true);
-  assert.equal(reg.lastChange().call.name, "pause_coucou");
+  assert.equal(reg.lastChange().call.name, "pause_peika");
 });
 
 // ── What stays private ────────────────────────────────────────────────────────

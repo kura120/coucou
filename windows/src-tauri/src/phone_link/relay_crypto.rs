@@ -15,6 +15,8 @@
 
 use ring::{aead, hkdf, hmac};
 
+/// Wire constant shared with the phone apps and the test vectors: kept as it was
+/// at the rebrand, changed only together with them.
 pub const LABEL: &str = "coucou-relay/v1";
 pub const VER: u8 = 1;
 pub const T_INIT: u8 = 1;
@@ -144,7 +146,7 @@ pub fn k_join(k: &PairingKey) -> Secret32 {
     derive32(k, &[], "join")
 }
 
-/// The join proof for the `coucou.join.<…>` sub-protocol.
+/// The join proof for the `peika.join.<…>` sub-protocol.
 pub fn join_proof(k: &PairingKey) -> String {
     base64url_encode(k_join(k).as_bytes())
 }

@@ -30,7 +30,7 @@ function ports(over = {}) {
     answerWaiting: () => true,
     prefillChat: () => true,
     wearOutfit: (selection) => {
-      State.settings.mochiOutfit = selection;
+      State.settings.peikaOutfit = selection;
     },
     settingsChanged: () => {},
     setPaused: (on) => {
@@ -150,7 +150,7 @@ test("the registry of the app: every capability declared, and the screen is the 
 });
 
 test("the guard is a click on a toast: with nobody to click, it is no", async () => {
-  assert.equal(await guardHost.confirm({ title: "Quit Coucou?", change: "Coucou closes.", action: "Quit" }), false);
+  assert.equal(await guardHost.confirm({ title: "Quit Peika?", change: "Peika closes.", action: "Quit" }), false);
   assert.equal(sent("toast_ask").length, 1);
 });
 

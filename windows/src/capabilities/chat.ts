@@ -51,7 +51,7 @@ export function chat(host: AppHost): Area {
         async run(args) {
           const message = str(args.message).slice(0, 1000);
           if (!message) return failed(t("That cannot be shown right now"), "There is no message to prepare.");
-          if (!host.prepareChat(message)) return failed(t("That cannot be shown right now"), "The chat cannot open now: a card is waiting, or Coucou is paused.");
+          if (!host.prepareChat(message)) return failed(t("That cannot be shown right now"), "The chat cannot open now: a card is waiting, or Peika is paused.");
           return done(t("It is in the chat: read it and send it yourself"), host.chat().draft === message);
         },
       }),

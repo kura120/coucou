@@ -50,7 +50,7 @@ impl Archive {
 }
 
 /// A file of Parakeet 0.6b v3, which is published file by file (the k2-fsa
-/// project's own copy on Hugging Face), at the revision upstream Coucou pins too.
+/// project's own copy on Hugging Face), at the revision upstream Peika pins too.
 macro_rules! parakeet_v3 {
     ($file:literal) => {
         concat!("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/", $file)
@@ -143,7 +143,7 @@ pub const HEARING_MODELS: &[Hearing] = &[
     },
     // The same model trained on 25 European languages, which it tells apart
     // by itself. Not measured here yet. Published as separate files, pinned
-    // to one revision with each file's SHA-256 (as upstream Coucou's speech/mod.rs).
+    // to one revision with each file's SHA-256 (as upstream Peika's speech/mod.rs).
     Hearing {
         id: "parakeet-0.6b-v3",
         name: "Parakeet 0.6b v3 (25 languages)",
@@ -578,15 +578,15 @@ mod tests {
     }
 
     /// The real thing: downloads nothing, but checks and unpacks archives
-    /// already on disk the way `install` does. `COUCOU_VOICE_ARCHIVES` is the
+    /// already on disk the way `install` does. `PEIKA_VOICE_ARCHIVES` is the
     /// folder holding `runtime-lib.tar.bz2`, `moontiny.tar.bz2`,
     /// `supertonic.tar.bz2` and `silero_vad.onnx`.
     #[test]
     #[cfg(windows)]
     #[ignore = "needs the downloaded archives"]
     fn the_archives_match_their_checksums_and_hold_what_is_kept() {
-        let folder = PathBuf::from(std::env::var("COUCOU_VOICE_ARCHIVES").expect("COUCOU_VOICE_ARCHIVES"));
-        let work = std::env::temp_dir().join(format!("coucou-voice-test-{}", std::process::id()));
+        let folder = PathBuf::from(std::env::var("PEIKA_VOICE_ARCHIVES").expect("PEIKA_VOICE_ARCHIVES"));
+        let work = std::env::temp_dir().join(format!("peika-voice-test-{}", std::process::id()));
         for (archive, file) in
             [(&RUNTIME, "runtime-lib.tar.bz2"), (&HEARING_MODELS[0].files[0], "moontiny.tar.bz2"), (&SPEAKING, "supertonic.tar.bz2")]
         {

@@ -1,4 +1,4 @@
-// Coucou for Windows — app wiring and the commands the island calls.
+// Peika for Windows — app wiring and the commands the island calls.
 
 mod agent_hooks;
 mod agents;
@@ -98,9 +98,9 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         let screen_changed = current.screen != settings.screen;
         let autostart_changed = current.autostart != settings.autostart;
         let shortcuts_changed = current.shortcuts != settings.shortcuts;
-        // Where Mochi sits on the desktop is desktop.rs's to say, not a webview's.
+        // Where Peika sits on the desktop is desktop.rs's to say, not a webview's.
         let mut settings = settings.clone();
-        settings.desktop_mochi = current.desktop_mochi.clone();
+        settings.desktop_peika = current.desktop_peika.clone();
         // Same for the phone link: only its own commands turn it on or off.
         settings.phone_link = current.phone_link;
         settings.phone_chat = current.phone_chat;
@@ -123,7 +123,7 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         let manager = app.autolaunch();
         let result = if settings.autostart { manager.enable() } else { manager.disable() };
         if let Err(err) = result {
-            eprintln!("[coucou] autostart: {err}");
+            eprintln!("[peika] autostart: {err}");
         }
     }
     if screen_changed {
@@ -157,7 +157,7 @@ fn set_system_languages(app: AppHandle, languages: Vec<String>) {
 fn language_changed(app: &AppHandle) {
     tray::retitle(app);
     if let Some(window) = app.get_webview_window("settings") {
-        let _ = window.set_title(&i18n::t("Settings — Coucou"));
+        let _ = window.set_title(&i18n::t("Settings — Peika"));
     }
 }
 
@@ -366,7 +366,7 @@ fn hooks_status() -> HookStatus {
     hooks::status()
 }
 
-/// Pill ID → whether that agent's hooks reach Coucou. Read-only.
+/// Pill ID → whether that agent's hooks reach Peika. Read-only.
 #[tauri::command]
 fn agent_hooks_status() -> std::collections::HashMap<String, bool> {
     agent_hooks::status()
@@ -566,7 +566,7 @@ async fn chat_models(shared: State<'_, Shared>, provider: String) -> Result<Vec<
     chat::models(&settings, &provider).await
 }
 
-/// Mochi says this out loud, when speaking is on in Settings → Voice.
+/// Peika says this out loud, when speaking is on in Settings → Voice.
 #[tauri::command]
 fn voice_say(app: AppHandle, shared: State<Shared>, text: String) {
     let pref = shared.settings.lock().unwrap().voice.clone();
@@ -748,7 +748,7 @@ fn create_settings_window(app: &AppHandle) {
     let url = settings_page_url(app);
     match WebviewWindowBuilder::new(app, "settings", url)
         .additional_browser_args(BROWSER_ARGS)
-        .title(i18n::t("Settings — Coucou"))
+        .title(i18n::t("Settings — Peika"))
         // Frameless: the page draws its own title bar (src/settings/main.ts).
         .decorations(false)
         .inner_size(760.0, 560.0)
@@ -858,7 +858,7 @@ pub fn run() {
 
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            // `coucou --shortcut <action>`: what a desktop's own keyboard
+            // `peika --shortcut <action>`: what a desktop's own keyboard
             // settings run where we can't listen for keys ourselves (Wayland).
             if let Some(which) = toast::sample_from_args(&argv) {
                 toast::show_sample(app, &which);
@@ -978,16 +978,16 @@ pub fn run() {
             recap::recap_clear,
             recap::recap_save_png,
             recap::recap_reveal_saved,
-            desktop::desktop_mochi_info,
-            desktop::desktop_mochi_pick_up,
-            desktop::desktop_mochi_carry,
-            desktop::desktop_mochi_carry_end,
-            desktop::desktop_mochi_drag_begin,
-            desktop::desktop_mochi_drag_move,
-            desktop::desktop_mochi_drag_end,
-            desktop::desktop_mochi_fly_out,
-            desktop::desktop_mochi_fly_home,
-            desktop::desktop_mochi_set_asleep,
+            desktop::desktop_peika_info,
+            desktop::desktop_peika_pick_up,
+            desktop::desktop_peika_carry,
+            desktop::desktop_peika_carry_end,
+            desktop::desktop_peika_drag_begin,
+            desktop::desktop_peika_drag_move,
+            desktop::desktop_peika_drag_end,
+            desktop::desktop_peika_fly_out,
+            desktop::desktop_peika_fly_home,
+            desktop::desktop_peika_set_asleep,
             sounds::custom_sounds,
             sounds::custom_sound,
             sounds::reveal_sounds_folder,
@@ -1036,7 +1036,7 @@ pub fn run() {
             tray::build(&handle)?;
             // Before the island: see create_settings_window.
             create_settings_window(&handle);
-            // Same rule for Mochi's desktop window.
+            // Same rule for Peika's desktop window.
             desktop::setup(&handle);
             // And for the toasts' window.
             toast::setup(&handle);
@@ -1064,17 +1064,17 @@ pub fn run() {
             gate.set_active(true);
             island::spawn_cursor_poll(handle.clone(), gate.clone());
 
-            log::line(format!("--- Coucou {} started ---", env!("CARGO_PKG_VERSION")));
+            log::line(format!("--- Peika {} started ---", env!("CARGO_PKG_VERSION")));
             hooks::ensure_hook_exe(&handle);
             pipe::start(handle.clone());
             phone_link::start_if_enabled(&handle);
             integrations::start(handle.clone());
             spotify::sync(&handle, &loaded.active_integrations);
             voice::sync(&handle, &loaded);
-            // A debug build started with COUCOU_DEVTOOLS=1 opens the island's developer console: its own
+            // A debug build started with PEIKA_DEVTOOLS=1 opens the island's developer console: its own
             // right-click menu stands in for the browser's, so there is no other way in. Never in a release.
             #[cfg(debug_assertions)]
-            if std::env::var_os("COUCOU_DEVTOOLS").is_some() {
+            if std::env::var_os("PEIKA_DEVTOOLS").is_some() {
                 if let Some(window) = island::window(&handle) {
                     window.open_devtools();
                 }
@@ -1087,7 +1087,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building Coucou")
+        .expect("error while building Peika")
         .run(|app, event| {
             // Withdraw the phone link's announcement on the local network before the process ends.
             if let tauri::RunEvent::Exit = event {
@@ -1102,7 +1102,7 @@ mod tests {
 
     #[test]
     fn only_an_existing_file_by_its_full_path_reaches_the_editor() {
-        let dir = std::env::temp_dir().join(format!("coucou-diff-file-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("peika-diff-file-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("edited.ts");
         std::fs::write(&file, "x").unwrap();

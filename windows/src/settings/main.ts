@@ -43,7 +43,7 @@ async function save() {
   await Bridge.saveSettings(settings);
 }
 
-/** A colour was picked for a pill's Mochi (see ./colors.ts): the island follows. */
+/** A colour was picked for a pill's Peika (see ./colors.ts): the island follows. */
 function pickColor(next: Record<string, string>) {
   settings.pillColors = next;
   void save();
@@ -79,7 +79,7 @@ const HOOKS_CHANGE: Change = {
   preview: Bridge.hooksPreview,
   apply: Bridge.hooksApply,
   get installText() { return t("This is exactly what will change in your settings.json. Your own hooks are left untouched."); },
-  get removeText() { return t("This removes Coucou's entries only. Your own hooks are left untouched."); },
+  get removeText() { return t("This removes Peika's entries only. Your own hooks are left untouched."); },
   get installButton() { return t("Back up and write"); },
   get removeButton() { return t("Back up and remove"); },
   done: (backup) => backup
@@ -90,7 +90,7 @@ const HOOKS_CHANGE: Change = {
 const STATUS_LINE_CHANGE: Change = {
   preview: Bridge.statusLinePreview,
   apply: Bridge.statusLineApply,
-  get installText() { return t("This is exactly what will change: only the status line. If you already have one it keeps working, Coucou's relay runs it for you."); },
+  get installText() { return t("This is exactly what will change: only the status line. If you already have one it keeps working, Peika's relay runs it for you."); },
   get removeText() { return t("This puts your previous status line back, or removes the entry if there was none."); },
   get installButton() { return t("Back up and write"); },
   get removeButton() { return t("Back up and remove"); },
@@ -186,7 +186,7 @@ function claudeSection(status: HookStatus): HTMLElement {
       h("div", {
         class: "hint",
         text: status.installed
-          ? t("Coucou is hooked into your Claude Code sessions. Tool calls, questions and permission requests show up in the island, and you can answer them there.")
+          ? t("Peika is hooked into your Claude Code sessions. Tool calls, questions and permission requests show up in the island, and you can answer them there.")
           : t("Install the hooks to see your Claude Code sessions in the island and approve permissions without leaving what you are doing."),
       }),
       h("div", { class: "row" },
@@ -203,7 +203,7 @@ function claudeSection(status: HookStatus): HTMLElement {
     if (!status.hookReady) {
       body.append(h("div", {
         class: "notice warn",
-        text: t("coucou-hook.exe is not in place yet. Restart Coucou; if it still fails, build it with `cargo build -p coucou-hook`."),
+        text: t("peika-hook.exe is not in place yet. Restart Peika; if it still fails, build it with `cargo build -p peika-hook`."),
       }));
     }
 
@@ -243,10 +243,10 @@ function claudeSection(status: HookStatus): HTMLElement {
  * that has been confirmed. A status line the user had keeps working.
  */
 const PLAN_SETTINGS_TEXT = {
-  get claude() { return t("Shows your Claude plan usage (5-hour and weekly limits) in the island's header. Coucou adds a status line relay in ~/.claude/settings.json. If you already have a status line, it keeps working as before. Pro and Max plans only."); },
+  get claude() { return t("Shows your Claude plan usage (5-hour and weekly limits) in the island's header. Peika adds a status line relay in ~/.claude/settings.json. If you already have a status line, it keeps working as before. Pro and Max plans only."); },
   get claudeCli() { return t("The numbers come from the Claude Code command-line tool. The Claude desktop app does not report them, so the gauge stays empty if you only use the desktop app."); },
   get showClaude() { return t("Show in notch"); },
-  get codex() { return t("Shows your Codex plan usage (weekly limit and free resets left) in the island's header. Coucou asks the Codex CLI (codex app-server) when the pill shows; nothing is installed. Codex must be signed in with ChatGPT."); },
+  get codex() { return t("Shows your Codex plan usage (weekly limit and free resets left) in the island's header. Peika asks the Codex CLI (codex app-server) when the pill shows; nothing is installed. Codex must be signed in with ChatGPT."); },
   get showCodex() { return t("Show Codex plan in the notch"); },
 };
 
@@ -308,7 +308,7 @@ function planSection(status: HookStatus): HTMLElement {
               onclick: () => void reviewChange(body, STATUS_LINE_CHANGE, true, redraw, () => void rebuild()),
             }),
       ),
-      // Codex: nothing to install, Coucou asks the Codex CLI when the pill shows.
+      // Codex: nothing to install, Peika asks the Codex CLI when the pill shows.
       h("div", { class: "hint", text: PLAN_SETTINGS_TEXT.codex }),
       h("div", { class: "row" },
         h("label", { text: PLAN_SETTINGS_TEXT.showCodex }),
@@ -482,7 +482,7 @@ function activePillsSection(connected: Record<string, boolean>): HTMLElement {
     "section",
     {},
     h("h2", {}, h("span", { text: t("Active pills") })),
-    h("div", { class: "hint", text: t("Choose the tools you use. Coucou only shows what you declare here.") }),
+    h("div", { class: "hint", text: t("Choose the tools you use. Peika only shows what you declare here.") }),
     slots,
     h("div", { class: "row" }, h("label", { text: t("Main tool") }), main),
     groups,
@@ -804,7 +804,7 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
 
   function updateNote() {
     const used = slotsUsed(settings.activeIntegrations);
-    note.textContent = t("Pick up to {max} pills to show next to Mochi — {used}/{max} in use. Keys are stored in the {store}, never on disk.", { max: MAX_ACTIVE, used, store: KEY_STORE });
+    note.textContent = t("Pick up to {max} pills to show next to Peika — {used}/{max} in use. Keys are stored in the {store}, never on disk.", { max: MAX_ACTIVE, used, store: KEY_STORE });
   }
   declaredViews.push(updateNote);
 
@@ -955,7 +955,7 @@ function generalSection(): HTMLElement {
       volume,
     ),
     h("div", { class: "row" }, soundsFolder, reloadSounds, customCount),
-    h("div", { class: "hint", text: t("Drop a file named like one of Mochi's sounds (finish.wav, approval.mp3, greet.m4a…) in the sounds folder to replace it, then Reload.") }),
+    h("div", { class: "hint", text: t("Drop a file named like one of Peika's sounds (finish.wav, approval.mp3, greet.m4a…) in the sounds folder to replace it, then Reload.") }),
     h("div", { class: "row" },
       h("label", { text: t("Open on hover") }),
       toggle(settings.openOnHover, (v) => { settings.openOnHover = v; void save(); }),
@@ -981,7 +981,7 @@ function generalSection(): HTMLElement {
 
 /**
  * Settings → General → Language, as on the Mac: "System" follows the
- * system's language when Coucou has it (else English), or one of the ten.
+ * system's language when Peika has it (else English), or one of the ten.
  * Both windows and the tray switch in place, without a restart.
  */
 function languageRow(): HTMLElement {
@@ -1118,12 +1118,12 @@ function voiceSection(): HTMLElement {
   };
 
   // The embedding model capabilities are ranked with: one the same server
-  // has. Coucou installs none; without one, voice is slower to choose.
+  // has. Peika installs none; without one, voice is slower to choose.
   const embed = h("select", {}) as HTMLSelectElement;
   const embedRow = h("div", { class: "row" }, h("label", { text: t("Embedding model") }), embed);
-  const embedAbout = h("div", { class: "hint", text: t("Finds which of Coucou's commands a sentence is closest to, before any model is asked. It runs on the server chosen above.") });
-  const embedNone = h("div", { class: "hint", text: t("This server has no embedding model. You install one on your server yourself: Coucou downloads nothing here.") });
-  const embedWithout = h("div", { class: "hint", text: t("Voice needs an embedding model: it is what finds which of Coucou's commands a sentence is about. mxbai-embed-large chose best in our measurements.") });
+  const embedAbout = h("div", { class: "hint", text: t("Finds which of Peika's commands a sentence is closest to, before any model is asked. It runs on the server chosen above.") });
+  const embedNone = h("div", { class: "hint", text: t("This server has no embedding model. You install one on your server yourself: Peika downloads nothing here.") });
+  const embedWithout = h("div", { class: "hint", text: t("Voice needs an embedding model: it is what finds which of Peika's commands a sentence is about. mxbai-embed-large chose best in our measurements.") });
   const fillEmbed = async () => {
     const chosen = server.value !== "";
     for (const el of [embedRow, embedAbout, embedNone, embedWithout]) el.style.display = "none";
@@ -1267,7 +1267,7 @@ function voiceSection(): HTMLElement {
   speaker.value = settings.voice.speaker === "male" ? "male" : "female";
   speaker.addEventListener("change", () => change({ speaker: speaker.value }));
   const spoken = enginePart(
-    "speaking", t("Mochi answers out loud"),
+    "speaking", t("Peika answers out loud"),
     () => settings.voice.speak,
     (on) => change({ speak: on }),
     speaker,
@@ -1284,7 +1284,7 @@ function voiceSection(): HTMLElement {
 
   // The cloud tier: off unless asked for, and the line says what it sends.
   const cloudText = () =>
-    t("When the local model cannot handle a request, the sentence and a description of Coucou's state are sent to the provider chosen for chat ({provider}). It counts against your plan or key with that provider. Off: nothing is sent to it.", {
+    t("When the local model cannot handle a request, the sentence and a description of Peika's state are sent to the provider chosen for chat ({provider}). It counts against your plan or key with that provider. Off: nothing is sent to it.", {
       provider: t(providerDef(settings.chatProvider).name),
     });
   const cloudHint = h("div", { class: "hint", text: cloudText() });
@@ -1297,9 +1297,9 @@ function voiceSection(): HTMLElement {
     ["anthropic", "Anthropic"],
   ];
   const WEB_HINTS: Record<WebSearchChoice, string> = {
-    browser: t("Coucou sends nothing: your browser opens on the search."),
-    brave: t("What you ask is sent to Brave Search with your own key, and the results are read on this computer. Coucou keeps nothing."),
-    anthropic: t("What you ask and the last few turns are sent to Anthropic, which searches the web. It counts against your Claude plan or key. Coucou keeps nothing."),
+    browser: t("Peika sends nothing: your browser opens on the search."),
+    brave: t("What you ask is sent to Brave Search with your own key, and the results are read on this computer. Peika keeps nothing."),
+    anthropic: t("What you ask and the last few turns are sent to Anthropic, which searches the web. It counts against your Claude plan or key. Peika keeps nothing."),
   };
   const webSearch = h("select", {}) as HTMLSelectElement;
   for (const [id, label] of WEB_CHOICES) webSearch.append(h("option", { value: id, text: label }));
@@ -1395,21 +1395,21 @@ function voiceSection(): HTMLElement {
     ),
     problem,
     needs,
-    h("div", { class: "hint", text: t("Say « OK Coucou », then your command. Coucou listens on this computer only: nothing is recorded and no audio leaves it. English only for now.") }),
+    h("div", { class: "hint", text: t("Say « OK Peika », then your command. Peika listens on this computer only: nothing is recorded and no audio leaves it. English only for now.") }),
     h("div", { class: "row" },
-      h("label", { text: t("Listen for « OK Coucou »") }),
+      h("label", { text: t("Listen for « OK Peika »") }),
       toggle(settings.voice.wake, (v) => change({ wake: v })),
     ),
-    h("div", { class: "hint", text: t("Off: the microphone opens only for the “Talk to Coucou” shortcut. While it listens, Windows shows a microphone in the taskbar.") }),
+    h("div", { class: "hint", text: t("Off: the microphone opens only for the “Talk to Peika” shortcut. While it listens, Windows shows a microphone in the taskbar.") }),
     free,
     h("div", { class: "hint", text: t("Lets a command be said in your own words, not only the sentences Windows was given. The engine and its English model (sherpa-onnx and Moonshine) are downloaded from GitHub when you ask, checked, and run on this computer. The wake phrase stays Windows' own.") }),
     h("div", { class: "row" }, h("label", { text: t("Speech model") }), hearing),
     hearingHint,
     h("div", { class: "hint", text: t("A larger model hears names and accents better, and takes a little longer to write a sentence down. Each is downloaded from GitHub when you ask for it. Parakeet is NVIDIA's (CC BY 4.0).") }),
     h("div", { class: "row" }, h("label", { text: t("Keep listening after a command") }), followUp),
-    h("div", { class: "hint", text: t("For a few seconds after a command, another can be said without « OK Coucou ». Only with free speech.") }),
+    h("div", { class: "hint", text: t("For a few seconds after a command, another can be said without « OK Peika ». Only with free speech.") }),
     h("div", { class: "row" }, h("label", { text: t("Understand free speech with") }), server, model),
-    h("div", { class: "hint", text: t("A sentence Coucou does not know is put to this model, with the tools Coucou offers. The model proposes; Coucou checks before acting, and never approves a permission. Connect a server in Local models first.") }),
+    h("div", { class: "hint", text: t("A sentence Peika does not know is put to this model, with the tools Peika offers. The model proposes; Peika checks before acting, and never approves a permission. Connect a server in Local models first.") }),
     embedRow,
     embedAbout,
     embedNone,
@@ -1420,7 +1420,7 @@ function voiceSection(): HTMLElement {
     ),
     cloudHint,
     spoken,
-    h("div", { class: "hint", text: t("Mochi says what a command did, in a calm voice made on this computer (Supertonic, downloaded from GitHub when you ask). In English, and quiet when Sound is off.") }),
+    h("div", { class: "hint", text: t("Peika says what a command did, in a calm voice made on this computer (Supertonic, downloaded from GitHub when you ask). In English, and quiet when Sound is off.") }),
     h("div", { class: "subhead", text: t("Web answers") }),
     h("div", { class: "row" }, h("label", { text: t("Answered by") }), webSearch),
     webHint,
@@ -1697,7 +1697,7 @@ function applyLanguage() {
 
 function applyDirection() {
   document.documentElement.dir = isRtl() ? "rtl" : "ltr";
-  document.title = t("Settings — Coucou");
+  document.title = t("Settings — Peika");
 }
 
 let rendering: Promise<void> | null = null;
@@ -1728,7 +1728,7 @@ async function rerender() {
 async function main() {
   // First, so the page is already waiting in its hidden state when shown.
   initMotion(root);
-  // Coucou's right-click menu here too: Cut, Copy, Paste in the fields, and
+  // Peika's right-click menu here too: Cut, Copy, Paste in the fields, and
   // never the webview's own.
   installContextMenu(document.body, { clipboardText: () => Bridge.clipboardText() });
   const boot = await Bridge.boot();
@@ -1823,7 +1823,7 @@ async function render() {
     "shortcuts": page(shortcutsGlobal),
     "shortcuts-island": page(shortcutsIsland),
     "about": page(
-      h("section", {}, h("h2", {}, h("span", { text: "Coucou" }), h("span", { class: "version", text: version }))),
+      h("section", {}, h("h2", {}, h("span", { text: "Peika" }), h("span", { class: "version", text: version }))),
       h("div", {
         class: "hint",
         text: t("No telemetry. Network requests only go to the services you configure yourself."),
@@ -1926,7 +1926,7 @@ function drawShell(pages: Record<string, HTMLElement>) {
       if (!(e.target as HTMLElement).closest("button")) void Bridge.toggleMaximizeSettingsWindow();
     },
   },
-    h("span", { class: "title", text: t("Settings — Coucou") }),
+    h("span", { class: "title", text: t("Settings — Peika") }),
     winButton(t("Minimize"), "min", "–", () => void Bridge.minimizeSettingsWindow()),
     winButton(t("Maximize"), "max", "□", () => void Bridge.toggleMaximizeSettingsWindow()),
     winButton(t("Close"), "close", "✕", () => void Bridge.closeSettingsWindow()),

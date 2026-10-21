@@ -1,9 +1,9 @@
 // The voice debug log, opt-in (Settings → Voice → "Keep a debug log"): every
 // turn — what was heard, what the embedding model ranked, what the models
-// were asked and answered, what ran and what came of it, what Mochi said — is
-// written to voice-debug.log beside coucou.log, on this computer only. It is
+// were asked and answered, what ran and what came of it, what Peika said — is
+// written to voice-debug.log beside peika.log, on this computer only. It is
 // the one place what was said is written down, and only while the user has
-// it on: turning it off deletes the file. coucou.log still never holds it.
+// it on: turning it off deletes the file. peika.log still never holds it.
 //
 // The island writes the lines (src/voice/turn.ts `trace`); Rust checks the
 // setting again before each write, so a line sent after it was turned off is
@@ -105,9 +105,9 @@ mod tests {
     }
 
     #[test]
-    fn the_log_is_its_own_file_beside_coucou_log() {
+    fn the_log_is_its_own_file_beside_peika_log() {
         assert!(file().ends_with("voice-debug.log"));
         assert_eq!(file().parent(), old_file().parent());
-        assert_ne!(file(), settings::local_dir().join("coucou.log"));
+        assert_ne!(file(), settings::local_dir().join("peika.log"));
     }
 }

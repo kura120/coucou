@@ -57,7 +57,7 @@ const fn interest(event: SPEVENTENUM) -> u64 {
 impl Recogniser {
     /// The recogniser, ready and silent: the microphone opens on `listen`.
     /// The wake phrase may be followed by anything in the same breath ("OK
-    /// Coucou, next track"). It is reported as the wake phrase either way;
+    /// Peika, next track"). It is reported as the wake phrase either way;
     /// `wake_length` says where in the sentence it ended.
     pub fn open() -> Result<Self, Unavailable> {
         Self::open_on(None)
@@ -268,14 +268,14 @@ mod tests {
     use super::*;
 
     /// What the recogniser makes of a recorded sentence, with the one-breath
-    /// wake rule. `COUCOU_VOICE_CLIPS` is a folder of 16-bit WAV files:
+    /// wake rule. `PEIKA_VOICE_CLIPS` is a folder of 16-bit WAV files:
     /// `alone.wav` (the wake phrase), `with-command.wav` (the wake phrase and a
     /// command in one breath) and `other.wav` (neither).
-    /// `cargo test -p coucou voice::sapi -- --ignored --nocapture`
+    /// `cargo test -p peika voice::sapi -- --ignored --nocapture`
     #[test]
     #[ignore = "needs recorded clips"]
     fn the_wake_phrase_is_heard_alone_and_with_a_command_after_it() {
-        let folder = std::path::PathBuf::from(std::env::var("COUCOU_VOICE_CLIPS").expect("COUCOU_VOICE_CLIPS"));
+        let folder = std::path::PathBuf::from(std::env::var("PEIKA_VOICE_CLIPS").expect("PEIKA_VOICE_CLIPS"));
         let hear = |file: &str| -> Option<Raw> {
             let mut recogniser = Recogniser::open_on(Some(&folder.join(file))).expect("recogniser");
             recogniser.listen(Listen::Wake).expect("listen");
@@ -304,7 +304,7 @@ mod tests {
     }
 
     /// Opens the real recogniser and the real microphone for a moment:
-    /// `cargo test -p coucou voice::sapi -- --ignored`.
+    /// `cargo test -p peika voice::sapi -- --ignored`.
     #[test]
     #[ignore = "opens the microphone"]
     fn the_recogniser_opens_listens_and_closes() {

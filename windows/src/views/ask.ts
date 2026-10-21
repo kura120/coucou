@@ -1,4 +1,4 @@
-// A question Mochi has on screen (voice/result.ts `Ask`), in one of three
+// A question Peika has on screen (voice/result.ts `Ask`), in one of three
 // shapes: a numbered list, two buttons, or a text field that is dictated
 // into and confirmed. One component for every question — the turn's, a
 // tool's, a model's — so they all answer the same way: a click, the key shown

@@ -8,7 +8,7 @@ import type { AppHost } from "./host";
 import { capability, type Area } from "./shared";
 
 const AREA = "music";
-/** Which player a result is about: what Mochi says of it ("Spotify is paused") is checked against the results. */
+/** Which player a result is about: what Peika says of it ("Spotify is paused") is checked against the results. */
 const PLAYER = { player: "Spotify" };
 
 export function music(host: AppHost): Area {
@@ -87,7 +87,7 @@ export function music(host: AppHost): Area {
       capability({
         name: "pause_music",
         area: AREA,
-        description: "Pauses the music playing in Spotify, which is also what stopping the music or Spotify means. What a pause means when nothing else is named. Not for pausing Coucou itself, and not for turning off Coucou's microphone.",
+        description: "Pauses the music playing in Spotify, which is also what stopping the music or Spotify means. What a pause means when nothing else is named. Not for pausing Peika itself, and not for turning off Peika's microphone.",
         args: {},
         tier: "reversible",
         available,
@@ -152,7 +152,7 @@ export function music(host: AppHost): Area {
       capability({
         name: "set_music_volume",
         area: AREA,
-        description: "Sets the music player's volume, from 0 to 100. Not for muting Coucou, nor for the volume of Coucou's own sounds and Mochi's voice: those are the settings Sound effects and Sound effects volume.",
+        description: "Sets the music player's volume, from 0 to 100. Not for muting Peika, nor for the volume of Peika's own sounds and Peika's voice: those are the settings Sound effects and Sound effects volume.",
         args: { percent: { type: "number", min: 0, max: 100, description: "The volume, from 0 to 100." } },
         tier: "reversible",
         available,

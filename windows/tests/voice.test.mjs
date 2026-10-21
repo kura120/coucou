@@ -1,4 +1,4 @@
-// "OK Coucou": the island's listening state (src/island/fsm.ts), when a wake
+// "OK Peika": the island's listening state (src/island/fsm.ts), when a wake
 // phrase is ignored and what each report from Rust does (src/island/voice.ts).
 // The session itself is tested in Rust (src-tauri/src/voice/session.rs).
 
@@ -116,7 +116,7 @@ test("the wake phrase is heard whatever is on screen: a request that waits, a qu
   assert.equal(wakeBlocked(false), null);
 });
 
-test("a paused Coucou does not wake", () => {
+test("a paused Peika does not wake", () => {
   assert.equal(wakeBlocked(true), "paused");
 });
 
@@ -163,7 +163,7 @@ test("each report reaches the island as what it is", () => {
   assert.deepEqual(calls.slice(8), ["final:uh place it:0.9,0.3,0.2", "partial:uh"]);
 });
 
-// ── Mochi's voice ─────────────────────────────────────────────────────────────
+// ── Peika's voice ─────────────────────────────────────────────────────────────
 
 test("speech arrives as 16-bit samples in base64 and plays as it was made", () => {
   // 0, full scale up, full scale down, a quarter: little-endian, as Rust writes them.
@@ -179,7 +179,7 @@ test("speech arrives as 16-bit samples in base64 and plays as it was made", () =
   assert.equal(decodeSpeech(Buffer.from([1, 2, 3]).toString("base64")).length, 1);
 });
 
-test("Mochi speaks at full level at the usual volume, quieter below, never louder", () => {
+test("Peika speaks at full level at the usual volume, quieter below, never louder", () => {
   assert.equal(speechGain(0.12), 1);
   assert.equal(speechGain(0.2), 1);
   assert.equal(speechGain(0.06), 0.5);
@@ -188,7 +188,7 @@ test("Mochi speaks at full level at the usual volume, quieter below, never loude
 
 // ── The view, the shortcut, the setting ───────────────────────────────────────
 
-test("the listening view is the Mac's: 160 high, Mochi at 68, 58 wide", () => {
+test("the listening view is the Mac's: 160 high, Peika at 68, 58 wide", () => {
   assert.deepEqual(VIEW_LAYOUTS.listening, { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "none" });
   assert.deepEqual(islandSize("expanded", "listening"), { w: 640, h: 160 });
 });
@@ -204,11 +204,11 @@ test("the voice views are neither a place the island comes back to nor a card ov
   }
 });
 
-test("talking to Coucou has the Mac's key and is off until turned on", () => {
-  const talk = SHORTCUTS.find((d) => d.id === "talkToCoucou");
-  assert.deepEqual(talk, { id: "talkToCoucou", defaultKeys: "Ctrl+Alt+V", enabledByDefault: false, ported: true });
-  assert.ok(!activeKeys({}).some(([id]) => id === "talkToCoucou"));
-  assert.ok(activeKeys({ talkToCoucou: { keys: "Ctrl+Alt+V", enabled: true } }).some(([id]) => id === "talkToCoucou"));
+test("talking to Peika has the Mac's key and is off until turned on", () => {
+  const talk = SHORTCUTS.find((d) => d.id === "talkToPeika");
+  assert.deepEqual(talk, { id: "talkToPeika", defaultKeys: "Ctrl+Alt+V", enabledByDefault: false, ported: true });
+  assert.ok(!activeKeys({}).some(([id]) => id === "talkToPeika"));
+  assert.ok(activeKeys({ talkToPeika: { keys: "Ctrl+Alt+V", enabled: true } }).some(([id]) => id === "talkToPeika"));
 });
 
 test("voice is off by default, with the wake phrase ready for when it is turned on", () => {

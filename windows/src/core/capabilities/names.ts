@@ -1,5 +1,5 @@
 // The names the user confirmed: what the words heard were, and the thing they
-// were. When Coucou asked "Did you mean Stripe?" and the user said yes (or
+// were. When Peika asked "Did you mean Stripe?" and the user said yes (or
 // picked it), "strife" is Stripe from then on, and the same words resolve
 // surely with no question. Put back right after, it is forgotten (registry.ts).
 //

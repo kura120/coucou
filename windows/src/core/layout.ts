@@ -102,7 +102,7 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   // questions, commands), which the Mac card leaves to the shared image.
   recap: { height: 244, botX: 62, botY: null, botDiameter: 58, agentMode: "column" },
   wardrobe: { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "none" },
-  // "OK Coucou": Mochi listening on the left, what he hears on the right.
+  // "OK Peika": Peika listening on the left, what he hears on the right.
   listening: { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "none" },
   // What a voice command did, for two seconds.
   voiceResult: { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "none" },
@@ -113,7 +113,7 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
 };
 
 // The upload views above are only the fallback geometry. Once a file is actually
-// dropped the whole sequence — Mochi included — is drawn by src/upload, which
+// dropped the whole sequence — Peika included — is drawn by src/upload, which
 // owns its own constants (USC) straight from UploadSequenceEngine.swift.
 
 /** The question view with options to pick from: room for two rows of them. */
@@ -185,8 +185,8 @@ export function islandSize(
 }
 
 /**
- * The room the compact island has for what is playing: from after Mochi to
- * before the little Mochis, which take two columns, or three (`columns`). The
+ * The room the compact island has for what is playing: from after Peika to
+ * before the little Peikas, which take two columns, or three (`columns`). The
  * compact island's own width is used, not the island's as it is drawn: the
  * line is placed while the island is still shrinking to it.
  */

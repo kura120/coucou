@@ -799,11 +799,11 @@ impl Library {
     }
 }
 
-/// The kind of model `COUCOU_VOICE_MODEL` holds, for the tests that load one:
-/// `COUCOU_VOICE_FAMILY=transducer` for a Parakeet, Moonshine otherwise.
+/// The kind of model `PEIKA_VOICE_MODEL` holds, for the tests that load one:
+/// `PEIKA_VOICE_FAMILY=transducer` for a Parakeet, Moonshine otherwise.
 #[cfg(test)]
 pub fn test_family() -> Family {
-    match std::env::var("COUCOU_VOICE_FAMILY").as_deref() {
+    match std::env::var("PEIKA_VOICE_FAMILY").as_deref() {
         Ok("transducer") => Family::Transducer,
         _ => Family::Moonshine,
     }
@@ -846,15 +846,15 @@ mod tests {
         assert_eq!(std::mem::size_of::<VadConfig>(), 88);
     }
 
-    /// With the real engine and voice on disk (`COUCOU_VOICE_RUNTIME`,
-    /// `COUCOU_VOICE_SPEAKER`), a sentence comes out as sound, and when
-    /// `COUCOU_VOICE_MODEL` is there too, it is heard back as its words.
-    /// `cargo test -p coucou voice::sherpa -- --ignored --nocapture`
+    /// With the real engine and voice on disk (`PEIKA_VOICE_RUNTIME`,
+    /// `PEIKA_VOICE_SPEAKER`), a sentence comes out as sound, and when
+    /// `PEIKA_VOICE_MODEL` is there too, it is heard back as its words.
+    /// `cargo test -p peika voice::sherpa -- --ignored --nocapture`
     #[test]
     #[ignore = "needs the downloaded engine"]
     fn a_sentence_is_said_and_heard_back() {
         let var = |name: &str| std::path::PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set")));
-        let speaker = Speaker::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_SPEAKER")).expect("speaker");
+        let speaker = Speaker::load(&var("PEIKA_VOICE_RUNTIME"), &var("PEIKA_VOICE_SPEAKER")).expect("speaker");
         for voice in [Voice::FEMALE, Voice::MALE] {
             let started = std::time::Instant::now();
             let (samples, rate) = speaker.say("GitHub is added.", voice);
@@ -863,8 +863,8 @@ mod tests {
             assert!(rate >= 16_000 && (0.6..4.0).contains(&seconds), "{seconds} s at {rate}");
             assert!(samples.iter().all(|s| s.is_finite() && s.abs() <= 1.5));
             assert!(samples.iter().any(|s| s.abs() > 0.05), "it is not silence");
-            if let Ok(model) = std::env::var("COUCOU_VOICE_MODEL") {
-                let engine = Engine::load(&var("COUCOU_VOICE_RUNTIME"), Path::new(&model), test_family()).expect("engine");
+            if let Ok(model) = std::env::var("PEIKA_VOICE_MODEL") {
+                let engine = Engine::load(&var("PEIKA_VOICE_RUNTIME"), Path::new(&model), test_family()).expect("engine");
                 let heard = engine.transcribe(rate, &samples).to_lowercase();
                 println!("heard back: {heard:?}");
                 assert!(heard.contains("added"), "{heard:?}");
@@ -890,15 +890,15 @@ mod tests {
     }
 
     /// With the real engine and model on disk, a spoken sentence comes back as
-    /// its words: `COUCOU_VOICE_RUNTIME`, `COUCOU_VOICE_MODEL` and
-    /// `COUCOU_VOICE_WAV` (16-bit mono) say where they are.
-    /// `cargo test -p coucou voice::sherpa -- --ignored --nocapture`
+    /// its words: `PEIKA_VOICE_RUNTIME`, `PEIKA_VOICE_MODEL` and
+    /// `PEIKA_VOICE_WAV` (16-bit mono) say where they are.
+    /// `cargo test -p peika voice::sherpa -- --ignored --nocapture`
     #[test]
     #[ignore = "needs the downloaded engine"]
     fn a_spoken_sentence_is_written_down() {
         let var = |name: &str| std::path::PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("{name} is not set")));
-        let engine = Engine::load(&var("COUCOU_VOICE_RUNTIME"), &var("COUCOU_VOICE_MODEL"), test_family()).expect("engine");
-        let bytes = std::fs::read(var("COUCOU_VOICE_WAV")).expect("wav");
+        let engine = Engine::load(&var("PEIKA_VOICE_RUNTIME"), &var("PEIKA_VOICE_MODEL"), test_family()).expect("engine");
+        let bytes = std::fs::read(var("PEIKA_VOICE_WAV")).expect("wav");
         let rate = u32::from_le_bytes(bytes[24..28].try_into().unwrap());
         let data = bytes.windows(4).position(|w| w == b"data").expect("data chunk") + 8;
         let samples: Vec<f32> = bytes[data..].chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect();
@@ -909,7 +909,7 @@ mod tests {
         assert!(sure.is_empty() || sure.len() == text.split_whitespace().count());
         assert!(sure.iter().all(|p| (0.0..=1.0).contains(p)));
         println!("heard: {text:?} in {:?} ({} samples at {rate} Hz)", started.elapsed(), samples.len());
-        let expected = std::env::var("COUCOU_VOICE_EXPECT").unwrap_or_default().to_lowercase();
+        let expected = std::env::var("PEIKA_VOICE_EXPECT").unwrap_or_default().to_lowercase();
         assert!(!text.is_empty());
         for word in expected.split_whitespace() {
             assert!(text.to_lowercase().contains(word), "{word:?} not in {text:?}");

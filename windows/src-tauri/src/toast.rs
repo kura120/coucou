@@ -243,7 +243,7 @@ fn page_url(app: &AppHandle) -> WebviewUrl {
 fn create_window(app: &AppHandle) -> Option<WebviewWindow> {
     let mut builder = WebviewWindowBuilder::new(app, LABEL, page_url(app))
         .additional_browser_args(crate::BROWSER_ARGS)
-        .title("Coucou")
+        .title("Peika")
         .inner_size(WIDTH, 1.0)
         // GTK won't size a non-resizable window below its natural size (see
         // island::apply_geometry). Windows would grow resize borders instead.
@@ -536,7 +536,7 @@ pub fn toast_keys(app: AppHandle, toasts: State<Arc<Toasts>>, on: bool) {
 
 // ── Samples, for review ───────────────────────────────────────────────────────
 
-/// `coucou --toast-sample <info|success|warning|error|decision|all>`, sent
+/// `peika --toast-sample <info|success|warning|error|decision|all>`, sent
 /// to the running app (or given at launch): shows sample toasts, so the look
 /// and the keys can be checked without a real caller. Not translated on
 /// purpose — nothing a user meets.
@@ -548,7 +548,7 @@ pub fn sample_from_args(args: &[String]) -> Option<String> {
 pub fn show_sample(app: &AppHandle, which: &str) {
     let all = which == "all";
     if all || which == "info" {
-        show(app, Toast::new(Kind::Info, "Sample: info").text("Mochi has something to tell you. It goes away by itself."));
+        show(app, Toast::new(Kind::Info, "Sample: info").text("Peika has something to tell you. It goes away by itself."));
     }
     if all || which == "success" {
         show(app, Toast::new(Kind::Success, "Sample: success").text("Everything went well.").pill("integration_github"));
@@ -705,8 +705,8 @@ mod tests {
     #[test]
     fn samples_come_from_the_command_line() {
         let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        assert_eq!(sample_from_args(&args(&["coucou", "--toast-sample", "decision"])).as_deref(), Some("decision"));
-        assert_eq!(sample_from_args(&args(&["coucou", "--toast-sample"])).as_deref(), Some("all"));
-        assert_eq!(sample_from_args(&args(&["coucou", "--shortcut", "openChat"])), None);
+        assert_eq!(sample_from_args(&args(&["peika", "--toast-sample", "decision"])).as_deref(), Some("decision"));
+        assert_eq!(sample_from_args(&args(&["peika", "--toast-sample"])).as_deref(), Some("all"));
+        assert_eq!(sample_from_args(&args(&["peika", "--shortcut", "openChat"])), None);
     }
 }

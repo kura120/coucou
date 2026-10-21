@@ -2,7 +2,7 @@
 
 import type { Ask } from "../voice/result";
 import type { BotEmoteName, BotStateName, IslandMode, IslandViewName } from "./layout";
-import type { EyeShape } from "../mochi/engine";
+import type { EyeShape } from "../peika/engine";
 import {
   DEFAULT_MAIN_PILL, HOST_OS, MAX_DECLARED, availablePills, takesSlot, orderPills, pillDefinition, sanitizeDeclared,
   toggleDeclared, type HostOs, type PillDefinition,
@@ -12,7 +12,7 @@ import type { ProviderId } from "./providers";
 import type { FileDiff } from "./diff";
 import type { VoiceResult } from "../voice/runner";
 import type { Bindings } from "./shortcuts";
-import { DEFAULT_OUTFIT, type Outfit } from "../mochi/wardrobe";
+import { DEFAULT_OUTFIT, type Outfit } from "../peika/wardrobe";
 import { pillColor } from "./pill-colors";
 import { Spotify, musicCardShown, musicPlaying } from "./spotify";
 
@@ -120,7 +120,7 @@ export interface Settings {
   model: string;
   /** Show the Claude plan pill (5 h and weekly limits) in the island's header. */
   showPlanInNotch: boolean;
-  /** Coucou's status line relay is installed in Claude Code's settings. */
+  /** Peika's status line relay is installed in Claude Code's settings. */
   planRelayInstalled: boolean;
   /** Show the Codex plan pill in the island's header. */
   showCodexPlanInNotch: boolean;
@@ -142,23 +142,23 @@ export interface Settings {
   /** Global shortcuts the user changed, by action id (see core/shortcuts.ts). */
   shortcuts: Bindings;
   /**
-   * Mochi's outfit: "auto" (dresses for the season), "none" or an outfit id.
-   * Same raw values as the Mac's "mochiOutfit"; read it through parseOutfit.
+   * Peika's outfit: "auto" (dresses for the season), "none" or an outfit id.
+   * Same raw values as the Mac's "peikaOutfit"; read it through parseOutfit.
    */
-  mochiOutfit: string;
+  peikaOutfit: string;
   /**
-   * A colour of the user's own for a pill's Mochi, by pill ID ("#RRGGBB").
+   * A colour of the user's own for a pill's Peika, by pill ID ("#RRGGBB").
    * Empty means the catalog's colours; read it through core/pill-colors.ts.
    * Same key and values as the Mac's "pillColors".
    */
   pillColors: Record<string, string>;
   /**
-   * Interface language: "" follows the system (when Coucou has its language,
+   * Interface language: "" follows the system (when Peika has its language,
    * else English), or one of src/i18n's ten codes ("fr", "pt-BR", "zh-Hans"…).
    */
   language: string;
   /**
-   * The phone link for Coucou for Android is on. Rust owns it (only the switch in
+   * The phone link for Peika for Android is on. Rust owns it (only the switch in
    * Settings → Android phone turns it on): whatever the page sends back is ignored.
    */
   phoneLink?: boolean;
@@ -168,9 +168,9 @@ export interface Settings {
   phoneDetails?: boolean;
   /** Which models the phone may use, "provider/model". Rust owns it too. */
   phoneChatModels?: string[];
-  /** Mochi on the desktop. Rust owns it: whatever the page sends back is ignored. */
+  /** Peika on the desktop. Rust owns it: whatever the page sends back is ignored. */
   /**
-   * "OK Coucou": off by default. `wake` listens for the wake phrase all the
+   * "OK Peika": off by default. `wake` listens for the wake phrase all the
    * time; without it the microphone opens only for the shortcut.
    */
   voice: {
@@ -185,7 +185,7 @@ export interface Settings {
     /** Which model the bundled engine hears with (Rust's `HEARING_MODELS`). */
     hearingModel: string;
     followUp: number;
-    /** Mochi says what a command did, out loud. */
+    /** Peika says what a command did, out loud. */
     speak: boolean;
     /** "female" or "male". */
     speaker: string;
@@ -206,7 +206,7 @@ export interface Settings {
   };
   /** The search engine the browser opens a search on. */
   searchEngine: string;
-  desktopMochi?: {
+  desktopPeika?: {
     onDesktop: boolean;
     spot: { x: number; y: number; space: string } | null;
   };
@@ -241,7 +241,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lmstudioUrl: "",
   customUrl: "",
   shortcuts: {},
-  mochiOutfit: DEFAULT_OUTFIT,
+  peikaOutfit: DEFAULT_OUTFIT,
   pillColors: {},
   language: "",
   voice: { enabled: false, wake: true, brain: "", brainModel: "", engine: "system", hearingModel: "parakeet-0.6b", followUp: 8, speak: false, speaker: "female", embedModel: "", cloud: false, webAnswers: false, webSearch: "browser", debugLog: false },
@@ -280,13 +280,13 @@ class AppState {
   droppedFile: { name: string; path: string } | null = null;
   noteMessage: string | null = null;
   /**
-   * What the listening view shows: the words so far, and the question Mochi
+   * What the listening view shows: the words so far, and the question Peika
    * asked when he is listening for its answer.
    */
   /** `working`: what is being done while the answer is waited for ("Opening Spotify…"), when known. */
   /** `ask`: a question on screen with its choices, buttons or field; `draft`: what that field holds. */
   voice: { text: string; question: string; thinking?: boolean; working?: string; ask?: Ask | null; draft?: string } = { text: "", question: "" };
-  /** Another command may be said without the wake phrase: Mochi still listens. */
+  /** Another command may be said without the wake phrase: Peika still listens. */
   voiceFollowing = false;
   /** What the last voice command did, for its card. */
   voiceResult: VoiceResult | null = null;
@@ -341,12 +341,12 @@ class AppState {
   /** Rows in the list on screen, 0 when there is none (AppState.cardItemCount). */
   cardItemCount = 0;
   /**
-   * Mochi is out of the island — on the desktop, flying, or being dragged
-   * there — so the island's own Mochi is hidden (AppState.mochiOnDesktop).
+   * Peika is out of the island — on the desktop, flying, or being dragged
+   * there — so the island's own Peika is hidden (AppState.peikaOnDesktop).
    */
-  mochiOnDesktop = false;
+  peikaOnDesktop = false;
 
-  /** Outfit shown on Mochi while the pointer rests on a wardrobe button. */
+  /** Outfit shown on Peika while the pointer rests on a wardrobe button. */
   wardrobePreview: Outfit | null = null;
 
   lastActivity = performance.now();
@@ -376,7 +376,7 @@ class AppState {
     return this.stateOverride ?? this.focusTask?.state ?? "idle";
   }
 
-  /** Spotify plays on a declared pill: Mochi dances. */
+  /** Spotify plays on a declared pill: Peika dances. */
   get spotifyPlaying(): boolean {
     return musicPlaying(Spotify.state, sanitizeDeclared(this.settings, this.os).activeIntegrations);
   }

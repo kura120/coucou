@@ -2,9 +2,9 @@
 
 Any tool that can write to a Unix domain socket (macOS, Linux) or a named pipe (Windows) can send events to Coucou and have its own pill next to Claude Code.
 
-## The `coucou_agent` field
+## The `peika_agent` field
 
-Add the optional field `coucou_agent` to any hook JSON payload. Coucou will create a pill labelled with the agent name and route all events to it.
+Add the optional field `peika_agent` to any hook JSON payload. Coucou will create a pill labelled with the agent name and route all events to it.
 
 **Validation:** the name must match `^[a-z0-9-]{1,24}$` (lowercase letters, digits and hyphens, 1–24 characters). An absent or invalid name routes the event to the Claude Code pill instead.
 
@@ -32,7 +32,7 @@ Same pattern with the Windows relay:
 {
   "hooks": {
     "UserPromptSubmit": [
-      { "type": "command", "command": "C:\\path\\to\\coucou-hook.exe --agent my-tool" }
+      { "type": "command", "command": "C:\\path\\to\\peika-hook.exe --agent my-tool" }
     ]
   }
 }
@@ -40,13 +40,13 @@ Same pattern with the Windows relay:
 
 ## Hook command (Linux)
 
-Same pattern with the Linux relay. Coucou copies the relay to `~/.local/share/coucou/bin/coucou-hook` at startup.
+Same pattern with the Linux relay. Coucou copies the relay to `~/.local/share/coucou/bin/peika-hook` at startup.
 
 ```json
 {
   "hooks": {
     "UserPromptSubmit": [
-      { "type": "command", "command": "/path/to/coucou-hook --agent my-tool" }
+      { "type": "command", "command": "/path/to/peika-hook --agent my-tool" }
     ]
   }
 }
@@ -54,13 +54,13 @@ Same pattern with the Linux relay. Coucou copies the relay to `~/.local/share/co
 
 ## Payload format
 
-The relay adds `coucou_agent` to the JSON it forwards. You can also add it yourself if you talk to the socket directly:
+The relay adds `peika_agent` to the JSON it forwards. You can also add it yourself if you talk to the socket directly:
 
 ```json
 {
   "hook_event_name": "UserPromptSubmit",
   "session_id": "my-session-1",
-  "coucou_agent": "my-tool",
+  "peika_agent": "my-tool",
   "prompt": "Running task…"
 }
 ```
@@ -105,7 +105,7 @@ Amp (`agent_amp`) and Hermes (`agent_hermes`) in Settings → Active pills. Curs
 (`agent_codex`, GitHub build only) are there too — their pills can be declared and set as
 the main pill; session support is coming in a future version.
 
-Claude Desktop (`agent_claude-desktop`, every build) is there as well. Claude Code sessions started from the Claude desktop app's Code tab carry `CLAUDE_CODE_ENTRYPOINT=claude-desktop`; the relay tags them `coucou_agent: claude-desktop` on its own (an explicit `--agent` still wins), so nothing extra is installed. Declare the pill to keep it after the session ends; the ↗ button opens the Claude app.
+Claude Desktop (`agent_claude-desktop`, every build) is there as well. Claude Code sessions started from the Claude desktop app's Code tab carry `CLAUDE_CODE_ENTRYPOINT=claude-desktop`; the relay tags them `peika_agent: claude-desktop` on its own (an explicit `--agent` still wins), so nothing extra is installed. Declare the pill to keep it after the session ends; the ↗ button opens the Claude app.
 
 ## Real-world examples
 
@@ -226,8 +226,8 @@ Every event is fire-and-forget: if the app is closed or unreachable, nothing is 
 ### Any other tool
 
 Follow the generic pattern: call `nb-hook --agent <your-name> <EventName>` (macOS),
-`coucou-hook.exe --agent <your-name> <EventName>` (Windows)
-or `~/.local/share/coucou/bin/coucou-hook --agent <your-name> <EventName>` (Linux)
+`peika-hook.exe --agent <your-name> <EventName>` (Windows)
+or `~/.local/share/coucou/bin/peika-hook --agent <your-name> <EventName>` (Linux)
 and let the relay forward the event.
 
 ## Quick test (Linux)
@@ -235,8 +235,8 @@ and let the relay forward the event.
 With Coucou running:
 
 ```sh
-echo '{"hook_event_name":"UserPromptSubmit","session_id":"t1","prompt":"hello","coucou_agent":"demo"}' \
-  | ~/.local/share/coucou/bin/coucou-hook --agent demo
+echo '{"hook_event_name":"UserPromptSubmit","session_id":"t1","prompt":"hello","peika_agent":"demo"}' \
+  | ~/.local/share/coucou/bin/peika-hook --agent demo
 ```
 
 A "demo" pill should appear in the island.
@@ -246,7 +246,7 @@ A "demo" pill should appear in the island.
 With Coucou running:
 
 ```sh
-echo '{"hook_event_name":"UserPromptSubmit","session_id":"t1","prompt":"hello","coucou_agent":"demo"}' \
+echo '{"hook_event_name":"UserPromptSubmit","session_id":"t1","prompt":"hello","peika_agent":"demo"}' \
   | /bin/sh ~/Library/Application\ Support/NotchBuddy/nb-hook --agent demo
 ```
 

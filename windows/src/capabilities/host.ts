@@ -1,5 +1,5 @@
 // What the capabilities need of the running app, as plain methods. They touch
-// Coucou only through this, so the tests run them against a fake; the island
+// Peika only through this, so the tests run them against a fake; the island
 // has the real one. Each method does what a click in the app would do.
 //
 // What is not here cannot be reached by the assistant: nothing approves a
@@ -20,7 +20,7 @@ export interface Option {
 // ── Music ─────────────────────────────────────────────────────────────────────
 
 export interface MusicNow {
-  /** Spotify is switched on in Settings: Coucou follows it and may drive it. */
+  /** Spotify is switched on in Settings: Peika follows it and may drive it. */
   enabled: boolean;
   running: boolean;
   playing: boolean;
@@ -118,8 +118,8 @@ export interface RecapOptions {
 
 export type RecapOption = "enabled" | "hideProjects";
 
-export interface MochiNow {
-  /** False where the desktop Mochi's window cannot be placed. */
+export interface PeikaNow {
+  /** False where the desktop Peika's window cannot be placed. */
   supported: boolean;
   onDesktop: boolean;
   asleep: boolean;
@@ -242,13 +242,13 @@ export interface AppHost {
   /** Sets one switch and saves; true when it was saved. */
   setRecapOption(option: RecapOption, on: boolean): Promise<boolean>;
 
-  // ── Mochi on the desktop ──
-  mochi(): MochiNow;
+  // ── Peika on the desktop ──
+  peika(): PeikaNow;
   /** From the island to his spot on the desktop. False when he has none. */
-  mochiFlyOut(): Promise<boolean>;
+  peikaFlyOut(): Promise<boolean>;
   /** Back into the island. */
-  mochiFlyHome(): Promise<boolean>;
-  setMochiAsleep(asleep: boolean): boolean;
+  peikaFlyHome(): Promise<boolean>;
+  setPeikaAsleep(asleep: boolean): boolean;
 
   // ── Services ──
   /** The services shown as pills, each with what it last reported. */
@@ -264,13 +264,13 @@ export interface AppHost {
   /** Opens the browser on a search, with the engine the user chose. */
   openWebSearch(query: string): Awaitable<boolean>;
 
-  // ── Coucou itself ──
+  // ── Peika itself ──
   /** Voice is on: the microphone may open. */
   listening(): boolean;
   /** Turns voice off (the microphone closes) and shows the way back on. */
   stopListening(): void;
   paused(): boolean;
-  /** Pauses Coucou or lifts the pause, as the tray does. */
+  /** Pauses Peika or lifts the pause, as the tray does. */
   setPaused(paused: boolean): void;
   quit(): void;
   /** A short note on screen. */

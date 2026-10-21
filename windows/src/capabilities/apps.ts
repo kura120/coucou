@@ -42,7 +42,7 @@ export function apps(host: AppHost): Area {
       capability({
         name: "open_app",
         area: AREA,
-        description: "Opens an application installed on this computer, even when a pill has the same name. Only opens it: not for installing anything or doing something inside it. Not for one of Coucou's own views, and not for an agent's session.",
+        description: "Opens an application installed on this computer, even when a pill has the same name. Only opens it: not for installing anything or doing something inside it. Not for one of Peika's own views, and not for an agent's session.",
         args: { app: { type: "entity", kind: "app", description: "The application, by its name." } },
         tier: "free",
         async run(args, context) {

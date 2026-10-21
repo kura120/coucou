@@ -554,7 +554,7 @@ html[data-dir="rtl"] .mail-back svg {
 }
 
 /* ── Arabic: right to left ──────────────────────────────────────────────────
-   As in style.css: the text of a card reads and aligns right to left; Mochi
+   As in style.css: the text of a card reads and aligns right to left; Peika
    and the card keep their places. Addresses, links and file names stay left
    to right (`.vc-ltr` and the rules above). */
 html[data-dir="rtl"] #views .vc-body {

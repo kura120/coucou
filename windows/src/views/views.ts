@@ -7,7 +7,7 @@ import { ICONS } from "./icons";
 import { Ticker } from "./ticker";
 import { State, type AgentTask } from "../core/state";
 import { washRGBA, type IslandViewName, type Wash } from "../core/layout";
-import { createMiniBot, pruneMiniBots } from "../mochi/minibots";
+import { createMiniBot, pruneMiniBots } from "../peika/minibots";
 import { buildAsk } from "./ask";
 import type { Answer, ToolResult } from "../voice/result";
 import { buildPrompt } from "./chat";
@@ -26,7 +26,7 @@ import { buildWardrobe } from "./wardrobe";
 import { buildSpotifyCard, buildSpotifyMini } from "./spotify";
 import { provideMenu } from "./menu";
 import { SPOTIFY_ID } from "../core/spotify";
-import type { Outfit, OutfitSelection } from "../mochi/wardrobe";
+import type { Outfit, OutfitSelection } from "../peika/wardrobe";
 import { language, t, tl, type Msg } from "../i18n/i18n";
 import type { ViewCommand } from "../island/shortcuts";
 import { registerVoiceCards } from "./voice-cards";
@@ -34,7 +34,7 @@ import { VIEW_SCREENS, type Shown } from "../island/screen";
 
 export interface ViewActions {
   setView(v: IslandViewName): void;
-  /** The answer to the question Mochi has on screen: a click on a choice, a button, the field confirmed. */
+  /** The answer to the question Peika has on screen: a click on a choice, a button, the field confirmed. */
   voiceAnswer(answer: Answer): void;
   /** The question's text field was edited by hand: what it holds now. */
   voiceDraft(value: string): void;
@@ -70,7 +70,7 @@ export interface ViewActions {
   capability(call: { name: string; arguments: Record<string, unknown> }): Promise<ToolResult>;
   /** Wardrobe click: keeps the outfit ("auto" and "none" included). */
   chooseOutfit(selection: OutfitSelection): void;
-  /** Wardrobe hover: shows an outfit on Mochi without keeping it; null ends it. */
+  /** Wardrobe hover: shows an outfit on Peika without keeping it; null ends it. */
   previewOutfit(outfit: Outfit | null): void;
 }
 
@@ -172,7 +172,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
       clear(soundBtn);
       soundBtn.append(svg(State.settings.soundEnabled ? ICONS.speakerOn : ICONS.speakerOff, ACTION_ICON));
       syncPlanPills();
-      // Nothing to navigate to while Mochi is dizzy or listening.
+      // Nothing to navigate to while Peika is dizzy or listening.
       const voice = v === "listening" || v === "voiceResult";
       el.style.opacity = v === "confused" || voice ? "0" : "1";
       el.style.pointerEvents = voice ? "none" : "";
@@ -773,7 +773,7 @@ function buildConfused(): ViewHost {
 
 // ── Note ──────────────────────────────────────────────────────────────────────
 
-/** "OK Coucou": what Mochi hears, as he hears it (VoiceListeningView). */
+/** "OK Peika": what Peika hears, as he hears it (VoiceListeningView). */
 function buildListening(actions: ViewActions): ViewHost {
   const asking = buildAsk((answer) => actions.voiceAnswer(answer), (value) => actions.voiceDraft(value), () => actions.voiceField());
   const micDot = h("span", { class: "mic-dot" });
@@ -797,7 +797,7 @@ function buildListening(actions: ViewActions): ViewHost {
       hearing.style.setProperty("--wash", washRGBA(thinking ? "soft" : "cyan"));
       hearing.classList.toggle("working", Boolean(thinking));
       title.textContent = thinking ? (working || t("Thinking…")) : t("Listening…");
-      // A question Mochi asked stays until its answer is being said.
+      // A question Peika asked stays until its answer is being said.
       line.textContent = text || question || t("Say your command");
       line.classList.toggle("heard", text !== "");
       line.classList.toggle("asked", text === "" && question !== "");

@@ -16,7 +16,7 @@ import { SPOTIFY_ID } from "./core/spotify";
 import { Recap } from "./recap/recap";
 import { onLanguageChange, resolveLanguage, setLanguage, systemLanguages } from "./i18n/i18n";
 
-/** Shows the language Settings asks for ("" = the system's, when Coucou has it). */
+/** Shows the language Settings asks for ("" = the system's, when Peika has it). */
 function applyLanguage() {
   setLanguage(resolveLanguage(State.settings.language, systemLanguages()));
 }
@@ -89,7 +89,7 @@ async function main() {
   });
 
   // The settings window writes preferences; apply them here without a restart.
-  // The app's own capabilities change a setting or pause Coucou the way Settings and the tray do (island/app.ts).
+  // The app's own capabilities change a setting or pause Peika the way Settings and the tray do (island/app.ts).
   island.onVoiceSettings = () => {
     applyLanguage();
     island.applySettings();
@@ -137,16 +137,16 @@ async function main() {
   if (!IS_TAURI) document.addEventListener("click", () => Sound.resume(), { once: true });
   if (CONSOLE_HOOKS) {
     // With no Rust to hear anything, or to try a state by hand: what Rust would report can be typed in the
-    // console, e.g. coucouVoice({ phase: "woke", text: "" }), and the
-    // microphone's level with coucouLevel(0.6).
+    // console, e.g. peikaVoice({ phase: "woke", text: "" }), and the
+    // microphone's level with peikaLevel(0.6).
     Object.assign(window, {
-      coucouVoice: (event: VoiceEvent) => applyVoice(island, event),
-      coucouLevel: (level: number) => island.voiceLevel(level),
-      // A question as Mochi would ask it, e.g. coucouAsk({ kind: "choice", question: "Which account?",
-      // options: [{ id: "a", label: "Work" }, { id: "b", label: "Home" }] }), and the gray card: coucouWorking("Opening Spotify…").
-      coucouAsk: (ask: Ask) => island.voicePreviewAsk(ask),
-      coucouAskKey: (key: string) => island.voiceAskKey(key),
-      coucouWorking: (line: string | null) => island.voicePreviewWorking(line),
+      peikaVoice: (event: VoiceEvent) => applyVoice(island, event),
+      peikaLevel: (level: number) => island.voiceLevel(level),
+      // A question as Peika would ask it, e.g. peikaAsk({ kind: "choice", question: "Which account?",
+      // options: [{ id: "a", label: "Work" }, { id: "b", label: "Home" }] }), and the gray card: peikaWorking("Opening Spotify…").
+      peikaAsk: (ask: Ask) => island.voicePreviewAsk(ask),
+      peikaAskKey: (key: string) => island.voiceAskKey(key),
+      peikaWorking: (line: string | null) => island.voicePreviewWorking(line),
     });
   }
 }

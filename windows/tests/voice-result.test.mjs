@@ -1,5 +1,5 @@
 // What a capability gives back (src/voice/result.ts): the card's line, what a
-// model is told, and what Mochi says.
+// model is told, and what Peika says.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -19,7 +19,7 @@ test("a model is told whether it was checked, not the card's hope", () => {
   });
 });
 
-test("Mochi says the model's words when it has some, in a sentence or two", () => {
+test("Peika says the model's words when it has some, in a sentence or two", () => {
   assert.equal(spoken("  Spotify is\nopen now.  ", "Spotify opened"), "Spotify is open now.");
   assert.equal(spoken("", "Spotify opened"), "Spotify opened");
   assert.equal(spoken(null, "Spotify opened"), "Spotify opened");

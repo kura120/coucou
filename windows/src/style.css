@@ -1,4 +1,4 @@
-/* Coucou for Windows — same palette, sizes and type scale as the macOS island.
+/* Peika for Windows — same palette, sizes and type scale as the macOS island.
    Every colour below is copied from the Swift views. */
 
 @import "./menu.css";
@@ -256,7 +256,7 @@ body {
 }
 
 /* What is playing, in the middle of the compact island (Island.syncNowPlaying):
-   between Mochi and the little Mochis. Clicks go through it to the island. */
+   between Peika and the little Peikas. Clicks go through it to the island. */
 #now-playing {
   position: absolute;
   top: 0;
@@ -299,7 +299,7 @@ body {
   transition: opacity 0.25s ease-in-out;
 }
 
-/* A mini Mochi: the slot is the body, the canvas is larger and overflows it so
+/* A mini Peika: the slot is the body, the canvas is larger and overflows it so
    hands, badges and particles are not cut off. */
 .mini {
   position: relative;
@@ -842,7 +842,7 @@ body {
   pointer-events: none;
 }
 
-/* A name too long to sit centred without running under the little Mochi
+/* A name too long to sit centred without running under the little Peika
    ("Claude Desktop") starts after him instead; a short one stays centred. */
 .pill .lbl.long {
   padding-left: 34px;
@@ -940,7 +940,7 @@ body {
   gap: 5px;
 }
 
-/* ── Listening ("OK Coucou") ────────────────────────────────────────────── */
+/* ── Listening ("OK Peika") ────────────────────────────────────────────── */
 
 .listening-head {
   display: flex;
@@ -953,7 +953,7 @@ body {
   color: #c8cbd0;
 }
 
-/* A question Mochi asked, waiting for its answer. */
+/* A question Peika asked, waiting for its answer. */
 .view .sub.asked {
   color: #f97316;
 }
@@ -966,7 +966,7 @@ body {
   background: #f97316;
 }
 
-/* Under the island while Coucou listens, for a command or for another after
+/* Under the island while Peika listens, for a command or for another after
    it: an orange half-moon as wide as the island, which swells with the voice
    (`--level`, 0…1, set from Rust's `voice-level`). Where no level comes —
    Windows' recogniser has the microphone — it glows steadily. Nothing here
@@ -1220,7 +1220,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* What an empty chat says. Centred on the island, not on the log: the log
-   starts after Mochi (84 px), the card's other side has 16. */
+   starts after Peika (84 px), the card's other side has 16. */
 .chat-empty {
   position: relative;
   left: -34px;
@@ -3025,7 +3025,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* ── Weekly recap ───────────────────────────────────────────────────────── */
-/* Text starts after Mochi (x = 116) and the card is the island's full 640 px:
+/* Text starts after Peika (x = 116) and the card is the island's full 640 px:
    headline numbers over a two-column facts grid. Labels are 12 px and up; only
    a value too long for its cell ends in an ellipsis. */
 
@@ -3186,7 +3186,7 @@ input[type="range"]::-webkit-slider-thumb {
   padding: 0;
 }
 
-/* ── Wardrobe (right-click on Mochi) — WardrobeView on macOS ─────────────── */
+/* ── Wardrobe (right-click on Peika) — WardrobeView on macOS ─────────────── */
 
 .wardrobe-stack {
   padding: 12px 16px 12px 104px;
@@ -3552,7 +3552,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 /* ── Arabic: right to left ─────────────────────────────────────────────────────
    i18n.ts sets <html data-dir="rtl">. The text of the cards reads and aligns
-   right to left; Mochi, the pills, the header and the cards themselves keep
+   right to left; Peika, the pills, the header and the cards themselves keep
    their places, and code, commands and the contribution grid stay left to
    right. A chat message follows its own text's direction (an English answer
    stays left to right). */
@@ -3574,7 +3574,7 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
   text-align: start;
 }
 
-/* A question Mochi asks (views/ask.ts): a numbered list, two buttons, or a
+/* A question Peika asks (views/ask.ts): a numbered list, two buttons, or a
    field that is dictated into. Under the line that asks it, in the listening card. */
 .ask {
   display: none;
@@ -3700,7 +3700,7 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
   background: #8b9097;
 }
 
-/* What a command came to, or Mochi's answer: whole, on as many lines as it takes. */
+/* What a command came to, or Peika's answer: whole, on as many lines as it takes. */
 .title.voice-line {
   white-space: normal;
   overflow-wrap: anywhere;

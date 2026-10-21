@@ -108,17 +108,17 @@ test("paste takes the clipboard from Rust and puts it where the selection was", 
     },
     dispatchEvent: (e) => typed.push(e.type),
   });
-  const paste = collectMenu(field, h("div", {}, field), {}, { clipboardText: async () => "Mochi\r\n  and friends" })[0][2];
+  const paste = collectMenu(field, h("div", {}, field), {}, { clipboardText: async () => "Peika\r\n  and friends" })[0][2];
   paste.action();
   await new Promise((resolve) => setTimeout(resolve, 0));
   // A one-line field takes a pasted paragraph on one line.
-  assert.equal(field.value, "hello Mochi and friends");
+  assert.equal(field.value, "hello Peika and friends");
   assert.deepEqual(typed, ["input"]);
 
   // An empty clipboard changes nothing.
   collectMenu(field, h("div", {}, field), {}, { clipboardText: async () => null })[0][2].action();
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(field.value, "hello Mochi and friends");
+  assert.equal(field.value, "hello Peika and friends");
 
   // A multi-line field keeps the lines.
   const area = h("textarea");
@@ -133,7 +133,7 @@ test("the menu opens at the pointer, pulled back inside the window", () => {
   assert.deepEqual(placeMenu(-20, 2, 150, 90, 720, 640), { x: 6, y: 6 });
 });
 
-test("the webview's menu never shows, whether or not Coucou has one to show", () => {
+test("the webview's menu never shows, whether or not Peika has one to show", () => {
   const row = h("div");
   const plain = h("div");
   const root = h("div", {}, row, plain);
@@ -194,11 +194,11 @@ test("a second right-click replaces the menu, and a right-click on nothing close
 });
 
 test("where a right-click is someone else's, no menu shows", () => {
-  const mochi = h("div");
-  const root = h("div", {}, mochi);
+  const peika = h("div");
+  const root = h("div", {}, peika);
   provideMenu(root, () => [item("Open")]);
-  installContextMenu(root, { skip: (e) => e.target === mochi });
-  assert.ok(rightClick(root, mochi).defaultPrevented);
+  installContextMenu(root, { skip: (e) => e.target === peika });
+  assert.ok(rightClick(root, peika).defaultPrevented);
   assert.equal(shown().length, 0);
   rightClick(root, root);
   assert.equal(shown().length, 1);

@@ -1,5 +1,5 @@
 // A voice's fingerprint: the sherpa-onnx speaker-embedding extractor over the
-// 3D-Speaker CAM++ model (the one upstream Coucou's diarizer uses), so that a
+// 3D-Speaker CAM++ model (the one upstream Peika's diarizer uses), so that a
 // sentence can be told to be the user's voice or another's. Nothing here
 // decides anything yet: this is the extractor and its measurement
 // (doc/voice-speaker.md).
@@ -355,19 +355,19 @@ mod tests {
         assert!(read_wav(&three).is_err());
     }
 
-    /// The measurement, by hand: `COUCOU_VOICE_SAMPLES` is a folder of 16-bit
+    /// The measurement, by hand: `PEIKA_VOICE_SAMPLES` is a folder of 16-bit
     /// WAVE files. Each `.wav` in it is a group named by its stem, and each
     /// subfolder is a group of its `.wav` files. The group named `mine` is the
     /// user's: its first five files are the enrolment, its others are "same",
     /// as is every group whose name starts with "mine" ("mine-with-video");
     /// every other group is "other". Prints the scores, the groups, the false
     /// rejections and acceptances for each threshold, and the time of an embedding.
-    /// Writes nothing. `cargo test -p coucou voice::speaker -- --ignored --nocapture`
+    /// Writes nothing. `cargo test -p peika voice::speaker -- --ignored --nocapture`
     #[test]
     #[ignore = "needs the recordings and the downloaded model"]
     fn voices_on_the_recordings() {
-        let Some(folder) = std::env::var_os("COUCOU_VOICE_SAMPLES").map(PathBuf::from) else {
-            println!("set COUCOU_VOICE_SAMPLES to a folder of recordings (see the comment above this test)");
+        let Some(folder) = std::env::var_os("PEIKA_VOICE_SAMPLES").map(PathBuf::from) else {
+            println!("set PEIKA_VOICE_SAMPLES to a folder of recordings (see the comment above this test)");
             return;
         };
         if !folder.is_dir() {

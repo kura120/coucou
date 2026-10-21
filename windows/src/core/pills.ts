@@ -163,7 +163,7 @@ export function slotsUsed(activeIntegrations: readonly string[]): number {
 }
 
 /**
- * The compact island's little Mochis sit in two rows: two columns for up to
+ * The compact island's little Peikas sit in two rows: two columns for up to
  * four of them, three for five or six.
  */
 export function miniGridColumns(count: number): number {

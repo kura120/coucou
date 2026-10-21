@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Coucou is now Peika** (Windows and Linux) — a new name and a new character: a small cloud instead of the blob. Click it and it plays peekaboo (covers its eyes, shrinks and trembles, then jumps back); three quick clicks make it dizzy. Its hands are puffs, the wardrobe is refitted to it, and the app icon is the cloud. The wake phrase is « OK Peika ».
+- Peika starts fresh: settings live in `%APPDATA%\Peika` (`~/.config/peika` on Linux), the hook is `peika-hook`, environment variables are `PEIKA_*`, and the Tauri identifier is `dev.kura120.peika`. Reinstall the agent hooks from Settings (and remove the old `coucou-hook` entries from `~/.claude/settings.json`), and enter your API keys again.
+- The phone-link wire constants (`coucou://pair`, the relay key label) are unchanged, so existing phone apps still pair.
+
 - **Coucou for Android**, by @Rhytam23 — your agents, Allow and Deny with your fingerprint or screen lock (even on a locked phone), answers to Claude's questions, chat through the computer's own keys, plan usage and services, an optional island over other apps, a widget, a quick-settings tile and an ongoing notification. It pairs with Coucou 0.4.0 or later on Windows or Linux. Android 11 or later, English only; the first signed APK is on its way. Build it today from [`android/`](android/README.md) (#501 by @Rhytam23)
 
 ## Windows and Linux 0.4.0 — October 11, 2026

@@ -1,6 +1,6 @@
 // What a sentence means when the parser does not know: the question is put to
 // the model server the user connected (Ollama, LM Studio or their own), with
-// the tools Coucou offers and the last few turns, so "what about Steam?" comes
+// the tools Peika offers and the last few turns, so "what about Steam?" comes
 // with what it follows. Those turns are the island's, kept in memory there for
 // a minute and a half: nothing of them is kept here, written or logged. The model proposes — tool calls, or a short answer —
 // and the island decides what is done with them (src/voice/tools.ts). Nothing
@@ -90,7 +90,7 @@ const WARM_UP: Duration = Duration::from_secs(30);
 /// A warm-up is on its way: one at a time.
 static WARMING: AtomicBool = AtomicBool::new(false);
 
-/// Coucou was just woken: the model that may be asked about the sentence is
+/// Peika was just woken: the model that may be asked about the sentence is
 /// got into the server's memory while the sentence is still being said. A
 /// server lets go of a model nobody asked for a few minutes (Ollama: five),
 /// and the island does not wait long for an answer. One word is asked for —

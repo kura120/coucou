@@ -56,7 +56,7 @@ export function services(host: AppHost): Area {
         async run(args) {
           const service = find(str(args.service));
           if (!service) return failed(t("Nothing to report"), "That service is not one of the pills shown.");
-          if (!(await host.refreshService(service.id))) return failed(t("That did not work"), `${service.name} could not be asked: it is not set up, or Coucou is paused.`);
+          if (!(await host.refreshService(service.id))) return failed(t("That did not work"), `${service.name} could not be asked: it is not set up, or Peika is paused.`);
           // Asked; what it answers arrives later, on its card.
           return done(service.name, false);
         },

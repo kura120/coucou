@@ -5,7 +5,7 @@
 //
 //   shortlist  the few tools a small local model is shown
 //   instant    a clear, simple command runs with no model call at all (tier 1)
-//   directed   a sentence said without the wake phrase: was it for Coucou?
+//   directed   a sentence said without the wake phrase: was it for Peika?
 //
 // Numbers and vectors only. Nothing here reads a word of the sentence: it is
 // embedded whole — less the names of the app's own things the registry found
@@ -17,15 +17,15 @@
 //
 // Measured 2026-10-18 with nomic-embed-text on Ollama, on the app's own 64
 // declarations (`scripts/voice-rank-eval.mjs --app`, 105 sentences meant for
-// Coucou, 14 negations, 12 for nobody). Before: whole descriptions embedded,
+// Peika, 14 negations, 12 for nobody). Before: whole descriptions embedded,
 // names left in — top-1 43 %, top-3 63 %, in the shortlist 77 %. Now: the
 // first sentence of each description (`indexText`), the twins reworded, the
 // names taken out and NAMED_BOOST — top-1 55 %, top-3 75 %, shortlist 85 %.
 // The local model is the normal path; tier 1 is a small saving.
 //
 // `directed` is NOT used to decide alone whether a sentence said without the
-// wake phrase was for Coucou: on those measurements sentences for nobody
-// score 0.48 to 0.64 and sentences for Coucou 0.50 to 0.94, so no band drops
+// wake phrase was for Peika: on those measurements sentences for nobody
+// score 0.48 to 0.64 and sentences for Peika 0.50 to 0.94, so no band drops
 // strays without dropping real commands (ignoring every stray would ignore
 // 46 % of those). The local model decides instead (voice/turn.ts). It stays
 // here, measured, for when an embedding model separates them.
@@ -76,12 +76,12 @@ export const INSTANT_SCORE = 0.6;
 /** Without the wake phrase: under this the sentence was for someone else, and nothing shows. PROVISIONAL, not measured. */
 export const DIRECTED_ASK = 0.45;
 
-/** Without the wake phrase: from this up it is acted on; between the two Coucou asks on screen. PROVISIONAL, not measured. */
+/** Without the wake phrase: from this up it is acted on; between the two Peika asks on screen. PROVISIONAL, not measured. */
 export const DIRECTED_ACT = 0.6;
 
 /**
  * How much lower both bands sit when a turn came just before: someone who
- * has just spoken to Coucou is likelier to be speaking to it still.
+ * has just spoken to Peika is likelier to be speaking to it still.
  * PROVISIONAL, not measured.
  */
 export const FOLLOWS_TURN_EASE = 0.05;
@@ -123,7 +123,7 @@ export const NAMED_BOOST = 0.08;
 
 /** The way out when the right capability was not ranked. */
 const MORE_TOOLS = "more_tools";
-/** The sentence asks for nothing, or was not for Coucou. */
+/** The sentence asks for nothing, or was not for Peika. */
 const NOTHING = "nothing";
 /** Beyond the local model: hand over to the cloud one. */
 const ESCALATE = "escalate";
@@ -337,8 +337,8 @@ export function instant(ranked: readonly Ranked[], capabilities: readonly Capabi
 }
 
 /**
- * A sentence said without the wake phrase: was it meant for Coucou? Low: it
- * is ignored and nothing shows. Middle: Coucou asks on screen. High: it is
+ * A sentence said without the wake phrase: was it meant for Peika? Low: it
+ * is ignored and nothing shows. Middle: Peika asks on screen. High: it is
  * acted on. `sure`: how sure the speech model was of each word, when it says.
  * With no ranking there is nothing to judge by, and it is ignored.
  */
@@ -375,7 +375,7 @@ export function shortlist(ranked: readonly Ranked[] | null, capabilities: readon
 /**
  * What a capability is embedded as: its area, and the first sentence of its
  * description — what it does. The sentences after it are for a model ("Not
- * for pausing Coucou itself", "to add, it is add_pills"); an embedding knows
+ * for pausing Peika itself", "to add, it is add_pills"); an embedding knows
  * no "not", and those words pull the vector towards the very capability they
  * point away from. Measured on the app's declarations with
  * scripts/voice-rank-eval.mjs --app (see NAMED_BOOST).

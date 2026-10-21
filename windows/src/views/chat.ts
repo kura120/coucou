@@ -12,7 +12,7 @@
 // behind the title on the left of the model: grouped by the folder they work
 // in, newest first. Opening one puts it back in the chat, on both sides. The
 // sessions Claude Code holds itself (a terminal, the Claude app) are in the
-// list too; those are Claude Code's to delete, not Coucou's.
+// list too; those are Claude Code's to delete, not Peika's.
 //
 // With Claude Code in a folder: each file it edits shows as a pill under the
 // answer, which opens the diff; and next to the conversations sits the list of
@@ -60,7 +60,7 @@ const STRINGS = {
   inFolder: N_("Claude Code can read, edit and run commands in this folder. What it must ask for shows in the island."),
   conversations: N_("Conversations"),
   newConversation: N_("New conversation"),
-  emptyTitle: N_("Ask Mochi anything"),
+  emptyTitle: N_("Ask Peika anything"),
   emptyHint: N_("Pick a model below, or just start typing."),
   emptyFolder: N_("Claude Code works in {folder}"),
   newChat: N_("New chat"),
@@ -460,7 +460,7 @@ function when(updated: number): string {
 }
 
 /** Where the folded folders of the list are remembered, on this machine. */
-const FOLDED_KEY = "coucou.conversations.folded";
+const FOLDED_KEY = "peika.conversations.folded";
 
 /** The folders the user folded away: their conversations stay out of sight. */
 export function loadFolded(): Set<string> {

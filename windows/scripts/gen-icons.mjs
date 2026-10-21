@@ -1,4 +1,4 @@
-// Draws Mochi into the PNG/ICO set Tauri needs. No dependencies: the icons are
+// Draws the cloud into the PNG/ICO set Tauri needs. No dependencies: the icons are
 // rasterised here and encoded with node:zlib, so the app icon stays "drawn in
 // code" like the character itself.
 //
@@ -11,19 +11,29 @@ import { fileURLToPath } from "node:url";
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", "src-tauri", "icons");
 
-// ── Mochi ─────────────────────────────────────────────────────────────────────
+// ── The cloud ─────────────────────────────────────────────────────────────────────
 
-const BASE_TOP = [255, 250, 245]; // #FFFAF5
-const BASE_BOTTOM = [221, 204, 191]; // #DDCCBF
+const BASE_TOP = [255, 255, 255]; // #FFFFFF
+const BASE_BOTTOM = [199, 218, 241]; // #C7DAF1
 const INK = [26, 20, 18]; // #1A1412
-const RIM = [0, 0, 0];
+const RIM = [58, 74, 99]; // #3A4A63
 
 const SS = 4; // supersampling factor
 
-/** Superellipse (exponent 2.7) test in body-local coordinates. */
-function insideBody(x, y, rx, ry) {
+/** The cloud's puffs as [x, y, radius] in units of R (same as src/peika/engine.ts). */
+const PUFFS = [
+  [0, -0.3, 0.52], [-0.46, -0.12, 0.38], [0.46, -0.12, 0.38],
+  [-0.72, 0.18, 0.36], [0.72, 0.18, 0.36], [-0.32, 0.36, 0.38], [0.32, 0.36, 0.38],
+];
+
+/** Cloud test in body-local coordinates; `grow` pushes the outline out (the rim). */
+function insideCloud(x, y, R, grow) {
   const n = 2.7;
-  return Math.pow(Math.abs(x / rx), n) + Math.pow(Math.abs(y / ry), n) <= 1;
+  if (Math.pow(Math.abs(x / (R * 0.8 + grow)), n) + Math.pow(Math.abs(y / (R * 0.64 + grow)), n) <= 1) return true;
+  for (const [px, py, pr] of PUFFS) {
+    if ((x - px * R) ** 2 + (y - py * R) ** 2 <= (pr * R + grow) ** 2) return true;
+  }
+  return false;
 }
 
 function insidePill(x, y, w, h) {
@@ -35,13 +45,13 @@ function insidePill(x, y, w, h) {
   return (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
 }
 
-function renderMochi(size) {
+function renderCloud(size) {
   const px = new Uint8Array(size * size * 4);
   const R = size * 0.34;
-  const rx = R * 1.14;
-  const ry = R * 0.88;
+  const rx = R * 1.0;
+  const ry = R * 0.8;
   const cx = size / 2;
-  const cy = size / 2 + R * 0.06;
+  const cy = size / 2;
   const rim = R * 0.055; // dark outline so the tray icon reads on light themes
 
   // Eyes — same geometry as BotEngine (yaw ±0.37, pitch −0.12)
@@ -64,9 +74,9 @@ function renderMochi(size) {
         for (let sx = 0; sx < SS; sx++) {
           const px0 = x + (sx + 0.5) / SS - cx;
           const py0 = y + (sy + 0.5) / SS - cy;
-          if (!insideBody(px0, py0, rx + rim, ry + rim)) continue;
+          if (!insideCloud(px0, py0, R, rim)) continue;
           rimHits++;
-          if (!insideBody(px0, py0, rx, ry)) continue;
+          if (!insideCloud(px0, py0, R, 0)) continue;
           bodyHits++;
           if (
             insidePill(px0 + ex, py0 - ey, ew, eh) ||
@@ -182,7 +192,7 @@ function encodeICO(entries) {
 
 mkdirSync(OUT, { recursive: true });
 
-const png = (size) => encodePNG(size, renderMochi(size));
+const png = (size) => encodePNG(size, renderCloud(size));
 
 const files = {
   "32x32.png": png(32),

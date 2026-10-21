@@ -1,4 +1,4 @@
-// Mochi's voice: what a command did, the answer to a question, or the question
+// Peika's voice: what a command did, the answer to a question, or the question
 // he asks, said out loud. Off by default, and only once the voice has been
 // downloaded (engine.rs). Made on this machine, in memory, and handed to the
 // island, which plays it like its other sounds — nothing is written to disk.
@@ -98,7 +98,7 @@ fn run(app: &AppHandle, rx: &Receiver<Job>) {
             continue;
         }
         let seconds = samples.len() as f64 / f64::from(sample_rate);
-        // Mochi does not listen to himself.
+        // Peika does not listen to himself.
         super::hush(Duration::from_secs_f64(seconds) + TAIL);
         let _ = app.emit_to(WINDOW_LABEL, EVENT, Speech { sample_rate, pcm: base64(&pcm16(&samples)) });
     }

@@ -1,6 +1,6 @@
 // The Spotify pill on the page: what src-tauri/src/spotify.rs reports (MPRIS
 // on Linux, Windows' media session on Windows), and the pure rules the views
-// and Mochi follow — ports of SpotifyController.swift, NowPlayingViews.swift
+// and Peika follow — ports of SpotifyController.swift, NowPlayingViews.swift
 // and the Mac's dance rules (BotCanvasView, DesktopMochi.swift).
 
 import type { BotStateName, IslandMode, IslandViewName } from "./layout";
@@ -141,11 +141,11 @@ export function marquee(textW: number, frameW: number): { distance: number; seco
   return { distance, seconds: Math.round((distance / MARQUEE_SPEED) * 10) / 10 };
 }
 
-/** The states Mochi dances in; the rest (an alert, an error, sleep) win. */
+/** The states Peika dances in; the rest (an alert, an error, sleep) win. */
 const DANCE_STATES: ReadonlySet<BotStateName> = new Set(["idle", "working", "thinking", "searching", "finished"]);
 
 /**
- * The island's Mochi (BotCanvasView, macOS): in the compact island whenever
+ * The island's Peika (BotCanvasView, macOS): in the compact island whenever
  * music plays, expanded only on the overview with the music pill in front.
  */
 export function islandDances(o: {
@@ -160,7 +160,7 @@ export function islandDances(o: {
   return o.mode === "expanded" && o.view === "overview" && o.focusId === SPOTIFY_ID;
 }
 
-/** Mochi on the desktop: the compact island's rules (DesktopMochi.swift). */
+/** Peika on the desktop: the compact island's rules (DesktopMochi.swift). */
 export function desktopDances(music: boolean, state: BotStateName): boolean {
   return music && DANCE_STATES.has(state);
 }
