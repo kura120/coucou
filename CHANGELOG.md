@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The Android app is removed from the repository (its code is © Rhytam Biswas, the original's side project, not Peika's), along with its workflows, its docs and its Pages section. The phone link in the desktop app stays for now, with its MIT notice in `windows/src-tauri/src/phone_link/LICENSE`.
 - **Coucou is now Peika** (Windows and Linux) — a new name and a new character: a small cloud instead of the blob. Click it and it plays peekaboo (covers its eyes, shrinks and trembles, then jumps back); three quick clicks make it dizzy. Its hands are puffs, the wardrobe is refitted to it, and the app icon is the cloud. The wake phrase is « OK Peika ».
 - Peika starts fresh: settings live in `%APPDATA%\Peika` (`~/.config/peika` on Linux), the hook is `peika-hook`, environment variables are `PEIKA_*`, and the Tauri identifier is `dev.kura120.peika`. Reinstall the agent hooks from Settings (and remove the old `coucou-hook` entries from `~/.claude/settings.json`), and enter your API keys again.
 - The phone-link wire constants (`coucou://pair`, the relay key label) are unchanged, so existing phone apps still pair.

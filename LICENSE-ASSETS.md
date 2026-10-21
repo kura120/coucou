@@ -9,11 +9,11 @@ The [MIT License](LICENSE) covers the **source code** of Coucou. It does **not**
 - the **app icon** and **menu bar icon** (`NotchBuddy/Assets.xcassets/`);
 - the **sounds** (`NotchBuddy/Resources/sounds/`);
 - the **images, GIFs and videos** in `docs/media/` and `design/`.
-- the copies of these assets anywhere else in this repository, such as the icon and the sounds in `android/app/src/main/res/` and `windows/`.
+- the copies of these assets anywhere else in this repository, such as the sounds in `windows/`.
 
-## Coucou for Android
+## The phone link
 
-Coucou for Android (`android/`) is part of Coucou and uses the name, Mochi, the icon and the sounds with the author's permission. Its code, and the phone link in `windows/src-tauri/src/phone_link/`, are © Rhytam Biswas under the MIT License ([`android/LICENSE`](android/LICENSE)); the assets stay under this file. The app is free, with no ads and no paid features.
+The phone link in `windows/src-tauri/src/phone_link/` is © Rhytam Biswas under the MIT License ([`LICENSE`](windows/src-tauri/src/phone_link/LICENSE)); the assets stay under this file.
 
 ## What you can do
 

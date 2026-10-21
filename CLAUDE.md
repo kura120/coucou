@@ -6,7 +6,7 @@ Peika is a small animated cloud at the top of the screen that shows AI coding ag
 - `windows/src-tauri/` — Rust: the app, the agent hooks (`agents.rs`, `agent_hooks.rs`), voice, phone link, platform code. `windows/hook/` — the `peika-hook` relay. `windows/src/` — TypeScript: the island, views, settings, and the character in `src/peika/` (`engine.ts` draws the cloud with Canvas, `outfits.ts` the wardrobe, `greeting.ts` the launch greeting).
 - `windows/dev/mascot-preview.html` — every state, outfit and the peekaboo of the cloud side by side (`npm run dev`, then `/dev/mascot-preview.html`; `?outfits`, `?hands`).
 - `windows/README.md` — what the app does and how to install it.
-- Inherited, being removed or replaced: `NotchBuddy/` (macOS and iPhone, Swift), `android/`, `relay/`, `design/`, `docs/`. Their sounds and media are the original author's (see `LICENSE-ASSETS.md`). `windows/vite.config.ts` still reads the sounds from `NotchBuddy/Resources/sounds`.
+- Inherited, being removed or replaced: `NotchBuddy/` (macOS and iPhone, Swift), `relay/`, `design/`, `docs/`. Their sounds and media are the original author's (see `LICENSE-ASSETS.md`). `windows/vite.config.ts` still reads the sounds from `NotchBuddy/Resources/sounds`.
 
 ## Build
 ```
