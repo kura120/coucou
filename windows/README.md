@@ -21,8 +21,8 @@ Approve Claude Code permissions, watch your session work, drop a file, chat with
 
 ## Install
 
-Download **[Peika-Windows.msi](https://github.com/Louis-CFM/coucou/releases/download/windows-latest/Peika-Windows.msi)**
-(Windows Installer) or **[Peika-Windows-setup.exe](https://github.com/Louis-CFM/coucou/releases/download/windows-latest/Peika-Windows-setup.exe)**,
+Download **[Peika-Windows.msi](https://github.com/kura120/peika/releases/download/windows-latest/Peika-Windows.msi)**
+(Windows Installer) or **[Peika-Windows-setup.exe](https://github.com/kura120/peika/releases/download/windows-latest/Peika-Windows-setup.exe)**,
 always the newest version, and run it. The .exe installs for the current user only, with no admin prompt; the .msi may ask for admin rights.
 
 **Windows will show a warning the first time — that's expected.** The installer isn't code-signed yet, so SmartScreen doesn't know the publisher:
@@ -775,7 +775,7 @@ npm run pack           # AppImage, .deb and .rpm in windows/release/
 On Arch Linux, build and install the package from `linux/arch/`:
 
 ```bash
-git clone https://github.com/Louis-CFM/coucou.git
+git clone https://github.com/kura120/peika.git
 cd peika/linux/arch
 makepkg -si
 ```
