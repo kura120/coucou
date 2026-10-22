@@ -24,7 +24,7 @@ use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoUninitiali
 use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 
 use super::vad::SAMPLE_RATE;
-use super::Unavailable;
+use super::MicError;
 
 const WAVE_FORMAT_IEEE_FLOAT: u16 = 3;
 /// AUDCLNT_BUFFERFLAGS_SILENT: the packet is silence, whatever its bytes say.
@@ -44,7 +44,7 @@ pub struct Capture {
 }
 
 impl Capture {
-    pub fn open() -> Result<Self, Unavailable> {
+    pub fn open() -> Result<Self, MicError> {
         unsafe {
             let com = CoInitializeEx(None, COINIT_MULTITHREADED).is_ok();
             let opened = Self::start();
@@ -71,13 +71,13 @@ impl Capture {
         }
     }
 
-    unsafe fn start() -> Result<(IAudioClient, IAudioCaptureClient, HANDLE), Unavailable> {
+    unsafe fn start() -> Result<(IAudioClient, IAudioCaptureClient, HANDLE), MicError> {
         unsafe {
             let devices: IMMDeviceEnumerator =
-                CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(Unavailable::error)?;
+                CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(MicError::error)?;
             // No default input, or Windows refuses the microphone to desktop apps.
-            let device = devices.GetDefaultAudioEndpoint(eCapture, eConsole).map_err(|_| Unavailable::Microphone)?;
-            let client: IAudioClient = device.Activate(CLSCTX_ALL, None).map_err(|_| Unavailable::Microphone)?;
+            let device = devices.GetDefaultAudioEndpoint(eCapture, eConsole).map_err(|_| MicError::Missing)?;
+            let client: IAudioClient = device.Activate(CLSCTX_ALL, None).map_err(|_| MicError::Missing)?;
             let format = WAVEFORMATEX {
                 wFormatTag: WAVE_FORMAT_IEEE_FLOAT,
                 nChannels: 1,
@@ -90,8 +90,8 @@ impl Capture {
             let flags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
             client
                 .Initialize(AUDCLNT_SHAREMODE_SHARED, flags, BUFFER, 0, &format, None)
-                .map_err(|_| Unavailable::Microphone)?;
-            let event = CreateEventW(None, false, false, None).map_err(Unavailable::error)?;
+                .map_err(|_| MicError::Missing)?;
+            let event = CreateEventW(None, false, false, None).map_err(MicError::error)?;
             let ready = (|| {
                 client.SetEventHandle(event)?;
                 let capture: IAudioCaptureClient = client.GetService()?;
@@ -102,7 +102,7 @@ impl Capture {
                 Ok(capture) => Ok((client, capture, event)),
                 Err(err) => {
                     let _ = CloseHandle(event);
-                    Err(Unavailable::error(err))
+                    Err(MicError::error(err))
                 }
             }
         }
@@ -110,7 +110,7 @@ impl Capture {
 
     /// Waits at most `wait` for sound, then appends everything that has
     /// arrived to `into`. Err: the microphone went away.
-    pub fn read(&mut self, wait: Duration, into: &mut Vec<f32>) -> Result<(), Unavailable> {
+    pub fn read(&mut self, wait: Duration, into: &mut Vec<f32>) -> Result<(), MicError> {
         #[cfg(debug_assertions)]
         if let Some(played) = self.played.as_mut() {
             // The microphone stays open and unread: what the room says is not heard.
@@ -122,21 +122,21 @@ impl Capture {
                 return Ok(());
             }
             loop {
-                let frames = self.capture.GetNextPacketSize().map_err(|_| Unavailable::Microphone)?;
+                let frames = self.capture.GetNextPacketSize().map_err(|_| MicError::Missing)?;
                 if frames == 0 {
                     return Ok(());
                 }
                 let mut data = std::ptr::null_mut::<u8>();
                 let mut count = 0u32;
                 let mut flags = 0u32;
-                self.capture.GetBuffer(&mut data, &mut count, &mut flags, None, None).map_err(|_| Unavailable::Microphone)?;
+                self.capture.GetBuffer(&mut data, &mut count, &mut flags, None, None).map_err(|_| MicError::Missing)?;
                 if flags & SILENT != 0 || data.is_null() {
                     into.extend(std::iter::repeat_n(0.0, count as usize));
                 } else {
                     // One float per frame: the format asked for above.
                     into.extend_from_slice(std::slice::from_raw_parts(data.cast::<f32>(), count as usize));
                 }
-                self.capture.ReleaseBuffer(count).map_err(|_| Unavailable::Microphone)?;
+                self.capture.ReleaseBuffer(count).map_err(|_| MicError::Missing)?;
             }
         }
     }
@@ -354,7 +354,7 @@ mod tests {
 
     /// The recordings `PEIKA_VOICE_WAV` names, cut out as sentences the way
     /// the listener cuts the microphone: how many there are and how long each
-    /// is. `cargo test -p peika voice::capture -- --ignored --nocapture`
+    /// is. `cargo test -p peika speech::capture -- --ignored --nocapture`
     #[test]
     #[ignore = "reads the recordings PEIKA_VOICE_WAV names"]
     fn the_recordings_named_are_each_cut_out_as_one_sentence() {
@@ -363,7 +363,7 @@ mod tests {
         assert!(!clips.is_empty(), "no 16-bit PCM recording there");
         let count = clips.len();
         let mut played = played::Played::of(clips);
-        let mut sentences = crate::voice::vad::Sentences::default();
+        let mut sentences = crate::speech::vad::Sentences::default();
         for at in 0..count {
             played.say_next();
             let mut cut = Vec::new();
@@ -379,7 +379,7 @@ mod tests {
     }
 
     /// Opens the real microphone for a second and reads from it:
-    /// `cargo test -p peika voice::capture -- --ignored --nocapture`.
+    /// `cargo test -p peika speech::capture -- --ignored --nocapture`.
     #[test]
     #[ignore = "opens the microphone"]
     fn the_microphone_gives_sixteen_thousand_samples_a_second() {

@@ -32,8 +32,8 @@
 // different way each time. It is given the wake phrases and nothing else — a
 // fixed grammar can only hear the sentences it was given, and no list of
 // sentences is kept for voice. The command after it is always free speech,
-// by the bundled engine (engine.rs, sherpa.rs): the microphone is read here
-// (capture.rs), a sentence is cut out of it (vad.rs) and written down. Where
+// by the bundled engine (speech/engine.rs, speech/sherpa.rs): the microphone is read
+// (speech/capture.rs), a sentence is cut out of it (speech/vad.rs) and written down. Where
 // that engine's hearing part is not installed, and the model server may not
 // hear in its place, nothing listens and the status says why (`noEngine`). For a
 // few seconds after a command, another may follow without the wake phrase:
@@ -73,20 +73,21 @@ pub mod brain;
 pub mod cloud;
 pub mod debug;
 pub mod embed;
-#[cfg(windows)]
-mod capture;
-pub mod engine;
 mod hear;
 pub mod mcp;
 #[cfg(windows)]
 mod sapi;
-mod sherpa;
 mod speak;
 // Nothing uses the fingerprints yet: the measurement only.
 #[allow(dead_code)]
 mod speaker;
-mod vad;
 mod session;
+
+// The engine, the microphone and the sentence cutter are the speech
+// service's, shared with dictation and the Notetaker (src/speech/).
+#[cfg(windows)]
+use crate::speech::capture;
+use crate::speech::{engine, sherpa, vad};
 
 #[cfg(windows)]
 use sapi::Recogniser;
@@ -125,6 +126,15 @@ impl Unavailable {
     #[cfg(windows)]
     fn error(err: windows::core::Error) -> Self {
         Self::Error(format!("{:#010x}", err.code().0))
+    }
+}
+
+impl From<crate::speech::MicError> for Unavailable {
+    fn from(err: crate::speech::MicError) -> Self {
+        match err {
+            crate::speech::MicError::Missing => Self::Microphone,
+            crate::speech::MicError::Error(code) => Self::Error(code),
+        }
     }
 }
 
@@ -867,6 +877,8 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, rx: &Receiver<Control>) 
     let mut paused = false;
     let mut ear = Listen::Nothing;
     let mut held_checked: Option<Instant> = None;
+    // Who else listens (speech/mic.rs): a change is looked at at once.
+    let mut mic_seen = crate::speech::mic::generation();
     let mut hush_until: Option<Instant> = None;
     // The command is the rest of the sentence that woke Peika: not to be forgotten.
     let mut same_breath = false;
@@ -893,9 +905,13 @@ fn listen(app: &AppHandle, generation: u64, plan: Plan, rx: &Receiver<Control>) 
         if hushed {
             session.speaking(now);
         }
-        if held_checked.is_none_or(|at| now.duration_since(at) >= HOLD_CHECK) {
+        let mic_now = crate::speech::mic::generation();
+        if mic_now != mic_seen || held_checked.is_none_or(|at| now.duration_since(at) >= HOLD_CHECK) {
+            mic_seen = mic_now;
             held_checked = Some(now);
-            if let Some(heard) = session.hold(paused || system_hold()) {
+            // Someone dictating or a note recording: voice stands aside, or
+            // it would take their words for commands.
+            if let Some(heard) = session.hold(paused || system_hold() || crate::speech::mic::voice_stands_aside()) {
                 tell(app, heard);
             }
         }

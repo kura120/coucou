@@ -20,14 +20,15 @@ use std::time::Duration;
 use reqwest::Url;
 use serde_json::{json, Value};
 
-use super::{brain, vad};
+use super::brain;
+use crate::speech::vad;
 use crate::local_chat::{self, Server};
 use crate::net;
 use crate::settings::Settings;
 
 /// What `voice.hearingModel` says when the model server is to hear. Not one
 /// of `engine::HEARING_MODELS`: nothing is downloaded for it.
-pub const ID: &str = "server";
+pub const ID: &str = crate::speech::engine::SERVER_HEARING;
 
 /// The listener waits this long and no longer: a model that is already loaded
 /// answers in a fraction of a second (gemma4:e4b on a GPU: 0.15 s to 0.4 s),
