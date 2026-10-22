@@ -267,6 +267,12 @@ class AppState {
 
   promptContext: PromptContext | null = null;
   droppedFile: { name: string; path: string } | null = null;
+  /**
+   * The screen capture the user selected (`capture-taken`): `path` is the PNG in
+   * the temp folder, `thumb` a preview at most 320 px wide. Shown on the capture
+   * card until it is pasted, copied, sent to the chat or closed (island/capture.ts).
+   */
+  capture: { path: string; width: number; height: number; thumb: string } | null = null;
   noteMessage: string | null = null;
   /**
    * What the listening view shows: the words so far, and the question Peika
