@@ -1207,6 +1207,22 @@ input[type="range"]::-webkit-slider-thumb {
   background: linear-gradient(135deg, #ff6b5b, #f7b32b, #2dd4a7, #38bdf8, #a78bfa);
 }
 
+/* Takes an attached window off before anything is sent. */
+.chip-x {
+  margin-left: 2px;
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: var(--dim-2);
+  font: 400 13px var(--font);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chip-x:hover {
+  color: var(--ink);
+}
+
 .chat-log {
   flex: 1 1 auto;
   min-height: 0;
