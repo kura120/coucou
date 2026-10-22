@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **The Crypto pill** (Windows and Linux), as on the Mac: the price of up to eight coins from Coinbase or OKX public market data (no account, no key). Each shows its 24-hour change and a sparkline of the last 24 hours. Prices refresh every minute and the curves every ten, only while the pill is on. Exchange, currency (USD or EUR) and coins are in Settings → Integrations (default BTC, ETH, SOL in dollars), and a row opens the pair on the exchange.
 - The macOS and iPhone app, the relay, the scripts and the specs say Peika too: bundle ids are `dev.kura120.peika` (Mac direct build `dev.kura120.peika.direct`), the Apple team id and the original's hosted relay address are gone, and `Sources/CoucouKit` is `Sources/PeikaKit`. Not built or run: there is no Mac or Xcode here.
 - The original app icons and menu bar icon are replaced by the cloud, and the Mochi character stills and outfit sheet are removed. The sounds and the other media stay until Peika has its own.
 - The Android app is removed from the repository (its code is © Rhytam Biswas, the original's side project, not Peika's), along with its workflows, its docs and its Pages section. The phone link goes with it (see below).
