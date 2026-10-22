@@ -62,6 +62,10 @@ windows = { version = "0.61", features = [
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
   "Win32_UI_Input_KeyboardAndMouse",
+  # The window in front as the chat's context: a browser's address bar
+  # through UI Automation, and windows the system cloaks (window_context.rs).
+  "Win32_UI_Accessibility",
+  "Win32_Graphics_Dwm",
   "Win32_UI_Shell",
   "Win32_UI_Shell_Common",
   "Win32_UI_WindowsAndMessaging",

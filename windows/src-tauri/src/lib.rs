@@ -40,6 +40,7 @@ mod voice;
 mod web_search;
 #[cfg(windows)]
 mod webview_drop;
+mod window_context;
 
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -175,6 +176,10 @@ fn set_island_rect(app: AppHandle, shared: State<Shared>, x: f64, y: f64, width:
 #[tauri::command]
 fn focus_window(app: AppHandle, focused: bool) {
     let Some(win) = island::window(&app) else { return };
+    // The window in front until now is the one the attach shortcut means.
+    if focused {
+        window_context::remember_front();
+    }
     platform::set_activating(&win, focused);
     if focused {
         let _ = win.set_focus();
