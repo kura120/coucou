@@ -10,6 +10,7 @@ mod clipboard;
 mod codex_plan;
 mod config_file;
 mod conversations;
+mod crypto;
 mod desktop;
 mod files;
 mod github;
