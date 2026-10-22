@@ -1,11 +1,11 @@
 // The bundled speech engine: sherpa-onnx with the hearing model the user chose
-// (Moonshine or Parakeet, voice/engine.rs), which writes down a whole sentence
+// (Moonshine or Parakeet, engine.rs), which writes down a whole sentence
 // once it has been said. Unlike Windows' grammar
 // recogniser it hears anything, not a list — so this is what lets a command
 // be said freely.
 //
 // It is not part of the installer: the user asks for it in Settings and it is
-// downloaded then (voice/engine.rs). The library is loaded from that folder at
+// downloaded then (engine.rs). The library is loaded from that folder at
 // run time, through its C API, with nothing linked at build time.
 //
 // The structs below are `c-api.h` of sherpa-onnx 1.13.8, field for field: the
@@ -744,18 +744,18 @@ impl Drop for Speaker {
 // ── Loading the library ───────────────────────────────────────────────────────
 
 #[cfg(windows)]
-pub(super) const LIBRARY: &str = "sherpa-onnx-c-api.dll";
+pub(crate) const LIBRARY: &str = "sherpa-onnx-c-api.dll";
 #[cfg(not(windows))]
-pub(super) const LIBRARY: &str = "libsherpa-onnx-c-api.so";
+pub(crate) const LIBRARY: &str = "libsherpa-onnx-c-api.so";
 
 #[cfg(windows)]
-pub(super) struct Library(windows::Win32::Foundation::HMODULE);
+pub(crate) struct Library(windows::Win32::Foundation::HMODULE);
 
 #[cfg(windows)]
 impl Library {
     /// By its full path, and its own folder searched for what it needs
     /// (onnxruntime.dll) — never the current directory or PATH.
-    pub(super) fn open(path: &Path) -> Result<Self, String> {
+    pub(crate) fn open(path: &Path) -> Result<Self, String> {
         use windows::core::HSTRING;
         use windows::Win32::System::LibraryLoader::{LoadLibraryExW, LOAD_WITH_ALTERED_SEARCH_PATH};
         if !path.is_absolute() || !path.is_file() {
@@ -767,7 +767,7 @@ impl Library {
     }
 
     /// `T` must be the function pointer type of that symbol.
-    pub(super) unsafe fn function<T: Copy>(&self, name: &str) -> Result<T, String> {
+    pub(crate) unsafe fn function<T: Copy>(&self, name: &str) -> Result<T, String> {
         use windows::core::PCSTR;
         use windows::Win32::System::LibraryLoader::GetProcAddress;
         let symbol = CString::new(name).map_err(|_| "bad name".to_string())?;
@@ -786,15 +786,15 @@ impl Drop for Library {
 
 /// Linux comes with its own step of the plan.
 #[cfg(not(windows))]
-pub(super) struct Library;
+pub(crate) struct Library;
 
 #[cfg(not(windows))]
 impl Library {
-    pub(super) fn open(_path: &Path) -> Result<Self, String> {
+    pub(crate) fn open(_path: &Path) -> Result<Self, String> {
         Err("the speech engine is not available on this system yet".into())
     }
 
-    pub(super) unsafe fn function<T: Copy>(&self, name: &str) -> Result<T, String> {
+    pub(crate) unsafe fn function<T: Copy>(&self, name: &str) -> Result<T, String> {
         Err(format!("{name} is missing"))
     }
 }
@@ -849,7 +849,7 @@ mod tests {
     /// With the real engine and voice on disk (`PEIKA_VOICE_RUNTIME`,
     /// `PEIKA_VOICE_SPEAKER`), a sentence comes out as sound, and when
     /// `PEIKA_VOICE_MODEL` is there too, it is heard back as its words.
-    /// `cargo test -p peika voice::sherpa -- --ignored --nocapture`
+    /// `cargo test -p peika speech::sherpa -- --ignored --nocapture`
     #[test]
     #[ignore = "needs the downloaded engine"]
     fn a_sentence_is_said_and_heard_back() {
@@ -892,7 +892,7 @@ mod tests {
     /// With the real engine and model on disk, a spoken sentence comes back as
     /// its words: `PEIKA_VOICE_RUNTIME`, `PEIKA_VOICE_MODEL` and
     /// `PEIKA_VOICE_WAV` (16-bit mono) say where they are.
-    /// `cargo test -p peika voice::sherpa -- --ignored --nocapture`
+    /// `cargo test -p peika speech::sherpa -- --ignored --nocapture`
     #[test]
     #[ignore = "needs the downloaded engine"]
     fn a_spoken_sentence_is_written_down() {

@@ -197,12 +197,16 @@ fn default_at() -> usize {
 /// the settings before anything listens.
 static CHOSEN: AtomicUsize = AtomicUsize::new(0);
 
+/// What the settings say when the model server is to hear (voice/hear.rs).
+/// Not one of `HEARING_MODELS`: nothing is downloaded for it.
+pub const SERVER_HEARING: &str = "server";
+
 /// The settings name a hearing model; one they do not know is the default.
-/// When they name the model server instead (hear.rs), this is the model that
-/// hears a sentence the server did not: the smallest that is installed.
+/// When they name the model server instead (voice/hear.rs), this is the model
+/// that hears a sentence the server did not: the smallest that is installed.
 /// Returns its place in the list, for whoever must notice a change.
 pub fn choose(id: &str) -> usize {
-    let at = if id == super::hear::ID {
+    let at = if id == SERVER_HEARING {
         HEARING_MODELS.iter().position(Hearing::installed).unwrap_or(0)
     } else {
         HEARING_MODELS.iter().position(|model| model.id == id).unwrap_or_else(default_at)
@@ -570,8 +574,8 @@ mod tests {
             // Its files are fetched only over https, from the release page or one pinned revision.
             assert!(model.files.iter().all(|file| file.address().starts_with("https://")));
             assert!(model.files.iter().all(|file| !file.url.starts_with("https://") || file.url.contains("/resolve/") && !file.url.contains("/resolve/main/")));
-            // "server" is the model server's name in the settings (hear.rs).
-            assert_ne!(model.id, super::super::hear::ID);
+            // "server" is the model server's name in the settings (voice/hear.rs).
+            assert_ne!(model.id, SERVER_HEARING);
         }
         assert!(dir().ends_with(format!("sherpa-onnx-{VERSION}")));
         assert_ne!(model_dir(Part::Hearing), model_dir(Part::Speaking));

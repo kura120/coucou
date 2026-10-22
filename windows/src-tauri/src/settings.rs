@@ -108,10 +108,10 @@ pub struct VoicePref {
     pub brain_model: String,
     /// What writes down a command: "system" (Windows' recogniser, which hears
     /// the sentences it was given) or "bundled" (the downloaded engine, which
-    /// hears anything — voice/sherpa.rs). The wake phrase is Windows' either way.
+    /// hears anything — speech/sherpa.rs). The wake phrase is Windows' either way.
     pub engine: String,
     /// Which model the bundled engine writes a command down with: one of
-    /// `voice::engine::HEARING_MODELS` by its id, the default when unknown.
+    /// `speech::engine::HEARING_MODELS` by its id, the default when unknown.
     pub hearing_model: String,
     /// Seconds after a command during which another may be said without the
     /// wake phrase. 0 turns it off. Only with the bundled engine.
@@ -161,7 +161,7 @@ impl Default for VoicePref {
             brain: String::new(),
             brain_model: String::new(),
             engine: "system".into(),
-            hearing_model: crate::voice::engine::DEFAULT_HEARING.into(),
+            hearing_model: crate::speech::engine::DEFAULT_HEARING.into(),
             follow_up: 8,
             speak: false,
             speaker: "female".into(),

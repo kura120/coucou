@@ -34,6 +34,7 @@ mod session_window;
 mod settings;
 mod shortcuts;
 mod sounds;
+mod speech;
 mod spotify;
 mod toast;
 mod tray;
