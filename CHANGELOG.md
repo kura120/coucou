@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **The Peika window** (Windows and Linux): the Settings window is now Peika's own window, with three little Peikas walking along a band at the top (they stop when the window is hidden, and stand still with reduced motion). Launching Peika again opens it, and it shows in the taskbar while it is open. Every setting is where it was; the dictation and Notetaker pages will join it.
 - The macOS and iPhone app, the relay, the scripts and the specs say Peika too: bundle ids are `dev.kura120.peika` (Mac direct build `dev.kura120.peika.direct`), the Apple team id and the original's hosted relay address are gone, and `Sources/CoucouKit` is `Sources/PeikaKit`. Not built or run: there is no Mac or Xcode here.
 - The original app icons and menu bar icon are replaced by the cloud, and the Mochi character stills and outfit sheet are removed. The sounds and the other media stay until Peika has its own.
 - The Android app is removed from the repository (its code is © Rhytam Biswas, the original's side project, not Peika's), along with its workflows, its docs and its Pages section. The phone link goes with it (see below).
