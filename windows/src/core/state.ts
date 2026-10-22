@@ -16,6 +16,7 @@ import { DEFAULT_OUTFIT, type Outfit } from "../peika/wardrobe";
 import { pillColor } from "./pill-colors";
 import { Spotify, musicCardShown, musicPlaying } from "./spotify";
 import { ApprovalQueue, type Queued } from "./approvals";
+import { PillSessions } from "./sessions";
 
 export type AgentSource = "claudeCode" | "n8n" | "agent";
 export type PillBadge = "approval" | "finished" | "error";
@@ -346,8 +347,15 @@ class AppState {
   showingPlanDetail = false;
   /** Which one: the Codex card rather than Claude's. */
   planDetailIsCodex = false;
+  /**
+   * The sessions behind each pill (Claude Code in two folders under VS Code
+   * share one pill): when each was last heard, its folder and project.
+   */
+  sessions = new PillSessions();
   /** Per-pill file diffs, in order of reception. Steps carry their ids. */
   sessionDiffs = new Map<string, FileDiff[]>();
+  /** The session each diff came from, by diff id, so one session ending takes only its own. */
+  private diffSession = new Map<number, string>();
   private sessionDiffTimers = new Map<string, number>();
   /** Never reset, so an id can never point at a newer diff than the one tapped. */
   private nextDiffId = 0;
@@ -511,12 +519,13 @@ class AppState {
     this.notify();
   }
 
-  /** Stores a diff for a pill and returns its id (for the ticker step). */
-  appendSessionDiff(pillId: string, diff: FileDiff): number {
+  /** Stores a diff for a pill, with the session it came from, and returns its id (for the ticker step). */
+  appendSessionDiff(pillId: string, diff: FileDiff, sessionId = ""): number {
     const id = this.nextDiffId++;
     const list = this.sessionDiffs.get(pillId) ?? [];
     list.push({ ...diff, id });
-    while (list.length > MAX_DIFFS_PER_PILL) list.shift();
+    this.diffSession.set(id, sessionId);
+    while (list.length > MAX_DIFFS_PER_PILL) this.diffSession.delete(list.shift()!.id);
     this.sessionDiffs.set(pillId, list);
     // One timer per pill, re-armed on every diff — nothing polls.
     const prev = this.sessionDiffTimers.get(pillId);
@@ -532,7 +541,18 @@ class AppState {
     return this.sessionDiffs.get(pillId)?.find((d) => d.id === id) ?? null;
   }
 
-  clearSessionDiffs(pillId: string) {
+  /**
+   * Forgets a pill's diffs: all of them, or only the ones a single session
+   * made while the others behind the pill keep theirs.
+   */
+  clearSessionDiffs(pillId: string, sessionId?: string) {
+    const list = this.sessionDiffs.get(pillId) ?? [];
+    const kept = sessionId == null ? [] : list.filter((d) => this.diffSession.get(d.id) !== sessionId);
+    for (const d of list) if (!kept.includes(d)) this.diffSession.delete(d.id);
+    if (kept.length > 0) {
+      this.sessionDiffs.set(pillId, kept);
+      return;
+    }
     const timer = this.sessionDiffTimers.get(pillId);
     if (timer != null) window.clearTimeout(timer);
     this.sessionDiffTimers.delete(pillId);
