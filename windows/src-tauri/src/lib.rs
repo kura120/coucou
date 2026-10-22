@@ -197,6 +197,13 @@ fn reposition(app: AppHandle, shared: State<Shared>) {
     island::apply_geometry(&app, &pref, collapsed);
 }
 
+/// Whether a fullscreen app or a presentation is in front (Windows only), asked
+/// when an alert is about to open the island.
+#[tauri::command]
+fn user_busy() -> bool {
+    platform::user_busy()
+}
+
 /// The displays the island can be pinned to, for Settings.
 #[tauri::command]
 fn list_monitors(app: AppHandle) -> Vec<island::MonitorChoice> {
@@ -903,6 +910,7 @@ pub fn run() {
             focus_window,
             reposition,
             list_monitors,
+            user_busy,
             open_url,
             open_in_vscode,
             open_session,
