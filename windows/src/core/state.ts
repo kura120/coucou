@@ -198,6 +198,10 @@ export interface Settings {
   };
   /** The search engine the browser opens a search on. */
   searchEngine: string;
+  /** The Crypto pill's prices: the exchange they come from, the currency, and the coins as typed. */
+  cryptoExchange: "coinbase" | "okx";
+  cryptoCurrency: "USD" | "EUR";
+  cryptoCoins: string;
   desktopPeika?: {
     onDesktop: boolean;
     spot: { x: number; y: number; space: string } | null;
@@ -238,6 +242,9 @@ export const DEFAULT_SETTINGS: Settings = {
   language: "",
   voice: { enabled: false, wake: true, brain: "", brainModel: "", engine: "system", hearingModel: "parakeet-0.6b", followUp: 8, speak: false, speaker: "female", embedModel: "", cloud: false, webAnswers: false, webSearch: "browser", debugLog: false },
   searchEngine: "google",
+  cryptoExchange: "coinbase",
+  cryptoCurrency: "USD",
+  cryptoCoins: "BTC, ETH, SOL",
 };
 
 type Listener = () => void;

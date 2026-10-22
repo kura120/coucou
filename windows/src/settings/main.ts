@@ -783,9 +783,50 @@ const INTEGRATIONS: IntegrationDef[] = [
     fields: [{ key: "notion-api-key", label: N_("Integration token"), placeholder: "ntn_…", secret: true }] },
   { id: "integration_calcom", name: "Cal.com", color: "#C9956A",
     fields: [{ key: "calcom-api-key", label: N_("API key"), placeholder: "cal_…", secret: true }] },
+  // Not a key: the exchange, the currency and the coins are plain settings (cryptoRows).
+  { id: "integration_crypto", name: "Crypto", color: "#F7931A", fields: [],
+    hint: N_("Public prices from the exchange you pick. No account or key.") },
   // Nothing to enter: Spotify is read from the system (see core/pills.ts).
   { id: "integration_spotify", name: "Spotify", color: "#1DB954", fields: [] },
 ];
+
+/** The Crypto pill's settings: the exchange, the currency and the coins, saved as settings (no key). */
+function cryptoRows(): HTMLElement[] {
+  const exchange = h("select", {}) as HTMLSelectElement;
+  exchange.append(h("option", { value: "coinbase", text: "Coinbase" }), h("option", { value: "okx", text: "OKX" }));
+  exchange.value = settings.cryptoExchange;
+  exchange.addEventListener("change", () => {
+    settings.cryptoExchange = exchange.value as Settings["cryptoExchange"];
+    void save();
+  });
+
+  const currency = h("select", {}) as HTMLSelectElement;
+  currency.append(h("option", { value: "USD", text: "USD" }), h("option", { value: "EUR", text: "EUR" }));
+  currency.value = settings.cryptoCurrency;
+  currency.addEventListener("change", () => {
+    settings.cryptoCurrency = currency.value as Settings["cryptoCurrency"];
+    void save();
+  });
+
+  const coins = h("input", {
+    type: "text",
+    placeholder: "BTC, ETH, SOL",
+    autocomplete: "off",
+    spellcheck: "false",
+    style: "flex:1 1 auto;min-width:0",
+  }) as HTMLInputElement;
+  coins.value = settings.cryptoCoins;
+  coins.addEventListener("change", () => {
+    settings.cryptoCoins = coins.value.trim();
+    void save();
+  });
+
+  return [
+    h("div", { class: "row" }, h("label", { style: "min-width:104px", text: t("Exchange") }), exchange),
+    h("div", { class: "row" }, h("label", { style: "min-width:104px", text: t("Currency") }), currency),
+    h("div", { class: "row" }, h("label", { style: "min-width:104px", text: t("Coins") }), coins),
+  ];
+}
 
 const MAX_ACTIVE = MAX_DECLARED;
 
@@ -855,6 +896,7 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
       );
     }
 
+    if (def.id === "integration_crypto") rows.append(...cryptoRows());
     if (def.hint) rows.append(h("div", { class: "hint", text: t(def.hint) }));
     if (def.id === "integration_spotify") {
       // As on the Mac's row: said only when there is no Spotify to launch.

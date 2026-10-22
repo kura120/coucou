@@ -2870,6 +2870,33 @@ input[type="range"]::-webkit-slider-thumb {
   color: #c5c8cd;
 }
 
+/* ── Crypto prices (views/integrations.ts cryptoCard) ──────────────────── */
+.crypto-symbol {
+  font: 600 11px var(--font);
+  color: #c5c8cd;
+  flex: 0 0 auto;
+}
+
+.crypto-change {
+  font: 500 11px var(--mono);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.crypto-spark {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  overflow: visible;
+}
+
+.crypto-row.crypto-link {
+  cursor: pointer;
+}
+
+.crypto-row.crypto-link:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
 /* ── GitHub pulse (GitHubPulseCardView / GitHubDetailView) ─────────────── */
 
 .gh-spark {

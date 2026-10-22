@@ -56,6 +56,7 @@ const OPEN_URLS: Record<string, string> = {
   integration_stripe: "https://dashboard.stripe.com/payments",
   integration_notion: "https://notion.so",
   integration_calcom: "https://app.cal.com/bookings",
+  integration_crypto: "https://www.coinbase.com/explore",
 };
 
 /** IntegrationCardView.statusLabel on macOS. */
@@ -414,6 +415,92 @@ function n8nDetail(task: AgentTask, onBack: () => void): HTMLElement {
   );
 }
 
+// ── Crypto ────────────────────────────────────────────────────────────────────
+
+const CRYPTO_COLOR = "#F7931A";
+const CRYPTO_UP = "#22C55E";
+const CRYPTO_DOWN = "#F4505E";
+/** A row opens the exchanges' own pages, and nothing else. */
+const CRYPTO_PAGES = ["https://www.coinbase.com/", "https://www.okx.com/"];
+
+/** Whether a quote's trade link may be opened. */
+export function isCryptoTradeUrl(url: unknown): url is string {
+  return typeof url === "string" && CRYPTO_PAGES.some((page) => url.startsWith(page));
+}
+
+/** Whole units from 1000 up, cents from 1, four decimals below. */
+export function cryptoPrice(price: number, currency: string): string {
+  const digits = price >= 1000 ? 0 : price >= 1 ? 2 : 4;
+  return new Intl.NumberFormat(language(), {
+    style: "currency", currency, minimumFractionDigits: digits, maximumFractionDigits: digits,
+  }).format(price);
+}
+
+/** "+1.87 %" or "−0.42 %": the minus is U+2212, as on the Mac. */
+export function cryptoChange(pct: number): string {
+  const amount = new Intl.NumberFormat(language(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .format(Math.abs(pct));
+  return `${pct < 0 ? "−" : "+"}${amount} %`;
+}
+
+/** A 48 × 14 line through the closes, oldest first: no fill, no axes. */
+function cryptoSpark(closes: number[], color: string): SVGSVGElement | null {
+  const values = closes.filter((v) => Number.isFinite(v));
+  if (values.length < 2) return null;
+  const w = 48;
+  const hgt = 14;
+  const lo = Math.min(...values);
+  const range = Math.max(...values) - lo || 1;
+  const points = values
+    .map((v, i) => `${((i * w) / (values.length - 1)).toFixed(1)},${(hgt - ((v - lo) / range) * hgt).toFixed(1)}`)
+    .join(" ");
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+  line.setAttribute("points", points);
+  line.setAttribute("fill", "none");
+  line.setAttribute("stroke", color);
+  line.setAttribute("stroke-width", "1.2");
+  line.setAttribute("stroke-linejoin", "round");
+  line.setAttribute("stroke-linecap", "round");
+  const el = svg("", 14);
+  el.setAttribute("viewBox", `0 0 ${w} ${hgt}`);
+  el.setAttribute("width", String(w));
+  el.classList.add("crypto-spark");
+  el.replaceChildren(line);
+  return el;
+}
+
+function cryptoCard(): HTMLElement {
+  const d = get("integration_crypto");
+  const code = String(d.currency ?? "");
+  const currency = /^[A-Z]{3}$/.test(code) ? code : "USD";
+  const rows = h("div", { class: "int-rows" });
+  arr("integration_crypto", "quotes").slice(0, 3).forEach((q, i) => {
+    const price = Number(q.price);
+    const change = Number(q.changePct);
+    const accent = change < 0 ? CRYPTO_DOWN : CRYPTO_UP;
+    const url = q.tradeUrl;
+    const cells: Node[] = [
+      h("b", { class: "crypto-symbol", text: String(q.symbol ?? "") }),
+      h("span", { class: "int-amount", text: Number.isFinite(price) ? cryptoPrice(price, currency) : "—" }),
+      h("span", { class: "crypto-change", style: `color:${accent}`, text: Number.isFinite(change) ? cryptoChange(change) : "" }),
+    ];
+    const spark = cryptoSpark(Array.isArray(q.spark) ? q.spark.map(Number) : [], accent);
+    if (spark) cells.push(spark);
+    const row = listRow(accent, i === 0, ...cells);
+    row.classList.add("crypto-row");
+    if (isCryptoTradeUrl(url)) {
+      row.classList.add("crypto-link");
+      row.addEventListener("click", () => void Bridge.openUrl(url));
+    }
+    rows.append(row);
+  });
+  const missing = Array.isArray(d.missing) ? d.missing.map(String) : [];
+  if (missing.length > 0) {
+    rows.append(h("div", { class: "int-empty", text: t("Not found: {symbols}", { symbols: missing.join(", ") }) }));
+  }
+  return h("div", { class: "int-card" }, header(CRYPTO_COLOR, "Crypto", t("Prices")), rows);
+}
+
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
 export interface IntegrationCardHooks {
@@ -438,6 +525,8 @@ export function hasIntegrationData(id: string): boolean {
       return info.loaded;
     case "integration_notion":
       return arr(id, "pages").length > 0;
+    case "integration_crypto":
+      return arr(id, "quotes").length > 0;
     case "integration_calcom":
       return info.loaded;
     default:
@@ -479,6 +568,8 @@ export function renderIntegrationCard(task: AgentTask, hooks: IntegrationCardHoo
       return notionCard();
     case "integration_calcom":
       return calcomCard();
+    case "integration_crypto":
+      return cryptoCard();
     default:
       return idleCard(task, hooks.openSettings);
   }
