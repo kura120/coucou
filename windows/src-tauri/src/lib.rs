@@ -811,14 +811,9 @@ fn hide_settings_window(app: AppHandle) {
     }
 }
 
-#[tauri::command]
-fn open_settings_window(app: AppHandle, page: Option<String>) {
-    show_window(&app, page.as_deref());
-}
-
 /// The Peika window, optionally on a page (the id of a leaf of the tree).
 #[tauri::command]
-fn open_peika_window(app: AppHandle, page: Option<String>) {
+fn open_settings_window(app: AppHandle, page: Option<String>) {
     show_window(&app, page.as_deref());
 }
 
@@ -939,7 +934,6 @@ pub fn run() {
             github_refresh,
             open_n8n,
             open_settings_window,
-            open_peika_window,
             hide_settings_window,
             close_settings_window,
             minimize_settings_window,

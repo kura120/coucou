@@ -92,9 +92,8 @@ export const Bridge = {
 
   quit: () => call<void>("quit_app"),
 
-  openSettingsWindow: (page?: string) => call<void>("open_settings_window", { page }),
   /** The Peika window (the settings window), on a page of its tree if given. */
-  openPeikaWindow: (page?: string) => call<void>("open_peika_window", { page }),
+  openSettingsWindow: (page?: string) => call<void>("open_settings_window", { page }),
   /** The settings page finished its closing motion: hide its window. */
   hideSettingsWindow: () => call<void>("hide_settings_window"),
   /** The settings page's own title bar: close, minimize, maximize, drag. */
