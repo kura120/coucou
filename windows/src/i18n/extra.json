@@ -2256,6 +2256,105 @@
    "ru": "Отправить сообщение",
    "id": "Kirim pesan"
   },
+  "While you were away": {
+   "zh-Hans": "你不在的时候",
+   "hi": "आपके दूर रहने के दौरान",
+   "es": "Mientras no estabas",
+   "ar": "أثناء غيابك",
+   "fr": "Pendant votre absence",
+   "bn": "আপনি যখন দূরে ছিলেন",
+   "pt-BR": "Enquanto você estava fora",
+   "ru": "Пока вас не было",
+   "id": "Selama Anda pergi"
+  },
+  "Away for {time}": {
+   "zh-Hans": "离开了 {time}",
+   "hi": "{time} के लिए दूर",
+   "es": "Ausente {time}",
+   "ar": "غائب منذ {time}",
+   "fr": "Absent {time}",
+   "bn": "{time} দূরে ছিলেন",
+   "pt-BR": "Ausente por {time}",
+   "ru": "Отсутствовали {time}",
+   "id": "Pergi selama {time}"
+  },
+  "stopped on an error": {
+   "zh-Hans": "因错误而停止",
+   "hi": "त्रुटि पर रुक गया",
+   "es": "se detuvo por un error",
+   "ar": "توقف بسبب خطأ",
+   "fr": "s'est arrêté sur une erreur",
+   "bn": "ত্রুটিতে থেমে গেছে",
+   "pt-BR": "parou com um erro",
+   "ru": "остановился из-за ошибки",
+   "id": "berhenti karena kesalahan"
+  },
+  "asked for your approval": {
+   "zh-Hans": "请求你的批准",
+   "hi": "ने आपकी मंज़ूरी माँगी",
+   "es": "pidió tu aprobación",
+   "ar": "طلب موافقتك",
+   "fr": "a demandé votre accord",
+   "bn": "আপনার অনুমোদন চেয়েছে",
+   "pt-BR": "pediu sua aprovação",
+   "ru": "запросил ваше разрешение",
+   "id": "meminta persetujuan Anda"
+  },
+  "asked you a question": {
+   "zh-Hans": "向你提了一个问题",
+   "hi": "ने आपसे एक सवाल पूछा",
+   "es": "te hizo una pregunta",
+   "ar": "طرح عليك سؤالاً",
+   "fr": "vous a posé une question",
+   "bn": "আপনাকে একটি প্রশ্ন করেছে",
+   "pt-BR": "fez uma pergunta a você",
+   "ru": "задал вам вопрос",
+   "id": "mengajukan pertanyaan kepada Anda"
+  },
+  "still waiting": {
+   "zh-Hans": "仍在等待",
+   "hi": "अब भी प्रतीक्षा में",
+   "es": "sigue esperando",
+   "ar": "لا يزال في الانتظار",
+   "fr": "attend toujours",
+   "bn": "এখনও অপেক্ষায়",
+   "pt-BR": "ainda aguardando",
+   "ru": "всё ещё ждёт",
+   "id": "masih menunggu"
+  },
+  "back in its terminal": {
+   "zh-Hans": "已回到它的终端",
+   "hi": "अपने टर्मिनल में लौट गया",
+   "es": "volvió a su terminal",
+   "ar": "عاد إلى الطرفية",
+   "fr": "revenu dans son terminal",
+   "bn": "টার্মিনালে ফিরে গেছে",
+   "pt-BR": "voltou ao terminal",
+   "ru": "вернулся в терминал",
+   "id": "kembali ke terminalnya"
+  },
+  "and {count} more": {
+   "zh-Hans": "另有 {count} 项",
+   "hi": "और {count}",
+   "es": "y {count} más",
+   "ar": "و{count} أخرى",
+   "fr": "et {count} de plus",
+   "bn": "এবং আরও {count}টি",
+   "pt-BR": "e mais {count}",
+   "ru": "и ещё {count}",
+   "id": "dan {count} lagi"
+  },
+  "minutes away, then Peika tells what happened (0: never)": {
+   "zh-Hans": "分钟后，Peika 会告诉你发生了什么（0：从不）",
+   "hi": "मिनट दूर रहने पर Peika बताएगा कि क्या हुआ (0: कभी नहीं)",
+   "es": "minutos fuera, y Peika te cuenta lo que pasó (0: nunca)",
+   "ar": "دقيقة من الغياب، ثم يخبرك Peika بما حدث (0: أبداً)",
+   "fr": "minutes d'absence, puis Peika raconte ce qui s'est passé (0 : jamais)",
+   "bn": "মিনিট দূরে থাকলে Peika কী ঘটেছে জানাবে (0: কখনও না)",
+   "pt-BR": "minutos fora, e o Peika conta o que aconteceu (0: nunca)",
+   "ru": "минут отсутствия, затем Peika расскажет, что произошло (0: никогда)",
+   "id": "menit pergi, lalu Peika menceritakan apa yang terjadi (0: tidak pernah)"
+  },
   "Sending by email isn't in this version.": {
    "zh-Hans": "此版本暂不支持通过邮件发送。",
    "hi": "ईमेल से भेजना इस संस्करण में नहीं है।",

@@ -31,6 +31,7 @@ import { language, t, tl, type Msg } from "../i18n/i18n";
 import type { ViewCommand } from "../island/shortcuts";
 import { registerVoiceCards } from "./voice-cards";
 import { buildCapture } from "./capture";
+import { buildAway } from "./away";
 import { VIEW_SCREENS, type Shown } from "../island/screen";
 
 export interface ViewActions {
@@ -977,6 +978,7 @@ export function buildViews(
   map.set("listening", buildListening(actions));
   map.set("voiceResult", buildVoiceResult());
   map.set("capture", buildCapture(actions));
+  map.set("away", buildAway(actions));
   // Not in the Windows v1: sending a file by email, window attach + web result.
   map.set("mail", buildPlaceholder(tl("Sending by email isn't in this version."), ""));
   map.set("searching", buildPlaceholder(tl("Claude is searching…"), ""));
