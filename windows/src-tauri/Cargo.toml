@@ -66,6 +66,10 @@ windows = { version = "0.61", features = [
   # own imaging codecs, no image crate (capture/win.rs).
   "Win32_Graphics_Gdi",
   "Win32_Graphics_Imaging",
+  # The window in front as the chat's context: a browser's address bar
+  # through UI Automation, and windows the system cloaks (window_context.rs).
+  "Win32_UI_Accessibility",
+  "Win32_Graphics_Dwm",
   "Win32_UI_Shell",
   "Win32_UI_Shell_Common",
   "Win32_UI_WindowsAndMessaging",

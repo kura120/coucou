@@ -128,6 +128,19 @@ function agentWho(task: AgentTask | null, label: string): HTMLElement {
   return row;
 }
 
+/**
+ * Who asks on a waiting card: its pill, named after the session that asks
+ * (several share a pill), and "1/3" while others wait behind it.
+ */
+function askerWho(label: string): HTMLElement {
+  const req = State.pendingApproval;
+  const task = State.focusTask;
+  const row = agentWho(task && req?.projectName ? { ...task, name: req.projectName } : task, label);
+  const waiting = State.approvals.count;
+  if (waiting > 1) row.append(h("span", { class: "queue", text: `1/${waiting}` }));
+  return row;
+}
+
 function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElement {
   const el = h("div", { class: "stack" }, ...children);
   el.style.padding = `4px ${padRight}px 4px ${padLeft}px`;
@@ -595,7 +608,7 @@ function buildApproval(actions: ViewActions): ViewHost {
         shownAt = performance.now();
       }
       clear(who);
-      who.append(agentWho(State.focusTask, t("needs permission")));
+      who.append(askerWho(t("needs permission")));
       // The whole point of approving here rather than in the terminal: this line
       // is the command, the file path or the URL being authorised, not just the
       // name of the tool asking.
@@ -633,7 +646,13 @@ function buildQuestion(actions: ViewActions): ViewHost {
   // between a mouse-down and a mouse-up would swallow the click.
   let rowKey = "";
 
+  // As on the permission card: a click meant for the card just answered must
+  // not land on the next request that takes its place.
+  let shownAt = 0;
+  const fresh = () => performance.now() - shownAt < CLICK_GUARD_MS;
+
   const next = (question: string, answer: string | string[], total: number) => {
+    if (fresh()) return;
     answers[question] = answer;
     picked = new Set();
     index += 1;
@@ -664,6 +683,7 @@ function buildQuestion(actions: ViewActions): ViewHost {
 
       if (State.pendingApproval!.requestId !== requestId) {
         requestId = State.pendingApproval!.requestId;
+        shownAt = performance.now();
         index = 0;
         answers = {};
         picked = new Set();
@@ -672,7 +692,7 @@ function buildQuestion(actions: ViewActions): ViewHost {
       const asking = questions.length > 1
         ? t("is asking ({index} of {total})", { index: index + 1, total: questions.length })
         : t("is asking");
-      who.append(agentWho(State.focusTask, asking));
+      who.append(askerWho(asking));
       title.textContent = q.question;
       title.title = q.question;
 
@@ -706,7 +726,9 @@ function buildQuestion(actions: ViewActions): ViewHost {
           class: "link-btn",
           style: "color:#8e939c",
           text: tl("Answer in terminal"),
-          onclick: () => actions.answerInTerminal(),
+          onclick: () => {
+            if (!fresh()) actions.answerInTerminal();
+          },
         }),
       );
     },

@@ -63,8 +63,8 @@ pub const ACTIONS: &[ActionDef] = &[
     action("openChat", "Ctrl+Alt+Space", true, true),
     action("goToAlert", "Ctrl+Alt+A", true, true),
     action("jumpToTerminal", "Ctrl+Alt+T", true, true),
-    // Dragging Peika onto a window is not in this version.
-    action("attachFrontWindow", "Ctrl+Alt+F", true, false),
+    // Windows only: reserved on Linux (see `available_here`).
+    action("attachFrontWindow", "Ctrl+Alt+F", true, true),
     action("nextPill", "Ctrl+Alt+Right", true, true),
     action("prevPill", "Ctrl+Alt+Left", true, true),
     action("muteToggle", "Ctrl+Alt+S", true, true),
@@ -80,10 +80,11 @@ pub fn find(id: &str) -> Option<&'static ActionDef> {
     ACTIONS.iter().find(|a| a.id == id)
 }
 
-/// Ported, and doable on this system: capturing the screen needs Windows'
-/// screen and input calls (capture/win.rs).
+/// Ported, and doable on this system: attaching the front window and
+/// capturing the screen need Windows' window, UI Automation, screen and
+/// input calls (window_context.rs, capture/win.rs).
 fn available_here(def: &ActionDef) -> bool {
-    def.ported && (cfg!(windows) || def.id != "captureScreen")
+    def.ported && (cfg!(windows) || !matches!(def.id, "attachFrontWindow" | "captureScreen"))
 }
 
 /// What an action does, in English: the key of its label in Settings
@@ -345,6 +346,10 @@ pub fn dispatch<R: Runtime>(app: &AppHandle<R>, action: &str) {
     crate::log::line(format!("shortcut {action}"));
     if action == "wardrobeToggle" {
         let _ = app.emit_to(WINDOW_LABEL, "open-wardrobe", ());
+    } else if action == "attachFrontWindow" {
+        // Read here, while the window the user is in is still in front: the
+        // island gets it as `window-context`.
+        crate::window_context::attach_front(app);
     } else if action == "talkToPeika" {
         // Straight to the listener: the island hears about it when it wakes.
         crate::voice::talk();
@@ -766,11 +771,11 @@ mod tests {
     }
 
     #[test]
-    fn the_action_not_ported_yet_is_reserved_not_registered() {
+    fn attaching_the_front_window_is_reserved_where_it_cannot_be_done() {
+        assert!(ACTIONS.iter().all(|def| def.ported));
         let plan = plan(&Bindings::new(), never);
         for (def, outcome) in plan {
-            let reserved = def.id == "attachFrontWindow";
-            assert_eq!(def.ported, !reserved);
+            let reserved = matches!(def.id, "attachFrontWindow" | "captureScreen") && !cfg!(windows);
             match outcome {
                 Ok(_) => assert!(def.ported && def.enabled_by_default, "{}", def.id),
                 Err(s) if reserved => assert_eq!(s.status, Status::NotPorted),
@@ -889,7 +894,8 @@ mod tests {
         assert_eq!(from_args(&args(&["peika", "--shortcut"])), None);
         assert_eq!(from_args(&args(&["peika", "--shortcut", "rm -rf"])), None);
         assert_eq!(from_args(&args(&["peika", "--shortcut", "desktopToggle"])), Some("desktopToggle"));
-        assert_eq!(from_args(&args(&["peika", "--shortcut", "attachFrontWindow"])), None);
+        let attach = from_args(&args(&["peika", "--shortcut", "attachFrontWindow"]));
+        assert_eq!(attach, cfg!(windows).then_some("attachFrontWindow"));
         assert_eq!(from_args(&args(&["peika"])), None);
     }
 }

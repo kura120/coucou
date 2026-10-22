@@ -19,7 +19,8 @@ use crate::{claude, claude_code, local_chat, openai_compat, secrets};
 pub const ANTHROPIC: &str = "anthropic";
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+// rename_all names the variants; the window's fields come as appName too.
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum ChatContext {
     File { name: String, path: String },
     Window { app_name: String, title: String, url: Option<String> },
@@ -460,6 +461,19 @@ mod tests {
         let win = ChatContext::Window { app_name: "Code".into(), title: "main.rs".into(), url: None };
         assert_eq!(plain_question(true, Some(&win), "q"), "Context — App: Code, Window: main.rs\n\nq");
         assert_eq!(window_line("Edge", "Docs", Some("https://x.dev")), "Context — App: Edge, Window: Docs, URL: https://x.dev");
+    }
+
+    #[test]
+    fn the_page_s_window_context_reads_with_its_camel_case_fields() {
+        let sent = serde_json::json!({ "kind": "window", "appName": "Firefox", "title": "Docs", "url": "https://a.b" });
+        let Ok(ChatContext::Window { app_name, title, url }) = serde_json::from_value::<ChatContext>(sent) else {
+            panic!("a window context from the page must deserialize");
+        };
+        assert_eq!((app_name.as_str(), title.as_str(), url.as_deref()), ("Firefox", "Docs", Some("https://a.b")));
+        let no_url = serde_json::json!({ "kind": "window", "appName": "Code", "title": "main.rs" });
+        assert!(matches!(serde_json::from_value::<ChatContext>(no_url), Ok(ChatContext::Window { url: None, .. })));
+        let file = serde_json::json!({ "kind": "file", "name": "a.txt", "path": "/x/a.txt" });
+        assert!(matches!(serde_json::from_value::<ChatContext>(file), Ok(ChatContext::File { .. })));
     }
 
     #[test]

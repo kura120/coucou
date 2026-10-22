@@ -11,8 +11,8 @@
 use std::ffi::{c_char, c_void, CString};
 use std::path::{Path, PathBuf};
 
-use super::engine;
-use super::sherpa::{Library, LIBRARY};
+use crate::speech::engine;
+use crate::speech::sherpa::{Library, LIBRARY};
 
 /// The folder of the model, under `engine::dir()`.
 const MODEL_DIR: &str = "speaker-campplus";

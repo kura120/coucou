@@ -82,6 +82,15 @@ pub struct Settings {
     /// user picks another. Kept as it comes, like `peika_outfit`: the island
     /// reads one it does not know as the default.
     pub search_engine: String,
+    /// The exchange the crypto pill reads prices from: "coinbase" or "okx"
+    /// (crypto.rs). Kept as it comes: one it does not know reads as coinbase.
+    pub crypto_exchange: String,
+    /// The currency the crypto pill prices in: "USD" or "EUR" (crypto.rs).
+    /// Kept as it comes: one it does not know reads as USD.
+    pub crypto_currency: String,
+    /// The coins the user typed, as written ("BTC, ETH, SOL"). crypto.rs
+    /// splits and cleans them.
+    pub crypto_coins: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -99,10 +108,10 @@ pub struct VoicePref {
     pub brain_model: String,
     /// What writes down a command: "system" (Windows' recogniser, which hears
     /// the sentences it was given) or "bundled" (the downloaded engine, which
-    /// hears anything — voice/sherpa.rs). The wake phrase is Windows' either way.
+    /// hears anything — speech/sherpa.rs). The wake phrase is Windows' either way.
     pub engine: String,
     /// Which model the bundled engine writes a command down with: one of
-    /// `voice::engine::HEARING_MODELS` by its id, the default when unknown.
+    /// `speech::engine::HEARING_MODELS` by its id, the default when unknown.
     pub hearing_model: String,
     /// Seconds after a command during which another may be said without the
     /// wake phrase. 0 turns it off. Only with the bundled engine.
@@ -152,7 +161,7 @@ impl Default for VoicePref {
             brain: String::new(),
             brain_model: String::new(),
             engine: "system".into(),
-            hearing_model: crate::voice::engine::DEFAULT_HEARING.into(),
+            hearing_model: crate::speech::engine::DEFAULT_HEARING.into(),
             follow_up: 8,
             speak: false,
             speaker: "female".into(),
@@ -223,6 +232,9 @@ impl Default for Settings {
             desktop_peika: DesktopPeikaPref::default(),
             voice: VoicePref::default(),
             search_engine: "google".into(),
+            crypto_exchange: "coinbase".into(),
+            crypto_currency: "USD".into(),
+            crypto_coins: "BTC, ETH, SOL".into(),
         }
     }
 }
@@ -504,7 +516,10 @@ mod tests {
   "language": "pt-BR",
   "desktopPeika": { "onDesktop": true, "spot": { "x": 1500.5, "y": -300.0, "space": "screen" } },
   "voice": { "enabled": true, "wake": false, "brain": "ollama", "brainModel": "qwen2.5:7b-instruct", "engine": "bundled", "hearingModel": "parakeet-110m", "followUp": 5, "speak": true, "speaker": "male", "embedModel": "nomic-embed-text", "cloud": true, "webAnswers": true, "webSearch": "brave", "debugLog": true },
-  "searchEngine": "duckduckgo"
+  "searchEngine": "duckduckgo",
+  "cryptoExchange": "okx",
+  "cryptoCurrency": "EUR",
+  "cryptoCoins": "DOGE, ADA"
 }"##;
 
     fn custom() -> Value {
@@ -719,6 +734,25 @@ mod tests {
     }
 
     #[test]
+    fn the_crypto_pill_starts_on_coinbase_in_dollars_with_three_coins() {
+        let d = Settings::default();
+        assert_eq!(d.crypto_exchange, "coinbase");
+        assert_eq!(d.crypto_currency, "USD");
+        assert_eq!(d.crypto_coins, "BTC, ETH, SOL");
+        // A file from before the pill keeps every other setting.
+        let loaded = shown(&parse(&custom_with("cryptoCoins", None)).unwrap());
+        let mut expected = custom();
+        expected["cryptoCoins"] = json!("BTC, ETH, SOL");
+        assert_eq!(loaded, expected);
+    }
+
+    #[test]
+    fn a_crypto_choice_this_build_does_not_know_is_kept_as_written() {
+        let loaded = parse(&custom_with("cryptoExchange", Some(json!("kraken")))).unwrap();
+        assert_eq!(loaded.crypto_exchange, "kraken");
+    }
+
+    #[test]
     fn a_missing_field_takes_its_default_and_the_rest_are_kept() {
         for key in custom().as_object().unwrap().keys() {
             let loaded = parse(&custom_with(key, None))
@@ -738,6 +772,7 @@ mod tests {
             ("mainPill", json!(["agent_cursor"])),
             ("screen", Value::Null),
             ("shortcuts", json!("Ctrl+Alt+A")),
+            ("cryptoCoins", json!(["BTC"])),
         ] {
             let loaded = parse(&custom_with(key, Some(wrong)))
                 .unwrap_or_else(|| panic!("a file with a bad {key} was thrown away"));
@@ -976,6 +1011,9 @@ mod tests {
                 "desktopPeika",
                 "voice",
                 "searchEngine",
+                "cryptoExchange",
+                "cryptoCurrency",
+                "cryptoCoins",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

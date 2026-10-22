@@ -14,8 +14,8 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
-use super::engine::{self, Part};
-use super::sherpa::{Speaker, Voice};
+use crate::speech::engine::{self, Part};
+use crate::speech::sherpa::{Speaker, Voice};
 use crate::island::WINDOW_LABEL;
 
 const EVENT: &str = "voice-speech";

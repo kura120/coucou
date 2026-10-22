@@ -31,6 +31,7 @@ import { DesktopLink } from "./desktop";
 import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../peika/desktop-logic";
 import { interruptedAfter, isPlace } from "./restore";
+import { showNextCard } from "./hooks";
 import {
   RESULT_SHOWN_MS, SPEECH_WAITED_MS, VOICE_PATIENCE_MS, createTurns, sayResult, stopSpeaking, wakeBlocked, willSpeak,
 } from "./voice";
@@ -212,7 +213,12 @@ export class Island {
 
   /** The request has its answer: the card goes and the session carries on. */
   private closeApproval() {
-    State.endApproval();
+    const next = State.endApproval();
+    // Another request was waiting behind this one: it takes the card.
+    if (next) {
+      showNextCard(this, next);
+      return;
+    }
     this.fsm.pinned = false;
     this.cardGone();
   }
@@ -292,6 +298,10 @@ export class Island {
           integration_stripe: "https://dashboard.stripe.com/payments",
           integration_notion: "https://notion.so",
           integration_calcom: "https://app.cal.com/bookings",
+          // The prices' own exchange.
+          integration_crypto: State.settings.cryptoExchange === "okx"
+            ? "https://www.okx.com/markets/prices"
+            : "https://www.coinbase.com/explore",
         };
         if (task.id === CLAUDE_DESKTOP_ID) void Bridge.openClaudeDesktop();
         else if (task.id === "integration_claude" || task.sessionId) {
@@ -987,8 +997,8 @@ export class Island {
     void Bridge.log(`decide deny (voice) req=${pending.requestId}`);
     Sound.play("blip");
     void Bridge.approvalDecision(pending.requestId, "deny");
-    State.endApproval();
-    this.fsm.pinned = false;
+    // The next request in line is left on the card for a click, never answered by voice.
+    if (!State.endApproval()) this.fsm.pinned = false;
     return true;
   }
 

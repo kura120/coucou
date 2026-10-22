@@ -5558,6 +5558,72 @@
    "pt-BR": "Clique em Permitir no cartão para aprovar",
    "ru": "Нажмите «Разрешить» на карточке, чтобы одобрить",
    "id": "Klik Izinkan pada kartu untuk menyetujuinya"
+  },
+  "Prices": {
+   "zh-Hans": "价格",
+   "hi": "कीमतें",
+   "es": "Precios",
+   "ar": "الأسعار",
+   "fr": "Cours",
+   "bn": "দাম",
+   "pt-BR": "Cotações",
+   "ru": "Курсы",
+   "id": "Harga"
+  },
+  "Not found: {symbols}": {
+   "zh-Hans": "未找到：{symbols}",
+   "hi": "नहीं मिला: {symbols}",
+   "es": "No encontrado: {symbols}",
+   "ar": "غير موجود: {symbols}",
+   "fr": "Introuvable : {symbols}",
+   "bn": "পাওয়া যায়নি: {symbols}",
+   "pt-BR": "Não encontrado: {symbols}",
+   "ru": "Не найдено: {symbols}",
+   "id": "Tidak ditemukan: {symbols}"
+  },
+  "Exchange": {
+   "zh-Hans": "交易所",
+   "hi": "एक्सचेंज",
+   "es": "Exchange",
+   "ar": "المنصة",
+   "fr": "Plateforme",
+   "bn": "এক্সচেঞ্জ",
+   "pt-BR": "Corretora",
+   "ru": "Биржа",
+   "id": "Bursa"
+  },
+  "Currency": {
+   "zh-Hans": "货币",
+   "hi": "मुद्रा",
+   "es": "Moneda",
+   "ar": "العملة",
+   "fr": "Devise",
+   "bn": "মুদ্রা",
+   "pt-BR": "Moeda",
+   "ru": "Валюта",
+   "id": "Mata uang"
+  },
+  "Coins": {
+   "zh-Hans": "币种",
+   "hi": "सिक्के",
+   "es": "Monedas",
+   "ar": "العملات",
+   "fr": "Cryptos",
+   "bn": "কয়েন",
+   "pt-BR": "Moedas",
+   "ru": "Монеты",
+   "id": "Koin"
+  },
+  "Public prices from the exchange you pick. No account or key.": {
+   "zh-Hans": "来自你所选交易所的公开价格。无需账户或密钥。",
+   "hi": "आपके चुने एक्सचेंज के सार्वजनिक भाव। कोई खाता या कुंजी नहीं।",
+   "es": "Precios públicos de la plataforma que elijas. Sin cuenta ni clave.",
+   "ar": "أسعار عامة من المنصة التي تختارها. بلا حساب ولا مفتاح.",
+   "fr": "Cours publics de la plateforme choisie. Ni compte ni clé.",
+   "bn": "আপনার বেছে নেওয়া এক্সচেঞ্জের সর্বজনীন দাম। কোনো অ্যাকাউন্ট বা কী লাগে না।",
+   "pt-BR": "Cotações públicas da corretora que você escolher. Sem conta nem chave.",
+   "ru": "Публичные курсы выбранной биржи. Без аккаунта и ключа.",
+   "id": "Harga publik dari bursa yang Anda pilih. Tanpa akun atau kunci."
   }
  }
 }

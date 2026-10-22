@@ -605,6 +605,15 @@ async fn finish_drop(app: &AppHandle, d: &Desktop, pos: (f64, f64), from: Source
         i.carry = None;
         i.landed = !home;
     }
+    // Let go with Ctrl held over someone's window: that window goes to the
+    // chat, as dropping him on a window does on the Mac. Ctrl, because here
+    // windows cover the screen and a plain move must stay a move. He still
+    // lands where he was let go.
+    if !home && d.mode == DesktopMode::Poll && crate::window_context::ctrl_held() {
+        if let Some((cx, cy)) = platform::cursor_physical() {
+            crate::window_context::attach_at(app, cx, cy);
+        }
+    }
     if home {
         if from == Source::Island {
             // Back where he came from: he simply reappears in the island.

@@ -33,7 +33,7 @@ export interface BootInfo {
   cursorPoll: boolean;
 }
 
-/** The bundled engine's parts (src-tauri/src/voice/engine.rs): what hears free speech, and Peika's voice. */
+/** The bundled engine's parts (src-tauri/src/speech/engine.rs): what hears free speech, and Peika's voice. */
 export type VoiceEnginePart = "hearing" | "speaking";
 
 /** src-tauri/src/voice/mod.rs `Status`. */
