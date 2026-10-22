@@ -15,6 +15,7 @@ import type { Bindings } from "./shortcuts";
 import { DEFAULT_OUTFIT, type Outfit } from "../peika/wardrobe";
 import { pillColor } from "./pill-colors";
 import { Spotify, musicCardShown, musicPlaying } from "./spotify";
+import { ApprovalQueue, type Queued } from "./approvals";
 
 export type AgentSource = "claudeCode" | "n8n" | "agent";
 export type PillBadge = "approval" | "finished" | "error";
@@ -43,13 +44,15 @@ export interface AgentTask {
   finalLine?: string | null;
 }
 
-export interface ApprovalInfo {
-  requestId: string;
-  sessionId: string;
+export interface ApprovalInfo extends Queued {
   /** The pill the request belongs to: VS Code's or Cursor's (Claude Code), or an agent's (Codex…). */
   pillId: string;
-  tool: string;
   command: string;
+  /**
+   * The project of the Claude Code session that asks. Several sessions share a
+   * pill, which is named after the latest one: the card names the one asking.
+   */
+  projectName?: string;
   /** Set when Claude Code is asking a question rather than for a permission. */
   questions?: AskedQuestion[];
 }
@@ -303,7 +306,17 @@ class AppState {
   chatUserHeight = 0;
   /** The chat's lower edge is being dragged: the island follows without easing. */
   chatResizing = false;
-  pendingApproval: ApprovalInfo | null = null;
+  /** Every request waiting for an answer, oldest first; the head is on the card. */
+  approvals = new ApprovalQueue<ApprovalInfo>();
+  /** The request on the card: the oldest one waiting. */
+  get pendingApproval(): ApprovalInfo | null {
+    return this.approvals.head;
+  }
+  /** Replaces everything waiting with this one request, or with nothing. */
+  set pendingApproval(info: ApprovalInfo | null) {
+    this.approvals.clear();
+    if (info) this.approvals.enqueue(info);
+  }
   /**
    * The last view one stays in (island/restore.ts): what the island opens on
    * again. Kept while the app runs, not across a restart.
@@ -411,33 +424,60 @@ class AppState {
   }
 
   /**
-   * A permission card or a question comes up: its pill comes to the front, and
-   * the pill that was there is remembered (HookServer.focusBeforeApproval).
+   * A permission request or a question arrives. With nothing waiting it goes
+   * on the card ("shown"); behind another it waits its turn ("queued"); past
+   * the bound it is refused ("full") and goes back to its terminal. Its pill
+   * shows that it waits either way.
    */
-  beginApproval(info: ApprovalInfo) {
-    this.pendingApproval = info;
-    this.isPinned = true;
-    if (this.focusBeforeApproval == null) this.focusBeforeApproval = this.focusId;
-    this.setFocus(info.pillId);
+  beginApproval(info: ApprovalInfo): "shown" | "queued" | "full" {
+    if (!this.approvals.enqueue(info)) return "full";
+    this.updateTask(info.pillId, info.questions ? "question" : "approval");
+    if (this.approvals.head !== info) return "queued";
+    this.showApprovalHead();
+    return "shown";
   }
 
   /**
-   * The card has its answer, or is withdrawn: the session carries on, and the
-   * pill you were on comes back — unless you moved to another one meanwhile.
+   * The card comes up for the head: its pill comes to the front, and the pill
+   * that was there before the first card is remembered (HookServer.focusBeforeApproval).
    */
-  endApproval() {
-    const req = this.pendingApproval;
-    if (!req) return;
-    this.pendingApproval = null;
+  private showApprovalHead() {
+    const head = this.approvals.head;
+    if (!head) return;
+    this.updateTask(head.pillId, head.questions ? "question" : "approval");
+    this.isPinned = true;
+    if (this.focusBeforeApproval == null) this.focusBeforeApproval = this.focusId;
+    this.setFocus(head.pillId);
+  }
+
+  /**
+   * A request has its answer, or is withdrawn (the head when no id is given).
+   * Its session carries on. The next one waiting takes the card, and is
+   * returned; with none left, the pill you were on comes back — unless you
+   * moved to another one meanwhile.
+   */
+  endApproval(requestId?: string): ApprovalInfo | null {
+    const head = this.approvals.head;
+    const req = this.approvals.remove(requestId ?? head?.requestId ?? "");
+    if (!req) return null;
+    if (!this.approvals.hasPill(req.pillId)) {
+      this.updateTask(req.pillId, "working");
+      this.setPillBadge(req.pillId, null);
+    }
+    const next = this.approvals.head;
+    if (next) {
+      if (req === head) this.showApprovalHead();
+      this.notify();
+      return req === head ? next : null;
+    }
     this.isPinned = false;
-    this.updateTask(req.pillId, "working");
-    this.setPillBadge(req.pillId, null);
     const previous = this.focusBeforeApproval;
     this.focusBeforeApproval = null;
     if (previous && this.focusId === req.pillId && this.tasks.some((t) => t.id === previous)) {
       this.focusId = previous;
     }
     this.notify();
+    return null;
   }
 
   updateTask(id: string, state: BotStateName) {

@@ -225,11 +225,23 @@ function typingDots(): HTMLElement {
   );
 }
 
-/** The coloured chip showing what the question is about (a dropped file). */
-function contextChip(label: string): HTMLElement {
-  const chip = h("div", { class: "chip" }, h("i", { class: "chip-dot" }), h("span", { text: label }));
+/**
+ * The coloured chip showing what the question is about: a dropped file, or an
+ * attached window, which can be taken off before anything is sent.
+ */
+function contextChip(label: string, detail: string, onRemove?: () => void): HTMLElement {
+  const chip = h("div", { class: "chip", title: detail }, h("i", { class: "chip-dot" }), h("span", { text: label }));
+  if (onRemove) {
+    chip.append(h("button", { class: "chip-x", title: tl("Remove"), text: "×", onclick: onRemove }));
+  }
   requestAnimationFrame(() => chip.classList.add("settled"));
   return chip;
+}
+
+/** An attached window on its chip: the app and the window's title, cut short. */
+export function windowChipLabel(appName: string, title: string): string {
+  const full = title ? `${appName} · ${title}` : appName;
+  return full.length > 48 ? `${full.slice(0, 47).trimEnd()}…` : full;
 }
 
 function saveSettings() {
@@ -1069,9 +1081,17 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     State.notify();
     onHeightChange();
 
+    // What the conversation is about goes with its first message only.
     const file = State.droppedFile;
-    const context: ChatContext | null =
-      State.chatHistory.length === 1 && file ? { kind: "file", name: file.name, path: file.path } : null;
+    const attached = State.promptContext?.kind === "window" ? State.promptContext : null;
+    const first = State.chatHistory.length === 1;
+    const context: ChatContext | null = !first
+      ? null
+      : file
+        ? { kind: "file", name: file.name, path: file.path }
+        : attached
+          ? { kind: "window", appName: attached.appName, title: attached.title, ...(attached.url ? { url: attached.url } : {}) }
+          : null;
 
     try {
       const reply = await Bridge.chatSend(query, context);
@@ -1137,11 +1157,21 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     el,
     sync() {
       const file = State.droppedFile;
-      const wantChip = file?.name ?? "";
+      const attached = State.promptContext?.kind === "window" ? State.promptContext : null;
+      const wantChip = file?.name ?? (attached ? windowChipLabel(attached.appName, attached.title) : "");
       if (chipRow.dataset.label !== wantChip) {
         chipRow.dataset.label = wantChip;
         clear(chipRow);
-        if (wantChip) chipRow.append(contextChip(wantChip));
+        if (file) {
+          chipRow.append(contextChip(wantChip, file.name));
+        } else if (attached) {
+          const detail = [attached.appName, attached.title, attached.url].filter(Boolean).join("\n");
+          chipRow.append(contextChip(wantChip, detail, () => {
+            State.promptContext = null;
+            State.notify();
+            input.focus();
+          }));
+        }
       }
 
       const thinking = State.stateOverride === "thinking";

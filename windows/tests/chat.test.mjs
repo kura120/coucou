@@ -578,3 +578,42 @@ test("the folder's pull requests are listed in two halves, and only asked for wh
   assert.match($(".pulls").textContent, /gh: not signed in/);
   assert.match($(".pulls").textContent, /No local branch waiting/);
 });
+
+test("an attached window shows on its chip, can be taken off, and goes with the first question only", async () => {
+  State.promptContext = { kind: "window", appName: "Google Chrome", title: "Peika — GitHub", url: "https://github.com/kura120/peika" };
+  view.sync();
+  // The label, then the × that takes it off.
+  assert.equal($(".chip").textContent, "Google Chrome · Peika — GitHub×");
+  answers.chat_send = { text: "ok" };
+  $(".chat-input").value = "what is this?";
+  $(".send-btn").fire("click");
+  await flush();
+  $(".chat-input").value = "and then?";
+  $(".send-btn").fire("click");
+  await flush();
+  assert.deepEqual(sent("chat_send").map((s) => s.context), [
+    { kind: "window", appName: "Google Chrome", title: "Peika — GitHub", url: "https://github.com/kura120/peika" },
+    null,
+  ]);
+
+  // Taken off before the first question: nothing goes.
+  State.chatHistory = [];
+  State.promptContext = { kind: "window", appName: "Code", title: "main.rs" };
+  view.sync();
+  $(".chip-x").fire("click");
+  view.sync();
+  assert.equal(State.promptContext, null);
+  assert.equal(view.el.find(".chip").length, 0);
+  calls.length = 0;
+  $(".chat-input").value = "hi";
+  $(".send-btn").fire("click");
+  await flush();
+  assert.deepEqual(sent("chat_send").map((s) => s.context), [null]);
+});
+
+test("a long window title is cut short on its chip", async () => {
+  const { windowChipLabel } = await import("../src/views/chat.ts");
+  assert.equal(windowChipLabel("Code", ""), "Code");
+  const label = windowChipLabel("Microsoft Edge", "A very long page title that goes on and on and on");
+  assert.ok(label.length <= 48 && label.endsWith("…"), label);
+});

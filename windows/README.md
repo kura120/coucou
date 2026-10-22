@@ -65,6 +65,7 @@ You can also [build it yourself](#build-it-yourself).
 | `Ctrl+Alt+Space` | Opens the chat, from any app |
 | `Ctrl+Alt+A` | Jumps to the waiting permission or question |
 | `Ctrl+Alt+T` | Brings the session's window forward ("Open terminal") |
+| `Ctrl+Alt+F` | Windows: attaches the window in front (its app, its title, a browser's address) to a new chat. It shows on a chip you can take off before you send. Letting go of Peika on the desktop with `Ctrl` held over a window does the same |
 | `Ctrl+Alt+→` / `Ctrl+Alt+←` | Next / previous pill |
 | `Ctrl+Alt+S` | Mutes or unmutes Peika |
 | `Ctrl+Alt+G` | Opens the wardrobe |
@@ -689,8 +690,13 @@ own window.
   are told from tracks by a
   guess (a short title with no artist and no album). Both the installer's
   Spotify and the Microsoft Store's are found.
-- Not in this version: sending a dropped file by email and dragging Peika onto
-  a window to attach it as context. On the Mac, email goes through Resend or
+- Attaching a window: only on Windows, and dropping Peika on a window attaches
+  it only with `Ctrl` held. On the Mac any drop on a window does, but here
+  windows usually cover the screen, and a plain drag has to stay a move. A
+  browser's address is read from its address bar (UI Automation) when it
+  answers within a second and a half, and kept only when it is an http(s)
+  address; otherwise the title goes alone.
+- Not in this version: sending a dropped file by email. On the Mac, email goes through Resend or
   Apple Mail's scripting; neither has a safe equivalent that attaches a file
   here, and the drop card would need a third button it doesn't have.
 - Cal.com shows the next bookings as a list rather than the Mac's calendar.
@@ -718,8 +724,8 @@ own window.
 - Keyboard shortcuts use `Ctrl+Alt` where the Mac uses `⌃⌥`, with different
   keys (see [Keyboard shortcuts](#keyboard-shortcuts)), and `Ctrl` where the
   Mac uses `⌘` inside the island. "Bring the terminal forward" is "Open
-  terminal" here. Not in this version: attaching the front window (its id is
-  kept for later). The island only reads its own shortcuts while it has the
+  terminal" here. Attaching the front window is `Ctrl+Alt+F` (the Mac's
+  `⌃⌥W`; AltGr+W types a character on several layouts), on Windows only. The island only reads its own shortcuts while it has the
   keyboard: in the chat, or after a global shortcut opened it. `Ctrl+↓`
   `Ctrl+↑` `Ctrl+O` walk the GitHub lists, as on the Mac, and the highlighted
   row scrolls into view where the Mac's three-row list doesn't follow it; in the
