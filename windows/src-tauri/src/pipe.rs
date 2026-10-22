@@ -12,8 +12,8 @@
 //
 // Claude Code is never blocked by us. Three things guarantee it:
 //   * peika-hook gives the connection 300 ms and exits cleanly if we are closed;
-//   * we only wait for a human once the island has *confirmed* the card is on
-//     screen, so a paused island or a webview that is not listening costs a few
+//   * we only wait for a human once the island has *confirmed* it has the
+//     request — on the card, or queued behind it — so a paused island or a webview that is not listening costs a few
 //     hundred milliseconds, not two minutes;
 //   * whatever happens we drop the connection after the decision timeout, and
 //     the terminal takes over.
@@ -53,11 +53,11 @@ const HANG_UP: Duration = Duration::from_secs(2);
 
 /// What the island can say about a permission request.
 pub enum Reply {
-    /// The card is on screen and a human can act on it.
+    /// The request is on the card, or queued behind it, and a human can act on it.
     Ack,
     /// A human clicked: `allow` or `deny`.
     Decision(String),
-    /// Nobody can act on it — paused, or another request already holds the card.
+    /// Nobody will act on it — paused, the queue is full, or it went moot.
     Decline,
 }
 
@@ -349,12 +349,13 @@ fn send(app: &AppHandle, request_id: &str, reply: Reply, keep: bool) {
     }
 }
 
-/// The island has the card on screen; the long wait may begin.
+/// The island has the request, on the card or queued; the long wait may begin.
+/// Each request waits on its own task, with its own timeout.
 pub fn acknowledge(app: &AppHandle, request_id: &str) {
     send(app, request_id, Reply::Ack, true);
 }
 
-/// Nobody can act on this one — paused, or another card already holds the view.
+/// Nobody will act on this one — paused, the queue is full, or it went moot.
 pub fn decline(app: &AppHandle, request_id: &str) {
     log::line(format!("decline id={request_id}"));
     send(app, request_id, Reply::Decline, false);
