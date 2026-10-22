@@ -471,7 +471,8 @@ fn approval_answer(
     pipe::answer_question(&app, &request_id, &answers);
 }
 
-/// The island has the card on screen, so the long wait for a human may begin.
+/// The island has the request, on the card or queued behind it, so the long
+/// wait for a human may begin.
 /// Until this arrives the relay only waits a few hundred milliseconds, which is
 /// what stops a paused or unresponsive island from freezing Claude Code.
 #[tauri::command]
@@ -479,8 +480,8 @@ fn approval_ack(app: AppHandle, request_id: String) {
     pipe::acknowledge(&app, &request_id);
 }
 
-/// Nobody can act on this request — the island is paused, or another card is
-/// already up. Claude Code falls back to asking in the terminal immediately.
+/// Nobody will act on this request — the island is paused, its queue is full,
+/// or the request went moot. Claude Code falls back to asking in the terminal immediately.
 #[tauri::command]
 fn approval_decline(app: AppHandle, request_id: String) {
     recap::forget_request(&app, &request_id);

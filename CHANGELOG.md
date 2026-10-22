@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Several permission requests wait their turn** (Windows and Linux), as on the Mac: a second agent's request no longer goes back to its terminal while a card is up. Up to five wait, oldest first; the card says "1/3" and names the project that asks, and answering it brings up the next. Each still runs out on its own after 110 s, and one answered in the terminal, or whose turn ends, leaves the queue.
 - The macOS and iPhone app, the relay, the scripts and the specs say Peika too: bundle ids are `dev.kura120.peika` (Mac direct build `dev.kura120.peika.direct`), the Apple team id and the original's hosted relay address are gone, and `Sources/CoucouKit` is `Sources/PeikaKit`. Not built or run: there is no Mac or Xcode here.
 - The original app icons and menu bar icon are replaced by the cloud, and the Mochi character stills and outfit sheet are removed. The sounds and the other media stay until Peika has its own.
 - The Android app is removed from the repository (its code is © Rhytam Biswas, the original's side project, not Peika's), along with its workflows, its docs and its Pages section. The phone link goes with it (see below).
