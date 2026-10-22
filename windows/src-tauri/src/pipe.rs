@@ -365,7 +365,10 @@ pub fn decline(app: &AppHandle, request_id: &str) {
 /// it into Claude Code's JSON is peika-hook's job.
 pub fn answer(app: &AppHandle, request_id: &str, decision: &str) {
     let word = match decision {
-        "allow" | "always" => "allow",
+        "allow" => "allow",
+        // The relay turns it into an allow that Claude Code remembers (reply.rs),
+        // or a plain allow where there is nothing to remember.
+        "always" => "always",
         _ => "deny",
     };
     log::line(format!("decision id={request_id} {word}"));
