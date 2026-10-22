@@ -22,6 +22,7 @@ import { installContextMenu } from "../views/menu";
 import { agentsSection } from "./agents";
 import { colorDot } from "./colors";
 import { initMotion } from "./motion";
+import { mountBand } from "./band";
 import { renderDiff, statusDot } from "./parts";
 import { SEARCH_ENGINES } from "./search";
 import {
@@ -1696,7 +1697,7 @@ function applyLanguage() {
 
 function applyDirection() {
   document.documentElement.dir = isRtl() ? "rtl" : "ltr";
-  document.title = t("Settings — Peika");
+  document.title = "Peika";
 }
 
 let rendering: Promise<void> | null = null;
@@ -1727,6 +1728,13 @@ async function rerender() {
 async function main() {
   // First, so the page is already waiting in its hidden state when shown.
   initMotion(root);
+  // Opened on a page (the tray, the island): `select` falls back to General for
+  // an id it does not know, and a page asked before the first draw is kept in
+  // `current` for it.
+  void onEvent<string>("peika-page", (id) => {
+    current = id;
+    showPage?.(id);
+  });
   // Peika's right-click menu here too: Cut, Copy, Paste in the fields, and
   // never the webview's own.
   installContextMenu(document.body, { clipboardText: () => Bridge.clipboardText() });
@@ -1884,13 +1892,15 @@ function splitAtSubheads(section: HTMLElement): HTMLElement[] {
 /** The page picked in the tree, kept across redraws. */
 let current = "general";
 let paneEl: HTMLElement | null = null;
+/** The tree's `select` of the window on screen, for a page asked from outside. */
+let showPage: ((id: string) => void) | null = null;
 
 /** Draws the title bar, the tree and the pane around the pages. */
 function drawShell(pages: Record<string, HTMLElement>) {
   const leafButtons = new Map<string, HTMLElement>();
   const groupOf: Record<string, string> = {};
   const heading = h("h1", {});
-  const pane = h("main", { id: "pane" }, heading, ...Object.values(pages));
+  const pane = h("main", { id: "pane" }, mountBand(), heading, ...Object.values(pages));
   const tree = h("nav", { id: "tree", "aria-label": t("Settings") });
 
   for (const [group, leaves] of TREE) {
@@ -1924,7 +1934,7 @@ function drawShell(pages: Record<string, HTMLElement>) {
       if (!(e.target as HTMLElement).closest("button")) void Bridge.toggleMaximizeSettingsWindow();
     },
   },
-    h("span", { class: "title", text: t("Settings — Peika") }),
+    h("span", { class: "title", text: "Peika" }),
     winButton(t("Minimize"), "min", "–", () => void Bridge.minimizeSettingsWindow()),
     winButton(t("Maximize"), "max", "□", () => void Bridge.toggleMaximizeSettingsWindow()),
     winButton(t("Close"), "close", "✕", () => void Bridge.closeSettingsWindow()),
@@ -1933,6 +1943,7 @@ function drawShell(pages: Record<string, HTMLElement>) {
   clear(root);
   root.append(bar, h("div", { id: "frame" }, tree, pane));
   paneEl = pane;
+  showPage = select;
   select(current);
 }
 

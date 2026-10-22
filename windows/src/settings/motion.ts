@@ -8,6 +8,7 @@
 // setting says: honouring it here only made this one window open flat.
 
 import { Bridge, IS_TAURI, onEvent } from "../core/bridge";
+import { setBandShown } from "./band";
 
 /** settings.css `#settings-root.leaving`. */
 const LEAVE_MS = 160;
@@ -23,6 +24,7 @@ let token = 0;
 function enter(root: HTMLElement) {
   if (phase === "open") return;
   phase = "open";
+  setBandShown(true);
   const mine = ++token;
   root.classList.remove("before", "leaving", "entering");
   // Restart the animation even if `entering` was only just removed.
@@ -37,6 +39,8 @@ function enter(root: HTMLElement) {
 function leave(root: HTMLElement) {
   if (phase === "closing") return;
   phase = "closing";
+  // The mini Peikas stop walking as the window starts to fade out.
+  setBandShown(false);
   const mine = ++token;
   root.classList.remove("entering");
   root.classList.add("leaving");
@@ -44,6 +48,7 @@ function leave(root: HTMLElement) {
     // Opened again during the fade: stay.
     if (token !== mine) return;
     phase = "hidden";
+    setBandShown(false);
     void Bridge.hideSettingsWindow();
   }, LEAVE_MS);
 }
