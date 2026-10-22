@@ -3,6 +3,8 @@
 // HookServer.swift. Nothing leaves the machine.
 //
 // One file stays open behind a lock instead of being opened for every line.
+// Past about 1 MB it moves to peika.1.log and a new peika.log starts, so the
+// history just before a problem is still there.
 
 use std::fs::File;
 use std::io::Write;
@@ -12,7 +14,9 @@ use std::sync::Mutex;
 use crate::{platform, settings};
 
 const LOG: &str = "peika.log";
-/// Past this size (bytes) the log is cleared before the next line.
+/// The previous log, kept after a rotation (replaced by the next one).
+const OLD: &str = "peika.1.log";
+/// Past this size (bytes) the log is rotated before the next line.
 const LIMIT: u64 = 1_000_000;
 
 /// The open log file, or None while it is not open (yet, or any more).
@@ -39,12 +43,12 @@ pub fn line(message: impl AsRef<str>) {
 /// keeping `slot` open between calls.
 fn write_line(slot: &mut Option<File>, dir: &Path, limit: u64, text: &str) {
     let path = dir.join(LOG);
-    // One stat per line: when the file is gone (deleted or renamed), the handle
-    // we hold writes to nothing anyone can read, so it is dropped.
+    // One stat per line: its size decides a rotation, and when the file is gone
+    // (deleted or renamed), the handle we hold writes to nothing anyone can read.
     match std::fs::metadata(&path) {
         Ok(meta) if meta.len() > limit => {
             *slot = None;
-            let _ = std::fs::remove_file(&path);
+            rotate(dir);
         }
         Ok(_) => {}
         Err(_) => *slot = None,
@@ -63,6 +67,16 @@ fn write_line(slot: &mut Option<File>, dir: &Path, limit: u64, text: &str) {
             }
         }
         *slot = None;
+    }
+}
+
+/// Moves the full log to peika.1.log, replacing the one before, so the next
+/// line starts a new peika.log. The caller has closed its handle first.
+fn rotate(dir: &Path) {
+    let path = dir.join(LOG);
+    if std::fs::rename(&path, dir.join(OLD)).is_err() {
+        // Could not move it (another program may have it open): start over instead.
+        let _ = std::fs::remove_file(&path);
     }
 }
 
@@ -118,6 +132,33 @@ mod tests {
         write_line(&mut slot, tmp.path(), LIMIT, "two\n");
         write_line(&mut slot, tmp.path(), LIMIT, "three\n");
         assert_eq!(read(tmp.path(), LOG), "one\ntwo\nthree\n");
+    }
+
+    /// A line of 29 bytes, so a 50-byte limit is passed by the third one.
+    fn numbered(n: u32) -> String {
+        format!("line {n:02} {}\n", "x".repeat(20))
+    }
+
+    #[test]
+    fn past_the_limit_the_old_log_becomes_peika_1_and_a_new_one_starts() {
+        let tmp = TempDir::new("rotate");
+        let mut slot = None;
+        for n in 1..=3 {
+            write_line(&mut slot, tmp.path(), 50, &numbered(n));
+        }
+        assert_eq!(read(tmp.path(), OLD), format!("{}{}", numbered(1), numbered(2)));
+        assert_eq!(read(tmp.path(), LOG), numbered(3));
+    }
+
+    #[test]
+    fn a_second_rotation_replaces_peika_1() {
+        let tmp = TempDir::new("rotate-twice");
+        let mut slot = None;
+        for n in 1..=5 {
+            write_line(&mut slot, tmp.path(), 50, &numbered(n));
+        }
+        assert_eq!(read(tmp.path(), OLD), format!("{}{}", numbered(3), numbered(4)));
+        assert_eq!(read(tmp.path(), LOG), numbered(5));
     }
 
     #[cfg(unix)]
