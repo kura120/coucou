@@ -1777,6 +1777,9 @@ async function main() {
     current = id;
     showPage?.(id);
   });
+  // A window made just now to open on a page missed that event: it asks.
+  const first = await Bridge.settingsFirstPage();
+  if (first) current = first;
   // Peika's right-click menu here too: Cut, Copy, Paste in the fields, and
   // never the webview's own.
   installContextMenu(document.body, { clipboardText: () => Bridge.clipboardText() });
