@@ -6,6 +6,7 @@ mod chat;
 mod claude;
 mod claude_code;
 mod claude_sessions;
+mod capture;
 mod clipboard;
 mod codex_plan;
 mod config_file;
@@ -999,6 +1000,13 @@ pub fn run() {
             voice::embed::voice_embed,
             voice::embed::voice_embed_models,
             web_search::web_search,
+            capture::capture_from,
+            capture::capture_cancel,
+            capture::capture_select,
+            capture::capture_copy,
+            capture::capture_paste,
+            capture::capture_open,
+            capture::capture_discard,
             voice_say,
         ])
         .setup(move |app| {
@@ -1010,6 +1018,8 @@ pub fn run() {
             desktop::setup(&handle);
             // And for the toasts' window.
             toast::setup(&handle);
+            // And for the screen capture's overlay (capture/mod.rs).
+            capture::setup(&handle);
 
             if let Some(win) = island::window(&handle) {
                 // Where Tauri takes the drop itself (Linux), its paths are the

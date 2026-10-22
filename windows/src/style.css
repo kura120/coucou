@@ -598,6 +598,48 @@ body {
   z-index: 2;
 }
 
+/* ── Screen capture (views/capture.ts) ───────────────────────────────────── */
+
+.capture-body {
+  flex-direction: row;
+  align-items: center;
+  padding: 0 18px 0 116px;
+  gap: 14px;
+}
+
+/* The picture, fitted within the card: never wider or taller than this. */
+.capture-thumb {
+  display: block;
+  flex: 0 0 auto;
+  width: auto;
+  height: auto;
+  max-width: 150px;
+  max-height: 96px;
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.capture-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Four buttons on the card's width: they wrap rather than run off it. */
+.capture-actions {
+  flex-wrap: wrap;
+}
+
+/* ✕ in the corner, where the fold button of a waiting card sits. */
+.capture-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 2;
+}
+
 /* Ticker */
 
 .ticker {

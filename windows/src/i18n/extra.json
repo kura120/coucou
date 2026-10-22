@@ -23,6 +23,17 @@
    "ru": "Модели ИИ",
    "id": "Model AI"
   },
+  "Draw on it": {
+   "zh-Hans": "在图上绘制",
+   "hi": "इस पर बनाएँ",
+   "es": "Dibujar encima",
+   "ar": "ارسم عليها",
+   "fr": "Dessiner dessus",
+   "bn": "এর উপর আঁকুন",
+   "pt-BR": "Desenhar nela",
+   "ru": "Нарисовать",
+   "id": "Gambar di atasnya"
+  },
   "Pills & integrations": {
    "zh-Hans": "胶囊与集成",
    "hi": "पिल्स और इंटीग्रेशन",
@@ -2222,6 +2233,17 @@
    "pt-BR": "Enviar o Peika para a área de trabalho",
    "ru": "Отправить Peika на рабочий стол",
    "id": "Kirim Peika ke desktop"
+  },
+  "Capture part of the screen": {
+   "zh-Hans": "截取屏幕的一部分",
+   "hi": "स्क्रीन का एक हिस्सा कैप्चर करें",
+   "es": "Capturar parte de la pantalla",
+   "ar": "التقاط جزء من الشاشة",
+   "fr": "Capturer une partie de l’écran",
+   "bn": "স্ক্রিনের একটি অংশ ক্যাপচার করুন",
+   "pt-BR": "Capturar parte da tela",
+   "ru": "Снять часть экрана",
+   "id": "Tangkap sebagian layar"
   },
   "Send the message": {
    "zh-Hans": "发送消息",

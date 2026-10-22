@@ -70,6 +70,7 @@ You can also [build it yourself](#build-it-yourself).
 | `Ctrl+Alt+S` | Mutes or unmutes Peika |
 | `Ctrl+Alt+G` | Opens the wardrobe |
 | `Ctrl+Alt+D` | Sends Peika to the desktop, or brings him home |
+| `Ctrl+Alt+X` | Windows: dims the screen; drag out the part to capture (`Esc` or a right click cancels). Peika swallows it, and its card offers **Paste** (into the window you were in), **Copy**, **Ask** (a new chat about it) and **Draw on it** (opens it in Paint). The image stays in Peika's temp folder only while the card has it |
 | `Ctrl+Alt+N` | Opens and closes the island (off until you turn it on) |
 | In the open island: `Ctrl+→` `Ctrl+←`, `Ctrl+1`–`Ctrl+9` | Switch pills |
 | In the open island: `Ctrl+↓` `Ctrl+↑`, `Ctrl+O` | Walk the open GitHub list, open the highlighted row |

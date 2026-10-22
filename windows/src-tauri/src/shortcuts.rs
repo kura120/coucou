@@ -71,16 +71,20 @@ pub const ACTIONS: &[ActionDef] = &[
     action("desktopToggle", "Ctrl+Alt+D", true, true),
     action("wardrobeToggle", "Ctrl+Alt+G", true, true),
     action("talkToPeika", "Ctrl+Alt+V", false, true),
+    // Windows only: reserved on Linux (see `available_here`). The Mac's ⌘⇧S
+    // would be "Save as" here, and S is mute.
+    action("captureScreen", "Ctrl+Alt+X", true, true),
 ];
 
 pub fn find(id: &str) -> Option<&'static ActionDef> {
     ACTIONS.iter().find(|a| a.id == id)
 }
 
-/// Ported, and doable on this system: attaching the front window needs
-/// Windows' window and UI Automation calls (window_context.rs).
+/// Ported, and doable on this system: attaching the front window and
+/// capturing the screen need Windows' window, UI Automation, screen and
+/// input calls (window_context.rs, capture/win.rs).
 fn available_here(def: &ActionDef) -> bool {
-    def.ported && (cfg!(windows) || def.id != "attachFrontWindow")
+    def.ported && (cfg!(windows) || !matches!(def.id, "attachFrontWindow" | "captureScreen"))
 }
 
 /// What an action does, in English: the key of its label in Settings
@@ -101,6 +105,7 @@ pub fn description(id: &str) -> &'static str {
         "desktopToggle" => n_("Send Peika to the desktop"),
         "wardrobeToggle" => n_("Open the wardrobe"),
         "talkToPeika" => n_("Talk to Peika"),
+        "captureScreen" => n_("Capture part of the screen"),
         _ => "Peika",
     }
 }
@@ -348,6 +353,9 @@ pub fn dispatch<R: Runtime>(app: &AppHandle<R>, action: &str) {
     } else if action == "talkToPeika" {
         // Straight to the listener: the island hears about it when it wakes.
         crate::voice::talk();
+    } else if action == "captureScreen" {
+        // The screen is copied now, before anything of Peika's moves over it.
+        crate::capture::start(app);
     } else {
         let _ = app.emit_to(WINDOW_LABEL, "shortcut", action.to_string());
     }
@@ -715,9 +723,10 @@ mod wayland {
 mod tests {
     use super::*;
 
-    const MAC_IDS: [&str; 11] = [
+    const MAC_IDS: [&str; 12] = [
         "toggleIsland", "openChat", "goToAlert", "jumpToTerminal", "attachFrontWindow",
         "nextPill", "prevPill", "muteToggle", "desktopToggle", "wardrobeToggle", "talkToPeika",
+        "captureScreen",
     ];
 
     /// As on the Mac: `toggleIsland` and `talkToPeika`.
@@ -766,7 +775,7 @@ mod tests {
         assert!(ACTIONS.iter().all(|def| def.ported));
         let plan = plan(&Bindings::new(), never);
         for (def, outcome) in plan {
-            let reserved = def.id == "attachFrontWindow" && !cfg!(windows);
+            let reserved = matches!(def.id, "attachFrontWindow" | "captureScreen") && !cfg!(windows);
             match outcome {
                 Ok(_) => assert!(def.ported && def.enabled_by_default, "{}", def.id),
                 Err(s) if reserved => assert_eq!(s.status, Status::NotPorted),

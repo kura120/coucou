@@ -43,6 +43,7 @@ import { firstSentence, showWebAnswer } from "../views/voice-cards";
 import type { WebFound } from "../views/websearch";
 import { installContextMenu, type ContextMenu, type Rect } from "../views/menu";
 import { createAppRegistry } from "./app";
+import { askAboutCapture, closeCapture, pasteCapture } from "./capture";
 import type { ScreenContext } from "../core/capabilities/types";
 import type { OutfitSelection } from "../peika/wardrobe";
 
@@ -355,6 +356,10 @@ export class Island {
       openSettingsWindow: () => void Bridge.openSettingsWindow(),
       blip: () => Sound.play("blip"),
       chooseOutfit: (selection) => this.wearOutfit(selection),
+      // The screen capture card's buttons (island/capture.ts).
+      captureAsk: () => askAboutCapture(this),
+      capturePaste: () => void pasteCapture(this),
+      captureClose: () => closeCapture(this),
       // A card's own button is the user's click: nothing is asked, nothing is confirmed twice.
       capability: (call) => this.registry.execute(call, { origin: "ui", ask: async () => ({ kind: "dropped" }), working: () => {} }),
       previewOutfit: (outfit) => {
@@ -1049,6 +1054,14 @@ export class Island {
 
   emote(name: BotEmoteName) {
     this.engine.triggerEmote(name);
+    this.ensureRunning();
+  }
+
+  /** A screen capture landed: Peika gulps it down, as he does a dropped file (island/capture.ts). */
+  gulpCapture() {
+    this.engine.gulp();
+    Sound.play("approve");
+    this.engine.triggerEmote("happy");
     this.ensureRunning();
   }
 
@@ -1835,7 +1848,9 @@ export class Island {
 
     // Nobody's words are folded away mid-sentence: while the chat field has the
     // keyboard the auto-close waits, and starts over once it lets go.
-    const typing = ((State.chatTyping && State.view === "prompt") || State.cardHeld) && State.mode === "expanded";
+    // A capture on its card waits for the user too: folding would lose it.
+    const capturing = State.view === "capture" && State.capture != null;
+    const typing = ((State.chatTyping && State.view === "prompt") || State.cardHeld || capturing) && State.mode === "expanded";
     if (typing !== this.fsm.typing) {
       this.fsm.typing = typing;
       if (!typing && !this.wasInIsland && this.fsm.state === "home") this.fsm.mouseLeft();
