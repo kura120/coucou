@@ -61,6 +61,13 @@ export const Bridge = {
 
   reposition: () => call<void>("reposition"),
 
+  /**
+   * Seconds since the keyboard or mouse was last used; null where the system
+   * cannot say (Linux). Asked on a slow timer, only while something is waiting
+   * to be told (island/away.ts).
+   */
+  idleSeconds: () => call<number | null>("idle_seconds"),
+
   /** Displays the island can be pinned to: `key` is what `settings.screen` stores. */
   listMonitors: () => call<{ key: string; label: string }[]>("list_monitors"),
 
