@@ -427,6 +427,25 @@ mod tests {
         assert_eq!(&rows[rows.len() - 4..], &[1, 0, 0, 255]);
     }
 
+    /// The real screen and Windows' own PNG codec: copies a corner of this
+    /// screen and writes it. The clipboard is left alone.
+    /// `cargo test -p peika capture -- --ignored`
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "reads this machine's screen"]
+    fn the_screen_is_copied_and_written_as_a_png() {
+        let (left, top, width, height) = win::virtual_screen();
+        assert!(width > 0 && height > 0);
+        let screen = win::grab(left, top, width, height).expect("the screen");
+        assert_eq!(screen.bgra.len(), width as usize * height as usize * 4);
+        let part = crop(&screen, 0, 0, 200.min(screen.width), 100.min(screen.height));
+        let path = std::env::temp_dir().join(format!("peika-capture-test-{}.png", std::process::id()));
+        win::write_png(&shrink(&part, 120), &path).expect("png");
+        let bytes = std::fs::read(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
+    }
+
     #[test]
     fn only_capture_files_in_peika_s_folder_are_touched() {
         let d = dir();
