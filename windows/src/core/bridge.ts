@@ -33,7 +33,7 @@ export interface BootInfo {
   cursorPoll: boolean;
 }
 
-/** The bundled engine's parts (src-tauri/src/voice/engine.rs): what hears free speech, and Peika's voice. */
+/** The bundled engine's parts (src-tauri/src/speech/engine.rs): what hears free speech, and Peika's voice. */
 export type VoiceEnginePart = "hearing" | "speaking";
 
 /** src-tauri/src/voice/mod.rs `Status`. */
@@ -185,6 +185,14 @@ export const Bridge = {
     callOrThrow<LocalServer>("local_connect", { provider, url }),
   /** Copies a dropped file into the inbox. */
   ingestFile: (path: string) => callOrThrow<DroppedFile>("ingest_file", { path }),
+  /** The screen capture card's Copy: puts the picture (a PNG file) on the clipboard. */
+  captureCopy: (path: string) => call<void>("capture_copy", { path }),
+  /** The capture card's Paste: pastes the picture into the window that was in front before the capture. */
+  capturePaste: (path: string) => call<void>("capture_paste", { path }),
+  /** The capture card's Draw on it: opens the picture in Paint. */
+  captureOpen: (path: string) => call<void>("capture_open", { path }),
+  /** The capture is done, or replaced: deletes its file. */
+  captureDiscard: (path: string) => call<void>("capture_discard", { path }),
   /** Only ever tells you whether a key exists — never its value. */
   secretPresent: (key: string) => call<boolean>("secret_present", { key }),
   secretSet: (key: string, value: string) => callOrThrow<void>("secret_set", { key, value }),

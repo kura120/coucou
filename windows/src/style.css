@@ -598,6 +598,48 @@ body {
   z-index: 2;
 }
 
+/* ── Screen capture (views/capture.ts) ───────────────────────────────────── */
+
+.capture-body {
+  flex-direction: row;
+  align-items: center;
+  padding: 0 18px 0 116px;
+  gap: 14px;
+}
+
+/* The picture, fitted within the card: never wider or taller than this. */
+.capture-thumb {
+  display: block;
+  flex: 0 0 auto;
+  width: auto;
+  height: auto;
+  max-width: 150px;
+  max-height: 96px;
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.capture-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Four buttons on the card's width: they wrap rather than run off it. */
+.capture-actions {
+  flex-wrap: wrap;
+}
+
+/* ✕ in the corner, where the fold button of a waiting card sits. */
+.capture-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 2;
+}
+
 /* Ticker */
 
 .ticker {
@@ -916,6 +958,13 @@ body {
   color: var(--ink);
 }
 
+/* Other requests waiting behind the card: "1/3" (the Mac's ApprovalView). */
+.who-row .queue {
+  font: 600 12px var(--font);
+  color: var(--dim-2);
+  font-variant-numeric: tabular-nums;
+}
+
 .code {
   font: 400 12px var(--mono);
   color: #e8e9ec;
@@ -1205,6 +1254,22 @@ input[type="range"]::-webkit-slider-thumb {
   height: 7px;
   border-radius: 50%;
   background: linear-gradient(135deg, #ff6b5b, #f7b32b, #2dd4a7, #38bdf8, #a78bfa);
+}
+
+/* Takes an attached window off before anything is sent. */
+.chip-x {
+  margin-left: 2px;
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: var(--dim-2);
+  font: 400 13px var(--font);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chip-x:hover {
+  color: var(--ink);
 }
 
 .chat-log {
@@ -2845,6 +2910,33 @@ input[type="range"]::-webkit-slider-thumb {
 .plan-credits {
   font-weight: 600;
   color: #c5c8cd;
+}
+
+/* ── Crypto prices (views/integrations.ts cryptoCard) ──────────────────── */
+.crypto-symbol {
+  font: 600 11px var(--font);
+  color: #c5c8cd;
+  flex: 0 0 auto;
+}
+
+.crypto-change {
+  font: 500 11px var(--mono);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.crypto-spark {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  overflow: visible;
+}
+
+.crypto-row.crypto-link {
+  cursor: pointer;
+}
+
+.crypto-row.crypto-link:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 /* ── GitHub pulse (GitHubPulseCardView / GitHubDetailView) ─────────────── */

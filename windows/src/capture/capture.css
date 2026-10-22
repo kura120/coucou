@@ -1,0 +1,31 @@
+/* The screen capture's overlay (capture.html): the screen dimmed, and the
+   part being dragged out of it clear, with a thin white edge. */
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  cursor: crosshair;
+  user-select: none;
+}
+
+#shade {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* While a part is dragged, the shade goes around it instead. */
+body.picking #shade {
+  display: none;
+}
+
+#pick {
+  position: fixed;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}

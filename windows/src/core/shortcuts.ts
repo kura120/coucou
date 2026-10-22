@@ -30,6 +30,7 @@ export const SHORTCUT_TEXT = {
   desktopToggle: N_("Send Peika to the desktop"),
   wardrobeToggle: N_("Open the wardrobe"),
   talkToPeika: N_("Talk to Peika"),
+  captureScreen: N_("Capture part of the screen"),
   island: {
     nextPrev: N_("Next or previous pill"),
     byNumber: N_("Go to pill 1 to 9"),
@@ -58,7 +59,8 @@ export type ShortcutId =
   | "muteToggle"
   | "desktopToggle"
   | "wardrobeToggle"
-  | "talkToPeika";
+  | "talkToPeika"
+  | "captureScreen";
 
 export interface ShortcutDef {
   id: ShortcutId;
@@ -77,13 +79,14 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   def("openChat", "Ctrl+Alt+Space", true, true),
   def("goToAlert", "Ctrl+Alt+A", true, true),
   def("jumpToTerminal", "Ctrl+Alt+T", true, true),
-  def("attachFrontWindow", "Ctrl+Alt+F", true, false),
+  def("attachFrontWindow", "Ctrl+Alt+F", true, true),
   def("nextPill", "Ctrl+Alt+Right", true, true),
   def("prevPill", "Ctrl+Alt+Left", true, true),
   def("muteToggle", "Ctrl+Alt+S", true, true),
   def("desktopToggle", "Ctrl+Alt+D", true, true),
   def("wardrobeToggle", "Ctrl+Alt+G", true, true),
   def("talkToPeika", "Ctrl+Alt+V", false, true),
+  def("captureScreen", "Ctrl+Alt+X", true, true),
 ];
 
 export interface Binding {

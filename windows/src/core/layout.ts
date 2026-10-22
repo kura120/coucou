@@ -27,7 +27,8 @@ export type IslandViewName =
   | "listening"
   | "voiceResult"
   | "webAnswer"
-  | "email";
+  | "email"
+  | "capture";
 
 export type BotStateName =
   | "idle"
@@ -110,6 +111,8 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   // heights are where they start: each card sets its own as its content changes.
   webAnswer: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "none" },
   email: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "none" },
+  // The screen capture card (views/capture.ts): the picture, its size and four buttons.
+  capture: { height: 160, botX: 62, botY: null, botDiameter: 56, agentMode: "none" },
 };
 
 // The upload views above are only the fallback geometry. Once a file is actually

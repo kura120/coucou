@@ -128,6 +128,9 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
     subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("calcom-api-key") },
   { id: "integration_stripe", name: "Stripe", color: "#0570DE", category: "service",
     subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("stripe-api-key") },
+  // Public prices from Coinbase or OKX: nothing to connect, the coins are set in Settings.
+  { id: "integration_crypto", name: "Crypto", color: "#F7931A", category: "service",
+    subtitle: N_("Integration"), source: "n8n", support: "yes", connect: none },
   { id: "integration_music", name: "Apple Music", color: "#FA2D48", category: "service",
     subtitle: N_("Integration"), source: "n8n", support: "no", connect: none },
   // Spotify's MPRIS interface on Linux's session bus, its media session on

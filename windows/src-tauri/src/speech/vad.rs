@@ -505,7 +505,7 @@ mod tests {
     /// to be cut out as a sentence by loudness, and is not one for the
     /// detector — which still cuts out a spoken sentence (`PEIKA_VOICE_WAV`,
     /// 16 kHz, 16-bit mono), typed over or not, where loudness does.
-    /// `cargo test -p peika voice::vad -- --ignored --nocapture`
+    /// `cargo test -p peika speech::vad -- --ignored --nocapture`
     #[test]
     #[cfg(windows)]
     #[ignore = "needs the downloaded engine"]

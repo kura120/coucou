@@ -30,6 +30,7 @@ import type { Outfit, OutfitSelection } from "../peika/wardrobe";
 import { language, t, tl, type Msg } from "../i18n/i18n";
 import type { ViewCommand } from "../island/shortcuts";
 import { registerVoiceCards } from "./voice-cards";
+import { buildCapture } from "./capture";
 import { VIEW_SCREENS, type Shown } from "../island/screen";
 
 export interface ViewActions {
@@ -72,6 +73,12 @@ export interface ViewActions {
   chooseOutfit(selection: OutfitSelection): void;
   /** Wardrobe hover: shows an outfit on Peika without keeping it; null ends it. */
   previewOutfit(outfit: Outfit | null): void;
+  /** The capture card's Ask: the picture goes to a fresh chat (island/capture.ts). */
+  captureAsk(): void;
+  /** The capture card's Paste: the picture goes into the window in front, then the island folds. */
+  capturePaste(): void;
+  /** The capture card's ✕: the picture is thrown away. */
+  captureClose(): void;
 }
 
 export interface ViewHost {
@@ -118,6 +125,19 @@ function agentWho(task: AgentTask | null, label: string): HTMLElement {
     row.append(dot(task.color, 8), h("span", { class: "n", text: task.name }));
   }
   row.append(h("span", { text: label }));
+  return row;
+}
+
+/**
+ * Who asks on a waiting card: its pill, named after the session that asks
+ * (several share a pill), and "1/3" while others wait behind it.
+ */
+function askerWho(label: string): HTMLElement {
+  const req = State.pendingApproval;
+  const task = State.focusTask;
+  const row = agentWho(task && req?.projectName ? { ...task, name: req.projectName } : task, label);
+  const waiting = State.approvals.count;
+  if (waiting > 1) row.append(h("span", { class: "queue", text: `1/${waiting}` }));
   return row;
 }
 
@@ -588,7 +608,7 @@ function buildApproval(actions: ViewActions): ViewHost {
         shownAt = performance.now();
       }
       clear(who);
-      who.append(agentWho(State.focusTask, t("needs permission")));
+      who.append(askerWho(t("needs permission")));
       // The whole point of approving here rather than in the terminal: this line
       // is the command, the file path or the URL being authorised, not just the
       // name of the tool asking.
@@ -626,7 +646,13 @@ function buildQuestion(actions: ViewActions): ViewHost {
   // between a mouse-down and a mouse-up would swallow the click.
   let rowKey = "";
 
+  // As on the permission card: a click meant for the card just answered must
+  // not land on the next request that takes its place.
+  let shownAt = 0;
+  const fresh = () => performance.now() - shownAt < CLICK_GUARD_MS;
+
   const next = (question: string, answer: string | string[], total: number) => {
+    if (fresh()) return;
     answers[question] = answer;
     picked = new Set();
     index += 1;
@@ -657,6 +683,7 @@ function buildQuestion(actions: ViewActions): ViewHost {
 
       if (State.pendingApproval!.requestId !== requestId) {
         requestId = State.pendingApproval!.requestId;
+        shownAt = performance.now();
         index = 0;
         answers = {};
         picked = new Set();
@@ -665,7 +692,7 @@ function buildQuestion(actions: ViewActions): ViewHost {
       const asking = questions.length > 1
         ? t("is asking ({index} of {total})", { index: index + 1, total: questions.length })
         : t("is asking");
-      who.append(agentWho(State.focusTask, asking));
+      who.append(askerWho(asking));
       title.textContent = q.question;
       title.title = q.question;
 
@@ -699,7 +726,9 @@ function buildQuestion(actions: ViewActions): ViewHost {
           class: "link-btn",
           style: "color:#8e939c",
           text: tl("Answer in terminal"),
-          onclick: () => actions.answerInTerminal(),
+          onclick: () => {
+            if (!fresh()) actions.answerInTerminal();
+          },
         }),
       );
     },
@@ -947,6 +976,7 @@ export function buildViews(
   map.set("wardrobe", buildWardrobe(actions));
   map.set("listening", buildListening(actions));
   map.set("voiceResult", buildVoiceResult());
+  map.set("capture", buildCapture(actions));
   // Not in the Windows v1: sending a file by email, window attach + web result.
   map.set("mail", buildPlaceholder(tl("Sending by email isn't in this version."), ""));
   map.set("searching", buildPlaceholder(tl("Claude is searching…"), ""));

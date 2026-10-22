@@ -6,10 +6,12 @@ mod chat;
 mod claude;
 mod claude_code;
 mod claude_sessions;
+mod capture;
 mod clipboard;
 mod codex_plan;
 mod config_file;
 mod conversations;
+mod crypto;
 mod desktop;
 mod files;
 mod github;
@@ -33,6 +35,7 @@ mod session_window;
 mod settings;
 mod shortcuts;
 mod sounds;
+mod speech;
 mod spotify;
 mod toast;
 mod tray;
@@ -40,6 +43,7 @@ mod voice;
 mod web_search;
 #[cfg(windows)]
 mod webview_drop;
+mod window_context;
 
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -119,6 +123,7 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         island::apply_geometry(&app, &settings.screen, collapsed);
     }
     integrations::settings_saved(&app, &settings.active_integrations);
+    crypto::settings_saved(&app, &settings.active_integrations);
     spotify::sync(&app, &settings.active_integrations);
     voice::sync(&app, &settings);
     if shortcuts_changed {
@@ -175,6 +180,10 @@ fn set_island_rect(app: AppHandle, shared: State<Shared>, x: f64, y: f64, width:
 #[tauri::command]
 fn focus_window(app: AppHandle, focused: bool) {
     let Some(win) = island::window(&app) else { return };
+    // The window in front until now is the one the attach shortcut means.
+    if focused {
+        window_context::remember_front();
+    }
     platform::set_activating(&win, focused);
     if focused {
         let _ = win.set_focus();
@@ -471,7 +480,8 @@ fn approval_answer(
     pipe::answer_question(&app, &request_id, &answers);
 }
 
-/// The island has the card on screen, so the long wait for a human may begin.
+/// The island has the request, on the card or queued behind it, so the long
+/// wait for a human may begin.
 /// Until this arrives the relay only waits a few hundred milliseconds, which is
 /// what stops a paused or unresponsive island from freezing Claude Code.
 #[tauri::command]
@@ -479,8 +489,8 @@ fn approval_ack(app: AppHandle, request_id: String) {
     pipe::acknowledge(&app, &request_id);
 }
 
-/// Nobody can act on this request — the island is paused, or another card is
-/// already up. Claude Code falls back to asking in the terminal immediately.
+/// Nobody will act on this request — the island is paused, its queue is full,
+/// or the request went moot. Claude Code falls back to asking in the terminal immediately.
 #[tauri::command]
 fn approval_decline(app: AppHandle, request_id: String) {
     recap::forget_request(&app, &request_id);
@@ -1000,6 +1010,13 @@ pub fn run() {
             voice::embed::voice_embed,
             voice::embed::voice_embed_models,
             web_search::web_search,
+            capture::capture_from,
+            capture::capture_cancel,
+            capture::capture_select,
+            capture::capture_copy,
+            capture::capture_paste,
+            capture::capture_open,
+            capture::capture_discard,
             voice_say,
         ])
         .setup(move |app| {
@@ -1011,6 +1028,8 @@ pub fn run() {
             desktop::setup(&handle);
             // And for the toasts' window.
             toast::setup(&handle);
+            // And for the screen capture's overlay (capture/mod.rs).
+            capture::setup(&handle);
 
             if let Some(win) = island::window(&handle) {
                 // Where Tauri takes the drop itself (Linux), its paths are the
