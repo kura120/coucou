@@ -65,6 +65,7 @@ export default defineConfig({
         settings: resolve(__dirname, "settings.html"),
         peika: resolve(__dirname, "peika.html"),
         toast: resolve(__dirname, "toast.html"),
+        capture: resolve(__dirname, "capture.html"),
       },
     },
   },

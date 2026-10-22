@@ -2223,6 +2223,17 @@
    "ru": "Отправить Peika на рабочий стол",
    "id": "Kirim Peika ke desktop"
   },
+  "Capture part of the screen": {
+   "zh-Hans": "截取屏幕的一部分",
+   "hi": "स्क्रीन का एक हिस्सा कैप्चर करें",
+   "es": "Capturar parte de la pantalla",
+   "ar": "التقاط جزء من الشاشة",
+   "fr": "Capturer une partie de l’écran",
+   "bn": "স্ক্রিনের একটি অংশ ক্যাপচার করুন",
+   "pt-BR": "Capturar parte da tela",
+   "ru": "Снять часть экрана",
+   "id": "Tangkap sebagian layar"
+  },
   "Send the message": {
    "zh-Hans": "发送消息",
    "hi": "संदेश भेजें",
