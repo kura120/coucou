@@ -1519,6 +1519,28 @@
    "ru": "Выключить или включить звук Peika",
    "id": "Bisukan atau bunyikan Peika"
   },
+  "Quiet over fullscreen apps": {
+   "zh-Hans": "全屏应用前保持安静",
+   "hi": "फ़ुलस्क्रीन ऐप के सामने शांत रहें",
+   "es": "Silencio sobre apps a pantalla completa",
+   "ar": "الهدوء فوق التطبيقات بملء الشاشة",
+   "fr": "Discret sur les applis en plein écran",
+   "bn": "ফুলস্ক্রিন অ্যাপের সামনে চুপ থাকুন",
+   "pt-BR": "Discreto sobre apps em tela cheia",
+   "ru": "Тишина поверх полноэкранных приложений",
+   "id": "Diam saat aplikasi layar penuh aktif"
+  },
+  "While a game, a video or a presentation is fullscreen, a finished or failed session only badges its pill, without a sound. Permission requests and questions still come up.": {
+   "zh-Hans": "游戏、视频或演示文稿全屏时，已完成或失败的会话只在其标签上显示徽标，不发出声音。权限请求和提问仍会弹出。",
+   "hi": "जब कोई गेम, वीडियो या प्रेज़ेंटेशन फ़ुलस्क्रीन में हो, तब पूरा हुआ या विफल सत्र बिना आवाज़ के सिर्फ़ अपने पिल पर बैज दिखाता है। अनुमति के अनुरोध और प्रश्न फिर भी दिखते हैं।",
+   "es": "Mientras un juego, un vídeo o una presentación está a pantalla completa, una sesión terminada o fallida solo marca su pastilla con una insignia, sin sonido. Las solicitudes de permiso y las preguntas siguen apareciendo.",
+   "ar": "عندما تكون لعبة أو فيديو أو عرض تقديمي بملء الشاشة، تكتفي الجلسة المنتهية أو الفاشلة بوضع شارة على كبسولتها دون صوت. أما طلبات الإذن والأسئلة فتظهر كالمعتاد.",
+   "fr": "Quand un jeu, une vidéo ou une présentation est en plein écran, une session terminée ou en échec se contente d'un badge sur sa pastille, sans son. Les demandes d'autorisation et les questions s'affichent toujours.",
+   "bn": "কোনো গেম, ভিডিও বা প্রেজেন্টেশন ফুলস্ক্রিনে থাকলে শেষ হওয়া বা ব্যর্থ সেশন শব্দ ছাড়া শুধু নিজের পিলে একটি ব্যাজ দেখায়। অনুমতির অনুরোধ ও প্রশ্ন আগের মতোই আসে।",
+   "pt-BR": "Enquanto um jogo, um vídeo ou uma apresentação está em tela cheia, uma sessão concluída ou com falha só coloca um selo na sua pílula, sem som. Pedidos de permissão e perguntas continuam aparecendo.",
+   "ru": "Пока игра, видео или презентация открыты на весь экран, завершившаяся или упавшая сессия лишь ставит значок на свою пилюлю, без звука. Запросы разрешений и вопросы по-прежнему появляются.",
+   "id": "Saat game, video, atau presentasi tampil layar penuh, sesi yang selesai atau gagal hanya memberi lencana pada pil-nya, tanpa suara. Permintaan izin dan pertanyaan tetap muncul."
+  },
   "Network error: {error}": {
    "zh-Hans": "网络错误：{error}",
    "hi": "नेटवर्क त्रुटि: {error}",
