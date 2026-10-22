@@ -30,6 +30,7 @@ import type { Outfit, OutfitSelection } from "../peika/wardrobe";
 import { language, t, tl, type Msg } from "../i18n/i18n";
 import type { ViewCommand } from "../island/shortcuts";
 import { registerVoiceCards } from "./voice-cards";
+import { buildCapture } from "./capture";
 import { VIEW_SCREENS, type Shown } from "../island/screen";
 
 export interface ViewActions {
@@ -72,6 +73,12 @@ export interface ViewActions {
   chooseOutfit(selection: OutfitSelection): void;
   /** Wardrobe hover: shows an outfit on Peika without keeping it; null ends it. */
   previewOutfit(outfit: Outfit | null): void;
+  /** The capture card's Ask: the picture goes to a fresh chat (island/capture.ts). */
+  captureAsk(): void;
+  /** The capture card's Paste: the picture goes into the window in front, then the island folds. */
+  capturePaste(): void;
+  /** The capture card's ✕: the picture is thrown away. */
+  captureClose(): void;
 }
 
 export interface ViewHost {
@@ -947,6 +954,7 @@ export function buildViews(
   map.set("wardrobe", buildWardrobe(actions));
   map.set("listening", buildListening(actions));
   map.set("voiceResult", buildVoiceResult());
+  map.set("capture", buildCapture(actions));
   // Not in the Windows v1: sending a file by email, window attach + web result.
   map.set("mail", buildPlaceholder(tl("Sending by email isn't in this version."), ""));
   map.set("searching", buildPlaceholder(tl("Claude is searching…"), ""));
