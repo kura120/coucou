@@ -35,7 +35,9 @@ pub fn line(message: impl AsRef<str>) {
         message.as_ref()
     );
     let dir = settings::local_dir();
-    let mut writer = WRITER.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut writer = WRITER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     write_line(&mut writer, &dir, LIMIT, &text);
 }
 
@@ -146,7 +148,10 @@ mod tests {
         for n in 1..=3 {
             write_line(&mut slot, tmp.path(), 50, &numbered(n));
         }
-        assert_eq!(read(tmp.path(), OLD), format!("{}{}", numbered(1), numbered(2)));
+        assert_eq!(
+            read(tmp.path(), OLD),
+            format!("{}{}", numbered(1), numbered(2))
+        );
         assert_eq!(read(tmp.path(), LOG), numbered(3));
     }
 
@@ -157,7 +162,10 @@ mod tests {
         for n in 1..=5 {
             write_line(&mut slot, tmp.path(), 50, &numbered(n));
         }
-        assert_eq!(read(tmp.path(), OLD), format!("{}{}", numbered(3), numbered(4)));
+        assert_eq!(
+            read(tmp.path(), OLD),
+            format!("{}{}", numbered(3), numbered(4))
+        );
         assert_eq!(read(tmp.path(), LOG), numbered(5));
     }
 
