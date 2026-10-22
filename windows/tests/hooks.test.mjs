@@ -4,9 +4,10 @@
 
 import { afterEach, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
-import { calls, emit, sent } from "./tauri.mjs";
+import { calls, emit, internals, sent } from "./tauri.mjs";
 import { registerHookHandlers } from "../src/island/hooks.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
+import { Sound } from "../src/core/sound.ts";
 
 const CLAUDE = "integration_claude";
 
@@ -38,7 +39,9 @@ beforeEach(() => {
   State.isPinned = false;
   State.pendingApproval = null;
   State.chatSessionId = null;
-  State.settings = { ...DEFAULT_SETTINGS };
+  // Off: the alerts below land at once. With it on they wait for the system's
+  // answer to "is a fullscreen app in front?" (see the last section).
+  State.settings = { ...DEFAULT_SETTINGS, quietWhenBusy: false };
   State.loadIntegrationTasks();
 });
 
@@ -832,3 +835,110 @@ test("a declined permission request leaves the stop timer running", () => {
   assert.deepEqual(sent("approval_decline"), [{ requestId: "r1" }, { requestId: "r7" }]);
   assert.equal(task().state, "idle");
 });
+
+// ── Quiet over a fullscreen app (issue #84) ───────────────────────────────────
+
+/** Answers `user_busy` like Rust would; everything else goes to the stand-in as before. */
+function systemSays(busy) {
+  const invoke = internals.invoke;
+  internals.invoke = async (cmd, args) => {
+    if (cmd !== "user_busy") return invoke(cmd, args);
+    calls.push([cmd, args]);
+    return busy;
+  };
+  return () => { internals.invoke = invoke; };
+}
+
+const answered = () => new Promise((resolve) => setImmediate(resolve));
+
+/** Runs `body` with the switch on, the system's answer fixed and the sounds counted. */
+async function quietly(busy, body) {
+  const restore = systemSays(busy);
+  const played = [];
+  const play = mock.method(Sound, "play", (name) => played.push(name));
+  State.settings = { ...DEFAULT_SETTINGS, quietWhenBusy: true };
+  try {
+    await body(played);
+  } finally {
+    play.mock.restore();
+    restore();
+  }
+}
+
+test("busy: a finished session only badges its pill, silently", () =>
+  quietly(true, async (played) => {
+    hook({ hook_event_name: "Stop" });
+    await answered();
+    assert.equal(sent("user_busy").length, 1);
+    assert.deepEqual(asked, []);
+    assert.deepEqual(played, []);
+    assert.equal(task().pillBadge, "finished");
+    seconds(5.2);
+    assert.equal(task().pillBadge, null);
+  }));
+
+test("busy: a failed session only badges its pill, silently", () =>
+  quietly(true, async (played) => {
+    hook({ hook_event_name: "StopFailure" });
+    await answered();
+    assert.deepEqual(asked, []);
+    assert.deepEqual(played, []);
+    assert.equal(task().pillBadge, "error");
+  }));
+
+test("not busy: a finished session opens the island with its sound, as before", () =>
+  quietly(false, async (played) => {
+    hook({ hook_event_name: "Stop" });
+    await answered();
+    assert.deepEqual(asked, ["alert:finished"]);
+    assert.deepEqual(played, ["finish"]);
+    hook({ hook_event_name: "StopFailure" });
+    await answered();
+    assert.deepEqual(asked, ["alert:finished", "alert:error"]);
+    assert.deepEqual(played, ["finish", "error"]);
+  }));
+
+test("busy, but the switch is off: the system is not even asked", async () => {
+  const restore = systemSays(true);
+  try {
+    hook({ hook_event_name: "Stop" });
+    assert.deepEqual(asked, ["alert:finished"]);
+    assert.deepEqual(sent("user_busy"), []);
+  } finally {
+    restore();
+  }
+});
+
+test("busy: permission requests and questions still come up, with their sound", () =>
+  quietly(true, async (played) => {
+    hook({ hook_event_name: "PermissionRequest", request_id: "r1", tool_name: "Bash", tool_input: { command: "ls" } });
+    assert.deepEqual(asked, ["alert:approval"]);
+    hook({
+      hook_event_name: "PermissionRequest", request_id: "r2", session_id: "s2", tool_name: "AskUserQuestion",
+      tool_input: { questions: [{ question: "Which one?", options: [{ label: "A" }, { label: "B" }] }] },
+    });
+    await answered();
+    assert.deepEqual(played, ["approval", "question"]);
+    assert.deepEqual(sent("user_busy"), []);
+  }));
+
+test("busy: a session finishing behind a waiting card is badged, and the card stays", () =>
+  quietly(true, async () => {
+    hook({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } });
+    asked.length = 0;
+    hook({ hook_event_name: "Stop", session_id: "s2" });
+    await answered();
+    assert.deepEqual(asked, []);
+    assert.equal(State.pendingApproval.requestId, "r1");
+  }));
+
+test("a new turn before the system answers leaves the late alert unsaid", () =>
+  quietly(false, async (played) => {
+    hook({ hook_event_name: "Stop" });
+    hook({ hook_event_name: "UserPromptSubmit", prompt: "go on" });
+    await answered();
+    // The new turn only reveals the compact island; no finished card, no chime.
+    assert.deepEqual(asked, ["reveal"]);
+    assert.deepEqual(played, []);
+    assert.equal(task().pillBadge ?? null, null);
+  }));
