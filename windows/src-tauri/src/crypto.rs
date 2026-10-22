@@ -5,8 +5,20 @@
 // are read every minute and the 24-hour hourly curve every ten minutes, and
 // only while the pill is on and Peika is not paused (integrations::spawn).
 
-use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
+use std::time::{Duration, Instant};
 
+use reqwest::StatusCode;
+use serde_json::{json, Value};
+use tauri::{AppHandle, Manager};
+
+use crate::integrations::{self, IntegrationUpdate};
+use crate::log;
+
+const ID: &str = "integration_crypto";
+/// How often a coin's hourly curve is fetched again.
+const CURVE_EVERY: Duration = Duration::from_secs(600);
 const MAX_COINS: usize = 8;
 /// The longest symbol kept. A longer token is a word, not a coin.
 const MAX_SYMBOL_LEN: usize = 10;
@@ -188,6 +200,223 @@ pub fn quote_json(
         "spark": spark,
         "tradeUrl": trade_url(exchange, &pair),
     })
+}
+
+// ── The poll ──────────────────────────────────────────────────────────────────
+
+/// Why one coin's request gave no answer. The first one of a poll that left
+/// every coin unanswered is the card's error line.
+#[derive(Debug)]
+enum Failure {
+    /// No answer at all: the network, a timeout.
+    Connection(String),
+    /// An answer that is not HTTP 200.
+    Status(u16),
+    /// An HTTP 200 whose body is not what the exchange documents.
+    Unreadable,
+}
+
+impl Failure {
+    /// The card's error line, worded as the other pollers word theirs.
+    fn message(&self) -> String {
+        match self {
+            Failure::Connection(error) => {
+                crate::i18n::tf("No connection: {error}", &[("error", error.as_str())])
+            }
+            Failure::Status(code) => {
+                crate::i18n::tf("API error {code}", &[("code", &code.to_string())])
+            }
+            Failure::Unreadable => {
+                crate::i18n::tf("No connection: {error}", &[("error", "unexpected reply")])
+            }
+        }
+    }
+}
+
+/// One GET, answered only by HTTP 200.
+async fn get_json(http: &reqwest::Client, url: &str) -> Result<Value, Failure> {
+    let response = http
+        .get(url)
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(|e| Failure::Connection(e.to_string()))?;
+    let status = response.status();
+    if status != StatusCode::OK {
+        return Err(Failure::Status(status.as_u16()));
+    }
+    response.json::<Value>().await.map_err(|_| Failure::Unreadable)
+}
+
+/// What one coin's fetch brought back.
+struct Fetched {
+    ticker: Result<(f64, f64), Failure>,
+    /// `None` when the curve was not due this time.
+    curve: Option<Result<Vec<f64>, Failure>>,
+}
+
+async fn fetch_coin(
+    http: reqwest::Client,
+    exchange: Exchange,
+    currency: &'static str,
+    symbol: String,
+    want_curve: bool,
+) -> Fetched {
+    let pair = pair(exchange, &symbol, currency);
+    let ticker = match get_json(&http, &ticker_url(exchange, &pair)).await {
+        Ok(json) => parse_ticker(exchange, &json).ok_or(Failure::Unreadable),
+        Err(failure) => Err(failure),
+    };
+    // A coin with no price has no curve drawn for it either.
+    let curve = if want_curve && ticker.is_ok() {
+        Some(
+            get_json(&http, &candles_url(exchange, &pair))
+                .await
+                .map(|json| parse_candles(exchange, &json)),
+        )
+    } else {
+        None
+    };
+    Fetched { ticker, curve }
+}
+
+/// What the last poll left: the market it was for, and each coin's curve with
+/// the time it was fetched.
+#[derive(Default)]
+struct Cache {
+    key: String,
+    curves: HashMap<String, (Instant, Vec<f64>)>,
+}
+
+impl Cache {
+    /// For each coin, whether its curve is to be fetched now. A different
+    /// exchange, currency or coin list forgets every curve: they were another
+    /// market's.
+    fn due(&mut self, key: &str, coins: &[String], now: Instant) -> Vec<bool> {
+        if self.key != key {
+            self.key = key.to_string();
+            self.curves.clear();
+        }
+        coins
+            .iter()
+            .map(|coin| curve_due(self.curves.get(coin).map(|(at, _)| *at), now))
+            .collect()
+    }
+}
+
+/// Due when it was never fetched, or was fetched `CURVE_EVERY` or more ago.
+fn curve_due(fetched_at: Option<Instant>, now: Instant) -> bool {
+    match fetched_at {
+        None => true,
+        Some(at) => now.saturating_duration_since(at) >= CURVE_EVERY,
+    }
+}
+
+static CACHE: LazyLock<Mutex<Cache>> = LazyLock::new(|| Mutex::new(Cache::default()));
+
+/// The crypto settings as the user left them.
+struct Request {
+    exchange: Exchange,
+    currency: &'static str,
+    coins: Vec<String>,
+}
+
+impl Request {
+    /// Names the market the curves are fetched for.
+    fn key(&self) -> String {
+        format!("{}|{}|{}", self.exchange.id(), self.currency, self.coins.join(","))
+    }
+}
+
+fn read_request(app: &AppHandle) -> Option<Request> {
+    let shared = app.try_state::<crate::Shared>()?;
+    let settings = shared.settings.lock().unwrap();
+    Some(Request {
+        exchange: Exchange::from_setting(&settings.crypto_exchange),
+        currency: currency_from_setting(&settings.crypto_currency),
+        coins: parse_coins(&settings.crypto_coins),
+    })
+}
+
+/// One poll: the price of every coin, the curves when they are due, then the card.
+pub async fn poll(app: AppHandle) {
+    let Some(request) = read_request(&app) else { return };
+    let due = CACHE.lock().unwrap().due(&request.key(), &request.coins, Instant::now());
+
+    let http = integrations::client();
+    let tasks: Vec<_> = request
+        .coins
+        .iter()
+        .zip(due)
+        .map(|(coin, want_curve)| {
+            tauri::async_runtime::spawn(fetch_coin(
+                http.clone(),
+                request.exchange,
+                request.currency,
+                coin.clone(),
+                want_curve,
+            ))
+        })
+        .collect();
+    let mut fetched = Vec::with_capacity(tasks.len());
+    for task in tasks {
+        fetched.push(task.await.unwrap_or_else(|e| Fetched {
+            ticker: Err(Failure::Connection(e.to_string())),
+            curve: None,
+        }));
+    }
+
+    let mut quotes = Vec::new();
+    let mut missing = Vec::new();
+    let mut first_error: Option<String> = None;
+    {
+        let mut cache = CACHE.lock().unwrap();
+        for (coin, fetch) in request.coins.iter().zip(fetched) {
+            match fetch.curve {
+                Some(Ok(closes)) => {
+                    cache.curves.insert(coin.clone(), (Instant::now(), closes));
+                }
+                Some(Err(failure)) => log::line(format!("crypto {coin} curve: {failure:?}")),
+                None => {}
+            }
+            match fetch.ticker {
+                Ok((price, open24h)) => {
+                    // A failed curve keeps the one it had, if any.
+                    let spark: &[f64] = match cache.curves.get(coin) {
+                        Some((_, closes)) => closes.as_slice(),
+                        None => &[],
+                    };
+                    quotes.push(quote_json(
+                        request.exchange,
+                        request.currency,
+                        coin,
+                        price,
+                        open24h,
+                        spark,
+                    ));
+                }
+                Err(failure) => {
+                    log::line(format!("crypto {coin}: {failure:?}"));
+                    first_error.get_or_insert_with(|| failure.message());
+                    missing.push(coin.clone());
+                }
+            }
+        }
+    }
+
+    // Not one coin answered: the network is down, or the exchange refused them all.
+    let error = if quotes.is_empty() && !request.coins.is_empty() {
+        first_error
+    } else {
+        None
+    };
+    let data = json!({
+        "exchange": request.exchange.id(),
+        "currency": request.currency,
+        "quotes": quotes,
+        "missing": missing,
+    });
+    integrations::emit(&app, IntegrationUpdate { id: ID, data, error, event: None });
 }
 
 #[cfg(test)]
@@ -425,5 +654,45 @@ mod tests {
         let eur = quote_json(Exchange::Coinbase, "EUR", "ETH", 2000.0, 2000.0, &[]);
         assert_eq!(eur["tradeUrl"], json!("https://www.coinbase.com/advanced-trade/spot/ETH-EUR"));
         assert_eq!(eur["changePct"], json!(0.0));
+    }
+
+    #[test]
+    fn a_curve_is_due_when_never_fetched_and_again_after_ten_minutes() {
+        let t0 = Instant::now();
+        assert!(curve_due(None, t0));
+        assert!(!curve_due(Some(t0), t0 + Duration::from_secs(599)));
+        assert!(curve_due(Some(t0), t0 + Duration::from_secs(600)));
+    }
+
+    #[test]
+    fn a_curve_is_kept_between_polls_and_forgotten_when_the_market_changes() {
+        let t0 = Instant::now();
+        let later = t0 + Duration::from_secs(60);
+        let coins = vec!["BTC".to_string(), "ETH".to_string()];
+        let mut cache = Cache::default();
+
+        assert_eq!(cache.due("coinbase|USD|BTC,ETH", &coins, t0), [true, true]);
+        cache.curves.insert("BTC".into(), (t0, vec![1.0]));
+        cache.curves.insert("ETH".into(), (t0, vec![2.0]));
+        assert_eq!(cache.due("coinbase|USD|BTC,ETH", &coins, later), [false, false]);
+        assert_eq!(cache.curves["BTC"].1, [1.0]);
+
+        // Another exchange, currency or coin list: no curve is kept.
+        assert_eq!(cache.due("okx|USD|BTC,ETH", &coins, later), [true, true]);
+        assert!(cache.curves.is_empty());
+    }
+
+    #[test]
+    fn a_coin_added_later_is_fetched_while_the_others_wait() {
+        let t0 = Instant::now();
+        let later = t0 + Duration::from_secs(60);
+        let mut cache = Cache::default();
+        let one = vec!["BTC".to_string()];
+        cache.due("coinbase|USD|BTC", &one, t0);
+        cache.curves.insert("BTC".into(), (t0, vec![1.0]));
+
+        // Adding a coin changes the market key, so every curve is fetched once more.
+        let two = vec!["BTC".to_string(), "SOL".to_string()];
+        assert_eq!(cache.due("coinbase|USD|BTC,SOL", &two, later), [true, true]);
     }
 }
