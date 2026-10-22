@@ -190,6 +190,15 @@ fn focus_window(app: AppHandle, focused: bool) {
     }
 }
 
+/// Seconds since the user last touched the keyboard or the mouse; `None` where
+/// the system cannot say (Linux), and then the "while you were away" card never
+/// shows. The island asks only on a slow timer, and only while something
+/// happened that the card would tell.
+#[tauri::command]
+fn idle_seconds() -> Option<u64> {
+    platform::idle_seconds()
+}
+
 #[tauri::command]
 fn reposition(app: AppHandle, shared: State<Shared>) {
     let pref = shared.settings.lock().unwrap().screen.clone();
@@ -902,6 +911,7 @@ pub fn run() {
             set_island_rect,
             focus_window,
             reposition,
+            idle_seconds,
             list_monitors,
             open_url,
             open_in_vscode,

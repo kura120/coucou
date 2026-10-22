@@ -21,11 +21,11 @@ use ::windows::Win32::System::Com::{
 };
 use ::windows::Win32::System::Ole::RevokeDragDrop;
 use ::windows::Win32::System::Pipes::GetNamedPipeClientProcessId;
-use ::windows::Win32::System::SystemInformation::GetLocalTime;
+use ::windows::Win32::System::SystemInformation::{GetLocalTime, GetTickCount};
 use ::windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 use ::windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, GetKeyboardLayoutList, MapVirtualKeyExW, ToUnicodeEx, HKL, MAPVK_VK_TO_VSC,
-    VK_CONTROL, VK_LBUTTON, VK_MENU, VK_SHIFT,
+    GetAsyncKeyState, GetKeyboardLayoutList, GetLastInputInfo, MapVirtualKeyExW, ToUnicodeEx, HKL,
+    LASTINPUTINFO, MAPVK_VK_TO_VSC, VK_CONTROL, VK_LBUTTON, VK_MENU, VK_SHIFT,
 };
 use ::windows::Win32::UI::Shell::{
     FileOpenDialog, IFileOpenDialog, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH,
@@ -105,6 +105,18 @@ pub fn local_time() -> LocalTime {
         minute: t.wMinute.into(),
         second: t.wSecond.into(),
     }
+}
+
+/// Seconds since the keyboard or the mouse was last touched: `GetLastInputInfo`
+/// against `GetTickCount`, both 32-bit tick counts, so the subtraction wraps.
+pub fn idle_seconds() -> Option<u64> {
+    let mut info = LASTINPUTINFO { cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32, dwTime: 0 };
+    // SAFETY: `info` is a LASTINPUTINFO with its size set, as the call requires.
+    if !unsafe { GetLastInputInfo(&mut info) }.as_bool() {
+        return None;
+    }
+    let now = unsafe { GetTickCount() };
+    Some(u64::from(now.wrapping_sub(info.dwTime)) / 1000)
 }
 
 // ── Processes ─────────────────────────────────────────────────────────────────

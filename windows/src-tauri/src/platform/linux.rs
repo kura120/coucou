@@ -163,6 +163,12 @@ fn dpi_scale_for(gsettings_output: &str) -> Option<String> {
     Some(format!("{:.4}", 1.0 / factor).trim_end_matches('0').trim_end_matches('.').to_string())
 }
 
+/// No idle time on Linux (it would take X11's screensaver extension or a
+/// compositor protocol): the "while you were away" card never shows.
+pub fn idle_seconds() -> Option<u64> {
+    None
+}
+
 pub fn local_time() -> LocalTime {
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };
     unsafe {
