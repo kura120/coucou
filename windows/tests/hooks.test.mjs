@@ -218,6 +218,46 @@ test("a request to edit a file carries what the edit would change; any other too
   assert.equal(State.pendingApproval.preview, undefined);
 });
 
+const SUGGESTIONS = [
+  { type: "addRules", rules: [{ toolName: "Bash", ruleContent: "npm test:*" }], behavior: "allow", destination: "localSettings" },
+  { type: "setMode", mode: "acceptEdits", destination: "session" },
+];
+
+test("Always is offered on Claude Code's request that came with an allow rule, and says which", () => {
+  hook({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", tool_name: "Bash",
+    tool_input: { command: "npm test" }, permission_suggestions: SUGGESTIONS });
+  assert.equal(State.pendingApproval.alwaysRule, "Bash(npm test:*)");
+
+  // A rule on a whole tool, and two of them.
+  State.pendingApproval = null;
+  hook({ hook_event_name: "PermissionRequest", request_id: "r2", session_id: "s1", tool_name: "WebFetch",
+    tool_input: { url: "https://x.dev" },
+    permission_suggestions: [{ type: "addRules", behavior: "allow", destination: "session",
+      rules: [{ toolName: "WebFetch" }, { toolName: "Bash", ruleContent: "ls" }] }] });
+  assert.equal(State.pendingApproval.alwaysRule, "WebFetch, Bash(ls)");
+});
+
+test("Always is not offered without a rule to remember, or on a card that is not Claude Code's", () => {
+  const ask = (extra, id) => {
+    State.pendingApproval = null;
+    hook({ hook_event_name: "PermissionRequest", request_id: id, session_id: "s1", tool_name: "Bash",
+      tool_input: { command: "ls" }, ...extra });
+    return State.pendingApproval.alwaysRule;
+  };
+  assert.equal(ask({}, "a"), undefined);
+  assert.equal(ask({ permission_suggestions: [] }, "b"), undefined);
+  // A mode change, a deny rule, a directory: not what "Always" means.
+  assert.equal(ask({ permission_suggestions: [SUGGESTIONS[1]] }, "c"), undefined);
+  assert.equal(ask({ permission_suggestions: [{ ...SUGGESTIONS[0], behavior: "deny" }] }, "d"), undefined);
+  assert.equal(ask({ permission_suggestions: [{ type: "addDirectories", directories: ["/"], destination: "session" }] }, "e"), undefined);
+  assert.equal(ask({ permission_suggestions: [{ ...SUGGESTIONS[0], destination: "elsewhere" }] }, "f"), undefined);
+  assert.equal(ask({ permission_suggestions: "Bash(*)" }, "g"), undefined);
+  // Codex, Copilot CLI and Muse Code never get it, whatever they send.
+  for (const agent of ["codex", "copilot", "muse"]) {
+    assert.equal(ask({ peika_agent: agent, permission_suggestions: SUGGESTIONS }, `h-${agent}`), undefined, agent);
+  }
+});
+
 test("a session finishing behind another pill only badges its own, for 5.2 s", () => {
   State.setFocus("integration_n8n");
   hook({ hook_event_name: "Stop" });

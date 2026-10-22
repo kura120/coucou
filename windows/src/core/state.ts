@@ -55,6 +55,11 @@ export interface ApprovalInfo extends Queued {
   projectName?: string;
   /** What an Edit, MultiEdit or Write waiting for a decision would change (the card shows a few lines of it). */
   preview?: ApprovalPreview;
+  /**
+   * What "Always" would have Claude Code remember, as it suggested it ("Bash(npm test:*)"):
+   * set only on Claude Code's own requests that came with an allow rule to add.
+   */
+  alwaysRule?: string;
   /** Set when Claude Code is asking a question rather than for a permission. */
   questions?: AskedQuestion[];
 }

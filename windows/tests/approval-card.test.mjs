@@ -262,3 +262,85 @@ test("the island grows to the card a preview makes, and goes back for a request 
   view.sync();
   assert.equal(VIEW_LAYOUTS.approval.height, 160);
 });
+
+// ── Always ────────────────────────────────────────────────────────────────────
+
+/** Lets the card's click guard pass, as it does 600 ms after a request appears. */
+function afterGuard(fn) {
+  const realNow = performance.now.bind(performance);
+  performance.now = () => realNow() + 700;
+  try {
+    fn();
+  } finally {
+    performance.now = realNow;
+  }
+}
+const labels = () => view.el.find("BUTTON").filter((b) => b.classList.contains("btn")).map((b) => b.childNodes[0].textContent);
+
+test("a request with a rule to remember has a third button, Always, between Deny and Allow", () => {
+  State.pendingApproval = request({ tool: "Bash", command: "Bash · npm test", alwaysRule: "Bash(npm test:*)" });
+  view.sync();
+  assert.deepEqual(labels(), ["Deny", "Always", "Allow"]);
+  const always = button("Always");
+  assert.equal(always.title, "Always allow Bash(npm test:*)");
+  // The rule is said on the card before the click.
+  assert.equal(view.el.querySelector("approval-rule").textContent, "Always allow Bash(npm test:*)");
+  assert.equal(hidden("approval-rule"), false);
+  // Y and N stay on their buttons; Always has no key of its own.
+  assert.equal(button("Allow").find(".kbd")[0].textContent, "Y");
+  assert.equal(button("Deny").find(".kbd")[0].textContent, "N");
+  assert.deepEqual(always.find(".kbd"), []);
+});
+
+test("Always waits out the same click guard, then answers always, not allow", () => {
+  State.pendingApproval = request({ tool: "Bash", command: "Bash · ls", alwaysRule: "Bash(ls)" });
+  view.sync();
+  button("Always").fire("click");
+  assert.deepEqual(decided, []);
+  afterGuard(() => button("Always").fire("click"));
+  assert.deepEqual(decided, ["always"]);
+  afterGuard(() => button("Allow").fire("click"));
+  assert.deepEqual(decided, ["always", "allow"]);
+});
+
+test("a request without a rule keeps the two buttons and no rule line", () => {
+  State.pendingApproval = request({ tool: "Bash", command: "Bash · ls" });
+  view.sync();
+  assert.deepEqual(labels(), ["Deny", "Allow"]);
+  assert.equal(hidden("approval-rule"), true);
+  // From one kind of card to the other and back, the buttons follow the request.
+  State.pendingApproval = request({ requestId: "r2", tool: "Bash", alwaysRule: "Bash(ls)" });
+  view.sync();
+  assert.deepEqual(labels(), ["Deny", "Always", "Allow"]);
+  State.pendingApproval = request({ requestId: "r3", tool: "Bash" });
+  view.sync();
+  assert.deepEqual(labels(), ["Deny", "Allow"]);
+});
+
+test("the buttons are not rebuilt while the same request stays on the card", () => {
+  State.pendingApproval = request({ tool: "Bash", alwaysRule: "Bash(ls)" });
+  view.sync();
+  const [deny, always, allow] = [button("Deny"), button("Always"), button("Allow")];
+  view.sync();
+  assert.ok(button("Deny") === deny && button("Always") === always && button("Allow") === allow);
+});
+
+test("an edit with a preview names the rule in Always's tooltip only, and the card keeps its preview height", () => {
+  const { VIEW_LAYOUTS } = layout;
+  State.pendingApproval = request({ preview: edit(40), alwaysRule: "Edit(//p/**)" });
+  view.sync();
+  assert.equal(hidden("approval-rule"), true);
+  assert.equal(button("Always").title, "Always allow Edit(//p/**)");
+  assert.equal(VIEW_LAYOUTS.approval.height, 148 + 52);
+});
+
+test("the line naming the rule makes the card as tall as it needs, no more", () => {
+  const { VIEW_LAYOUTS } = layout;
+  assert.equal(approvalCardHeight(null, false, true), 111);
+  State.pendingApproval = request({ tool: "Bash", alwaysRule: "Bash(ls)" });
+  view.sync();
+  assert.equal(VIEW_LAYOUTS.approval.height, 111 + 52);
+  State.pendingApproval = request({ requestId: "r2", tool: "Bash" });
+  view.sync();
+  assert.equal(VIEW_LAYOUTS.approval.height, 160);
+});

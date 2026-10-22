@@ -1046,6 +1046,17 @@ body {
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
+/* "Always allow Bash(npm test:*)": what that button would have Claude Code remember. */
+.approval-rule {
+  flex: 0 0 auto;
+  font: 400 11px/14px var(--font);
+  color: var(--dim-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+
 .approval-preview .diff-note {
   padding: 0 8px;
 }

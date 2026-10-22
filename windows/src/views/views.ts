@@ -58,7 +58,8 @@ export interface ViewActions {
   /** The ↗ button: opens whatever the focused pill points at. */
   openTarget(): void;
   openUrl(url: string): void;
-  decide(d: "allow" | "deny"): void;
+  /** "always" lets Claude Code remember the rule it suggested (relay reply.rs); only its own card offers it. */
+  decide(d: "allow" | "deny" | "always"): void;
   /** Answers the question Claude Code asked: question text → chosen label. */
   answer(answers: Record<string, string | string[]>): void;
   /** Hands the pending request back to the terminal. */
@@ -600,6 +601,9 @@ const APPROVAL_FIXED_H = 97;
 /** …and one row of changed lines, and the frame (padding and border) around the rows. */
 const PREVIEW_ROW_H = 14.2;
 const PREVIEW_FRAME_H = 8;
+/** The card with only the target and the buttons (no preview), and the line that names the rule "Always" would add. */
+const APPROVAL_NO_PREVIEW_H = 92;
+const APPROVAL_RULE_H = 19;
 /** The most rows the box shows at once when opened; past that it scrolls. */
 export const PREVIEW_ROWS_OPEN = 4;
 
@@ -607,8 +611,8 @@ export const PREVIEW_ROWS_OPEN = 4;
  * How tall the card is for this request: the usual 108 px without a preview,
  * and as much more as three lines (four, opened) under the target take.
  */
-export function approvalCardHeight(p: ApprovalPreview | null, open: boolean): number {
-  if (!p) return APPROVAL_CARD_H;
+export function approvalCardHeight(p: ApprovalPreview | null, open: boolean, ruleLine = false): number {
+  if (!p) return ruleLine ? APPROVAL_NO_PREVIEW_H + APPROVAL_RULE_H : APPROVAL_CARD_H;
   const shown = p.tooLarge || p.lines.length === 0 ? 1 : Math.min(p.lines.length, open ? PREVIEW_ROWS_OPEN : PREVIEW_ROWS);
   return Math.max(APPROVAL_CARD_H, Math.ceil(APPROVAL_FIXED_H + PREVIEW_FRAME_H + shown * PREVIEW_ROW_H));
 }
@@ -646,29 +650,31 @@ export function buildApproval(actions: ViewActions): ViewHost {
   });
   const target = h("div", { class: "approval-target" }, code, counts, more);
   const preview = h("div", { class: "approval-preview" });
+  // What "Always" would have Claude Code remember, said before it is clicked.
+  const rule = h("div", { class: "approval-rule" });
   const row = h("div", { class: "actions" });
   const el = h("div", { class: "view" },
-    card("amber", stack(116, 16, who, target, preview, row), foldButton(actions)));
+    card("amber", stack(116, 16, who, target, preview, rule, row), foldButton(actions)));
   let rowKey = "";
   // The card pops up under a cursor that was busy with something else: a click
   // meant for the window underneath must not land on Allow. Clicks in the first
   // moments after a new request appears are ignored.
   let shownFor: string | null = null;
   let shownAt = 0;
-  const guarded = (d: "allow" | "deny") => () => {
+  const guarded = (d: "allow" | "deny" | "always") => () => {
     if (performance.now() - shownAt < CLICK_GUARD_MS) return;
     actions.decide(d);
   };
 
   /** The counts and the lines under the target; nothing at all for a tool that edits no file. */
-  const syncPreview = (p: ApprovalPreview | null) => {
+  const syncPreview = (p: ApprovalPreview | null, ruleLine: boolean) => {
     const key = p ? `${shownFor}:${open}:${p.path}:${p.added}:${p.removed}` : "";
     const hidden = p ? Math.max(0, p.lines.length - PREVIEW_ROWS) : 0;
     counts.style.display = p ? "" : "none";
     preview.style.display = p ? "" : "none";
     more.style.display = hidden > 0 ? "" : "none";
     // The island grows to what the card holds, and goes back for a request with nothing to show.
-    fit("approval", approvalCardHeight(p, open), actions);
+    fit("approval", approvalCardHeight(p, open, ruleLine), actions);
     if (key === previewKey) return;
     previewKey = key;
     clear(counts);
@@ -703,14 +709,32 @@ export function buildApproval(actions: ViewActions): ViewHost {
       // is the command, the file path or the URL being authorised, not just the
       // name of the tool asking.
       code.textContent = info?.command || info?.tool || "…";
-      syncPreview(info?.preview ?? null);
-      // The buttons are built once. Rebuilding them between a mouse-down and a
-      // mouse-up would swallow the click, and there is nothing left to vary.
-      if (rowKey === "built") return;
-      rowKey = "built";
+      // "Always" is Claude Code's own: it suggested the rule, it remembers it.
+      // Without a suggestion, or for another agent, there is no such button.
+      const always = info?.alwaysRule ?? "";
+      // The line naming the rule takes room an edit's preview needs: an edit's
+      // rule is in the button's tooltip.
+      const ruleLine = always !== "" && !info?.preview;
+      rule.style.display = ruleLine ? "" : "none";
+      rule.textContent = ruleLine ? t("Always allow {rule}", { rule: always }) : "";
+      rule.title = ruleLine ? rule.textContent : "";
+      syncPreview(info?.preview ?? null, ruleLine);
+      // The buttons are built once per kind of card. Rebuilding them between a
+      // mouse-down and a mouse-up would swallow the click; they only change when
+      // the next request is one "Always" is offered on, or not.
+      const key = always !== "" ? `always:${always}` : "plain";
+      if (rowKey === key) return;
+      rowKey = key;
       clear(row);
+      const middle: HTMLElement[] = [];
+      if (always !== "") {
+        const alwaysBtn = btn(tl("Always"), "secondary", guarded("always"));
+        alwaysBtn.title = t("Always allow {rule}", { rule: always });
+        middle.push(alwaysBtn);
+      }
       row.append(
         btn(tl("Deny"), "secondary", guarded("deny"), "N"),
+        ...middle,
         btn(tl("Allow"), "primary", guarded("allow"), "Y"),
       );
     },

@@ -67,6 +67,17 @@
    "ru": "Свернуть",
    "id": "Tampilkan lebih sedikit"
   },
+  "Always allow {rule}": {
+   "zh-Hans": "始终允许 {rule}",
+   "hi": "{rule} को हमेशा अनुमति दें",
+   "es": "Permitir siempre {rule}",
+   "ar": "السماح دائمًا بـ {rule}",
+   "fr": "Toujours autoriser {rule}",
+   "bn": "সবসময় {rule} অনুমতি দিন",
+   "pt-BR": "Permitir sempre {rule}",
+   "ru": "Всегда разрешать {rule}",
+   "id": "Selalu izinkan {rule}"
+  },
   "Only the start of this edit is shown": {
    "zh-Hans": "仅显示此编辑的开头部分",
    "hi": "केवल इस बदलाव की शुरुआत दिखाई गई है",
