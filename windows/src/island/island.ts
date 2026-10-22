@@ -291,6 +291,10 @@ export class Island {
           integration_stripe: "https://dashboard.stripe.com/payments",
           integration_notion: "https://notion.so",
           integration_calcom: "https://app.cal.com/bookings",
+          // The prices' own exchange.
+          integration_crypto: State.settings.cryptoExchange === "okx"
+            ? "https://www.okx.com/markets/prices"
+            : "https://www.coinbase.com/explore",
         };
         if (task.id === CLAUDE_DESKTOP_ID) void Bridge.openClaudeDesktop();
         else if (task.id === "integration_claude" || task.sessionId) {

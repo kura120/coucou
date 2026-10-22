@@ -120,6 +120,7 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         island::apply_geometry(&app, &settings.screen, collapsed);
     }
     integrations::settings_saved(&app, &settings.active_integrations);
+    crypto::settings_saved(&app, &settings.active_integrations);
     spotify::sync(&app, &settings.active_integrations);
     voice::sync(&app, &settings);
     if shortcuts_changed {

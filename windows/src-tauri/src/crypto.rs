@@ -338,6 +338,19 @@ fn read_request(app: &AppHandle) -> Option<Request> {
     })
 }
 
+/// Settings were saved: when the pill is on and its exchange, currency or coins
+/// changed, the card follows now rather than at the next minute.
+pub fn settings_saved(app: &AppHandle, active_integrations: &[String]) {
+    if !active_integrations.iter().any(|id| id == ID) || integrations::PAUSED.load(std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+    let Some(request) = read_request(app) else { return };
+    if CACHE.lock().unwrap().key == request.key() {
+        return;
+    }
+    tauri::async_runtime::spawn(poll(app.clone()));
+}
+
 /// One poll: the price of every coin, the curves when they are due, then the card.
 pub async fn poll(app: AppHandle) {
     let Some(request) = read_request(&app) else { return };
