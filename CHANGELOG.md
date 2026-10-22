@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Under the hood, for dictation and the Notetaker: the bundled speech engine, the microphone and the sentence cutter move out of voice into a shared speech service (`src-tauri/src/speech/`), with one rule about listening. While something else claims the microphone, "OK Peika" stands aside and comes back after. Voice works as before; the models and their folder are unchanged.
 - The macOS and iPhone app, the relay, the scripts and the specs say Peika too: bundle ids are `dev.kura120.peika` (Mac direct build `dev.kura120.peika.direct`), the Apple team id and the original's hosted relay address are gone, and `Sources/CoucouKit` is `Sources/PeikaKit`. Not built or run: there is no Mac or Xcode here.
 - The original app icons and menu bar icon are replaced by the cloud, and the Mochi character stills and outfit sheet are removed. The sounds and the other media stay until Peika has its own.
 - The Android app is removed from the repository (its code is © Rhytam Biswas, the original's side project, not Peika's), along with its workflows, its docs and its Pages section. The phone link goes with it (see below).
