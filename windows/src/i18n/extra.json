@@ -45,6 +45,39 @@
    "ru": "Плашки и интеграции",
    "id": "Pil dan integrasi"
   },
+  "Show all": {
+   "zh-Hans": "显示全部",
+   "hi": "सभी दिखाएँ",
+   "es": "Mostrar todo",
+   "ar": "عرض الكل",
+   "fr": "Tout afficher",
+   "bn": "সব দেখান",
+   "pt-BR": "Mostrar tudo",
+   "ru": "Показать все",
+   "id": "Tampilkan semua"
+  },
+  "Show less": {
+   "zh-Hans": "收起",
+   "hi": "कम दिखाएँ",
+   "es": "Mostrar menos",
+   "ar": "عرض أقل",
+   "fr": "Afficher moins",
+   "bn": "কম দেখান",
+   "pt-BR": "Mostrar menos",
+   "ru": "Свернуть",
+   "id": "Tampilkan lebih sedikit"
+  },
+  "Only the start of this edit is shown": {
+   "zh-Hans": "仅显示此编辑的开头部分",
+   "hi": "केवल इस बदलाव की शुरुआत दिखाई गई है",
+   "es": "Solo se muestra el principio de esta edición",
+   "ar": "يظهر بداية هذا التعديل فقط",
+   "fr": "Seul le début de cette modification est affiché",
+   "bn": "এই সম্পাদনার শুধু শুরুটুকু দেখানো হয়েছে",
+   "pt-BR": "Apenas o início desta edição é mostrado",
+   "ru": "Показано только начало этой правки",
+   "id": "Hanya awal dari suntingan ini yang ditampilkan"
+  },
   "About": {
    "zh-Hans": "关于",
    "hi": "के बारे में",

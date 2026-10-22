@@ -6,7 +6,7 @@
 // Code's (hook/src/normalize.rs), so one handler serves them all.
 
 import { Bridge, onEvent } from "../core/bridge";
-import { buildFileDiff, fileName, makeDiffStep, toOneLine } from "../core/diff";
+import { approvalPreview, buildFileDiff, fileName, makeDiffStep, toOneLine } from "../core/diff";
 import { Sound } from "../core/sound";
 import { State, type ApprovalInfo, type AskedQuestion } from "../core/state";
 import { MAX_PENDING, inputKey } from "../core/approvals";
@@ -498,6 +498,8 @@ function handleHook(island: Island, payload: HookPayload) {
       // shows the options and sends back the one that was picked. Only Claude
       // Code asks questions this way.
       const questions = isExternalAgent ? null : askedQuestions(tool, input);
+      // An edit asking to be allowed: what it would change, for the card to show.
+      const preview = questions ? null : approvalPreview(tool, input);
       const view = questions ? "question" : "approval";
       // The card always comes up, even over another pill or an island that is
       // already open: its pill comes to the front, and the one you were on
@@ -510,6 +512,7 @@ function handleHook(island: Island, payload: HookPayload) {
         inputKey: inputKey(payload.tool_input),
         received: Date.now(),
         command: approvalTarget(tool, input),
+        ...(preview ? { preview } : {}),
         ...(isExternalAgent ? {} : { projectName }),
         ...(questions ? { questions } : {}),
       });

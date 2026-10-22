@@ -19,7 +19,7 @@ import {
   PlanCard, buildPlanPill, claudePillVisible, codexPillVisible, planCardOpen, refreshCodexPlanUsage,
 } from "./usage";
 import { buildDiffCard } from "./diff";
-import { lastTextStep } from "../core/diff";
+import { lastTextStep, type ApprovalPreview } from "../core/diff";
 import { Bridge } from "../core/bridge";
 import { buildRecap } from "./recap";
 import { buildWardrobe } from "./wardrobe";
@@ -27,10 +27,11 @@ import { buildSpotifyCard, buildSpotifyMini } from "./spotify";
 import { provideMenu } from "./menu";
 import { SPOTIFY_ID } from "../core/spotify";
 import type { Outfit, OutfitSelection } from "../peika/wardrobe";
-import { language, t, tl, type Msg } from "../i18n/i18n";
+import { N_, language, t, tl, type Msg } from "../i18n/i18n";
 import type { ViewCommand } from "../island/shortcuts";
 import { registerVoiceCards } from "./voice-cards";
 import { buildCapture } from "./capture";
+import { fit } from "./card";
 import { VIEW_SCREENS, type Shown } from "../island/screen";
 
 export interface ViewActions {
@@ -583,12 +584,71 @@ function foldButton(actions: ViewActions): HTMLElement {
   );
 }
 
-function buildApproval(actions: ViewActions): ViewHost {
+/** How many changed lines the card shows, and how many once opened (it scrolls through the rest). */
+export const PREVIEW_ROWS = 3;
+
+const APPROVAL_STRINGS = {
+  showAll: N_("Show all"),
+  showLess: N_("Show less"),
+  partial: N_("Only the start of this edit is shown"),
+};
+
+/** The card's usual height (the island's 160 less its header); the island's own minimum for a card. */
+const APPROVAL_CARD_H = 108;
+/** Measured in the card's CSS: its padding, border, three gaps and rows other than the preview's… */
+const APPROVAL_FIXED_H = 97;
+/** …and one row of changed lines, and the frame (padding and border) around the rows. */
+const PREVIEW_ROW_H = 14.2;
+const PREVIEW_FRAME_H = 8;
+/** The most rows the box shows at once when opened; past that it scrolls. */
+export const PREVIEW_ROWS_OPEN = 4;
+
+/**
+ * How tall the card is for this request: the usual 108 px without a preview,
+ * and as much more as three lines (four, opened) under the target take.
+ */
+export function approvalCardHeight(p: ApprovalPreview | null, open: boolean): number {
+  if (!p) return APPROVAL_CARD_H;
+  const shown = p.tooLarge || p.lines.length === 0 ? 1 : Math.min(p.lines.length, open ? PREVIEW_ROWS_OPEN : PREVIEW_ROWS);
+  return Math.max(APPROVAL_CARD_H, Math.ceil(APPROVAL_FIXED_H + PREVIEW_FRAME_H + shown * PREVIEW_ROW_H));
+}
+
+/**
+ * The first `rows` changed lines of an edit waiting to be allowed, `+` green and
+ * `−` red like the diff card. Built as text nodes: the text is the agent's own.
+ */
+export function previewRows(preview: ApprovalPreview, rows: number): HTMLElement[] {
+  return preview.lines.slice(0, rows).map((line) =>
+    h(
+      "div",
+      { class: `diff-line ${line.kind}` },
+      h("span", { class: "sym", text: line.kind === "added" ? "+" : "−" }),
+      h("span", { class: "txt", text: line.text }),
+    ),
+  );
+}
+
+export function buildApproval(actions: ViewActions): ViewHost {
   const who = h("div");
   const code = h("div", { class: "code" });
+  // "+N −M" next to the target, as the ticker counts a finished edit, and the
+  // way to see the rest of it. The button is built once: rebuilding it between
+  // a mouse-down and a mouse-up would swallow the click.
+  const counts = h("span", { class: "approval-counts" });
+  let open = false;
+  let previewKey = "";
+  const more = h("button", {
+    class: "link-btn approval-more",
+    onclick: () => {
+      open = !open;
+      State.notify();
+    },
+  });
+  const target = h("div", { class: "approval-target" }, code, counts, more);
+  const preview = h("div", { class: "approval-preview" });
   const row = h("div", { class: "actions" });
   const el = h("div", { class: "view" },
-    card("amber", stack(116, 16, who, code, row), foldButton(actions)));
+    card("amber", stack(116, 16, who, target, preview, row), foldButton(actions)));
   let rowKey = "";
   // The card pops up under a cursor that was busy with something else: a click
   // meant for the window underneath must not land on Allow. Clicks in the first
@@ -599,23 +659,53 @@ function buildApproval(actions: ViewActions): ViewHost {
     if (performance.now() - shownAt < CLICK_GUARD_MS) return;
     actions.decide(d);
   };
+
+  /** The counts and the lines under the target; nothing at all for a tool that edits no file. */
+  const syncPreview = (p: ApprovalPreview | null) => {
+    const key = p ? `${shownFor}:${open}:${p.path}:${p.added}:${p.removed}` : "";
+    const hidden = p ? Math.max(0, p.lines.length - PREVIEW_ROWS) : 0;
+    counts.style.display = p ? "" : "none";
+    preview.style.display = p ? "" : "none";
+    more.style.display = hidden > 0 ? "" : "none";
+    // The island grows to what the card holds, and goes back for a request with nothing to show.
+    fit("approval", approvalCardHeight(p, open), actions);
+    if (key === previewKey) return;
+    previewKey = key;
+    clear(counts);
+    clear(preview);
+    if (!p) return;
+    if (p.isNewFile) counts.append(h("span", { class: "approval-new", text: tl("New") }));
+    if (p.added > 0) counts.append(h("span", { class: "tick-count plus", text: `+${p.added}` }));
+    if (p.removed > 0) counts.append(h("span", { class: "tick-count minus", text: `−${p.removed}` }));
+    if (p.partial) counts.append(h("span", { class: "approval-partial", title: tl(APPROVAL_STRINGS.partial), text: "…" }));
+    preview.classList.toggle("open", open);
+    more.textContent = open ? t(APPROVAL_STRINGS.showLess) : t(APPROVAL_STRINGS.showAll);
+    if (p.tooLarge || p.lines.length === 0) {
+      preview.append(h("div", { class: "diff-note", text: tl("Diff too large") }));
+      return;
+    }
+    preview.append(...previewRows(p, open ? p.lines.length : PREVIEW_ROWS));
+  };
+
   return {
     el,
     sync() {
-      const req = State.pendingApproval?.requestId ?? null;
+      const info = State.pendingApproval;
+      const req = info?.requestId ?? null;
       if (req !== shownFor) {
         shownFor = req;
         shownAt = performance.now();
+        open = false;
       }
       clear(who);
       who.append(askerWho(t("needs permission")));
       // The whole point of approving here rather than in the terminal: this line
       // is the command, the file path or the URL being authorised, not just the
       // name of the tool asking.
-      code.textContent = State.pendingApproval?.command || State.pendingApproval?.tool || "…";
-      // Two buttons, built once. Rebuilding them between a mouse-down and a
-      // mouse-up would swallow the click, and there is nothing left to vary:
-      // "Always" is gone until the remembered-rules list exists to back it.
+      code.textContent = info?.command || info?.tool || "…";
+      syncPreview(info?.preview ?? null);
+      // The buttons are built once. Rebuilding them between a mouse-down and a
+      // mouse-up would swallow the click, and there is nothing left to vary.
       if (rowKey === "built") return;
       rowKey = "built";
       clear(row);

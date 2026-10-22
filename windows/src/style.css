@@ -979,6 +979,81 @@ body {
   user-select: text;
 }
 
+/* The permission card's target line, with an edit's +N −M and "Show all" after it. */
+.approval-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.approval-target .code {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.approval-counts {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  font: 500 10.5px var(--mono);
+  white-space: pre;
+}
+
+.approval-counts .plus {
+  color: var(--green);
+}
+
+.approval-counts .minus {
+  color: var(--red);
+}
+
+.approval-new,
+.approval-partial {
+  color: var(--dim-3);
+}
+
+.approval-more {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0;
+  color: var(--dim-2);
+  white-space: nowrap;
+}
+
+.approval-more:hover {
+  color: var(--ink);
+}
+
+/* A few changed lines (three rows; four once opened, then it scrolls): the card
+   stays the island's usual 160 px. */
+.approval-preview {
+  flex: 0 0 auto;
+  max-height: 52px;
+  overflow: hidden;
+  padding: 3px 0;
+  border-radius: 8px;
+  background: #0b0c0e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  user-select: text;
+}
+
+.approval-preview.open {
+  max-height: 66px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.approval-preview .diff-note {
+  padding: 0 8px;
+}
+
+.approval-preview .diff-line {
+  padding: 0 8px;
+}
+
 .stack {
   position: relative;
   z-index: 1;

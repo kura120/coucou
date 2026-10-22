@@ -196,6 +196,28 @@ test("the chat's own turn still gets its permission card", () => {
   assert.equal(State.pendingApproval.requestId, "r1");
 });
 
+test("a request to edit a file carries what the edit would change; any other tool does not", () => {
+  hook({
+    hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", tool_name: "Edit",
+    tool_input: { file_path: "/p/a.ts", old_string: "a\nb", new_string: "a\nc\nd" },
+  });
+  const { preview, command } = State.pendingApproval;
+  assert.equal(command, "Edit · /p/a.ts");
+  assert.deepEqual(preview.lines, [
+    { kind: "removed", text: "b" },
+    { kind: "added", text: "c" },
+    { kind: "added", text: "d" },
+  ]);
+  assert.deepEqual([preview.added, preview.removed], [2, 1]);
+
+  State.pendingApproval = null;
+  hook({ hook_event_name: "PermissionRequest", request_id: "r2", session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } });
+  assert.equal(State.pendingApproval.preview, undefined);
+  State.pendingApproval = null;
+  hook({ hook_event_name: "PermissionRequest", request_id: "r3", session_id: "s1", tool_name: "Write", tool_input: { file_path: "/p/a.ts" } });
+  assert.equal(State.pendingApproval.preview, undefined);
+});
+
 test("a session finishing behind another pill only badges its own, for 5.2 s", () => {
   State.setFocus("integration_n8n");
   hook({ hook_event_name: "Stop" });
@@ -444,6 +466,16 @@ test("a permission request puts the card up, says exactly what it authorises, an
     inputKey: JSON.stringify({ content: "SECRET=1", file_path: " C:\\Users\\me\\proj\\.env " }),
     received: Date.now(),
     command: "Write · C:\\Users\\me\\proj\\.env",
+    // A Write also says what it would put in the file (the card shows a few lines).
+    preview: {
+      path: " C:\\Users\\me\\proj\\.env ",
+      added: 1,
+      removed: 0,
+      lines: [{ kind: "added", text: "SECRET=1" }],
+      isNewFile: true,
+      tooLarge: false,
+      partial: false,
+    },
     projectName: "proj",
   });
   assert.deepEqual(sent("approval_ack"), [{ requestId: "r1" }]);

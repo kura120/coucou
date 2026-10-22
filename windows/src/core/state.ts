@@ -9,7 +9,7 @@ import {
 } from "./pills";
 import type { CodexPlanUsage, PlanUsage } from "./plan";
 import type { ProviderId } from "./providers";
-import type { FileDiff } from "./diff";
+import type { ApprovalPreview, FileDiff } from "./diff";
 import type { VoiceResult } from "../voice/runner";
 import type { Bindings } from "./shortcuts";
 import { DEFAULT_OUTFIT, type Outfit } from "../peika/wardrobe";
@@ -53,6 +53,8 @@ export interface ApprovalInfo extends Queued {
    * pill, which is named after the latest one: the card names the one asking.
    */
   projectName?: string;
+  /** What an Edit, MultiEdit or Write waiting for a decision would change (the card shows a few lines of it). */
+  preview?: ApprovalPreview;
   /** Set when Claude Code is asking a question rather than for a permission. */
   questions?: AskedQuestion[];
 }
