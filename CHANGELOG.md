@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Screen capture** (Windows), as on the Mac: `Ctrl+Alt+X` dims the screen, you drag out a part, and Peika swallows it. Its card can paste it into the window you were in, copy it, ask a new chat about it, or open it in Paint to draw on it. The image stays in Peika's temp folder only while the card has it, and nothing leaves the computer unless you ask the chat. Linux keeps the shortcut reserved.
 - The macOS and iPhone app, the relay, the scripts and the specs say Peika too: bundle ids are `dev.kura120.peika` (Mac direct build `dev.kura120.peika.direct`), the Apple team id and the original's hosted relay address are gone, and `Sources/CoucouKit` is `Sources/PeikaKit`. Not built or run: there is no Mac or Xcode here.
 - The original app icons and menu bar icon are replaced by the cloud, and the Mochi character stills and outfit sheet are removed. The sounds and the other media stay until Peika has its own.
 - The Android app is removed from the repository (its code is © Rhytam Biswas, the original's side project, not Peika's), along with its workflows, its docs and its Pages section. The phone link goes with it (see below).
