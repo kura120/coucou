@@ -242,6 +242,24 @@ body.settings-window {
   gap: 16px;
 }
 
+/* The band of mini Peikas above the page heading (band.ts): about 56 px, the
+   clouds walk in it. Decorative, so it never takes a click. */
+#band {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+#band canvas {
+  position: absolute;
+  left: 0;
+  will-change: transform;
+}
+
 /* A maximized window keeps readable lines. */
 #pane > * {
   width: 100%;

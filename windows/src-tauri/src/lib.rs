@@ -150,7 +150,7 @@ fn set_system_languages(app: AppHandle, languages: Vec<String>) {
 fn language_changed(app: &AppHandle) {
     tray::retitle(app);
     if let Some(window) = app.get_webview_window("settings") {
-        let _ = window.set_title(&i18n::t("Settings — Peika"));
+        let _ = window.set_title("Peika");
     }
 }
 
@@ -746,7 +746,7 @@ fn create_settings_window(app: &AppHandle) {
     let url = settings_page_url(app);
     match WebviewWindowBuilder::new(app, "settings", url)
         .additional_browser_args(BROWSER_ARGS)
-        .title(i18n::t("Settings — Peika"))
+        .title("Peika")
         // Frameless: the page draws its own title bar (src/settings/main.ts).
         .decorations(false)
         .inner_size(760.0, 560.0)
@@ -789,7 +789,10 @@ static SETTINGS_GENERATION: AtomicU64 = AtomicU64::new(0);
 /// hidden anyway: a stalled webview must not keep it on screen.
 const SETTINGS_CLOSE_FALLBACK: std::time::Duration = std::time::Duration::from_millis(400);
 
-pub fn show_settings_window(app: &AppHandle) {
+/// Shows the Peika window — the existing `settings` window, never a new one —
+/// and, when `page` is given, opens it on that page: the page listens for
+/// `peika-page` and falls back to General for an id it does not know.
+pub fn show_window(app: &AppHandle, page: Option<&str>) {
     let Some(win) = app.get_webview_window("settings") else {
         log::line("settings window missing");
         return;
@@ -800,6 +803,13 @@ pub fn show_settings_window(app: &AppHandle) {
     let _ = win.set_focus();
     // The page plays its opening motion (src/settings/motion.ts).
     let _ = app.emit_to("settings", "settings-shown", ());
+    if let Some(page) = page {
+        let _ = app.emit_to("settings", "peika-page", page.to_string());
+    }
+}
+
+pub fn show_settings_window(app: &AppHandle) {
+    show_window(app, None);
 }
 
 /// The settings page finished its closing motion.
@@ -811,9 +821,10 @@ fn hide_settings_window(app: AppHandle) {
     }
 }
 
+/// The Peika window, optionally on a page (the id of a leaf of the tree).
 #[tauri::command]
-fn open_settings_window(app: AppHandle) {
-    show_settings_window(&app);
+fn open_settings_window(app: AppHandle, page: Option<String>) {
+    show_window(&app, page.as_deref());
 }
 
 /// The settings page's own title bar: the window has no frame of its own.
@@ -864,9 +875,8 @@ pub fn run() {
             }
             match shortcuts::from_args(&argv) {
                 Some(action) => shortcuts::dispatch(app, action),
-                None => {
-                    let _ = app.emit_to(island::WINDOW_LABEL, "tray", "open".to_string());
-                }
+                // Peika launched again: its own window opens.
+                None => show_window(app, None),
             }
         }))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None));

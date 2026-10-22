@@ -1,4 +1,5 @@
-// Notification-area icon: Open, Weekly recap, Wardrobe, Settings, Pause, Quit.
+// Notification-area icon: Open, Weekly recap, Wardrobe, Settings (the Peika
+// window), Pause, Quit.
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -13,6 +14,7 @@ const ITEMS: [(&str, &str); 6] = [
     ("open", n_("Open Peika")),
     ("recap", n_("Weekly recap")),
     ("wardrobe", n_("Wardrobe…")),
+    // "Open Peika" above is the island: this one stays "Settings…".
     ("settings", n_("Settings…")),
     ("pause", n_("Pause")),
     ("quit", n_("Quit")),
@@ -38,7 +40,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         .menu(&menu)
         .on_menu_event(|app: &AppHandle, event| match event.id.as_ref() {
             "quit" => app.exit(0),
-            "settings" => crate::show_settings_window(app),
+            "settings" => crate::show_window(app, None),
             id => {
                 let _ = app.emit_to(WINDOW_LABEL, "tray", id.to_string());
             }
