@@ -133,8 +133,8 @@ export function runGlobalShortcut(host: ShortcutHost, action: string, resume: ()
       host.flyOutOrHome();
       break;
 
-    // wardrobeToggle never comes this way (Rust sends `open-wardrobe`), and
-    // attachFrontWindow isn't in this version.
+    // wardrobeToggle and attachFrontWindow never come this way: Rust sends
+    // `open-wardrobe`, and reads the window itself (`window-context`).
     default:
       break;
   }
@@ -189,8 +189,44 @@ function inTextField(target: EventTarget | null): boolean {
   return el?.tagName === "INPUT" || el?.tagName === "TEXTAREA" || el?.isContentEditable === true;
 }
 
+/** A window read for the chat (src-tauri/src/window_context.rs). */
+export interface AttachedWindow {
+  appName: string;
+  title: string;
+  url?: string;
+}
+
+/**
+ * The attach shortcut, or Peika let go over a window with Ctrl held, read a
+ * window: a new chat about it, since the context rides with a conversation's
+ * first message (IslandWindowController.performAttachFrontWindow). Nothing
+ * readable, or an answer still on its way, and Peika says no.
+ */
+export function attachWindow(host: ShortcutHost, found: AttachedWindow | null, resume: () => void) {
+  if (!found || State.stateOverride === "thinking") {
+    Sound.play("error");
+    host.emote("annoyed");
+    return;
+  }
+  resume();
+  State.chatHistory = [];
+  State.droppedFile = null;
+  State.promptContext = {
+    kind: "window",
+    appName: found.appName,
+    title: found.title,
+    ...(found.url ? { url: found.url } : {}),
+  };
+  void Bridge.chatReset();
+  Sound.play("approve");
+  host.emote("happy");
+  host.alert("prompt");
+  host.takeKeyboard();
+}
+
 export function registerShortcutHandlers(host: ShortcutHost, resume: () => void) {
   void onEvent<string>("shortcut", (action) => runGlobalShortcut(host, action, resume));
+  void onEvent<AttachedWindow | null>("window-context", (found) => attachWindow(host, found, resume));
   // The wardrobe shortcut comes as its own event (shortcuts.rs): it opens the
   // wardrobe (peika/wardrobe.ts, views/wardrobe.ts), or closes it again.
   void onEvent<null>("open-wardrobe", () => {

@@ -73,14 +73,15 @@ test("the descriptions the Wayland portal shows are the labels Settings shows", 
 });
 
 // testEnabledByDefault
-test("only the island toggle is off by default; the one not ported yet is reserved", () => {
+test("only the island toggle is off by default, and every Mac action is ported", () => {
   for (const d of SHORTCUTS) {
     assert.equal(d.enabledByDefault, d.id !== "toggleIsland" && d.id !== "talkToPeika", d.id);
-    assert.equal(d.ported, d.id !== "attachFrontWindow", d.id);
+    // Attaching the front window too: Rust reserves it where it cannot be done (Linux).
+    assert.equal(d.ported, true, d.id);
   }
   assert.deepEqual(activeKeys({}).map(([id]) => id), [
-    "openChat", "goToAlert", "jumpToTerminal", "nextPill", "prevPill", "muteToggle", "desktopToggle",
-    "wardrobeToggle",
+    "openChat", "goToAlert", "jumpToTerminal", "attachFrontWindow", "nextPill", "prevPill", "muteToggle",
+    "desktopToggle", "wardrobeToggle",
   ]);
   // The Mac's ⌃⌥D, on the same letter.
   assert.equal(SHORTCUTS.find((d) => d.id === "desktopToggle").defaultKeys, "Ctrl+Alt+D");
@@ -320,6 +321,41 @@ test("the wardrobe shortcut's own event opens the wardrobe", () => {
 test("a global shortcut arrives as an event and opens the chat", () => {
   emit("shortcut", "openChat");
   assert.deepEqual(did, ["resume", "alert:prompt"]);
+});
+
+// ── Attaching the front window (window_context.rs → `window-context`) ─────────
+
+test("an attached window starts a chat about it, shown before anything is sent", () => {
+  State.chatHistory = [{ id: 1, role: "user", content: "earlier" }];
+  State.droppedFile = { name: "a.txt", path: "C:\\a.txt" };
+  emit("window-context", { appName: "Google Chrome", title: "Peika — GitHub", url: "https://github.com/kura120/peika" });
+  assert.deepEqual(State.promptContext, {
+    kind: "window", appName: "Google Chrome", title: "Peika — GitHub", url: "https://github.com/kura120/peika",
+  });
+  // Its context rides with the first message of a conversation: a new one.
+  assert.deepEqual(State.chatHistory, []);
+  assert.equal(State.droppedFile, null);
+  assert.equal(sent("chat_reset").length, 1);
+  assert.deepEqual(did, ["resume", "emote:happy", "alert:prompt", "keyboard"]);
+});
+
+test("a window without an address keeps no url", () => {
+  emit("window-context", { appName: "Visual Studio Code", title: "main.rs" });
+  assert.deepEqual(State.promptContext, { kind: "window", appName: "Visual Studio Code", title: "main.rs" });
+});
+
+test("nothing readable, or an answer on its way, and nothing is attached", () => {
+  State.promptContext = null;
+  emit("window-context", null);
+  assert.equal(State.promptContext, null);
+  assert.deepEqual(did, ["emote:annoyed"]);
+  did = [];
+  State.stateOverride = "thinking";
+  State.chatHistory = [{ id: 1, role: "user", content: "still answering" }];
+  emit("window-context", { appName: "Code", title: "x" });
+  assert.equal(State.promptContext, null);
+  assert.equal(State.chatHistory.length, 1);
+  assert.deepEqual(did, ["emote:annoyed"]);
 });
 
 test("island keys are read before the chat field sees them, and only while open", () => {
