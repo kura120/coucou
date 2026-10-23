@@ -216,6 +216,8 @@ export interface Settings {
   cryptoExchange: "coinbase" | "okx";
   cryptoCurrency: "USD" | "EUR";
   cryptoCoins: string;
+  /** Minutes away after which the island tells what happened meanwhile; 0 for never (island/away.ts). */
+  awayMinutes: number;
   desktopPeika?: {
     onDesktop: boolean;
     spot: { x: number; y: number; space: string } | null;
@@ -260,6 +262,7 @@ export const DEFAULT_SETTINGS: Settings = {
   cryptoExchange: "coinbase",
   cryptoCurrency: "USD",
   cryptoCoins: "BTC, ETH, SOL",
+  awayMinutes: 10,
 };
 
 type Listener = () => void;

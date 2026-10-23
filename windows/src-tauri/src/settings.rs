@@ -96,6 +96,9 @@ pub struct Settings {
     /// The coins the user typed, as written ("BTC, ETH, SOL"). crypto.rs
     /// splits and cleans them.
     pub crypto_coins: String,
+    /// Minutes away from the keyboard after which the island tells what
+    /// happened meanwhile; 0 turns the card off (src/island/away.ts).
+    pub away_minutes: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -241,6 +244,7 @@ impl Default for Settings {
             crypto_exchange: "coinbase".into(),
             crypto_currency: "USD".into(),
             crypto_coins: "BTC, ETH, SOL".into(),
+            away_minutes: 10,
         }
     }
 }
@@ -526,7 +530,8 @@ mod tests {
   "searchEngine": "duckduckgo",
   "cryptoExchange": "okx",
   "cryptoCurrency": "EUR",
-  "cryptoCoins": "DOGE, ADA"
+  "cryptoCoins": "DOGE, ADA",
+  "awayMinutes": 25
 }"##;
 
     fn custom() -> Value {
@@ -780,6 +785,7 @@ mod tests {
             ("screen", Value::Null),
             ("shortcuts", json!("Ctrl+Alt+A")),
             ("cryptoCoins", json!(["BTC"])),
+            ("awayMinutes", json!("ten")),
         ] {
             let loaded = parse(&custom_with(key, Some(wrong)))
                 .unwrap_or_else(|| panic!("a file with a bad {key} was thrown away"));
@@ -1022,6 +1028,7 @@ mod tests {
                 "cryptoExchange",
                 "cryptoCurrency",
                 "cryptoCoins",
+                "awayMinutes",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

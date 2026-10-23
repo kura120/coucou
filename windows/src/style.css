@@ -640,6 +640,93 @@ body {
   z-index: 2;
 }
 
+/* ── While you were away (views/away.ts) ─────────────────────────────────── */
+
+.away-stack {
+  padding: 10px 18px 10px 116px;
+  gap: 4px;
+}
+
+.away-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 4px;
+}
+
+.away-title {
+  font: 600 13px var(--font);
+  color: var(--cyan);
+  white-space: nowrap;
+}
+
+.away-range {
+  font: 400 12px var(--font);
+  color: var(--dim-2);
+  white-space: nowrap;
+}
+
+.away-head .actions {
+  flex: none;
+}
+
+/* One line per session: a button, since it opens the pill. */
+.away-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  width: calc(100% + 12px);
+  margin: 0 -6px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dim-2);
+  font: 400 12.5px var(--font);
+  text-align: start;
+  cursor: default;
+}
+
+.away-line:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.away-line .n {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.away-line .what {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.away-line .status {
+  flex: none;
+  color: var(--amber);
+  white-space: nowrap;
+}
+
+/* The session is over and its pill gone: nothing to open. */
+.away-line.gone {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.away-more {
+  font: 400 12px var(--font);
+  color: var(--dim-3);
+}
+
 /* Ticker */
 
 .ticker {

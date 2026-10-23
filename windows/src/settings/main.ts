@@ -961,6 +961,19 @@ function generalSection(): HTMLElement {
     void save();
   });
 
+  // "While you were away": minutes without the keyboard or mouse, 0 for never.
+  const away = h("input", {
+    type: "number", min: "0", max: "240", step: "1",
+    value: String(Math.round(settings.awayMinutes)),
+    style: "width:72px",
+  }) as HTMLInputElement;
+  away.addEventListener("change", () => {
+    const minutes = Number(away.value);
+    settings.awayMinutes = Number.isFinite(minutes) ? Math.max(0, Math.min(240, Math.round(minutes))) : 10;
+    away.value = String(settings.awayMinutes);
+    void save();
+  });
+
   const screen = h("select", {}) as HTMLSelectElement;
   screen.append(
     h("option", { value: "primary", text: t("Main display") }),
@@ -1012,6 +1025,11 @@ function generalSection(): HTMLElement {
       h("label", { text: t("Auto-close") }),
       autoClose,
       h("span", { class: "hint", text: t("seconds after you leave the island") }),
+    ),
+    h("div", { class: "row" },
+      h("label", { text: t("While you were away") }),
+      away,
+      h("span", { class: "hint", text: t("minutes away, then Peika tells what happened (0: never)") }),
     ),
     h("div", { class: "row" },
       h("label", { text: t("Island lives on") }),
