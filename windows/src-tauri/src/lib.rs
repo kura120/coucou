@@ -1064,6 +1064,9 @@ pub fn run() {
             capture::capture_paste,
             capture::capture_open,
             capture::capture_discard,
+            speech::dictate::dictation_begin,
+            speech::dictate::dictation_finish,
+            speech::dictate::dictation_cancel,
             voice_say,
         ])
         .setup(move |app| {
