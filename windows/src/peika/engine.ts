@@ -647,20 +647,37 @@ export class BotEngine {
     return !this.isMini && this.outfit !== "none" && this.outfitPresence > 0.05;
   }
 
-  /** True while anything is still moving — lets the island stop its RAF loop. */
+  /**
+   * True while anything is still moving — lets the island stop its RAF loop.
+   * A state's slow loops (breathing, z's, sweat) count: they never end.
+   */
   get busy(): boolean {
+    return this.cfg.breathes || this.cfg.zz || this.cfg.sweat || this.isMini || this.particles.length > 0 || this.fastMotion;
+  }
+
+  /**
+   * True while anything moves that is not a slow loop (breathing, the z's and the
+   * sweat drops): a tween, a bounce, a scan, a settling pose, any other particle,
+   * the dance, a mini. The island draws at the screen's rate while this is true,
+   * and at about 30 fps when only the slow loops of `busy` are left (island/frames.ts).
+   * While breathing, the scale follows a moving target, so its gap is the loop;
+   * a mini (13 to 24 px) is all slow loop in the same way, its wandering look, sway, hops,
+   * blinks and hearts, except what is meant to catch the eye: bouncing, scanning, dancing.
+   */
+  get fastMotion(): boolean {
+    const breathing = this.cfg.breathes;
+    const mini = this.isMini;
     return (
-      this.tweens.size > 0 ||
-      this.particles.length > 0 ||
-      this.cfg.bounces || this.cfg.scans || this.cfg.breathes || this.cfg.zz || this.cfg.sweat ||
-      this.isMini ||
+      (!mini && this.tweens.size > 0) ||
+      (!mini && this.particles.some((p) => p.type !== "z" && p.type !== "sweat")) ||
+      this.cfg.bounces || this.cfg.scans ||
       this.isDancing || this.dancingLevel > 0.001 ||
       this.isListening ||
-      Math.abs(this.tgYaw - this.yaw) > 0.002 ||
-      Math.abs(this.tgPitch - this.pitch) > 0.002 ||
-      Math.abs(this.tgTilt - this.tilt) > 0.002 ||
-      Math.abs(this.tgSy - this.sy) > 0.002 ||
-      Math.abs(this.tgSx - this.sx) > 0.002 ||
+      (!mini && Math.abs(this.tgYaw - this.yaw) > 0.002) ||
+      (!mini && Math.abs(this.tgPitch - this.pitch) > 0.002) ||
+      (!mini && Math.abs(this.tgTilt - this.tilt) > 0.002) ||
+      (!breathing && !mini && Math.abs(this.tgSy - this.sy) > 0.002) ||
+      (!breathing && !mini && Math.abs(this.tgSx - this.sx) > 0.002) ||
       Math.abs(this.tgEs - this.es) > 0.002 ||
       this.slotH > 0.001 || Math.abs(this.slotHVel) > 0.001 ||
       Math.abs(this.col[0] - this.colT[0]) > 0.003 ||

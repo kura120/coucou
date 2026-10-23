@@ -91,3 +91,9 @@ export function tickMiniBots(dt: number) {
 }
 
 export const miniBotCount = () => live.size;
+
+/** True while any mini moves with more than its own slow loops (BotEngine.fastMotion). */
+export function miniBotsFast(): boolean {
+  for (const mb of live.values()) if (mb.engine.fastMotion) return true;
+  return false;
+}
