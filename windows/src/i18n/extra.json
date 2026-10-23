@@ -1904,6 +1904,28 @@
    "ru": "Открыть гардероб",
    "id": "Buka lemari"
   },
+  "Flow could not start": {
+   "zh-Hans": "Flow 无法启动",
+   "hi": "Flow शुरू नहीं हो सका",
+   "es": "Flow no pudo iniciarse",
+   "ar": "تعذّر بدء Flow",
+   "fr": "Flow n’a pas pu démarrer",
+   "bn": "Flow শুরু করা যায়নি",
+   "pt-BR": "O Flow não pôde iniciar",
+   "ru": "Не удалось запустить Flow",
+   "id": "Flow tidak dapat dimulai"
+  },
+  "Windows refused the keyboard hook: {why}": {
+   "zh-Hans": "Windows 拒绝了键盘钩子：{why}",
+   "hi": "Windows ने कीबोर्ड हुक अस्वीकार कर दिया: {why}",
+   "es": "Windows rechazó el gancho de teclado: {why}",
+   "ar": "رفض Windows خطّاف لوحة المفاتيح: {why}",
+   "fr": "Windows a refusé le crochet clavier : {why}",
+   "bn": "Windows কিবোর্ড হুক প্রত্যাখ্যান করেছে: {why}",
+   "pt-BR": "O Windows recusou o gancho de teclado: {why}",
+   "ru": "Windows отклонил перехват клавиатуры: {why}",
+   "id": "Windows menolak kait papan ketik: {why}"
+  },
   "OpenAI-compatible": {
    "zh-Hans": "兼容 OpenAI",
    "hi": "OpenAI-संगत",

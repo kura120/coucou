@@ -99,6 +99,30 @@ pub struct Settings {
     /// Minutes away from the keyboard after which the island tells what
     /// happened meanwhile; 0 turns the card off (src/island/away.ts).
     pub away_minutes: u32,
+    /// Flow dictation (flow/mod.rs): hold a key, speak, the words are pasted.
+    /// Off until the user turns it on: off means no keyboard hook and no pill.
+    pub flow: FlowPref,
+}
+
+/// `Settings::flow`. The key and the lists are kept as they come, like
+/// `peika_outfit`: flow/logic.rs reads a key it does not know as right Ctrl,
+/// and the text step skips an entry it cannot use.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct FlowPref {
+    pub enabled: bool,
+    /// The key held to dictate: "RightCtrl", "RightAlt" or "RightShift".
+    pub key: String,
+    /// Words written another way: ("cloud code", "Claude Code").
+    pub replacements: Vec<(String, String)>,
+    /// Words spelled the way the user spells them ("Supabase").
+    pub dictionary: Vec<String>,
+}
+
+impl Default for FlowPref {
+    fn default() -> Self {
+        Self { enabled: false, key: "RightCtrl".into(), replacements: Vec::new(), dictionary: Vec::new() }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -245,6 +269,7 @@ impl Default for Settings {
             crypto_currency: "USD".into(),
             crypto_coins: "BTC, ETH, SOL".into(),
             away_minutes: 10,
+            flow: FlowPref::default(),
         }
     }
 }
@@ -531,7 +556,8 @@ mod tests {
   "cryptoExchange": "okx",
   "cryptoCurrency": "EUR",
   "cryptoCoins": "DOGE, ADA",
-  "awayMinutes": 25
+  "awayMinutes": 25,
+  "flow": { "enabled": true, "key": "RightAlt", "replacements": [["cloud code", "Claude Code"]], "dictionary": ["Supabase", "Peika"] }
 }"##;
 
     fn custom() -> Value {
@@ -759,6 +785,40 @@ mod tests {
     }
 
     #[test]
+    fn a_file_from_before_flow_leaves_it_off_on_right_ctrl() {
+        let loaded = parse(&custom_with("flow", None)).unwrap();
+        assert_eq!(loaded.flow, FlowPref::default());
+        assert!(!loaded.flow.enabled);
+        assert_eq!(loaded.flow.key, "RightCtrl");
+        assert!(loaded.flow.replacements.is_empty() && loaded.flow.dictionary.is_empty());
+        assert_eq!(loaded.peika_outfit, "witchHat");
+    }
+
+    #[test]
+    fn flow_takes_the_defaults_for_what_its_part_of_the_file_lacks() {
+        let loaded = parse(&custom_with("flow", Some(json!({ "enabled": true })))).unwrap();
+        assert!(loaded.flow.enabled);
+        assert_eq!(loaded.flow.key, "RightCtrl");
+        assert!(loaded.flow.dictionary.is_empty());
+    }
+
+    #[test]
+    fn flow_s_words_survive_a_save_and_a_load() {
+        let (dir, file) = scratch("flow");
+        let mut settings = Settings::default();
+        settings.flow.enabled = true;
+        settings.flow.replacements = vec![("cloud code".into(), "Claude Code".into())];
+        settings.flow.dictionary = vec!["Supabase".into()];
+        save_to(&file, &settings).unwrap();
+        let loaded = load_from(&file);
+        assert_eq!(loaded.flow, settings.flow);
+        // Pairs are written as two-item arrays, which is what the page sends back.
+        let raw: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+        assert_eq!(raw["flow"]["replacements"], json!([["cloud code", "Claude Code"]]));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn a_crypto_choice_this_build_does_not_know_is_kept_as_written() {
         let loaded = parse(&custom_with("cryptoExchange", Some(json!("kraken")))).unwrap();
         assert_eq!(loaded.crypto_exchange, "kraken");
@@ -786,6 +846,7 @@ mod tests {
             ("shortcuts", json!("Ctrl+Alt+A")),
             ("cryptoCoins", json!(["BTC"])),
             ("awayMinutes", json!("ten")),
+            ("flow", json!("on")),
         ] {
             let loaded = parse(&custom_with(key, Some(wrong)))
                 .unwrap_or_else(|| panic!("a file with a bad {key} was thrown away"));
@@ -1029,6 +1090,7 @@ mod tests {
                 "cryptoCurrency",
                 "cryptoCoins",
                 "awayMinutes",
+                "flow",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);
