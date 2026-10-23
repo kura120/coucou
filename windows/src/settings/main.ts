@@ -1017,6 +1017,11 @@ function generalSection(): HTMLElement {
     ),
     h("div", { class: "hint", text: t("Hovering the island opens it; it folds again shortly after the pointer leaves. Click inside to keep it open.") }),
     h("div", { class: "row" },
+      h("label", { text: t("Quiet over fullscreen apps") }),
+      toggle(settings.quietWhenBusy, (v) => { settings.quietWhenBusy = v; void save(); }),
+    ),
+    h("div", { class: "hint", text: t("While a game, a video or a presentation is fullscreen, a finished or failed session only badges its pill, without a sound. Permission requests and questions still come up.") }),
+    h("div", { class: "row" },
       h("label", { text: t("Auto-close") }),
       autoClose,
       h("span", { class: "hint", text: t("seconds after you leave the island") }),
@@ -1795,6 +1800,9 @@ async function main() {
     current = id;
     showPage?.(id);
   });
+  // A window made just now to open on a page missed that event: it asks.
+  const first = await Bridge.settingsFirstPage();
+  if (first) current = first;
   // Peika's right-click menu here too: Cut, Copy, Paste in the fields, and
   // never the webview's own.
   installContextMenu(document.body, { clipboardText: () => Bridge.clipboardText() });

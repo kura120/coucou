@@ -28,7 +28,9 @@ use ::windows::Win32::UI::Input::KeyboardAndMouse::{
     LASTINPUTINFO, MAPVK_VK_TO_VSC, VK_CONTROL, VK_LBUTTON, VK_MENU, VK_SHIFT,
 };
 use ::windows::Win32::UI::Shell::{
-    FileOpenDialog, IFileOpenDialog, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH,
+    FileOpenDialog, IFileOpenDialog, SHQueryUserNotificationState, FOS_FORCEFILESYSTEM,
+    FOS_PICKFOLDERS, QUNS_BUSY, QUNS_PRESENTATION_MODE, QUNS_RUNNING_D3D_FULL_SCREEN,
+    SIGDN_FILESYSPATH,
 };
 use ::windows::Win32::UI::WindowsAndMessaging::{
     EnumChildWindows, EnumWindows, GetClassNameW, GetCursorPos, GetWindow, GetWindowLongPtrW,
@@ -323,6 +325,17 @@ pub fn cursor_physical() -> Option<(f64, f64)> {
     let mut p = POINT::default();
     unsafe { GetCursorPos(&mut p).ok()? };
     Some((p.x as f64, p.y as f64))
+}
+
+/// True while a fullscreen app (a game, a video) or a presentation is in front,
+/// the states in which Windows itself holds its notifications back. Asked of the
+/// system on the spot, never polled. Not busy when the system cannot say.
+pub fn user_busy() -> bool {
+    unsafe { SHQueryUserNotificationState() }
+        .map(|state| {
+            matches!(state, QUNS_BUSY | QUNS_RUNNING_D3D_FULL_SCREEN | QUNS_PRESENTATION_MODE)
+        })
+        .unwrap_or(false)
 }
 
 /// True while the left mouse button is held — the only signal we get that a

@@ -46,11 +46,11 @@ mod webview_drop;
 mod window_context;
 
 use std::process::Command;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_autostart::{ManagerExt, MacosLauncher};
 
 use chat::{Chat, ChatContext, ChatReply, ModelInfo};
@@ -204,6 +204,13 @@ fn reposition(app: AppHandle, shared: State<Shared>) {
     let pref = shared.settings.lock().unwrap().screen.clone();
     let collapsed = shared.gate.collapsed.load(Ordering::Relaxed);
     island::apply_geometry(&app, &pref, collapsed);
+}
+
+/// Whether a fullscreen app or a presentation is in front (Windows only), asked
+/// when an alert is about to open the island.
+#[tauri::command]
+fn user_busy() -> bool {
+    platform::user_busy()
 }
 
 /// The displays the island can be pinned to, for Settings.
@@ -747,11 +754,12 @@ fn settings_page_url(app: &AppHandle) -> WebviewUrl {
     WebviewUrl::App("settings.html".into())
 }
 
-/// The settings window is created hidden at launch and only ever shown and
-/// hidden afterwards. A WebView2 window created later — on the main thread or
-/// not — silently comes up blank in this app, so the window that works is the
-/// one that exists before the island's webview does.
-fn create_settings_window(app: &AppHandle) {
+/// The Peika window is made when it is first opened, and closed again once it
+/// has stayed hidden a while (`close_when_unused`): a renderer process and its
+/// memory are not kept for a window that is rarely open. It asks for the same
+/// browser arguments as the island, which is what a window made after launch
+/// needs (BROWSER_ARGS; issue #81).
+fn create_settings_window(app: &AppHandle) -> Option<WebviewWindow> {
     let url = settings_page_url(app);
     match WebviewWindowBuilder::new(app, "settings", url)
         .additional_browser_args(BROWSER_ARGS)
@@ -782,12 +790,17 @@ fn create_settings_window(app: &AppHandle) {
                         std::thread::sleep(SETTINGS_CLOSE_FALLBACK);
                         if SETTINGS_GENERATION.load(Ordering::SeqCst) == generation {
                             let _ = late.hide();
+                            close_when_unused(late, generation);
                         }
                     });
                 }
             });
+            Some(win)
         }
-        Err(err) => log::line(format!("settings window failed: {err}")),
+        Err(err) => {
+            log::line(format!("settings window failed: {err}"));
+            None
+        }
     }
 }
 
@@ -797,13 +810,46 @@ static SETTINGS_GENERATION: AtomicU64 = AtomicU64::new(0);
 /// How long the page gets for its closing motion (160 ms) before the window is
 /// hidden anyway: a stalled webview must not keep it on screen.
 const SETTINGS_CLOSE_FALLBACK: std::time::Duration = std::time::Duration::from_millis(400);
+/// How long the Peika window stays made, hidden, before it is closed for good:
+/// opening it again soon is instant, and an unused one costs nothing.
+const SETTINGS_KEPT: std::time::Duration = std::time::Duration::from_secs(180);
+/// Set while the window is being made, so a second open meanwhile waits for it.
+static SETTINGS_MAKING: AtomicBool = AtomicBool::new(false);
+/// The page a window being made is to open on: it asks once it has loaded
+/// (`settings_first_page`), since an event sent before then is lost.
+static SETTINGS_FIRST_PAGE: Mutex<Option<String>> = Mutex::new(None);
 
-/// Shows the Peika window — the existing `settings` window, never a new one —
-/// and, when `page` is given, opens it on that page: the page listens for
-/// `peika-page` and falls back to General for an id it does not know.
+/// Closes the hidden window once SETTINGS_KEPT has passed with no show or
+/// close request in between.
+fn close_when_unused(win: WebviewWindow, generation: u64) {
+    std::thread::spawn(move || {
+        std::thread::sleep(SETTINGS_KEPT);
+        if SETTINGS_GENERATION.load(Ordering::SeqCst) == generation && !win.is_visible().unwrap_or(true) {
+            log::line("Peika window closed after a while hidden");
+            let _ = win.destroy();
+        }
+    });
+}
+
+/// Shows the Peika window — made first if it is not there — and, when `page`
+/// is given, opens it on that page: the page listens for `peika-page` and
+/// falls back to General for an id it does not know.
 pub fn show_window(app: &AppHandle, page: Option<&str>) {
     let Some(win) = app.get_webview_window("settings") else {
-        log::line("settings window missing");
+        *SETTINGS_FIRST_PAGE.lock().unwrap() = page.map(str::to_string);
+        if SETTINGS_MAKING.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        // Made off the event loop: WebView2 deadlocks a window built inside a
+        // synchronous handler, and the tray's menu and a second launch are those.
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let made = create_settings_window(&app);
+            SETTINGS_MAKING.store(false, Ordering::SeqCst);
+            if made.is_some() {
+                show_window(&app, None);
+            }
+        });
         return;
     };
     SETTINGS_GENERATION.fetch_add(1, Ordering::SeqCst);
@@ -824,10 +870,17 @@ pub fn show_settings_window(app: &AppHandle) {
 /// The settings page finished its closing motion.
 #[tauri::command]
 fn hide_settings_window(app: AppHandle) {
-    SETTINGS_GENERATION.fetch_add(1, Ordering::SeqCst);
+    let generation = SETTINGS_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     if let Some(win) = app.get_webview_window("settings") {
         let _ = win.hide();
+        close_when_unused(win, generation);
     }
+}
+
+/// A Peika window that was just made asks which page to open on.
+#[tauri::command]
+fn settings_first_page() -> Option<String> {
+    SETTINGS_FIRST_PAGE.lock().unwrap().take()
 }
 
 /// The Peika window, optionally on a page (the id of a leaf of the tree).
@@ -913,6 +966,7 @@ pub fn run() {
             reposition,
             idle_seconds,
             list_monitors,
+            user_busy,
             open_url,
             open_in_vscode,
             open_session,
@@ -955,6 +1009,7 @@ pub fn run() {
             open_n8n,
             open_settings_window,
             hide_settings_window,
+            settings_first_page,
             close_settings_window,
             minimize_settings_window,
             toggle_maximize_settings_window,
@@ -1027,18 +1082,19 @@ pub fn run() {
             capture::capture_paste,
             capture::capture_open,
             capture::capture_discard,
+            speech::dictate::dictation_begin,
+            speech::dictate::dictation_finish,
+            speech::dictate::dictation_cancel,
             voice_say,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
             tray::build(&handle)?;
-            // Before the island: see create_settings_window.
-            create_settings_window(&handle);
-            // Same rule for Peika's desktop window.
+            // The Peika window and the capture overlay are made when first
+            // needed (create_settings_window, capture::start). Desktop Peika
+            // and the toasts must answer at once, so theirs are made now.
             desktop::setup(&handle);
-            // And for the toasts' window.
             toast::setup(&handle);
-            // And for the screen capture's overlay (capture/mod.rs).
             capture::setup(&handle);
 
             if let Some(win) = island::window(&handle) {
