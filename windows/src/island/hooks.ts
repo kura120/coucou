@@ -11,6 +11,7 @@ import { Sound } from "../core/sound";
 import { State, type ApprovalInfo, type AskedQuestion } from "../core/state";
 import { MAX_PENDING, inputKey } from "../core/approvals";
 import { pillDefinition } from "../core/pills";
+import { mayBeQuiet, quietDecision } from "./quiet";
 import { APPROVAL_AGENTS, agentColor, agentName, validateAgent } from "./agents";
 import type { Island } from "./island";
 import { parseClaudePlan, restorePlanUsage } from "../core/plan";
@@ -389,6 +390,29 @@ function handleHook(island: Island, payload: HookPayload) {
     }
   };
 
+  /**
+   * A finished or failed session: its sound, then the island opens or only the
+   * pill is badged. A fullscreen app in front (asked of the system now, once)
+   * turns it into the badge, silently (island/quiet.ts).
+   */
+  const settle = (kind: "finished" | "error") => {
+    const apply = (busy: boolean) => {
+      const { open, sound } = quietDecision(kind, busy, State.settings.quietWhenBusy);
+      if (!ownChat && sound) Sound.play(kind === "error" ? "error" : "finish");
+      // A card waiting for an answer is never covered by another alert. Read
+      // now: the card dropped above may have handed the front back to this pill.
+      if (open && State.focusId === agentId && !State.pendingApproval && !ownChat) surface(kind, true);
+      else State.setPillBadge(agentId, kind);
+    };
+    if (ownChat || !mayBeQuiet(kind, State.settings.quietWhenBusy)) return apply(false);
+    // The answer takes a moment: a newer turn of the pill leaves it unsaid (a
+    // request still waiting on the pill shows as its state, and does not).
+    void Bridge.userBusy().then((busy) => {
+      const state = State.tasks.find((x) => x.id === agentId)?.state;
+      if (state === kind || State.approvals.hasPill(agentId)) apply(busy);
+    });
+  };
+
   /** Ensure the agent pill exists (no-op for Claude Code). */
   const ensurePill = () => {
     if (isExternalAgent) {
@@ -434,9 +458,6 @@ function handleHook(island: Island, payload: HookPayload) {
     if (moot.length > 0) withdrawApprovals(island, moot.map((req) => req.requestId));
   }
 
-  // Read after the card above is dropped: its pill may have handed the front
-  // back to the pill you were on.
-  const focused = State.focusId === agentId;
   // The chat's own Claude Code turn: its answer is in the chat, which already
   // says so. No card comes over the chat for it, and no second chime.
   const ownChat = sessionId !== "" && sessionId === State.chatSessionId;
@@ -516,10 +537,7 @@ function handleHook(island: Island, payload: HookPayload) {
         const t = State.tasks.find((x) => x.id === agentId);
         if (t) t.finalLine = finalText;
       }
-      if (!ownChat) Sound.play("finish");
-      // A card waiting for an answer is never covered by another alert.
-      if (focused && !State.pendingApproval && !ownChat) surface("finished", true);
-      else State.setPillBadge(agentId, "finished");
+      settle("finished");
       cancelStopTimer(agentId);
       stopTimers.set(
         agentId,
@@ -548,9 +566,7 @@ function handleHook(island: Island, payload: HookPayload) {
     case "StopFailure":
       supersedeStop();
       State.updateTask(agentId, "error");
-      if (!ownChat) Sound.play("error");
-      if (focused && !State.pendingApproval && !ownChat) surface("error", true);
-      else State.setPillBadge(agentId, "error");
+      settle("error");
       break;
 
     case "SessionEnd":

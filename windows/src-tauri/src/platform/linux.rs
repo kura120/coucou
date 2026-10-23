@@ -28,6 +28,12 @@ pub const HOOK_EXE: &str = "peika-hook";
 /// Environment variable holding the home directory.
 pub const HOME_VAR: &str = "HOME";
 
+/// Whether a fullscreen app or a presentation is in front. Linux has no such
+/// signal to ask: never busy.
+pub fn user_busy() -> bool {
+    false
+}
+
 // ── Files ─────────────────────────────────────────────────────────────────────
 
 /// An XDG base directory (`$XDG_CONFIG_HOME` …), or its fallback under the home

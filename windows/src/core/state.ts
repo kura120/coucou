@@ -118,6 +118,12 @@ export interface Settings {
   autoCloseInterval: number;
   /** Hovering the island opens it all the way (off: hovering only peeks). */
   openOnHover: boolean;
+  /**
+   * A fullscreen app or a presentation in front: finished and failed sessions
+   * only badge their pill, without a sound (island/quiet.ts). Requests that
+   * wait for an answer still come up.
+   */
+  quietWhenBusy: boolean;
   absenceInterval: number;
   /** Declared pills next to the main one (at most MAX_DECLARED), in the order they were added. */
   activeIntegrations: string[];
@@ -224,6 +230,7 @@ export const DEFAULT_SETTINGS: Settings = {
   soundVolume: 0.12,
   autoCloseInterval: 15,
   openOnHover: false,
+  quietWhenBusy: true,
   absenceInterval: 180,
   activeIntegrations: [
     "integration_resend", "integration_n8n", "integration_vercel", "integration_github",

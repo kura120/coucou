@@ -64,6 +64,13 @@ export const Bridge = {
   /** Displays the island can be pinned to: `key` is what `settings.screen` stores. */
   listMonitors: () => call<{ key: string; label: string }[]>("list_monitors"),
 
+  /**
+   * A fullscreen app or a presentation is in front (Windows; never on Linux).
+   * Asked when an alert is about to open the island; not busy when the system
+   * cannot say.
+   */
+  userBusy: async () => (await call<boolean>("user_busy")) === true,
+
   openUrl: (url: string) => call<void>("open_url", { url }),
 
   /** Which of these sounds have a file of the user's own in the sounds folder. */
