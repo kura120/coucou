@@ -25,6 +25,19 @@ fn wants_json(agent: &str) -> bool {
 /// (`None`: nobody clicked) and, for Claude Code's AskUserQuestion, the
 /// question as it was asked.
 pub fn stdout(agent: &str, event: &str, decision: Option<&str>, question: Option<&Value>) -> Option<String> {
+    stdout_with(agent, event, decision, question, None)
+}
+
+/// `stdout`, with the `permission_suggestions` Claude Code sent along with the
+/// request: what an "always" click may hand back to be remembered (see
+/// `remembered_rules`). Any other agent ignores them.
+pub fn stdout_with(
+    agent: &str,
+    event: &str,
+    decision: Option<&str>,
+    question: Option<&Value>,
+    suggestions: Option<&Value>,
+) -> Option<String> {
     if event != "PermissionRequest" {
         // Antigravity reads "{}" on PreToolUse as a denial. "ask" keeps its own prompt
         // (and the user's Always Allow): Peika never allows a tool by itself.
@@ -51,7 +64,10 @@ pub fn stdout(agent: &str, event: &str, decision: Option<&str>, question: Option
         }
         // Claude Code and Codex share the documented hookSpecificOutput. Only
         // Claude Code asks questions.
-        "" => decision.and_then(|d| decision_json(d, question)),
+        "" => decision.and_then(|d| match (d.trim(), suggestions) {
+            ("always", Some(suggestions)) => always_json(suggestions).or_else(|| decision_json(d, question)),
+            _ => decision_json(d, question),
+        }),
         _ => decision.and_then(|d| decision_json(d, None)),
     }
 }
@@ -85,8 +101,8 @@ pub fn decision_json(decision: &str, question: Option<&Value>) -> Option<String>
         );
     }
     let behavior = match decision.trim() {
-        // "always" still answers a plain allow; remembering it is the island's
-        // business, not the agent's.
+        // "always" is a plain allow here: remembering it is `always_json`'s
+        // business, and only Claude Code, which brought the suggestion, gets that.
         "allow" | "always" => r#"{"behavior":"allow"}"#.to_string(),
         "deny" => r#"{"behavior":"deny","message":"Denied from Peika"}"#.to_string(),
         _ => return None,
@@ -94,6 +110,69 @@ pub fn decision_json(decision: &str, question: Option<&Value>) -> Option<String>
     Some(format!(
         r#"{{"hookSpecificOutput":{{"hookEventName":"PermissionRequest","decision":{behavior}}}}}"#
     ))
+}
+
+/// Where Claude Code may be told to keep a rule (the `destination` of a permission update).
+const DESTINATIONS: &[&str] = &["session", "localSettings", "projectSettings", "userSettings"];
+
+/// The rules Claude Code itself suggested remembering for this request, as its
+/// own "don't ask again" would add them, and nothing else: only `addRules`
+/// entries that *allow*, rebuilt field by field so that nothing else of the
+/// suggestion rides along. A mode change (`setMode`), a directory, a deny or
+/// ask rule is never taken from here: those are not what "Always" means.
+/// Peika adds no rule of its own, and stores none.
+pub fn remembered_rules(suggestions: &Value) -> Vec<Value> {
+    let Some(entries) = suggestions.as_array() else { return Vec::new() };
+    entries
+        .iter()
+        .filter_map(|entry| {
+            if entry.get("type")?.as_str()? != "addRules" || entry.get("behavior")?.as_str()? != "allow" {
+                return None;
+            }
+            let destination = entry.get("destination")?.as_str()?;
+            if !DESTINATIONS.contains(&destination) {
+                return None;
+            }
+            let rules: Vec<Value> = entry
+                .get("rules")?
+                .as_array()?
+                .iter()
+                .map(|rule| {
+                    let tool = rule.get("toolName")?.as_str().filter(|t| !t.is_empty())?;
+                    match rule.get("ruleContent") {
+                        None | Some(Value::Null) => Some(json!({ "toolName": tool })),
+                        Some(Value::String(content)) => Some(json!({ "toolName": tool, "ruleContent": content })),
+                        Some(_) => None,
+                    }
+                })
+                .collect::<Option<_>>()?;
+            if rules.is_empty() {
+                return None;
+            }
+            Some(json!({ "type": "addRules", "rules": rules, "behavior": "allow", "destination": destination }))
+        })
+        .collect()
+}
+
+/// The reply to an "always" click on Claude Code's card: an allow that also
+/// carries `updatedPermissions`, so Claude Code remembers the rule itself.
+/// `None` when it suggested nothing that can be remembered; the caller then
+/// answers a plain allow. See https://code.claude.com/docs/en/hooks
+/// ("PermissionRequest decision control", "Permission update entries").
+pub fn always_json(suggestions: &Value) -> Option<String> {
+    let rules = remembered_rules(suggestions);
+    if rules.is_empty() {
+        return None;
+    }
+    Some(
+        json!({
+            "hookSpecificOutput": {
+                "hookEventName": "PermissionRequest",
+                "decision": { "behavior": "allow", "updatedPermissions": rules },
+            }
+        })
+        .to_string(),
+    )
 }
 
 /// True when `answers` answers exactly the questions Claude Code asked: one entry
@@ -226,6 +305,84 @@ mod tests {
             r#"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}"#
         );
         assert!(decision_json("always", None).unwrap().contains(r#""behavior":"allow""#));
+    }
+
+    fn suggestions() -> Value {
+        json!([
+            { "type": "addRules", "rules": [{ "toolName": "Bash", "ruleContent": "npm run test:*" }],
+              "behavior": "allow", "destination": "localSettings" },
+            { "type": "setMode", "mode": "bypassPermissions", "destination": "session" },
+            { "type": "addRules", "rules": [{ "toolName": "Bash" }], "behavior": "deny", "destination": "userSettings" },
+            { "type": "addDirectories", "directories": ["/etc"], "destination": "session" },
+        ])
+    }
+
+    const PLAIN_ALLOW: &str = r#"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}"#;
+
+    #[test]
+    fn always_hands_claude_code_its_own_rule_back_and_nothing_else() {
+        let out = stdout_with("", "PermissionRequest", Some("always"), None, Some(&suggestions())).unwrap();
+        let v: Value = serde_json::from_str(&out).unwrap();
+        let decision = &v["hookSpecificOutput"]["decision"];
+        assert_eq!(v["hookSpecificOutput"]["hookEventName"], "PermissionRequest");
+        assert_eq!(decision["behavior"], "allow");
+        // The one allow rule; the mode change, the deny rule and the directory stay out.
+        assert_eq!(
+            decision["updatedPermissions"],
+            json!([{ "type": "addRules", "rules": [{ "toolName": "Bash", "ruleContent": "npm run test:*" }],
+                     "behavior": "allow", "destination": "localSettings" }])
+        );
+        assert!(decision.get("updatedInput").is_none());
+    }
+
+    #[test]
+    fn a_plain_allow_never_remembers_anything() {
+        assert_eq!(stdout_with("", "PermissionRequest", Some("allow"), None, Some(&suggestions())).unwrap(), PLAIN_ALLOW);
+        let deny = stdout_with("", "PermissionRequest", Some("deny"), None, Some(&suggestions())).unwrap();
+        assert!(!deny.contains("updatedPermissions") && !allows(&deny));
+        // No click, no rule.
+        assert_eq!(stdout_with("", "PermissionRequest", None, None, Some(&suggestions())), None);
+    }
+
+    #[test]
+    fn always_without_a_rule_to_remember_is_a_plain_allow() {
+        for none in [json!([]), json!("x"), json!(null), json!([{ "type": "setMode", "mode": "acceptEdits", "destination": "session" }])] {
+            assert_eq!(stdout_with("", "PermissionRequest", Some("always"), None, Some(&none)).unwrap(), PLAIN_ALLOW, "{none}");
+        }
+        assert_eq!(stdout_with("", "PermissionRequest", Some("always"), None, None).unwrap(), PLAIN_ALLOW);
+    }
+
+    #[test]
+    fn only_well_formed_allow_rules_are_remembered() {
+        let bad = json!([
+            { "type": "addRules", "rules": [], "behavior": "allow", "destination": "session" },
+            { "type": "addRules", "rules": [{ "toolName": "" }], "behavior": "allow", "destination": "session" },
+            { "type": "addRules", "rules": [{ "toolName": "Bash", "ruleContent": 3 }], "behavior": "allow", "destination": "session" },
+            { "type": "addRules", "rules": [{ "toolName": "Bash" }], "behavior": "allow", "destination": "/etc/passwd" },
+            { "type": "addRules", "rules": [{ "toolName": "Bash" }], "behavior": "ask", "destination": "session" },
+            { "type": "addRules", "rules": [{ "toolName": "Bash" }], "behavior": "allow" },
+        ]);
+        assert!(remembered_rules(&bad).is_empty());
+        // Extra fields do not ride along.
+        let extra = json!([{ "type": "addRules", "rules": [{ "toolName": "Read", "extra": 1 }], "behavior": "allow",
+                             "destination": "session", "mode": "bypassPermissions" }]);
+        assert_eq!(
+            remembered_rules(&extra),
+            vec![json!({ "type": "addRules", "rules": [{ "toolName": "Read" }], "behavior": "allow", "destination": "session" })]
+        );
+    }
+
+    #[test]
+    fn only_claude_code_remembers() {
+        assert_eq!(stdout_with("codex", "PermissionRequest", Some("always"), None, Some(&suggestions())).unwrap(), PLAIN_ALLOW);
+        for agent in ["copilot", "muse"] {
+            assert_eq!(
+                stdout_with(agent, "PermissionRequest", Some("always"), None, Some(&suggestions())).unwrap(),
+                r#"{"permissionDecision":"allow"}"#
+            );
+        }
+        // Hermes' decisions are not relayed at all.
+        assert_eq!(stdout_with("hermes", "PermissionRequest", Some("always"), None, Some(&suggestions())), None);
     }
 
     #[test]

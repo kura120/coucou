@@ -152,6 +152,75 @@ export function buildFileDiff(tool: string, input: Record<string, unknown>): Fil
   }
 }
 
+// ── The permission card's preview ─────────────────────────────────────────────
+
+/** One changed line of an edit waiting for a decision. */
+export interface PreviewLine {
+  kind: "added" | "removed";
+  text: string;
+}
+
+/**
+ * What an Edit, MultiEdit or Write that asks for permission would change: the
+ * counts (the ones the ticker shows once it is done) and the changed lines, for
+ * the approval card to cut to its size.
+ */
+export interface ApprovalPreview {
+  path: string;
+  added: number;
+  removed: number;
+  /** Only the lines that go in or out, in file order; at most PREVIEW_KEEP_LINES. */
+  lines: PreviewLine[];
+  isNewFile: boolean;
+  /** Too big to diff: the counts are all there is. */
+  tooLarge: boolean;
+  /** The relay cut some of the edit's text (it forwards 2 000 bytes of a request): the counts are the part seen. */
+  partial: boolean;
+}
+
+/** The most changed lines kept for the card: it shows a few and scrolls through these. */
+export const PREVIEW_KEEP_LINES = 200;
+/** What the relay keeps of a string before the tool runs (peika-hook's MAX_FIELD_LEN), and the "…" it adds. */
+const RELAY_FIELD_CAP = 2000;
+const RELAY_ELLIPSIS_BYTES = 3;
+
+/** True for a string the relay cut: it ends with its "…" and is a hair past the cap. */
+function wasCut(s: unknown): boolean {
+  if (typeof s !== "string" || !s.endsWith("…")) return false;
+  const bytes = utf8Length(s);
+  return bytes > RELAY_FIELD_CAP && bytes <= RELAY_FIELD_CAP + RELAY_ELLIPSIS_BYTES;
+}
+
+/** A Write's or Edit's text, whichever of the edit fields the relay cut. */
+function inputWasCut(input: Record<string, unknown>): boolean {
+  const own = [input.old_string, input.new_string, input.content].some(wasCut);
+  const edits = Array.isArray(input.edits) ? input.edits : [];
+  return own || edits.some((e) => e && typeof e === "object" && [(e as Record<string, unknown>).old_string, (e as Record<string, unknown>).new_string].some(wasCut));
+}
+
+/** The preview of an Edit, MultiEdit or Write request, or null for anything else (or a no-op). */
+export function approvalPreview(tool: string, input: Record<string, unknown>): ApprovalPreview | null {
+  const diff = buildFileDiff(tool, input);
+  if (!diff) return null;
+  const lines: PreviewLine[] = [];
+  for (const hunk of diff.hunks) {
+    for (const line of hunk.lines) {
+      if (line.kind === "context") continue;
+      if (lines.length >= PREVIEW_KEEP_LINES) break;
+      lines.push({ kind: line.kind, text: line.text });
+    }
+  }
+  return {
+    path: diff.path,
+    added: diff.added,
+    removed: diff.removed,
+    lines,
+    isNewFile: diff.isNewFile,
+    tooLarge: diff.tooLarge,
+    partial: inputWasCut(input),
+  };
+}
+
 /**
  * A file edit as a saved conversation keeps it (kept_edit in
  * src-tauri/src/claude_code.rs): the tool and its input, or — for one too

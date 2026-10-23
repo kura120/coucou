@@ -9,13 +9,14 @@ import {
 } from "./pills";
 import type { CodexPlanUsage, PlanUsage } from "./plan";
 import type { ProviderId } from "./providers";
-import type { FileDiff } from "./diff";
+import type { ApprovalPreview, FileDiff } from "./diff";
 import type { VoiceResult } from "../voice/runner";
 import type { Bindings } from "./shortcuts";
 import { DEFAULT_OUTFIT, type Outfit } from "../peika/wardrobe";
 import { pillColor } from "./pill-colors";
 import { Spotify, musicCardShown, musicPlaying } from "./spotify";
 import { ApprovalQueue, type Queued } from "./approvals";
+import { PillSessions } from "./sessions";
 
 export type AgentSource = "claudeCode" | "n8n" | "agent";
 export type PillBadge = "approval" | "finished" | "error";
@@ -53,6 +54,13 @@ export interface ApprovalInfo extends Queued {
    * pill, which is named after the latest one: the card names the one asking.
    */
   projectName?: string;
+  /** What an Edit, MultiEdit or Write waiting for a decision would change (the card shows a few lines of it). */
+  preview?: ApprovalPreview;
+  /**
+   * What "Always" would have Claude Code remember, as it suggested it ("Bash(npm test:*)"):
+   * set only on Claude Code's own requests that came with an allow rule to add.
+   */
+  alwaysRule?: string;
   /** Set when Claude Code is asking a question rather than for a permission. */
   questions?: AskedQuestion[];
 }
@@ -110,6 +118,12 @@ export interface Settings {
   autoCloseInterval: number;
   /** Hovering the island opens it all the way (off: hovering only peeks). */
   openOnHover: boolean;
+  /**
+   * A fullscreen app or a presentation in front: finished and failed sessions
+   * only badge their pill, without a sound (island/quiet.ts). Requests that
+   * wait for an answer still come up.
+   */
+  quietWhenBusy: boolean;
   absenceInterval: number;
   /** Declared pills next to the main one (at most MAX_DECLARED), in the order they were added. */
   activeIntegrations: string[];
@@ -202,6 +216,8 @@ export interface Settings {
   cryptoExchange: "coinbase" | "okx";
   cryptoCurrency: "USD" | "EUR";
   cryptoCoins: string;
+  /** Minutes away after which the island tells what happened meanwhile; 0 for never (island/away.ts). */
+  awayMinutes: number;
   desktopPeika?: {
     onDesktop: boolean;
     spot: { x: number; y: number; space: string } | null;
@@ -216,6 +232,7 @@ export const DEFAULT_SETTINGS: Settings = {
   soundVolume: 0.12,
   autoCloseInterval: 15,
   openOnHover: false,
+  quietWhenBusy: true,
   absenceInterval: 180,
   activeIntegrations: [
     "integration_resend", "integration_n8n", "integration_vercel", "integration_github",
@@ -245,6 +262,7 @@ export const DEFAULT_SETTINGS: Settings = {
   cryptoExchange: "coinbase",
   cryptoCurrency: "USD",
   cryptoCoins: "BTC, ETH, SOL",
+  awayMinutes: 10,
 };
 
 type Listener = () => void;
@@ -346,8 +364,15 @@ class AppState {
   showingPlanDetail = false;
   /** Which one: the Codex card rather than Claude's. */
   planDetailIsCodex = false;
+  /**
+   * The sessions behind each pill (Claude Code in two folders under VS Code
+   * share one pill): when each was last heard, its folder and project.
+   */
+  sessions = new PillSessions();
   /** Per-pill file diffs, in order of reception. Steps carry their ids. */
   sessionDiffs = new Map<string, FileDiff[]>();
+  /** The session each diff came from, by diff id, so one session ending takes only its own. */
+  private diffSession = new Map<number, string>();
   private sessionDiffTimers = new Map<string, number>();
   /** Never reset, so an id can never point at a newer diff than the one tapped. */
   private nextDiffId = 0;
@@ -511,12 +536,13 @@ class AppState {
     this.notify();
   }
 
-  /** Stores a diff for a pill and returns its id (for the ticker step). */
-  appendSessionDiff(pillId: string, diff: FileDiff): number {
+  /** Stores a diff for a pill, with the session it came from, and returns its id (for the ticker step). */
+  appendSessionDiff(pillId: string, diff: FileDiff, sessionId = ""): number {
     const id = this.nextDiffId++;
     const list = this.sessionDiffs.get(pillId) ?? [];
     list.push({ ...diff, id });
-    while (list.length > MAX_DIFFS_PER_PILL) list.shift();
+    this.diffSession.set(id, sessionId);
+    while (list.length > MAX_DIFFS_PER_PILL) this.diffSession.delete(list.shift()!.id);
     this.sessionDiffs.set(pillId, list);
     // One timer per pill, re-armed on every diff — nothing polls.
     const prev = this.sessionDiffTimers.get(pillId);
@@ -532,7 +558,18 @@ class AppState {
     return this.sessionDiffs.get(pillId)?.find((d) => d.id === id) ?? null;
   }
 
-  clearSessionDiffs(pillId: string) {
+  /**
+   * Forgets a pill's diffs: all of them, or only the ones a single session
+   * made while the others behind the pill keep theirs.
+   */
+  clearSessionDiffs(pillId: string, sessionId?: string) {
+    const list = this.sessionDiffs.get(pillId) ?? [];
+    const kept = sessionId == null ? [] : list.filter((d) => this.diffSession.get(d.id) !== sessionId);
+    for (const d of list) if (!kept.includes(d)) this.diffSession.delete(d.id);
+    if (kept.length > 0) {
+      this.sessionDiffs.set(pillId, kept);
+      return;
+    }
     const timer = this.sessionDiffTimers.get(pillId);
     if (timer != null) window.clearTimeout(timer);
     this.sessionDiffTimers.delete(pillId);

@@ -28,7 +28,8 @@ export type IslandViewName =
   | "voiceResult"
   | "webAnswer"
   | "email"
-  | "capture";
+  | "capture"
+  | "away";
 
 export type BotStateName =
   | "idle"
@@ -113,6 +114,8 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   email: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "none" },
   // The screen capture card (views/capture.ts): the picture, its size and four buttons.
   capture: { height: 160, botX: 62, botY: null, botDiameter: 56, agentMode: "none" },
+  // "While you were away" (views/away.ts): a heading and up to four lines, one per session.
+  away: { height: 224, botX: 62, botY: null, botDiameter: 58, agentMode: "column" },
 };
 
 // The upload views above are only the fallback geometry. Once a file is actually

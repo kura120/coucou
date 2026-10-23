@@ -364,7 +364,7 @@ export class Island {
         void Bridge.saveSettings(State.settings);
         State.notify();
       },
-      openSettingsWindow: () => void Bridge.openSettingsWindow(),
+      openSettingsWindow: (page) => void Bridge.openSettingsWindow(page),
       blip: () => Sound.play("blip"),
       chooseOutfit: (selection) => this.wearOutfit(selection),
       // The screen capture card's buttons (island/capture.ts).

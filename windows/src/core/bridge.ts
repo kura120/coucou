@@ -61,8 +61,22 @@ export const Bridge = {
 
   reposition: () => call<void>("reposition"),
 
+  /**
+   * Seconds since the keyboard or mouse was last used; null where the system
+   * cannot say (Linux). Asked on a slow timer, only while something is waiting
+   * to be told (island/away.ts).
+   */
+  idleSeconds: () => call<number | null>("idle_seconds"),
+
   /** Displays the island can be pinned to: `key` is what `settings.screen` stores. */
   listMonitors: () => call<{ key: string; label: string }[]>("list_monitors"),
+
+  /**
+   * A fullscreen app or a presentation is in front (Windows; never on Linux).
+   * Asked when an alert is about to open the island; not busy when the system
+   * cannot say.
+   */
+  userBusy: async () => (await call<boolean>("user_busy")) === true,
 
   openUrl: (url: string) => call<void>("open_url", { url }),
 
@@ -96,6 +110,8 @@ export const Bridge = {
   openSettingsWindow: (page?: string) => call<void>("open_settings_window", { page }),
   /** The settings page finished its closing motion: hide its window. */
   hideSettingsWindow: () => call<void>("hide_settings_window"),
+  /** A Peika window made just now: the page it was opened on, if any. */
+  settingsFirstPage: () => call<string | null>("settings_first_page"),
   /** The settings page's own title bar: close, minimize, maximize, drag. */
   closeSettingsWindow: () => call<void>("close_settings_window"),
   minimizeSettingsWindow: () => call<void>("minimize_settings_window"),
@@ -142,7 +158,7 @@ export const Bridge = {
    */
   codexPlanUsage: () => call<unknown>("codex_plan_usage"),
 
-  approvalDecision: (requestId: string, decision: "allow" | "deny") =>
+  approvalDecision: (requestId: string, decision: "allow" | "deny" | "always") =>
     call<void>("approval_decision", { requestId, decision }),
   /** "The card is up" — until this lands the relay only waits a moment. */
   approvalAck: (requestId: string) => call<void>("approval_ack", { requestId }),

@@ -28,6 +28,12 @@ pub const HOOK_EXE: &str = "peika-hook";
 /// Environment variable holding the home directory.
 pub const HOME_VAR: &str = "HOME";
 
+/// Whether a fullscreen app or a presentation is in front. Linux has no such
+/// signal to ask: never busy.
+pub fn user_busy() -> bool {
+    false
+}
+
 // ── Files ─────────────────────────────────────────────────────────────────────
 
 /// An XDG base directory (`$XDG_CONFIG_HOME` …), or its fallback under the home
@@ -161,6 +167,12 @@ fn dpi_scale_for(gsettings_output: &str) -> Option<String> {
         return None;
     }
     Some(format!("{:.4}", 1.0 / factor).trim_end_matches('0').trim_end_matches('.').to_string())
+}
+
+/// No idle time on Linux (it would take X11's screensaver extension or a
+/// compositor protocol): the "while you were away" card never shows.
+pub fn idle_seconds() -> Option<u64> {
+    None
 }
 
 pub fn local_time() -> LocalTime {

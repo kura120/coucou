@@ -21,14 +21,16 @@ use ::windows::Win32::System::Com::{
 };
 use ::windows::Win32::System::Ole::RevokeDragDrop;
 use ::windows::Win32::System::Pipes::GetNamedPipeClientProcessId;
-use ::windows::Win32::System::SystemInformation::GetLocalTime;
+use ::windows::Win32::System::SystemInformation::{GetLocalTime, GetTickCount};
 use ::windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 use ::windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, GetKeyboardLayoutList, MapVirtualKeyExW, ToUnicodeEx, HKL, MAPVK_VK_TO_VSC,
-    VK_CONTROL, VK_LBUTTON, VK_MENU, VK_SHIFT,
+    GetAsyncKeyState, GetKeyboardLayoutList, GetLastInputInfo, MapVirtualKeyExW, ToUnicodeEx, HKL,
+    LASTINPUTINFO, MAPVK_VK_TO_VSC, VK_CONTROL, VK_LBUTTON, VK_MENU, VK_SHIFT,
 };
 use ::windows::Win32::UI::Shell::{
-    FileOpenDialog, IFileOpenDialog, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH,
+    FileOpenDialog, IFileOpenDialog, SHQueryUserNotificationState, FOS_FORCEFILESYSTEM,
+    FOS_PICKFOLDERS, QUNS_BUSY, QUNS_PRESENTATION_MODE, QUNS_RUNNING_D3D_FULL_SCREEN,
+    SIGDN_FILESYSPATH,
 };
 use ::windows::Win32::UI::WindowsAndMessaging::{
     EnumChildWindows, EnumWindows, GetClassNameW, GetCursorPos, GetWindow, GetWindowLongPtrW,
@@ -105,6 +107,18 @@ pub fn local_time() -> LocalTime {
         minute: t.wMinute.into(),
         second: t.wSecond.into(),
     }
+}
+
+/// Seconds since the keyboard or the mouse was last touched: `GetLastInputInfo`
+/// against `GetTickCount`, both 32-bit tick counts, so the subtraction wraps.
+pub fn idle_seconds() -> Option<u64> {
+    let mut info = LASTINPUTINFO { cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32, dwTime: 0 };
+    // SAFETY: `info` is a LASTINPUTINFO with its size set, as the call requires.
+    if !unsafe { GetLastInputInfo(&mut info) }.as_bool() {
+        return None;
+    }
+    let now = unsafe { GetTickCount() };
+    Some(u64::from(now.wrapping_sub(info.dwTime)) / 1000)
 }
 
 // ── Processes ─────────────────────────────────────────────────────────────────
@@ -311,6 +325,17 @@ pub fn cursor_physical() -> Option<(f64, f64)> {
     let mut p = POINT::default();
     unsafe { GetCursorPos(&mut p).ok()? };
     Some((p.x as f64, p.y as f64))
+}
+
+/// True while a fullscreen app (a game, a video) or a presentation is in front,
+/// the states in which Windows itself holds its notifications back. Asked of the
+/// system on the spot, never polled. Not busy when the system cannot say.
+pub fn user_busy() -> bool {
+    unsafe { SHQueryUserNotificationState() }
+        .map(|state| {
+            matches!(state, QUNS_BUSY | QUNS_RUNNING_D3D_FULL_SCREEN | QUNS_PRESENTATION_MODE)
+        })
+        .unwrap_or(false)
 }
 
 /// True while the left mouse button is held — the only signal we get that a
