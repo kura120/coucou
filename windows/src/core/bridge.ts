@@ -107,6 +107,16 @@ export const Bridge = {
 
   quit: () => call<void>("quit_app"),
 
+  /**
+   * Starts writing down what is said (src-tauri/src/speech/dictate.rs): its id, which the
+   * `dictation` event carries. Fails when one is running or the speech engine is not installed.
+   */
+  dictationBegin: () => callOrThrow<number>("dictation_begin"),
+  /** The button was pressed again: what is left is written down, then "final" comes. */
+  dictationFinish: (id: number) => call<void>("dictation_finish", { id }),
+  /** Esc: nothing more is written down. */
+  dictationCancel: (id: number) => call<void>("dictation_cancel", { id }),
+
   /** The Peika window (the settings window), on a page of its tree if given. */
   openSettingsWindow: (page?: string) => call<void>("open_settings_window", { page }),
   /** The settings page finished its closing motion: hide its window. */
@@ -548,6 +558,14 @@ export type BridgeEvent =
   | { name: "tray"; payload: string }
   | { name: "hook"; payload: Record<string, unknown> }
   | { name: "screen-changed"; payload: null };
+
+/** The `dictation` event: `level` is how loud (0…1), `text` the words so far, or why it failed. */
+export interface DictationEvent {
+  id: number;
+  phase: "level" | "partial" | "final" | "cancelled" | "failed";
+  text: string;
+  level: number;
+}
 
 export interface DragDropPayload {
   type: "enter" | "over" | "drop" | "leave";

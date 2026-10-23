@@ -2407,6 +2407,37 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--dim-3);
 }
 
+/* The microphone: quiet beside the send button, orange while it listens. The
+   voice (`--level`, 0…1, from the `dictation` event) swells a ring around it. */
+.chat-mic {
+  --level: 0;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dim-3);
+  display: grid;
+  place-items: center;
+  cursor: default;
+  transition: color 0.12s ease-out, background 0.12s ease-out, box-shadow 0.09s linear;
+}
+
+.chat-mic:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.chat-mic:disabled {
+  opacity: 0.4;
+}
+
+.chat-mic.on {
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.16);
+  box-shadow: 0 0 0 calc(var(--level) * 5px) rgba(249, 115, 22, 0.24);
+}
+
 .send-btn {
   width: 28px;
   height: 28px;

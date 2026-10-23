@@ -111,6 +111,39 @@
    "ru": "Развернуть",
    "id": "Perbesar"
   },
+  "Dictate": {
+   "zh-Hans": "语音输入",
+   "hi": "बोलकर लिखें",
+   "es": "Dictar",
+   "ar": "إملاء صوتي",
+   "fr": "Dicter",
+   "bn": "বলে লিখুন",
+   "pt-BR": "Ditar",
+   "ru": "Диктовать",
+   "id": "Dikte"
+  },
+  "Stop dictating": {
+   "zh-Hans": "停止语音输入",
+   "hi": "बोलना बंद करें",
+   "es": "Dejar de dictar",
+   "ar": "إيقاف الإملاء",
+   "fr": "Arrêter la dictée",
+   "bn": "বলা বন্ধ করুন",
+   "pt-BR": "Parar de ditar",
+   "ru": "Остановить диктовку",
+   "id": "Hentikan dikte"
+  },
+  "The speech engine is not installed yet.": {
+   "zh-Hans": "尚未安装语音引擎。",
+   "hi": "स्पीच इंजन अभी इंस्टॉल नहीं है।",
+   "es": "El motor de voz aún no está instalado.",
+   "ar": "لم يُثبَّت محرك الكلام بعد.",
+   "fr": "Le moteur vocal n’est pas encore installé.",
+   "bn": "স্পিচ ইঞ্জিন এখনও ইনস্টল করা হয়নি।",
+   "pt-BR": "O mecanismo de voz ainda não está instalado.",
+   "ru": "Движок распознавания речи ещё не установлен.",
+   "id": "Mesin suara belum dipasang."
+  },
   "No model server and model are chosen yet: see “{row}” below.": {
    "zh-Hans": "尚未选择模型服务器和模型：见下方的“{row}”。",
    "hi": "अभी कोई मॉडल सर्वर और मॉडल नहीं चुना गया है: नीचे “{row}” देखें।",
