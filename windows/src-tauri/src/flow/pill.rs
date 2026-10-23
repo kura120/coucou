@@ -30,7 +30,7 @@ pub const LABEL: &str = "pill";
 const WIDTH: f64 = 340.0;
 const HEIGHT: f64 = 112.0;
 /// Kept between the card and the bottom of the work area.
-const MARGIN: f64 = 14.0;
+const MARGIN: f64 = 8.0;
 /// How long a message stays up.
 const MESSAGE_FOR: Duration = Duration::from_millis(4500);
 /// How long the page gets to fade out before the window leaves.
@@ -117,6 +117,11 @@ pub fn ensure(app: &AppHandle) -> Option<WebviewWindow> {
             // Something may have been asked of it while it was being made.
             if current().state != "hidden" {
                 place(app, &win);
+            } else {
+                // The position asked for in the builder is not always kept
+                // (the window can land at the system's default spot, where its
+                // see-through page would block clicks): it is moved once made.
+                park(&win);
             }
             Some(win)
         }
@@ -249,7 +254,7 @@ mod tests {
         assert_eq!(w, 510);
         assert_eq!(h, 168);
         assert_eq!(x, -2560 + (2560 - 510) / 2);
-        assert_eq!(y, 1400 - 168 - 21);
+        assert_eq!(y, 1400 - 168 - 12);
         // Wholly inside the work area.
         assert!(x >= -2560 && x + w as i32 <= 0 && y >= 0 && y + h as i32 <= 1400);
     }

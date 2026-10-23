@@ -6,6 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { SavedEdit } from "./diff";
+import type { FlowPillState } from "./flow";
 import type { Settings } from "./state";
 import type { RecapHistory, RecapPrefs } from "../recap/summary";
 import type { SpotifyState } from "./spotify";
@@ -355,6 +356,10 @@ export const Bridge = {
   voiceEngineRemove: (part: VoiceEnginePart) => call<void>("voice_engine_remove", { part }),
   /** Peika says this out loud, when speaking is on and his voice is installed. */
   voiceSay: (text: string) => call<void>("voice_say", { text }),
+  /** Flow's pill window (src-tauri/src/flow/mod.rs): what it shows now, and its ✓ (hands-free) and ✕. */
+  flowPillState: () => call<FlowPillState>("flow_pill_state"),
+  flowPillFinish: () => call<void>("flow_pill_finish"),
+  flowPillCancel: () => call<void>("flow_pill_cancel"),
   /** Opens the mail app on a draft, for the user to read and send. False when the recipient is not one address. */
   openMailDraft: (to: string, subject: string, body: string) => call<boolean>("open_mail_draft", { to, subject, body }),
   /** The user is done talking: nothing more is listened for until the wake phrase. */
