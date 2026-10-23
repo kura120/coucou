@@ -26,7 +26,8 @@ import { ICONS } from "./icons";
 import { renderMarkdown, writeClipboard } from "./markdown";
 import { provideMenu } from "./menu";
 import {
-  Bridge, onEvent, type ChatContext, type ChatEdit, type ConversationSummary, type ModelInfo, type RepoPulls,
+  Bridge, onEvent, type ChatContext, type ChatEdit, type ConversationSummary, type DictationEvent, type ModelInfo,
+  type RepoPulls,
 } from "../core/bridge";
 import {
   buildFileDiff, changeBar, diffOfSaved, fileName, folderLabel, relativePath, type DiffKind, type FileDiff,
@@ -50,6 +51,9 @@ const STRINGS = {
   noKey: N_("No API key — add it in Settings."),
   openSettings: N_("Open Settings"),
   stop: N_("Stop answering"),
+  dictate: N_("Dictate"),
+  dictateStop: N_("Stop dictating"),
+  noEngine: N_("The speech engine is not installed yet."),
   folder: N_("Folder"),
   noFolder: N_("None: chat only"),
   choose: N_("Choose…"),
@@ -740,6 +744,9 @@ export const ChatControls = {
   open: async (_id: string): Promise<boolean> => false,
 };
 
+/** A microphone, drawn with a stroke on the 24-grid like the other icons. */
+const MIC = "M12 3.5a3 3 0 0 0-3 3V12a3 3 0 0 0 6 0V6.5a3 3 0 0 0-3-3zM5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3";
+
 export function buildPrompt(onHeightChange: () => void): ViewHost {
   const chipRow = h("div", { class: "chip-row" });
   const log = h("div", { class: "chat-log" });
@@ -750,7 +757,11 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     spellcheck: "false",
   }) as HTMLInputElement;
   const send = h("button", { class: "send-btn", title: tl(STRINGS.send) }, svg(ICONS.arrowUp, 11));
-  const bar = h("div", { class: "chat-bar" }, input, send);
+  const mic = h("button", { class: "chat-mic", title: tl(STRINGS.dictate) }, svg(MIC, 14, { stroke: 2 })) as HTMLButtonElement;
+  const bar = h("div", { class: "chat-bar" }, input, mic, send);
+  // Why the microphone did not start, above the field, in the pickers' status style.
+  const micNote = h("div", { class: "picker-status" });
+  micNote.style.display = "none";
 
   const modelDot = h("i", { class: "model-dot" });
   const modelName = h("span", { class: "model-name" });
@@ -806,7 +817,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     if (convos.isOpen) convos.close();
     if (pulls.isOpen) pulls.close();
   };
-  body.append(chipRow, log, picker.el, convos.el, pulls.el, modelRow, bar);
+  body.append(chipRow, log, picker.el, convos.el, pulls.el, modelRow, micNote, bar);
 
   // The card's lower edge: drag it to make the chat taller or shorter, double-
   // click to let it follow the conversation again. The height lasts until the
@@ -981,7 +992,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   ChatControls.draft = () => input.value;
   ChatControls.busy = () => sending;
   ChatControls.send = () => {
-    if (!input.value.trim() || sending) return false;
+    if (!input.value.trim() || sending || micStarting || dictating) return false;
     void submit();
     return true;
   };
@@ -1065,9 +1076,162 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     log.scrollTop = log.scrollHeight;
   });
 
+  // ── Dictation ───────────────────────────────────────────────────────────────
+  // The microphone button writes what is said after what was typed. Nothing
+  // is sent: the user presses send. Rust holds the microphone and tells us
+  // with `dictation` events (src-tauri/src/speech/dictate.rs); only the one
+  // this button started is listened to, Flow may run its own.
+
+  /** The dictation this button started: its id, what the field held before, and how it is ending. */
+  let dictating: { id: number; before: string; ending: "finish" | "cancel" | null } | null = null;
+  /** Asked for, no id yet. Events that come before the id are kept until it does. */
+  let micStarting = false;
+  let early: DictationEvent[] = [];
+  let endWanted: "finish" | "cancel" | null = null;
+
+  const micOn = () => micStarting || (dictating != null && dictating.ending == null);
+
+  function drawMic(level = 0) {
+    const on = micOn();
+    mic.classList.toggle("on", on);
+    mic.title = t(on ? STRINGS.dictateStop : STRINGS.dictate);
+    mic.setAttribute("aria-pressed", String(on));
+    mic.style.setProperty("--level", on ? level.toFixed(2) : "0");
+    input.readOnly = dictating != null;
+  }
+
+  /** What the field holds: what was typed, then the words, the caret after them. */
+  function setField(before: string, said: string) {
+    const gap = before && said && !/\s$/.test(before) ? " " : "";
+    input.value = before + gap + said;
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
+
+  function micNoteShow(why: string) {
+    const noEngine = /not installed/i.test(why);
+    clear(micNote);
+    micNote.append(noEngine ? t(STRINGS.noEngine) : why);
+    if (noEngine) {
+      micNote.append(
+        h("button", {
+          class: "picker-link",
+          text: tl(STRINGS.openSettings),
+          onclick: () => void Bridge.openSettingsWindow("voice"),
+        }),
+      );
+    }
+    micNote.style.display = "";
+  }
+
+  function micNoteHide() {
+    micNote.style.display = "none";
+    clear(micNote);
+  }
+
+  function dictationOver() {
+    dictating = null;
+    drawMic();
+  }
+
+  function onDictation(e: DictationEvent) {
+    if (!e) return;
+    if (!dictating) {
+      if (micStarting) early.push(e);
+      return;
+    }
+    if (e.id !== dictating.id) return;
+    const { before, ending } = dictating;
+    switch (e.phase) {
+      case "level":
+        if (!ending) drawMic(Number(e.level) || 0);
+        break;
+      case "partial":
+        if (ending !== "cancel") setField(before, e.text);
+        break;
+      case "final":
+        dictationOver();
+        setField(before, e.text);
+        input.focus();
+        break;
+      case "cancelled":
+        dictationOver();
+        setField(before, "");
+        break;
+      case "failed":
+        dictationOver();
+        micNoteShow(e.text);
+        break;
+    }
+  }
+
+  /** The button again, or leaving the chat: the words are kept ("finish"); Esc: they are not ("cancel"). */
+  function endDictation(how: "finish" | "cancel"): boolean {
+    if (micStarting) {
+      if (how === "cancel" || endWanted == null) endWanted = how;
+      return true;
+    }
+    if (!dictating || dictating.ending) return false;
+    dictating.ending = how;
+    if (how === "cancel") {
+      void Bridge.dictationCancel(dictating.id);
+      setField(dictating.before, "");
+    } else {
+      void Bridge.dictationFinish(dictating.id);
+    }
+    drawMic();
+    return true;
+  }
+
+  async function startDictation() {
+    if (sending || micStarting || dictating) return;
+    micNoteHide();
+    micStarting = true;
+    early = [];
+    endWanted = null;
+    drawMic();
+    const before = input.value;
+    let id: number;
+    try {
+      id = await Bridge.dictationBegin();
+    } catch (err) {
+      micStarting = false;
+      early = [];
+      drawMic();
+      micNoteShow(String(err).replace(/^Error:\s*/, ""));
+      return;
+    }
+    micStarting = false;
+    dictating = { id, before, ending: null };
+    drawMic();
+    input.focus();
+    const wanted = endWanted;
+    endWanted = null;
+    if (wanted) endDictation(wanted);
+    for (const e of early.splice(0)) onDictation(e);
+  }
+
+  void onEvent<DictationEvent>("dictation", onDictation);
+
+  mic.addEventListener("mousedown", (e) => e.preventDefault()); // the field keeps the caret
+  mic.addEventListener("click", () => {
+    if (micOn()) endDictation("finish");
+    else void startDictation();
+  });
+  mic.addEventListener("keydown", (e) => {
+    if ((e as KeyboardEvent).key === "Escape" && micOn()) {
+      e.preventDefault();
+      endDictation("cancel");
+      e.stopPropagation(); // Esc cancels the dictation, the island stays
+    }
+  });
+  // Leaving the chat, or the island closing, finishes it.
+  State.subscribe(() => {
+    if (micOn() && (State.view !== "prompt" || State.mode !== "expanded")) endDictation("finish");
+  });
+
   async function submit() {
     const query = input.value.trim();
-    if (!query || sending) return;
+    if (!query || sending || micStarting || dictating) return;
     closePanels();
     turnEdits = [];
     input.value = "";
@@ -1146,6 +1310,9 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     if (key === "Enter") {
       e.preventDefault();
       void submit();
+    } else if (key === "Escape" && micOn()) {
+      e.preventDefault();
+      endDictation("cancel");
     } else if (key === "Escape" && (picker.isOpen || convos.isOpen || pulls.isOpen)) {
       e.preventDefault();
       closePanels();
@@ -1193,6 +1360,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
 
       input.placeholder = t(State.chatHistory.length === 0 ? STRINGS.placeholderFirst : STRINGS.placeholderNext);
       input.disabled = sending;
+      mic.disabled = sending;
     },
     focus() {
       input.focus();
