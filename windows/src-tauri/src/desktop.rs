@@ -275,9 +275,9 @@ fn body_disc() -> MouseShape {
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
-/// Same reasoning as the settings window: created hidden at launch, before the
-/// island's webview, then only shown and hidden. Nothing is created where the
-/// feature is off.
+/// Created hidden at launch, then only shown and hidden: Peika flies out the
+/// moment he is asked to, with no window to make first. Nothing is created
+/// where the feature is off.
 pub fn setup(app: &AppHandle) {
     let mut mode = platform::desktop_mode();
     if mode != DesktopMode::Off {

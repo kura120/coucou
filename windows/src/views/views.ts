@@ -67,7 +67,8 @@ export interface ViewActions {
   toggleSound(): void;
   setVolume(v: number): void;
   setAutoClose(seconds: number): void;
-  openSettingsWindow(): void;
+  /** Opens the Peika window, on a page when one is given (a leaf id of the settings tree). */
+  openSettingsWindow(page?: string): void;
   blip(): void;
   /** One of the app's capabilities, asked for by a card's own button: the interface's own call (core/capabilities). */
   capability(call: { name: string; arguments: Record<string, unknown> }): Promise<ToolResult>;
@@ -300,7 +301,7 @@ function buildOverview(actions: ViewActions): ViewHost {
       cardKey = "";
       State.notify();
     },
-    openSettings: () => actions.openSettingsWindow(),
+    openSettings: (page) => actions.openSettingsWindow(page),
   };
 
   /** The countdowns move every 30 s while a card is open, and only then. */

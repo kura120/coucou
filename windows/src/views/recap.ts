@@ -1,7 +1,8 @@
 // Weekly recap card and its share panel — port of WeeklyRecapCardView and
 // RecapSharePanelView (WeeklyRecapView.swift). The Mac shares from a separate
-// panel; here the card flips to a share mode inside the island, because a
-// window created after launch comes up blank in WebView2 (see lib.rs).
+// panel; here the card flips to a share mode inside the island. (That choice
+// was made when a window created after launch came up blank; it no longer
+// does, see issue #81, but the share mode works and stays.)
 //
 // Nothing animates in this view: the image is drawn once, when share mode
 // opens or the privacy toggle changes.
