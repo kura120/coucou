@@ -9,7 +9,7 @@ import {
 } from "./pills";
 import type { CodexPlanUsage, PlanUsage } from "./plan";
 import type { ProviderId } from "./providers";
-import type { FileDiff } from "./diff";
+import type { ApprovalPreview, FileDiff } from "./diff";
 import type { VoiceResult } from "../voice/runner";
 import type { Bindings } from "./shortcuts";
 import { DEFAULT_OUTFIT, type Outfit } from "../peika/wardrobe";
@@ -54,6 +54,13 @@ export interface ApprovalInfo extends Queued {
    * pill, which is named after the latest one: the card names the one asking.
    */
   projectName?: string;
+  /** What an Edit, MultiEdit or Write waiting for a decision would change (the card shows a few lines of it). */
+  preview?: ApprovalPreview;
+  /**
+   * What "Always" would have Claude Code remember, as it suggested it ("Bash(npm test:*)"):
+   * set only on Claude Code's own requests that came with an allow rule to add.
+   */
+  alwaysRule?: string;
   /** Set when Claude Code is asking a question rather than for a permission. */
   questions?: AskedQuestion[];
 }

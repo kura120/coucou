@@ -6,7 +6,7 @@
 // Code's (hook/src/normalize.rs), so one handler serves them all.
 
 import { Bridge, onEvent } from "../core/bridge";
-import { buildFileDiff, fileName, makeDiffStep, toOneLine } from "../core/diff";
+import { approvalPreview, buildFileDiff, fileName, makeDiffStep, toOneLine } from "../core/diff";
 import { Sound } from "../core/sound";
 import { State, type ApprovalInfo, type AskedQuestion } from "../core/state";
 import { MAX_PENDING, inputKey } from "../core/approvals";
@@ -112,6 +112,8 @@ interface HookPayload {
   last_assistant_message?: string;
   tool_name?: string;
   tool_input?: Record<string, unknown>;
+  /** PermissionRequest, Claude Code: the permission updates it suggests (an allow rule to add…). */
+  permission_suggestions?: unknown;
   /** Set by the relay when an edit was too big to forward whole (> 256 KB). */
   peika_diff_truncated?: boolean;
   /** Optional agent tag: lowercase, digits and hyphens, ≤ 24 chars. */
@@ -208,6 +210,34 @@ function approvalTarget(tool: string, input: Record<string, unknown>): string {
     }
   }
   return tool;
+}
+
+/** Where Claude Code may keep a rule (the `destination` of a permission update); the relay checks the same list. */
+const RULE_DESTINATIONS = ["session", "localSettings", "projectSettings", "userSettings"];
+
+/**
+ * What an "Always" click would have Claude Code remember: the allow rules in the
+ * `permission_suggestions` it sent with the request, as "Bash(npm test:*)"
+ * (peika-hook, reply.rs, hands back the same ones and nothing else). Null when
+ * it suggested none: a mode change or a directory is not what "Always" means.
+ * Docs: https://code.claude.com/docs/en/hooks ("Permission update entries").
+ */
+export function alwaysRuleOf(suggestions: unknown): string | null {
+  if (!Array.isArray(suggestions)) return null;
+  const names: string[] = [];
+  for (const entry of suggestions as Record<string, unknown>[]) {
+    if (!entry || entry.type !== "addRules" || entry.behavior !== "allow") continue;
+    if (typeof entry.destination !== "string" || !RULE_DESTINATIONS.includes(entry.destination)) continue;
+    if (!Array.isArray(entry.rules) || entry.rules.length === 0) continue;
+    const rules = (entry.rules as Record<string, unknown>[]).map((rule) => {
+      const tool = rule?.toolName;
+      if (typeof tool !== "string" || !tool) return null;
+      if (rule.ruleContent == null) return tool;
+      return typeof rule.ruleContent === "string" ? `${tool}(${rule.ruleContent})` : null;
+    });
+    if (rules.every((r): r is string => r !== null)) names.push(...(rules as string[]));
+  }
+  return names.length > 0 ? names.join(", ") : null;
 }
 
 /**
@@ -574,6 +604,11 @@ function handleHook(island: Island, payload: HookPayload) {
       // shows the options and sends back the one that was picked. Only Claude
       // Code asks questions this way.
       const questions = isExternalAgent ? null : askedQuestions(tool, input);
+      // An edit asking to be allowed: what it would change, for the card to show.
+      const preview = questions ? null : approvalPreview(tool, input);
+      // "Always" is Claude Code's own: it remembers the rule it suggested. Codex,
+      // Copilot CLI and Muse Code have no such thing, so no button there.
+      const alwaysRule = isExternalAgent || questions ? null : alwaysRuleOf(payload.permission_suggestions);
       const view = questions ? "question" : "approval";
       // The card always comes up, even over another pill or an island that is
       // already open: its pill comes to the front, and the one you were on
@@ -586,6 +621,8 @@ function handleHook(island: Island, payload: HookPayload) {
         inputKey: inputKey(payload.tool_input),
         received: Date.now(),
         command: approvalTarget(tool, input),
+        ...(preview ? { preview } : {}),
+        ...(alwaysRule ? { alwaysRule } : {}),
         ...(isExternalAgent ? {} : { projectName }),
         ...(questions ? { questions } : {}),
       });

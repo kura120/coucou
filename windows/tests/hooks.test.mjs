@@ -200,6 +200,68 @@ test("the chat's own turn still gets its permission card", () => {
   assert.equal(State.pendingApproval.requestId, "r1");
 });
 
+test("a request to edit a file carries what the edit would change; any other tool does not", () => {
+  hook({
+    hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", tool_name: "Edit",
+    tool_input: { file_path: "/p/a.ts", old_string: "a\nb", new_string: "a\nc\nd" },
+  });
+  const { preview, command } = State.pendingApproval;
+  assert.equal(command, "Edit · /p/a.ts");
+  assert.deepEqual(preview.lines, [
+    { kind: "removed", text: "b" },
+    { kind: "added", text: "c" },
+    { kind: "added", text: "d" },
+  ]);
+  assert.deepEqual([preview.added, preview.removed], [2, 1]);
+
+  State.pendingApproval = null;
+  hook({ hook_event_name: "PermissionRequest", request_id: "r2", session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } });
+  assert.equal(State.pendingApproval.preview, undefined);
+  State.pendingApproval = null;
+  hook({ hook_event_name: "PermissionRequest", request_id: "r3", session_id: "s1", tool_name: "Write", tool_input: { file_path: "/p/a.ts" } });
+  assert.equal(State.pendingApproval.preview, undefined);
+});
+
+const SUGGESTIONS = [
+  { type: "addRules", rules: [{ toolName: "Bash", ruleContent: "npm test:*" }], behavior: "allow", destination: "localSettings" },
+  { type: "setMode", mode: "acceptEdits", destination: "session" },
+];
+
+test("Always is offered on Claude Code's request that came with an allow rule, and says which", () => {
+  hook({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", tool_name: "Bash",
+    tool_input: { command: "npm test" }, permission_suggestions: SUGGESTIONS });
+  assert.equal(State.pendingApproval.alwaysRule, "Bash(npm test:*)");
+
+  // A rule on a whole tool, and two of them.
+  State.pendingApproval = null;
+  hook({ hook_event_name: "PermissionRequest", request_id: "r2", session_id: "s1", tool_name: "WebFetch",
+    tool_input: { url: "https://x.dev" },
+    permission_suggestions: [{ type: "addRules", behavior: "allow", destination: "session",
+      rules: [{ toolName: "WebFetch" }, { toolName: "Bash", ruleContent: "ls" }] }] });
+  assert.equal(State.pendingApproval.alwaysRule, "WebFetch, Bash(ls)");
+});
+
+test("Always is not offered without a rule to remember, or on a card that is not Claude Code's", () => {
+  const ask = (extra, id) => {
+    State.pendingApproval = null;
+    hook({ hook_event_name: "PermissionRequest", request_id: id, session_id: "s1", tool_name: "Bash",
+      tool_input: { command: "ls" }, ...extra });
+    return State.pendingApproval.alwaysRule;
+  };
+  assert.equal(ask({}, "a"), undefined);
+  assert.equal(ask({ permission_suggestions: [] }, "b"), undefined);
+  // A mode change, a deny rule, a directory: not what "Always" means.
+  assert.equal(ask({ permission_suggestions: [SUGGESTIONS[1]] }, "c"), undefined);
+  assert.equal(ask({ permission_suggestions: [{ ...SUGGESTIONS[0], behavior: "deny" }] }, "d"), undefined);
+  assert.equal(ask({ permission_suggestions: [{ type: "addDirectories", directories: ["/"], destination: "session" }] }, "e"), undefined);
+  assert.equal(ask({ permission_suggestions: [{ ...SUGGESTIONS[0], destination: "elsewhere" }] }, "f"), undefined);
+  assert.equal(ask({ permission_suggestions: "Bash(*)" }, "g"), undefined);
+  // Codex, Copilot CLI and Muse Code never get it, whatever they send.
+  for (const agent of ["codex", "copilot", "muse"]) {
+    assert.equal(ask({ peika_agent: agent, permission_suggestions: SUGGESTIONS }, `h-${agent}`), undefined, agent);
+  }
+});
+
 test("a session finishing behind another pill only badges its own, for 5.2 s", () => {
   State.setFocus("integration_n8n");
   hook({ hook_event_name: "Stop" });
@@ -448,6 +510,16 @@ test("a permission request puts the card up, says exactly what it authorises, an
     inputKey: JSON.stringify({ content: "SECRET=1", file_path: " C:\\Users\\me\\proj\\.env " }),
     received: Date.now(),
     command: "Write · C:\\Users\\me\\proj\\.env",
+    // A Write also says what it would put in the file (the card shows a few lines).
+    preview: {
+      path: " C:\\Users\\me\\proj\\.env ",
+      added: 1,
+      removed: 0,
+      lines: [{ kind: "added", text: "SECRET=1" }],
+      isNewFile: true,
+      tooLarge: false,
+      partial: false,
+    },
     projectName: "proj",
   });
   assert.deepEqual(sent("approval_ack"), [{ requestId: "r1" }]);
