@@ -61,8 +61,8 @@ mod imp {
     use ::windows::core::{w, PCWSTR};
     use ::windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL};
     use ::windows::Win32::System::DataExchange::{
-        CloseClipboard, EmptyClipboard, GetClipboardSequenceNumber, OpenClipboard, RegisterClipboardFormatW,
-        SetClipboardData,
+        CloseClipboard, EmptyClipboard, GetClipboardSequenceNumber, IsClipboardFormatAvailable, OpenClipboard,
+        RegisterClipboardFormatW, SetClipboardData,
     };
     use ::windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
 
@@ -115,7 +115,7 @@ mod imp {
     /// `text` is the clipboard's only content, and for a dictation, out of the
     /// clipboard history and the cloud clipboard. Returns the clipboard's
     /// sequence number right after, to tell later whether it changed.
-    fn set_text(text: &str, private: bool) -> Result<u32, String> {
+    pub(super) fn set_text(text: &str, private: bool) -> Result<u32, String> {
         let mut units: Vec<u16> = text.encode_utf16().collect();
         units.push(0);
         let bytes: Vec<u8> = units.iter().flat_map(|u| u.to_le_bytes()).collect();
@@ -146,7 +146,7 @@ mod imp {
         Ok(unsafe { GetClipboardSequenceNumber() })
     }
 
-    fn clear() {
+    pub(super) fn clear() {
         if open().is_ok() {
             unsafe {
                 let _ = EmptyClipboard();
@@ -155,7 +155,7 @@ mod imp {
         }
     }
 
-    pub fn paste(text: &str, target: Option<isize>, key: FlowKey) -> Outcome {
+    pub(super) fn paste(text: &str, target: Option<isize>, key: FlowKey) -> Outcome {
         // The window the words are for must be the one in front.
         if let Some(window) = target {
             if !os::bring_to_front(window) {
@@ -165,7 +165,17 @@ mod imp {
         if os::foreground().is_some_and(os::refuses_input) {
             return keep(text, Why::Elevated);
         }
-        let previous = crate::clipboard::text();
+        // What the clipboard holds, as text. The clipboard may be busy for a
+        // moment: a few tries before taking it for empty.
+        let had_text = unsafe { IsClipboardFormatAvailable(UNICODE_TEXT) }.is_ok();
+        let mut previous = None;
+        for _ in 0..3 {
+            previous = crate::clipboard::text();
+            if previous.is_some() || !had_text {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
         let sequence = match set_text(text, true) {
             Ok(n) => n,
             Err(err) => {
@@ -189,6 +199,9 @@ mod imp {
                 Some(old) => {
                     let _ = set_text(&old, true);
                 }
+                // Text that could not be read: the words stay rather than
+                // wipe what the user had.
+                None if had_text => {}
                 None => clear(),
             }
         });
@@ -220,5 +233,91 @@ mod tests {
     #[test]
     fn the_words_stay_on_the_clipboard_for_a_moment_only() {
         assert!((200..=400).contains(&RESTORE_AFTER_MS));
+    }
+
+    /// The whole paste into a real window: a small form with a text box is
+    /// opened (by PowerShell, on top and focused), the words are pasted into it
+    /// by `paste`, and what the text box then holds is read back, with the
+    /// clipboard's old text checked as put back. The form takes the keyboard for
+    /// a few seconds, so it is not run with the others:
+    /// `cargo test -p peika flow::paste -- --ignored --nocapture`
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "opens a window, takes the keyboard for a few seconds and uses the real clipboard"]
+    fn the_words_are_pasted_into_a_real_window_and_the_old_text_comes_back() {
+        use super::imp::{clear, paste, set_text};
+        use std::time::Duration;
+        const FORM: &str = r#"
+Add-Type -AssemblyName System.Windows.Forms
+$out = $args[0]
+$f = New-Object Windows.Forms.Form; $f.Text = 'PeikaFlowTarget'; $f.Width = 420; $f.Height = 160; $f.TopMost = $true
+$tb = New-Object Windows.Forms.TextBox; $tb.Dock = 'Fill'; $f.Controls.Add($tb)
+$t = New-Object Windows.Forms.Timer; $t.Interval = 150
+$t.Add_Tick({ [IO.File]::WriteAllText("$out.text", $tb.Text) }); $t.Start()
+$f.Add_Shown({ $f.Activate(); $tb.Focus(); [IO.File]::WriteAllText("$out.hwnd", $f.Handle.ToInt64().ToString()) })
+$c = New-Object Windows.Forms.Timer; $c.Interval = 20000; $c.Add_Tick({ $f.Close() }); $c.Start()
+[Windows.Forms.Application]::Run($f)
+"#;
+        let dir = std::env::temp_dir().join(format!("peika-flow-paste-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("form.ps1");
+        std::fs::write(&script, FORM).unwrap();
+        let out = dir.join("target");
+        let mut command = std::process::Command::new("powershell.exe");
+        command.args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"]).arg(&script).arg(&out);
+        let mut form = command.spawn().expect("PowerShell starts");
+
+        let hwnd_file = dir.join("target.hwnd");
+        let mut waited = 0;
+        while !hwnd_file.exists() && waited < 150 {
+            std::thread::sleep(Duration::from_millis(100));
+            waited += 1;
+        }
+        let hwnd: isize = std::fs::read_to_string(&hwnd_file).expect("the form opened").trim().parse().unwrap();
+        std::thread::sleep(Duration::from_millis(600));
+
+        let user_text = crate::clipboard::text();
+        set_text("the text before the dictation", false).unwrap();
+        let words = "Peika Flow: déjà vu, 日本語 🙂";
+        let outcome = paste(words, Some(hwnd), FlowKey::RightCtrl);
+        std::thread::sleep(Duration::from_millis(900));
+        let in_the_box = std::fs::read_to_string(dir.join("target.text")).unwrap_or_default();
+        let clipboard_after = crate::clipboard::text();
+
+        let _ = form.kill();
+        let _ = std::fs::remove_dir_all(&dir);
+        match user_text {
+            Some(old) => {
+                let _ = set_text(&old, false);
+            }
+            None => clear(),
+        }
+        assert_eq!(outcome, Outcome::Pasted);
+        assert_eq!(in_the_box.trim_start_matches('\u{feff}'), words);
+        assert_eq!(clipboard_after.as_deref(), Some("the text before the dictation"));
+    }
+
+    /// The real clipboard: the words go on it as text, in the same unicode the
+    /// page sent, and the text that was there comes back. It replaces what the
+    /// clipboard holds for a moment (and puts it back), so it is not run
+    /// with the others: `cargo test -p peika flow::paste -- --ignored`
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "uses the real clipboard"]
+    fn the_words_go_through_the_real_clipboard_and_the_old_text_comes_back() {
+        use super::imp::{clear, set_text};
+        let before = crate::clipboard::text();
+        let words = "Peika Flow test: déjà vu, 日本語, emoji 🙂, a\nsecond line";
+        let sequence = set_text(words, true).expect("the clipboard takes text");
+        assert_eq!(crate::clipboard::text().as_deref(), Some(words));
+        let changed = set_text("someone else copied this", false).expect("a second copy");
+        assert!(!restore_wanted(sequence, changed), "a copy since the words is told apart");
+        match before {
+            Some(old) => {
+                set_text(&old, true).expect("the old text goes back");
+                assert_eq!(crate::clipboard::text().as_deref(), Some(old.as_str()));
+            }
+            None => clear(),
+        }
     }
 }
