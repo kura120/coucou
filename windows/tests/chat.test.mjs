@@ -2,7 +2,7 @@
 // the model switcher asks for a provider's models only once it is picked and
 // has a key, picking saves the settings, and a streamed answer grows in place.
 
-import { beforeEach, test } from "node:test";
+import { afterEach, beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { installFakeDom } from "./fakedom.mjs";
 import { calls, emit, internals, sent } from "./tauri.mjs";
@@ -616,4 +616,200 @@ test("a long window title is cut short on its chip", async () => {
   assert.equal(windowChipLabel("Code", ""), "Code");
   const label = windowChipLabel("Microsoft Edge", "A very long page title that goes on and on and on");
   assert.ok(label.length <= 48 && label.endsWith("…"), label);
+});
+
+// ── The microphone in the field ───────────────────────────────────────────────
+
+// A dictation left running would be finished by the next test's State.notify().
+afterEach(() => {
+  State.view = "overview";
+  State.notify();
+  State.mode = "hidden";
+});
+
+/** A key pressed in an element: the fake `fire` carries no key. */
+function press(el, key) {
+  const event = { type: "keydown", key, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; } };
+  for (const fn of el.listeners.get("keydown") ?? []) fn(event);
+  return event;
+}
+
+/** Types `typed`, presses the microphone, and lets the id come back. */
+async function startDictating(typed, id = 7) {
+  State.mode = "expanded";
+  State.view = "prompt";
+  answers.dictation_begin = id;
+  const input = $(".chat-input");
+  input.value = typed;
+  input.selection = [];
+  input.setSelectionRange = (a, b) => (input.selection = [a, b]);
+  $(".chat-mic").fire("click");
+  await flush();
+  return input;
+}
+
+const said = (id, phase, text = "", level = 0) => emit("dictation", { id, phase, text, level });
+const noteText = () => {
+  const note = view.el.find(".picker-status").find((n) => n.style.display !== "none");
+  return note ? note.textContent : "";
+};
+
+test("what is said is written after what was typed, then the final text replaces it", async () => {
+  const input = await startDictating("Fix");
+  assert.equal(sent("dictation_begin").length, 1);
+  assert.ok($(".chat-mic").classList.contains("on"));
+  assert.ok(input.readOnly, "the field is the dictation's while it listens");
+
+  said(7, "partial", "the log");
+  assert.equal(input.value, "Fix the log");
+  said(7, "partial", "the login bug");
+  assert.equal(input.value, "Fix the login bug");
+  said(7, "final", "the login bug.");
+  assert.equal(input.value, "Fix the login bug.");
+  assert.deepEqual(input.selection, [18, 18], "the caret ends after the words");
+  assert.ok(!input.readOnly);
+  assert.ok(!$(".chat-mic").classList.contains("on"));
+
+  assert.deepEqual(sent("chat_send"), [], "nothing is sent: the user sends");
+  assert.equal(State.chatHistory.length, 0);
+});
+
+test("no space is added after a space, or before the first words", async () => {
+  let input = await startDictating("Hello ");
+  said(7, "final", "world");
+  assert.equal(input.value, "Hello world");
+  view = buildPrompt(() => {});
+  await flush();
+  input = await startDictating("", 8);
+  said(8, "final", "first words");
+  assert.equal(input.value, "first words");
+});
+
+test("the button toggles: the second click finishes, and the final text lands after it", async () => {
+  const input = await startDictating("Note:");
+  $(".chat-mic").fire("click");
+  assert.deepEqual(sent("dictation_finish"), [{ id: 7 }]);
+  assert.ok(!$(".chat-mic").classList.contains("on"));
+  // The words that were being written down are still on their way.
+  said(7, "final", "buy milk");
+  assert.equal(input.value, "Note: buy milk");
+  assert.deepEqual(sent("dictation_cancel"), []);
+});
+
+test("the voice swells the button while it listens", async () => {
+  await startDictating("");
+  said(7, "level", "", 0.5);
+  assert.equal($(".chat-mic").style["--level"], "0.50");
+  said(7, "final", "");
+  assert.equal($(".chat-mic").style["--level"], "0");
+});
+
+test("Esc cancels, keeps what was typed, and the island stays", async () => {
+  const input = await startDictating("Fix");
+  said(7, "partial", "the login bug");
+  const event = press(input, "Escape");
+  assert.ok(event.defaultPrevented && event.stopped);
+  assert.deepEqual(sent("dictation_cancel"), [{ id: 7 }]);
+  assert.equal(input.value, "Fix");
+  said(7, "partial", "late words");
+  assert.equal(input.value, "Fix", "nothing more is written after the cancel");
+  said(7, "cancelled");
+  assert.equal(input.value, "Fix");
+  assert.ok(!input.readOnly);
+  assert.ok(!$(".chat-mic").classList.contains("on"));
+});
+
+test("Esc with the button focused cancels too, and only while dictating", async () => {
+  const input = await startDictating("Hi");
+  const mic = $(".chat-mic");
+  assert.ok(press(mic, "Escape").stopped);
+  assert.deepEqual(sent("dictation_cancel"), [{ id: 7 }]);
+  said(7, "cancelled");
+  // Idle: Esc goes on to close the island.
+  assert.ok(!press(mic, "Escape").stopped);
+  assert.equal(input.value, "Hi");
+});
+
+test("the events of another dictation are ignored", async () => {
+  const input = await startDictating("Fix");
+  said(99, "partial", "Flow's words");
+  said(99, "level", "", 0.9);
+  said(99, "final", "Flow's final words");
+  said(99, "failed", "Flow's trouble");
+  assert.equal(input.value, "Fix");
+  assert.ok($(".chat-mic").classList.contains("on"), "still dictating");
+  assert.equal(noteText(), "");
+  said(7, "final", "mine");
+  assert.equal(input.value, "Fix mine");
+});
+
+test("a failure says why, in the chat", async () => {
+  const input = await startDictating("Fix");
+  said(7, "failed", "The microphone is in use.");
+  assert.equal(noteText(), "The microphone is in use.");
+  assert.equal(input.value, "Fix");
+  assert.ok(!input.readOnly);
+  assert.ok(!$(".chat-mic").classList.contains("on"));
+  // The next try starts clean.
+  answers.dictation_begin = 8;
+  $(".chat-mic").fire("click");
+  assert.equal(noteText(), "");
+});
+
+test("without the engine, the chat points to Settings → Voice", async () => {
+  State.mode = "expanded";
+  answers.dictation_begin = () => Promise.reject("The speech engine is not installed (Settings → Voice).");
+  $(".chat-mic").fire("click");
+  await flush();
+  assert.match(noteText(), /^The speech engine is not installed yet\.Open Settings$/);
+  assert.ok(!$(".chat-mic").classList.contains("on"));
+  view.el.find(".picker-link").at(-1).fire("click");
+  assert.deepEqual(sent("open_settings_window"), [{ page: "voice" }]);
+});
+
+test("leaving the chat or closing the island finishes the dictation", async () => {
+  await startDictating("Fix");
+  State.view = "overview";
+  State.notify();
+  assert.deepEqual(sent("dictation_finish"), [{ id: 7 }]);
+  said(7, "final", "the bug");
+  assert.equal($(".chat-input").value, "Fix the bug");
+
+  calls.length = 0;
+  await startDictating("Again", 8);
+  State.mode = "compact";
+  State.notify();
+  assert.deepEqual(sent("dictation_finish"), [{ id: 8 }]);
+  State.mode = "hidden";
+});
+
+test("what Rust says before the id comes back is not lost", async () => {
+  State.mode = "expanded";
+  let reply;
+  answers.dictation_begin = () => new Promise((resolve) => (reply = resolve));
+  const input = $(".chat-input");
+  input.value = "";
+  input.setSelectionRange = () => {};
+  $(".chat-mic").fire("click");
+  await flush();
+  said(5, "partial", "quick words");
+  reply(5);
+  await flush();
+  assert.equal(input.value, "quick words");
+});
+
+test("the send button and Enter send nothing while it listens", async () => {
+  const input = await startDictating("Fix");
+  said(7, "partial", "this");
+  $(".send-btn").fire("click");
+  press(input, "Enter");
+  await flush();
+  assert.deepEqual(sent("chat_send"), []);
+});
+
+test("one dictation at a time from the button", async () => {
+  await startDictating("");
+  $(".chat-mic").fire("click"); // finishes the first
+  $(".chat-mic").fire("click"); // the first is still ending: no second one
+  assert.equal(sent("dictation_begin").length, 1);
 });
