@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Settings opens on the right page** (Windows and Linux): the "Settings…" link on an integration with nothing connected opens Integrations, on an agent whose hooks are not installed opens Agents (Claude Code's own page for Claude Code), and on an AI provider without a key opens Chat providers (Claude API for Anthropic) in the Peika window, instead of the first page.
 - Lighter at rest (Windows): the Peika window and the screen capture overlay are made when first opened, not at launch, and close again after a few minutes hidden. That is two fewer WebView2 processes and about 160 MB less while you are not using them. The first opening takes a moment longer.
 - **The log** (Windows and Linux): Peika keeps its log file open instead of opening it for every line, and past about 1 MB it moves the old file to `peika.1.log` (replacing the one before) instead of deleting it, so the history just before a problem is kept. Same folder, same format, and it still never says what was heard or typed.
 - **The Peika window** (Windows and Linux): the Settings window is now Peika's own window, with three little Peikas walking along a band at the top (they stop when the window is hidden, and stand still with reduced motion). Launching Peika again opens it, and it shows in the taskbar while it is open. Every setting is where it was; the dictation and Notetaker pages will join it.
