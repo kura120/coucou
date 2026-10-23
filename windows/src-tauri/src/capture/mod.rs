@@ -15,8 +15,9 @@
 //   the card deletes it, and whatever a crash left is deleted at the next start.
 // - The commands only ever touch files in that folder.
 //
-// The overlay window is made hidden at launch, like every window here (see
-// create_settings_window in lib.rs). The corners of the selection are read
+// The overlay window is made on the first capture and closed again once
+// unused for a while (issue #81: a window made after launch works when it asks
+// for the island's browser arguments). The corners of the selection are read
 // from the cursor, in physical pixels, so monitors with different scales
 // cannot shift it; the page only draws the rectangle. Windows only: on Linux
 // the shortcut stays reserved (shortcuts.rs).
@@ -25,6 +26,7 @@
 mod win;
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
 use serde::Serialize;
@@ -170,12 +172,21 @@ fn page_url<R: Runtime>(app: &AppHandle<R>) -> tauri::WebviewUrl {
     tauri::WebviewUrl::App("capture.html".into())
 }
 
-/// Made at launch, hidden: a window made later comes up blank here.
-pub fn setup(app: &AppHandle) {
+/// At launch: only what a crash left behind goes. The overlay itself is made on
+/// the first capture, and closed again once unused for a while.
+pub fn setup(_app: &AppHandle) {
     clear_leftovers();
-    if !cfg!(windows) {
-        return;
-    }
+}
+
+/// How long the overlay stays made, hidden, after a capture: the next one is
+/// instant, and an unused overlay costs nothing.
+const OVERLAY_KEPT: std::time::Duration = std::time::Duration::from_secs(300);
+/// Bumped by every capture, so only the last hide closes the overlay.
+static OVERLAY_GENERATION: AtomicU64 = AtomicU64::new(0);
+
+/// The overlay window: see-through, over everything, out of the taskbar.
+#[cfg(windows)]
+fn make_overlay<R: Runtime>(app: &AppHandle<R>) -> Option<tauri::WebviewWindow<R>> {
     let built = tauri::WebviewWindowBuilder::new(app, LABEL, page_url(app))
         .additional_browser_args(crate::BROWSER_ARGS)
         .title("Peika")
@@ -190,16 +201,13 @@ pub fn setup(app: &AppHandle) {
         .disable_drag_drop_handler()
         .visible(false)
         .build();
-    if let Err(err) = built {
-        crate::log::line(format!("capture window failed: {err}"));
-    }
+    built.map_err(|err| crate::log::line(format!("capture window failed: {err}"))).ok()
 }
 
 /// The capture shortcut: the screen is copied now, then the overlay comes up
 /// over all of it.
 #[cfg(windows)]
 pub fn start<R: Runtime>(app: &AppHandle<R>) {
-    let Some(overlay) = app.get_webview_window(LABEL) else { return };
     if TAKING.lock().unwrap().is_some() {
         return;
     }
@@ -210,20 +218,36 @@ pub fn start<R: Runtime>(app: &AppHandle<R>) {
         return;
     };
     *TAKING.lock().unwrap() = Some(Taking { screen, origin: (left, top), front, from: None });
-    let _ = overlay.set_position(tauri::PhysicalPosition::new(left, top));
-    let _ = overlay.set_size(tauri::PhysicalSize::new(width as u32, height as u32));
-    let _ = overlay.show();
-    let _ = overlay.set_focus();
-    let _ = app.emit_to(LABEL, "capture-start", ());
+    OVERLAY_GENERATION.fetch_add(1, Ordering::SeqCst);
+    // The overlay may have to be made: off the shortcut's handler, where
+    // WebView2 would deadlock building a window.
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let Some(overlay) = app.get_webview_window(LABEL).or_else(|| make_overlay(&app)) else {
+            TAKING.lock().unwrap().take();
+            return;
+        };
+        let _ = overlay.set_position(tauri::PhysicalPosition::new(left, top));
+        let _ = overlay.set_size(tauri::PhysicalSize::new(width as u32, height as u32));
+        let _ = overlay.show();
+        let _ = overlay.set_focus();
+        let _ = app.emit_to(LABEL, "capture-start", ());
+    });
 }
 
 #[cfg(not(windows))]
 pub fn start<R: Runtime>(_app: &AppHandle<R>) {}
 
 fn hide_overlay(app: &AppHandle) {
-    if let Some(overlay) = app.get_webview_window(LABEL) {
-        let _ = overlay.hide();
-    }
+    let Some(overlay) = app.get_webview_window(LABEL) else { return };
+    let _ = overlay.hide();
+    let generation = OVERLAY_GENERATION.load(Ordering::SeqCst);
+    std::thread::spawn(move || {
+        std::thread::sleep(OVERLAY_KEPT);
+        if OVERLAY_GENERATION.load(Ordering::SeqCst) == generation && TAKING.lock().unwrap().is_none() {
+            let _ = overlay.destroy();
+        }
+    });
 }
 
 /// The page saw the button go down: the drag starts where the cursor is.

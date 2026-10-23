@@ -23,6 +23,7 @@
 
 #[cfg(windows)]
 pub mod capture;
+pub mod dictate;
 pub mod engine;
 pub mod mic;
 pub mod sherpa;

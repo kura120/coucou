@@ -16,9 +16,9 @@
 // file has no way to reach either — keep it that way; a caller may ask a
 // question here and do something with the answer, but not those.
 //
-// The toasts live in their own window, made once at launch before the island's
-// webview (WebView2 brings a later window up blank: see create_settings_window)
-// and shown only while a toast is on screen. The stack itself — what is shown,
+// The toasts live in their own window, made once at launch (a toast has to
+// show at once, with no window to make first) and shown only while a toast is
+// on screen. The stack itself — what is shown,
 // for how long, the animations — is the page's (src/toast/stack.ts); this file
 // owns the window, the answers, and the decision shortcuts:
 //   * Windows and X11: Shift+Y / Shift+N, registered while a decision is on
@@ -207,7 +207,7 @@ pub fn window(app: &AppHandle) -> Option<WebviewWindow> {
     app.get_webview_window(LABEL)
 }
 
-/// Made at launch, before the island's webview (see the top of this file).
+/// Made at launch, so a toast never waits for its window (see the top of this file).
 pub fn setup(app: &AppHandle) {
     let mode = platform::desktop_mode();
     match create_window(app) {
