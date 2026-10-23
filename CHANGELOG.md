@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Several sessions behind one pill** (Windows and Linux), as on the Mac: two Claude Code sessions in two folders under VS Code (or Cursor) used to share one pill, and the first to end wiped the card, the steps and the diffs the other was still filling. Now the pill remembers each session. One ending takes only its own diffs, the card and "Open terminal" follow the session heard last, and the pill goes back to idle only when the last one ends. A session that never says goodbye (a killed terminal) is forgotten after 12 hours of silence.
 - **Settings opens on the right page** (Windows and Linux): the "Settings…" link on an integration with nothing connected opens Integrations, on an agent whose hooks are not installed opens Agents (Claude Code's own page for Claude Code), and on an AI provider without a key opens Chat providers (Claude API for Anthropic) in the Peika window, instead of the first page.
 - Lighter at rest (Windows): the Peika window and the screen capture overlay are made when first opened, not at launch, and close again after a few minutes hidden. That is two fewer WebView2 processes and about 160 MB less while you are not using them. The first opening takes a moment longer.
 - **The log** (Windows and Linux): Peika keeps its log file open instead of opening it for every line, and past about 1 MB it moves the old file to `peika.1.log` (replacing the one before) instead of deleting it, so the history just before a problem is kept. Same folder, same format, and it still never says what was heard or typed.
