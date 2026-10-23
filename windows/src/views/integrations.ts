@@ -83,7 +83,21 @@ export function idleStatus(
   return configured ? ok(t("Connected · loading…")) : missing(t("Key not configured"));
 }
 
-function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
+/**
+ * The Settings page an idle card's "Settings…" opens: a leaf id of the tree in
+ * settings/main.ts. Claude Code's hooks are installed on its own page, the
+ * other agents' hooks on Agents; an AI pill's key on Chat providers, or on
+ * Claude API for Anthropic; anything else on Integrations.
+ */
+export function settingsPageFor(id: string): string {
+  const def = pillDefinition(id);
+  if (def?.connect.kind === "hooks") return id === "integration_claude" ? "claude-code" : "agents";
+  if (id === "ai_anthropic") return "claude-api";
+  if (def?.category === "ai") return "chat-providers";
+  return "integrations";
+}
+
+function idleCard(task: AgentTask, openSettings: (page: string) => void): HTMLElement {
   const info = State.integrations[task.id];
   const configured = info?.configured ?? false;
   const def = pillDefinition(task.id);
@@ -142,7 +156,7 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
     );
   } else if (!configured) {
     actions.append(
-      h("button", { class: "link-btn", style: "color:#8e939c", text: t("Settings…"), onclick: openSettings }),
+      h("button", { class: "link-btn", style: "color:#8e939c", text: t("Settings…"), onclick: () => openSettings(settingsPageFor(task.id)) }),
     );
   }
 
@@ -360,7 +374,7 @@ function calcomCard(): HTMLElement {
 
 // ── n8n ───────────────────────────────────────────────────────────────────────
 
-function n8nCard(task: AgentTask, onDetail: () => void, openSettings: () => void): HTMLElement {
+function n8nCard(task: AgentTask, onDetail: () => void, openSettings: (page: string) => void): HTMLElement {
   const hasActivity = task.steps.length > 0 && (task.state === "finished" || task.state === "error");
   if (!hasActivity) return idleCard(task, openSettings);
   const success = task.state === "finished";
@@ -507,7 +521,8 @@ export interface IntegrationCardHooks {
   detailOpen: boolean;
   openDetail(): void;
   closeDetail(): void;
-  openSettings(): void;
+  /** Opens the Peika window on a page: a leaf id of the tree (settingsPageFor). */
+  openSettings(page: string): void;
 }
 
 /** True when this integration has data worth showing instead of the idle card. */

@@ -38,6 +38,7 @@ beforeEach(() => {
   State.paused = false;
   State.isPinned = false;
   State.pendingApproval = null;
+  State.sessions.clear();
   State.chatSessionId = null;
   // Off: the alerts below land at once. With it on they wait for the system's
   // answer to "is a fullscreen app in front?" (see the last section).
@@ -48,9 +49,12 @@ beforeEach(() => {
 // hooks.ts keeps timer handles between events: the 110 s approval timeout, and
 // one 5.2 s return to idle per pill that has stopped. Letting every timer fire
 // before the reset clears them all; otherwise the next test would cancel a timer
-// that belongs to a mock clock that no longer exists.
+// that belongs to a mock clock that no longer exists. The 12 h stale watch is
+// the furthest of them: runAll does not always reach it, so a day is ticked too.
 afterEach(() => {
+  State.sessions.clear();
   mock.timers.runAll();
+  mock.timers.tick(24 * 3600 * 1000);
   mock.timers.reset();
 });
 
@@ -197,6 +201,68 @@ test("the chat's own turn still gets its permission card", () => {
   hook({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "chat-1", tool_name: "Bash", tool_input: { command: "ls" } });
   assert.deepEqual(asked, ["alert:approval"]);
   assert.equal(State.pendingApproval.requestId, "r1");
+});
+
+test("a request to edit a file carries what the edit would change; any other tool does not", () => {
+  hook({
+    hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", tool_name: "Edit",
+    tool_input: { file_path: "/p/a.ts", old_string: "a\nb", new_string: "a\nc\nd" },
+  });
+  const { preview, command } = State.pendingApproval;
+  assert.equal(command, "Edit · /p/a.ts");
+  assert.deepEqual(preview.lines, [
+    { kind: "removed", text: "b" },
+    { kind: "added", text: "c" },
+    { kind: "added", text: "d" },
+  ]);
+  assert.deepEqual([preview.added, preview.removed], [2, 1]);
+
+  State.pendingApproval = null;
+  hook({ hook_event_name: "PermissionRequest", request_id: "r2", session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } });
+  assert.equal(State.pendingApproval.preview, undefined);
+  State.pendingApproval = null;
+  hook({ hook_event_name: "PermissionRequest", request_id: "r3", session_id: "s1", tool_name: "Write", tool_input: { file_path: "/p/a.ts" } });
+  assert.equal(State.pendingApproval.preview, undefined);
+});
+
+const SUGGESTIONS = [
+  { type: "addRules", rules: [{ toolName: "Bash", ruleContent: "npm test:*" }], behavior: "allow", destination: "localSettings" },
+  { type: "setMode", mode: "acceptEdits", destination: "session" },
+];
+
+test("Always is offered on Claude Code's request that came with an allow rule, and says which", () => {
+  hook({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", tool_name: "Bash",
+    tool_input: { command: "npm test" }, permission_suggestions: SUGGESTIONS });
+  assert.equal(State.pendingApproval.alwaysRule, "Bash(npm test:*)");
+
+  // A rule on a whole tool, and two of them.
+  State.pendingApproval = null;
+  hook({ hook_event_name: "PermissionRequest", request_id: "r2", session_id: "s1", tool_name: "WebFetch",
+    tool_input: { url: "https://x.dev" },
+    permission_suggestions: [{ type: "addRules", behavior: "allow", destination: "session",
+      rules: [{ toolName: "WebFetch" }, { toolName: "Bash", ruleContent: "ls" }] }] });
+  assert.equal(State.pendingApproval.alwaysRule, "WebFetch, Bash(ls)");
+});
+
+test("Always is not offered without a rule to remember, or on a card that is not Claude Code's", () => {
+  const ask = (extra, id) => {
+    State.pendingApproval = null;
+    hook({ hook_event_name: "PermissionRequest", request_id: id, session_id: "s1", tool_name: "Bash",
+      tool_input: { command: "ls" }, ...extra });
+    return State.pendingApproval.alwaysRule;
+  };
+  assert.equal(ask({}, "a"), undefined);
+  assert.equal(ask({ permission_suggestions: [] }, "b"), undefined);
+  // A mode change, a deny rule, a directory: not what "Always" means.
+  assert.equal(ask({ permission_suggestions: [SUGGESTIONS[1]] }, "c"), undefined);
+  assert.equal(ask({ permission_suggestions: [{ ...SUGGESTIONS[0], behavior: "deny" }] }, "d"), undefined);
+  assert.equal(ask({ permission_suggestions: [{ type: "addDirectories", directories: ["/"], destination: "session" }] }, "e"), undefined);
+  assert.equal(ask({ permission_suggestions: [{ ...SUGGESTIONS[0], destination: "elsewhere" }] }, "f"), undefined);
+  assert.equal(ask({ permission_suggestions: "Bash(*)" }, "g"), undefined);
+  // Codex, Copilot CLI and Muse Code never get it, whatever they send.
+  for (const agent of ["codex", "copilot", "muse"]) {
+    assert.equal(ask({ peika_agent: agent, permission_suggestions: SUGGESTIONS }, `h-${agent}`), undefined, agent);
+  }
 });
 
 test("a session finishing behind another pill only badges its own, for 5.2 s", () => {
@@ -447,6 +513,16 @@ test("a permission request puts the card up, says exactly what it authorises, an
     inputKey: JSON.stringify({ content: "SECRET=1", file_path: " C:\\Users\\me\\proj\\.env " }),
     received: Date.now(),
     command: "Write · C:\\Users\\me\\proj\\.env",
+    // A Write also says what it would put in the file (the card shows a few lines).
+    preview: {
+      path: " C:\\Users\\me\\proj\\.env ",
+      added: 1,
+      removed: 0,
+      lines: [{ kind: "added", text: "SECRET=1" }],
+      isNewFile: true,
+      tooLarge: false,
+      partial: false,
+    },
     projectName: "proj",
   });
   assert.deepEqual(sent("approval_ack"), [{ requestId: "r1" }]);
@@ -675,6 +751,7 @@ test("a card answered in time leaves nothing for the 110 s timer to undo", () =>
   ask("r1");
   // What the Allow button does to the state before the timer fires.
   State.pendingApproval = null;
+  State.sessions.clear();
   State.updateTask(CLAUDE, "working");
   asked = [];
   seconds(110);
@@ -942,3 +1019,134 @@ test("a new turn before the system answers leaves the late alert unsaid", () =>
     assert.deepEqual(played, []);
     assert.equal(task().pillBadge ?? null, null);
   }));
+
+// ── Several sessions behind one pill ──────────────────────────────────────────
+
+const ALPHA = { cwd: "C:\\dev\\alpha", session_id: "a" };
+const BETA = { cwd: "C:\\dev\\beta", session_id: "b" };
+const edit = (who, file) =>
+  hook({
+    hook_event_name: "PostToolUse", ...who, tool_name: "Edit",
+    tool_input: { file_path: file, old_string: "x\n", new_string: "y\n" },
+  });
+const diffsOf = (id = CLAUDE) => (State.sessionDiffs.get(id) ?? []).map((d) => d.path);
+const ls = { tool_name: "Bash", tool_input: { command: "ls" } };
+
+test("two sessions in two folders: one ends, the other keeps the card and its diffs", () => {
+  hook({ hook_event_name: "SessionStart", ...ALPHA });
+  hook({ hook_event_name: "SessionStart", ...BETA });
+  edit(ALPHA, "C:\\dev\\alpha\\one.ts");
+  edit(BETA, "C:\\dev\\beta\\two.ts");
+  hook({ hook_event_name: "PreToolUse", ...ALPHA, ...ls });
+  assert.equal(task().name, "alpha");
+  assert.deepEqual(diffsOf(), ["C:\\dev\\alpha\\one.ts", "C:\\dev\\beta\\two.ts"]);
+
+  hook({ hook_event_name: "SessionEnd", ...BETA });
+  // The pill is still alpha's: state, steps, name and terminal, and alpha's diff.
+  assert.equal(task().state, "working");
+  assert.equal(task().name, "alpha");
+  assert.equal(task().sessionId, "a");
+  assert.equal(task().sessionCwd, "C:\\dev\\alpha");
+  assert.ok(task().steps.length > 0);
+  assert.deepEqual(diffsOf(), ["C:\\dev\\alpha\\one.ts"]);
+
+  hook({ hook_event_name: "SessionEnd", ...ALPHA });
+  assert.equal(task().state, "idle");
+  assert.equal(task().name, "VS Code");
+  assert.deepEqual(task().steps, []);
+  assert.equal(task().sessionId, null);
+  assert.deepEqual(diffsOf(), []);
+});
+
+test("the card and Open terminal follow the session heard last, and fall back when it ends", () => {
+  hook({ hook_event_name: "PreToolUse", ...ALPHA, ...ls });
+  hook({ hook_event_name: "PreToolUse", ...BETA, ...ls });
+  assert.equal(task().name, "beta");
+  assert.equal(task().sessionId, "b");
+  assert.equal(task().sessionCwd, "C:\\dev\\beta");
+  // A Stop carries the folder too: alpha speaking again takes the card back.
+  hook({ hook_event_name: "Stop", ...ALPHA });
+  assert.equal(task().name, "alpha");
+  assert.equal(task().sessionId, "a");
+  // The one heard last ends: the card goes to the one left.
+  hook({ hook_event_name: "PreToolUse", ...BETA, ...ls });
+  hook({ hook_event_name: "SessionEnd", ...BETA });
+  assert.equal(task().name, "alpha");
+  assert.equal(task().sessionId, "a");
+  assert.equal(task().sessionCwd, "C:\\dev\\alpha");
+});
+
+test("an event without a session id belongs to the pill's latest session", () => {
+  hook({ hook_event_name: "SessionStart", ...ALPHA });
+  hook({ hook_event_name: "SessionStart", ...BETA });
+  edit({ cwd: BETA.cwd }, "C:\\dev\\beta\\x.ts");
+  hook({ hook_event_name: "SessionEnd", cwd: BETA.cwd });
+  assert.equal(task().name, "alpha");
+  assert.deepEqual(diffsOf(), []);
+});
+
+test("a session that never ends goes stale after 12 h; the other keeps the pill until it goes too", () => {
+  hook({ hook_event_name: "SessionStart", ...ALPHA });
+  seconds(3600);
+  hook({ hook_event_name: "SessionStart", ...BETA });
+  // Alpha was last heard 12 h ago on the dot, one second from now; beta an hour later.
+  mock.timers.tick(12 * 3600 * 1000 - 3600 * 1000 - 1000);
+  assert.equal(State.sessions.count(CLAUDE), 2);
+  seconds(1);
+  assert.equal(State.sessions.count(CLAUDE), 1);
+  assert.equal(State.sessions.has(CLAUDE, "b"), true);
+  assert.equal(task().name, "beta");
+  // The last one goes too: the pill is put back as it was.
+  mock.timers.tick(3600 * 1000);
+  assert.equal(State.sessions.active, false);
+  assert.equal(task().state, "idle");
+  assert.equal(task().name, "VS Code");
+  assert.deepEqual(diffsOf(), []);
+});
+
+test("a stale session is also dropped when the next event arrives", () => {
+  hook({ hook_event_name: "SessionStart", ...ALPHA });
+  // The timer has not had its turn: only Date moved.
+  mock.timers.setTime(12 * 3600 * 1000);
+  hook({ hook_event_name: "SessionStart", ...BETA });
+  assert.equal(State.sessions.has(CLAUDE, "a"), false);
+  assert.equal(State.sessions.has(CLAUDE, "b"), true);
+});
+
+test("a request waiting keeps its state through a sibling's end, and its card names the asking project", () => {
+  hook({ hook_event_name: "SessionStart", ...ALPHA });
+  hook({ hook_event_name: "SessionStart", ...BETA });
+  hook({
+    hook_event_name: "PermissionRequest", request_id: "r1", ...ALPHA,
+    tool_name: "Bash", tool_input: { command: "npm publish" },
+  });
+  // Beta speaks after: the pill is named beta, the card still names alpha.
+  hook({ hook_event_name: "PreToolUse", ...BETA, tool_name: "Read", tool_input: { path: "f" } });
+  assert.equal(task().name, "beta");
+  assert.equal(task().state, "approval");
+  assert.equal(State.pendingApproval.projectName, "alpha");
+  hook({ hook_event_name: "SessionEnd", ...BETA });
+  assert.equal(task().state, "approval");
+  assert.equal(State.pendingApproval.projectName, "alpha");
+});
+
+test("an agent's pill counts its sessions too, and keeps its own name", () => {
+  const codex = (event, id, cwd) =>
+    hook({ hook_event_name: event, session_id: id, peika_agent: "codex", ...(cwd ? { cwd } : {}) });
+  codex("SessionStart", "c1", "C:\\dev\\alpha");
+  codex("SessionStart", "c2", "C:\\dev\\beta");
+  codex("SessionEnd", "c1");
+  assert.notEqual(task("agent_codex"), undefined);
+  assert.equal(task("agent_codex").sessionId, "c2");
+  assert.equal(task("agent_codex").name, "Codex");
+  codex("SessionEnd", "c2");
+  assert.equal(task("agent_codex"), undefined);
+  assert.equal(State.sessions.count("agent_codex"), 0);
+});
+
+test("with no session left, no stale watch is waiting", () => {
+  hook({ hook_event_name: "SessionStart", ...ALPHA });
+  hook({ hook_event_name: "SessionEnd", ...ALPHA });
+  assert.equal(State.sessions.active, false);
+  assert.equal(State.sessions.nextDeadline(), null);
+});

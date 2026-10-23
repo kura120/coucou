@@ -100,6 +100,9 @@ struct Event {
     name: String,
     /// For Claude Code's AskUserQuestion, the question as it was asked.
     question: Option<Value>,
+    /// Claude Code's own `permission_suggestions`, kept whole: what an "Always"
+    /// click may have it remember (reply.rs). Never the shortened copy.
+    suggestions: Option<Value>,
 }
 
 fn main() {
@@ -139,7 +142,13 @@ fn main() {
     });
 
     let decision = rx.recv_timeout(budget).ok().flatten();
-    print(reply::stdout(&args.agent, &event.name, decision.as_deref(), event.question.as_ref()));
+    print(reply::stdout_with(
+        &args.agent,
+        &event.name,
+        decision.as_deref(),
+        event.question.as_ref(),
+        event.suggestions.as_ref(),
+    ));
     std::process::exit(0);
 }
 
@@ -199,13 +208,15 @@ fn prepare(raw: &[u8], args: &Args, env: &dyn Fn(&str) -> Option<String>, cwd: &
         .then(|| map.get("tool_input").cloned())
         .flatten();
 
+    let suggestions = if name == "PermissionRequest" { map.get("permission_suggestions").cloned() } else { None };
+
     // Every string is capped, except the edit text of a finished Edit /
     // MultiEdit / Write, which the live diff needs whole (within its own limits).
     truncate_payload(&mut payload, &name);
 
     let mut line = payload.to_string();
     line.push('\n');
-    Some(Event { line, name, question })
+    Some(Event { line, name, question, suggestions })
 }
 
 /// Which terminal the session runs in. Unlike macOS, Peika here accepts events
@@ -459,6 +470,17 @@ mod tests {
         assert!(v["tool_input"]["questions"][0]["question"].as_str().unwrap().ends_with('…'));
         let (_, ev) = run(r#"{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"ls"}}"#, "", "");
         assert!(ev.question.is_none());
+    }
+
+    #[test]
+    fn suggestions_are_kept_whole_for_a_permission_request_only() {
+        let long = "x".repeat(3000);
+        let raw = format!(r#"{{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{{"command":"ls"}},"permission_suggestions":[{{"type":"addRules","rules":[{{"toolName":"Bash","ruleContent":"{long}"}}],"behavior":"allow","destination":"localSettings"}}]}}"#);
+        let (v, ev) = run(&raw, "", "");
+        assert_eq!(ev.suggestions.unwrap()[0]["rules"][0]["ruleContent"].as_str().unwrap().len(), 3000);
+        assert!(v["permission_suggestions"][0]["rules"][0]["ruleContent"].as_str().unwrap().ends_with('…'));
+        let (_, ev) = run(r#"{"hook_event_name":"PreToolUse","permission_suggestions":[1]}"#, "", "");
+        assert!(ev.suggestions.is_none());
     }
 
     #[test]

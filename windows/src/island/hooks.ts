@@ -6,7 +6,7 @@
 // Code's (hook/src/normalize.rs), so one handler serves them all.
 
 import { Bridge, onEvent } from "../core/bridge";
-import { buildFileDiff, fileName, makeDiffStep, toOneLine } from "../core/diff";
+import { approvalPreview, buildFileDiff, fileName, makeDiffStep, toOneLine } from "../core/diff";
 import { Sound } from "../core/sound";
 import { State, type ApprovalInfo, type AskedQuestion } from "../core/state";
 import { MAX_PENDING, inputKey } from "../core/approvals";
@@ -35,6 +35,35 @@ function armExpiry(island: Island): void {
     withdrawApprovals(island, State.approvals.expired(Date.now()).map((req) => req.requestId));
     armExpiry(island);
   }, Math.max(0, at - Date.now()));
+}
+
+/**
+ * Watches for sessions that never said goodbye (a killed terminal). One timer,
+ * set for the first session to go silent and only while some pill has a
+ * session, so an island with nothing running wakes for nothing. Deadlines only
+ * move later (a session heard again), so a timer already set is never undone:
+ * if it fires early it finds nothing stale and is set again.
+ */
+let staleTimer: number | null = null;
+
+function armStale(): void {
+  if (staleTimer != null) return;
+  const at = State.sessions.nextDeadline();
+  if (at == null) return;
+  staleTimer = window.setTimeout(() => {
+    staleTimer = null;
+    dropStale();
+    armStale();
+    State.notify();
+  }, Math.max(0, at - Date.now()));
+}
+
+/** Forgets the sessions silent for too long; a pill left with none is cleared as if its last had ended. */
+function dropStale(): void {
+  const { emptied, touched } = State.sessions.stale(Date.now());
+  // A request still waiting keeps its pill: it runs out on its own.
+  for (const id of emptied) if (!State.approvals.hasPill(id)) endPill(id, !isWorkspacePill(id));
+  for (const id of touched) followLatest(id);
 }
 
 /** The next request in line takes the card, with its sound, as if it had just arrived. */
@@ -84,6 +113,8 @@ interface HookPayload {
   last_assistant_message?: string;
   tool_name?: string;
   tool_input?: Record<string, unknown>;
+  /** PermissionRequest, Claude Code: the permission updates it suggests (an allow rule to add…). */
+  permission_suggestions?: unknown;
   /** Set by the relay when an edit was too big to forward whole (> 256 KB). */
   peika_diff_truncated?: boolean;
   /** Optional agent tag: lowercase, digits and hyphens, ≤ 24 chars. */
@@ -182,6 +213,34 @@ function approvalTarget(tool: string, input: Record<string, unknown>): string {
   return tool;
 }
 
+/** Where Claude Code may keep a rule (the `destination` of a permission update); the relay checks the same list. */
+const RULE_DESTINATIONS = ["session", "localSettings", "projectSettings", "userSettings"];
+
+/**
+ * What an "Always" click would have Claude Code remember: the allow rules in the
+ * `permission_suggestions` it sent with the request, as "Bash(npm test:*)"
+ * (peika-hook, reply.rs, hands back the same ones and nothing else). Null when
+ * it suggested none: a mode change or a directory is not what "Always" means.
+ * Docs: https://code.claude.com/docs/en/hooks ("Permission update entries").
+ */
+export function alwaysRuleOf(suggestions: unknown): string | null {
+  if (!Array.isArray(suggestions)) return null;
+  const names: string[] = [];
+  for (const entry of suggestions as Record<string, unknown>[]) {
+    if (!entry || entry.type !== "addRules" || entry.behavior !== "allow") continue;
+    if (typeof entry.destination !== "string" || !RULE_DESTINATIONS.includes(entry.destination)) continue;
+    if (!Array.isArray(entry.rules) || entry.rules.length === 0) continue;
+    const rules = (entry.rules as Record<string, unknown>[]).map((rule) => {
+      const tool = rule?.toolName;
+      if (typeof tool !== "string" || !tool) return null;
+      if (rule.ruleContent == null) return tool;
+      return typeof rule.ruleContent === "string" ? `${tool}(${rule.ruleContent})` : null;
+    });
+    if (rules.every((r): r is string => r !== null)) names.push(...(rules as string[]));
+  }
+  return names.length > 0 ? names.join(", ") : null;
+}
+
 /**
  * The questions of an AskUserQuestion call, if the island can show all of them
  * as options to pick from. Anything it cannot is left to the terminal.
@@ -228,6 +287,40 @@ function clearSession(id: string) {
   t.finalLine = null;
 }
 
+/** The pill is the workspace's (VS Code, Cursor), named after its latest session; any other is an agent's. */
+function isWorkspacePill(id: string): boolean {
+  return id === CLAUDE_ID || id === CURSOR_ID;
+}
+
+/**
+ * The card and "Open terminal" follow the session heard last: its project
+ * names a workspace pill, its folder and id are what the terminal is found by.
+ */
+function followLatest(id: string) {
+  const t = State.tasks.find((x) => x.id === id);
+  const last = State.sessions.latest(id);
+  if (!t || !last) return;
+  if (last.cwd) {
+    t.sessionCwd = last.cwd;
+    if (last.project) t.name = last.project;
+  }
+  if (last.session) t.sessionId = last.session;
+}
+
+/** The last session behind the pill is over: steps, diffs, timer and card go. */
+function endPill(id: string, external: boolean) {
+  // Nothing left for the timer to do, and it must not outlive the session: a
+  // pill recreated within 5.2 s would be removed by it.
+  cancelStopTimer(id);
+  State.clearSessionDiffs(id);
+  if (external) {
+    State.removeTask(id);
+  } else {
+    State.updateTask(id, "idle");
+    clearSession(id);
+  }
+}
+
 /** The final message stays on the card until the next turn starts. */
 function clearFinalLine(id: string) {
   const t = State.tasks.find((x) => x.id === id);
@@ -240,12 +333,12 @@ function clearFinalLine(id: string) {
  * exist, so a stray event cannot grow memory. An edit the relay had to cut
  * would give wrong counts: the PreToolUse step ("Edits · file") stands alone.
  */
-function recordDiff(agentId: string, payload: HookPayload) {
+function recordDiff(agentId: string, sessionKey: string, payload: HookPayload) {
   if (payload.peika_diff_truncated) return;
   if (!State.tasks.some((t) => t.id === agentId)) return;
   const diff = buildFileDiff(payload.tool_name ?? "", payload.tool_input ?? {});
   if (!diff) return;
-  const id = State.appendSessionDiff(agentId, diff);
+  const id = State.appendSessionDiff(agentId, diff, sessionKey);
   State.appendStep(agentId, makeDiffStep(fileName(diff.path), diff.added, diff.removed, id));
 }
 
@@ -341,6 +434,19 @@ function handleHook(island: Island, payload: HookPayload) {
     if (cancelStopTimer(agentId)) State.setPillBadge(agentId, null);
   };
 
+  // Sessions that went silent for good are forgotten first; then this one is
+  // heard, so a pill shared by several sessions knows who is still behind it.
+  // Only Claude Code names a workspace pill after its project.
+  dropStale();
+  // An event that does not say which session it is from is the pill's latest.
+  const sessionKey = sessionId || State.sessions.latest(agentId)?.session || "";
+  if (name !== "SessionEnd") {
+    State.sessions.heard(agentId, sessionKey, Date.now(), {
+      cwd,
+      project: isExternalAgent ? "" : projectName,
+    });
+  }
+
   // A waiting request this event makes moot — its tool ran (answered in the
   // terminal), or its turn is over (interrupted, a new prompt) — would be
   // lying on the card. It goes, and its relay is released without a decision.
@@ -356,6 +462,7 @@ function handleHook(island: Island, payload: HookPayload) {
   // says so. No card comes over the chat for it, and no second chime.
   const ownChat = sessionId !== "" && sessionId === State.chatSessionId;
 
+  let known = true;
   switch (name) {
     case "SessionStart":
       ensurePill();
@@ -394,7 +501,7 @@ function handleHook(island: Island, payload: HookPayload) {
     case "PostToolUse":
       supersedeStop();
       State.updateTask(agentId, "working");
-      recordDiff(agentId, payload);
+      recordDiff(agentId, sessionKey, payload);
       break;
 
     case "PostToolUseFailure":
@@ -463,15 +570,14 @@ function handleHook(island: Island, payload: HookPayload) {
       break;
 
     case "SessionEnd":
-      // Nothing left for the timer to do, and it must not outlive the session: a
-      // pill recreated within 5.2 s would be removed by it.
-      cancelStopTimer(agentId);
-      State.clearSessionDiffs(agentId);
-      if (isExternalAgent) {
-        State.removeTask(agentId);
+      if (State.sessions.ended(agentId, sessionKey)) {
+        // The last session behind the pill: it goes back as it was.
+        endPill(agentId, isExternalAgent);
       } else {
-        State.updateTask(agentId, "idle");
-        clearSession(agentId);
+        // Another session still fills the card: only this one's diffs go, and
+        // the card follows the session heard last among those left.
+        State.clearSessionDiffs(agentId, sessionKey);
+        followLatest(agentId);
       }
       break;
 
@@ -514,6 +620,11 @@ function handleHook(island: Island, payload: HookPayload) {
       // shows the options and sends back the one that was picked. Only Claude
       // Code asks questions this way.
       const questions = isExternalAgent ? null : askedQuestions(tool, input);
+      // An edit asking to be allowed: what it would change, for the card to show.
+      const preview = questions ? null : approvalPreview(tool, input);
+      // "Always" is Claude Code's own: it remembers the rule it suggested. Codex,
+      // Copilot CLI and Muse Code have no such thing, so no button there.
+      const alwaysRule = isExternalAgent || questions ? null : alwaysRuleOf(payload.permission_suggestions);
       const view = questions ? "question" : "approval";
       // The card always comes up, even over another pill or an island that is
       // already open: its pill comes to the front, and the one you were on
@@ -526,6 +637,8 @@ function handleHook(island: Island, payload: HookPayload) {
         inputKey: inputKey(payload.tool_input),
         received: Date.now(),
         command: approvalTarget(tool, input),
+        ...(preview ? { preview } : {}),
+        ...(alwaysRule ? { alwaysRule } : {}),
         ...(isExternalAgent ? {} : { projectName }),
         ...(questions ? { questions } : {}),
       });
@@ -544,8 +657,14 @@ function handleHook(island: Island, payload: HookPayload) {
     }
 
     default:
+      // An event Peika does not know changes nothing on the card.
+      known = false;
       break;
   }
+  // The card follows the session heard last, and one slow timer watches for
+  // sessions that never end (none is armed while no pill has a session).
+  if (known && cwd && name !== "SessionEnd") followLatest(agentId);
+  armStale();
   // A sibling session's event, or a parallel tool call of the one asking, must
   // not take a pill out of the state of the request it still has waiting.
   const waiting = State.approvals.all.find((req) => req.pillId === agentId);
