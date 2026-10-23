@@ -11,6 +11,9 @@ import {
   ISLAND_SHORTCUTS, SHORTCUTS, SHORTCUT_TEXT, activeKeys, displayKeys, duplicates, effective,
   recordPress, type Binding,
 } from "../core/shortcuts";
+import {
+  FLOW_KEYS, FLOW_KEY_LABELS, MAX_LENGTH, addReplacement, addWord, flowKeyName, removeAt,
+} from "../core/flow";
 import { DEFAULT_SETTINGS, type Settings, type WebSearchChoice } from "../core/state";
 import { SOUND_NAMES } from "../core/sound";
 import {
@@ -1523,6 +1526,153 @@ const voiceEngineListeners: Partial<Record<VoiceEnginePart, (p: EngineProgress) 
 /** Asks Rust again what a part's row shows: the hearing model changed. */
 const voiceEngineRedraw: Partial<Record<VoiceEnginePart, () => void>> = {};
 
+// ── Flow dictation section ────────────────────────────────────────────────────
+
+/** Flow's keyboard hook is Windows only for now (src-tauri/src/flow/mod.rs). */
+const FLOW_HERE = navigator.userAgent.includes("Windows");
+
+function flowSection(): HTMLElement {
+  const change = (patch: Partial<Settings["flow"]>) => {
+    settings.flow = { ...settings.flow, ...patch };
+    return save();
+  };
+
+  const on = toggle(settings.flow.enabled, (v) => void change({ enabled: v }));
+  if (!FLOW_HERE) on.setAttribute("disabled", "");
+
+  const key = h("select", {}) as HTMLSelectElement;
+  for (const name of FLOW_KEYS) key.append(h("option", { value: name, text: FLOW_KEY_LABELS[name] }));
+  key.value = flowKeyName(settings.flow.key);
+  key.addEventListener("change", () => void change({ key: key.value }));
+
+  // Flow writes down what is said with the bundled engine: say so when it is not here yet.
+  const needsEngine = h("div", {
+    class: "notice warn",
+    text: t("Flow needs the speech engine: download it in Settings → Voice."),
+  });
+  needsEngine.style.display = "none";
+  void Bridge.voiceEngineStatus("hearing").then((s) => {
+    needsEngine.style.display = FLOW_HERE && s && !s.installed ? "" : "none";
+  });
+
+  return h(
+    "section",
+    {},
+    h("h2", {}, h("span", { text: t("Flow dictation") })),
+    h("div", {
+      class: "hint",
+      text: t("Hold a key anywhere, speak, and let go: the words are pasted where your cursor is. Tap it twice to talk hands-free; Esc cancels."),
+    }),
+    FLOW_HERE ? needsEngine : h("div", { class: "notice warn", text: t("Flow is only on Windows for now.") }),
+    h("div", { class: "row" }, h("label", { text: t("Dictate with a key") }), on),
+    h("div", { class: "row" }, h("label", { text: t("Key to hold") }), key),
+    h("div", {
+      class: "hint",
+      text: t("Right Alt is AltGr on many keyboard layouts, so it types characters there: pick another key if you use it."),
+    }),
+    h("div", {
+      class: "hint",
+      text: t("Peika looks at key presses on this computer only to know when you press this key, and Esc or another key while you are dictating. Nothing is recorded or stored; only the text is pasted."),
+    }),
+    h("div", { class: "subhead", text: t("Replacements") }),
+    h("div", {
+      class: "hint",
+      text: t("Words Peika writes another way: say “cloud code”, get “Claude Code”. Case and hyphens do not matter, and only whole words match."),
+    }),
+    ...replacementRows(change),
+    h("div", { class: "subhead", text: t("Dictionary") }),
+    h("div", {
+      class: "hint",
+      text: t("Words spelled your way: names, products, terms. When Peika hears one, it uses your capitals and hyphens."),
+    }),
+    ...dictionaryRows(change),
+  );
+}
+
+/** A small ✕ that takes an entry out of a list. */
+function removeButton(onClick: () => void): HTMLElement {
+  return h("button", { class: "flow-remove", text: "✕", title: t("Remove"), "aria-label": t("Remove"), onclick: onClick });
+}
+
+/** Runs `add` when Enter is pressed in `input`. */
+function onEnter(input: HTMLInputElement, add: () => void) {
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      add();
+    }
+  });
+}
+
+function replacementRows(change: (patch: Partial<Settings["flow"]>) => Promise<void>): HTMLElement[] {
+  const list = h("div", { class: "flow-list" });
+  const from = h("input", { type: "text", placeholder: t("You say"), maxlength: String(MAX_LENGTH) }) as HTMLInputElement;
+  const to = h("input", { type: "text", placeholder: t("Peika writes"), maxlength: String(MAX_LENGTH) }) as HTMLInputElement;
+
+  const draw = () => {
+    clear(list);
+    settings.flow.replacements.forEach(([said, written], i) => {
+      list.append(
+        h("div", { class: "flow-item" },
+          h("span", { class: "flow-text", text: said }),
+          h("span", { class: "flow-arrow", text: "→" }),
+          h("span", { class: "flow-text", text: written }),
+          removeButton(() => {
+            void change({ replacements: removeAt(settings.flow.replacements, i) });
+            draw();
+          }),
+        ),
+      );
+    });
+  };
+  const add = () => {
+    const next = addReplacement(settings.flow.replacements, from.value, to.value);
+    if (!next) return;
+    from.value = "";
+    to.value = "";
+    void change({ replacements: next });
+    draw();
+    from.focus();
+  };
+  onEnter(from, add);
+  onEnter(to, add);
+  draw();
+
+  return [list, h("div", { class: "row" }, from, to, h("button", { text: t("Add"), onclick: add }))];
+}
+
+function dictionaryRows(change: (patch: Partial<Settings["flow"]>) => Promise<void>): HTMLElement[] {
+  const list = h("div", { class: "flow-list" });
+  const word = h("input", { type: "text", placeholder: t("A word or name"), maxlength: String(MAX_LENGTH) }) as HTMLInputElement;
+
+  const draw = () => {
+    clear(list);
+    settings.flow.dictionary.forEach((entry, i) => {
+      list.append(
+        h("div", { class: "flow-item" },
+          h("span", { class: "flow-text", text: entry }),
+          removeButton(() => {
+            void change({ dictionary: removeAt(settings.flow.dictionary, i) });
+            draw();
+          }),
+        ),
+      );
+    });
+  };
+  const add = () => {
+    const next = addWord(settings.flow.dictionary, word.value);
+    if (!next) return;
+    word.value = "";
+    void change({ dictionary: next });
+    draw();
+    word.focus();
+  };
+  onEnter(word, add);
+  draw();
+
+  return [list, h("div", { class: "row" }, word, h("button", { text: t("Add"), onclick: add }))];
+}
+
 function shortcutsSection(initial: ShortcutsReport | null): HTMLElement {
   let report = initial;
   const list = h("div", { class: "shortcut-list" });
@@ -1879,6 +2029,7 @@ async function render() {
   shortcutsListener = null;
   // Built first: each is cut into pages at its sub-headings (splitAtSubheads).
   const [voiceMain, voiceWeb, voiceDebug] = splitAtSubheads(voiceSection());
+  const [flowMain, flowReplacements, flowDictionary] = splitAtSubheads(flowSection());
   const [shortcutsGlobal, shortcutsIsland] = splitAtSubheads(shortcutsSection(shortcutReport));
   // One page per leaf of the tree; only the one picked is shown (drawShell).
   const pages: Record<string, HTMLElement> = {
@@ -1894,6 +2045,9 @@ async function render() {
     "voice": page(voiceMain),
     "voice-web": page(voiceWeb),
     "voice-debug": page(voiceDebug),
+    "flow": page(flowMain),
+    "flow-replacements": page(flowReplacements),
+    "flow-dictionary": page(flowDictionary),
     "shortcuts": page(shortcutsGlobal),
     "shortcuts-island": page(shortcutsIsland),
     "about": page(
@@ -1919,6 +2073,7 @@ const TREE: [string, [string, string][]][] = [
   [N_("AI models"), [["chat-providers", N_("Chat providers")], ["local-models", N_("Local models")]]],
   [N_("Pills & integrations"), [["pills", N_("Active pills")], ["integrations", N_("Integrations")]]],
   [N_("Voice"), [["voice", N_("Voice")], ["voice-web", N_("Web answers")], ["voice-debug", N_("Debugging")]]],
+  [N_("Flow dictation"), [["flow", N_("Flow dictation")], ["flow-replacements", N_("Replacements")], ["flow-dictionary", N_("Dictionary")]]],
   [N_("Shortcuts"), [["shortcuts", N_("From anywhere")], ["shortcuts-island", N_("In the open island")]]],
   [N_("About"), [["about", N_("About")]]],
 ];

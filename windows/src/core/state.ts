@@ -13,6 +13,7 @@ import type { ApprovalPreview, FileDiff } from "./diff";
 import type { VoiceResult } from "../voice/runner";
 import type { Bindings } from "./shortcuts";
 import { DEFAULT_OUTFIT, type Outfit } from "../peika/wardrobe";
+import { DEFAULT_FLOW, type FlowPref } from "./flow";
 import { pillColor } from "./pill-colors";
 import { Spotify, musicCardShown, musicPlaying } from "./spotify";
 import { ApprovalQueue, type Queued } from "./approvals";
@@ -218,6 +219,8 @@ export interface Settings {
   cryptoCoins: string;
   /** Minutes away after which the island tells what happened meanwhile; 0 for never (island/away.ts). */
   awayMinutes: number;
+  /** Flow dictation: hold a key anywhere, speak, the words are pasted (core/flow.ts, flow/mod.rs). Off by default. */
+  flow: FlowPref;
   desktopPeika?: {
     onDesktop: boolean;
     spot: { x: number; y: number; space: string } | null;
@@ -263,6 +266,7 @@ export const DEFAULT_SETTINGS: Settings = {
   cryptoCurrency: "USD",
   cryptoCoins: "BTC, ETH, SOL",
   awayMinutes: 10,
+  flow: DEFAULT_FLOW,
 };
 
 type Listener = () => void;
