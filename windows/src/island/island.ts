@@ -18,7 +18,8 @@ import { t } from "../i18n/i18n";
 import { miniGridColumns } from "../core/pills";
 import { BotEngine, hexToRGB, stepBodyColor, type RGB } from "../peika/engine";
 import { Greeting } from "../peika/greeting";
-import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../peika/minibots";
+import { createMiniBot, miniBotsFast, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../peika/minibots";
+import { frameDelay, shouldDraw, type Motion } from "./frames";
 import { SeasonCache, parseOutfit } from "../peika/wardrobe";
 import { UploadCanvas } from "../upload/canvas";
 import { USC, UploadSeq } from "../upload/sequence";
@@ -116,7 +117,16 @@ export class Island {
   private seasons = new SeasonCache();
 
   private running = false;
+  /** The pending animation frame, to cancel it when the page stops being visible. */
+  private raf = 0;
+  /** The timer that sleeps between the frames of a slow loop (frames.ts `frameDelay`). */
+  private tick = 0;
+  /** When the last frame was drawn (skipped frames leave it, so `dt` spans them). */
   private lastFrame = 0;
+  /** Something asked for a frame since the last one drawn: draw the next one. */
+  private wake = true;
+  /** The current view's ticker was still animating at the last drawn frame. */
+  private viewTicking = false;
   private dirty = true;
   private canvasPx = 0;
 
@@ -209,6 +219,7 @@ export class Island {
       this.dirty = true;
       this.ensureRunning();
     });
+    document.addEventListener("visibilitychange", this.onVisibility);
   }
 
   /** The request has its answer: the card goes and the session carries on. */
@@ -1612,13 +1623,76 @@ export class Island {
   // ── Frame loop ──────────────────────────────────────────────────────────────
 
   ensureRunning() {
-    if (this.running) return;
+    // Even when running: a change must be drawn at once, not at the next slow tick.
+    this.wake = true;
+    if (this.running) {
+      // Asleep between two slow frames: this one is not to wait.
+      if (this.tick) {
+        window.clearTimeout(this.tick);
+        this.tick = 0;
+        this.raf = requestAnimationFrame(this.frame);
+      }
+      return;
+    }
     this.running = true;
     this.lastFrame = performance.now();
-    requestAnimationFrame(this.frame);
+    this.raf = requestAnimationFrame(this.frame);
+  }
+
+  /** Asks for the next animation frame, after a nap if only a slow loop moves. */
+  private next() {
+    const wait = frameDelay(this.motion(), performance.now() - this.lastFrame);
+    if (wait < 1) {
+      this.raf = requestAnimationFrame(this.frame);
+      return;
+    }
+    this.tick = window.setTimeout(() => {
+      this.tick = 0;
+      this.raf = requestAnimationFrame(this.frame);
+    }, wait);
+  }
+
+  /**
+   * Nothing to draw for a page nobody sees: the loop stops (the webview mostly
+   * stops it anyway) and starts again, drawing at once, when it shows.
+   */
+  private onVisibility = () => {
+    if (document.visibilityState === "hidden") {
+      if (this.raf) cancelAnimationFrame(this.raf);
+      if (this.tick) window.clearTimeout(this.tick);
+      this.raf = 0;
+      this.tick = 0;
+      this.running = false;
+    } else {
+      this.ensureRunning();
+    }
+  };
+
+  /** What moves right now, for frames.ts. Cheap: it is asked on every animation frame. */
+  private motion(): Motion {
+    return {
+      geometry: this.width.animating || this.height.animating || this.radius.animating,
+      bot: !this.botCx.settled || !this.botCy.settled || !this.botSize.settled,
+      greeting: State.mode === "expanded" && State.view === "greeting",
+      upload: UploadSeq.isActive,
+      view: this.viewTicking,
+      miniBots: miniBotsFast(),
+      engine: this.engine.fastMotion,
+      wake: this.wake,
+    };
   }
 
   private frame = (nowMs: number) => {
+    this.raf = 0;
+    // Only a slow loop is moving: most animation frames are skipped, and
+    // `lastFrame` stays on the last one drawn so the next `dt` covers the whole
+    // gap. Whatever starts moving is either seen here at once (a tween, a
+    // settling pose) or came with an event that called ensureRunning (wake).
+    if (!shouldDraw(this.motion(), nowMs - this.lastFrame)) {
+      this.next();
+      return;
+    }
+    this.wake = false;
     const dt = Math.min(0.05, (nowMs - this.lastFrame) / 1000);
     this.lastFrame = nowMs;
 
@@ -1659,6 +1733,7 @@ export class Island {
     tickMiniBots(dt);
     // A ticker scroll that loses its frames freezes mid-way, rows overlapping.
     const viewAnimating = this.views.get(State.view)?.tick?.(nowMs) === true;
+    this.viewTicking = viewAnimating;
     if (UploadSeq.isActive) this.stepSequence();
     this.updateCountdown(nowMs);
 
@@ -1677,7 +1752,7 @@ export class Island {
         greetingActive || this.engine.busy || UploadSeq.isActive || viewAnimating;
 
     if (busy) {
-      requestAnimationFrame(this.frame);
+      this.next();
     } else {
       this.running = false;
       Sound.idle();
