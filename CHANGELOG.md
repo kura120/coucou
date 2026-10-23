@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **The log** (Windows and Linux): Peika keeps its log file open instead of opening it for every line, and past about 1 MB it moves the old file to `peika.1.log` (replacing the one before) instead of deleting it, so the history just before a problem is kept. Same folder, same format, and it still never says what was heard or typed.
 - **The Peika window** (Windows and Linux): the Settings window is now Peika's own window, with three little Peikas walking along a band at the top (they stop when the window is hidden, and stand still with reduced motion). Launching Peika again opens it, and it shows in the taskbar while it is open. Every setting is where it was; the dictation and Notetaker pages will join it.
 - **Screen capture** (Windows), as on the Mac: `Ctrl+Alt+X` dims the screen, you drag out a part, and Peika swallows it. Its card can paste it into the window you were in, copy it, ask a new chat about it, or open it in Paint to draw on it. The image stays in Peika's temp folder only while the card has it, and nothing leaves the computer unless you ask the chat. Linux keeps the shortcut reserved.
 - Under the hood, for dictation and the Notetaker: the bundled speech engine, the microphone and the sentence cutter move out of voice into a shared speech service (`src-tauri/src/speech/`), with one rule about listening. While something else claims the microphone, "OK Peika" stands aside and comes back after. Voice works as before; the models and their folder are unchanged.
