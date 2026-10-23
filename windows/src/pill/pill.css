@@ -1,0 +1,146 @@
+/* The Flow pill (pill.html): a black capsule in the island's own style, at the
+   bottom of a see-through window. Hidden, the card is invisible and takes no
+   clicks; the window itself is parked off screen by Rust. */
+
+#pill {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  /* Room under the card for its shadow. */
+  padding-bottom: 18px;
+}
+
+.pill-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 196px;
+  max-width: 330px;
+  padding: 5px 16px 5px 8px;
+  border-radius: 30px;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transform: translateY(10px) scale(0.96);
+  pointer-events: none;
+  /* The island's overshoot (style.css .view.on). */
+  transition:
+    opacity 0.22s ease-out,
+    transform 0.3s cubic-bezier(0.3, 1.2, 0.4, 1);
+}
+
+.pill-card.on {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.pill-peika {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  margin: -8px -4px -8px 0;
+}
+
+.pill-middle {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.pill-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+}
+
+.pill-dots i {
+  display: block;
+  width: 4px;
+  height: 22px;
+  border-radius: 2px;
+  background: var(--cyan);
+  transform: scaleY(0.14);
+}
+
+.pill-card[data-state="locked"] .pill-dots i {
+  background: var(--green-2);
+}
+
+.pill-caption {
+  font: 500 11px/1.3 var(--font);
+  color: var(--dim);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+/* Writing it down: no voice to show, only the line. */
+.pill-card[data-state="working"] .pill-dots,
+.pill-card[data-state="message"] .pill-dots {
+  display: none;
+}
+
+.pill-card[data-state="working"] .pill-caption {
+  animation: pill-pulse 1.1s ease-in-out infinite;
+}
+
+/* A message is read, not glanced at. */
+.pill-card[data-state="message"] .pill-middle {
+  align-items: flex-start;
+  padding: 7px 0;
+}
+
+.pill-card[data-state="message"] .pill-caption {
+  font-size: 12px;
+  color: var(--ink);
+  text-align: start;
+}
+
+@keyframes pill-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Hands-free: the way to end it with the mouse. */
+.pill-actions {
+  display: none;
+  gap: 6px;
+  flex: none;
+}
+
+.pill-card[data-state="locked"] .pill-actions {
+  display: flex;
+}
+
+.pill-btn {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: default;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.pill-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.pill-btn.done {
+  background: var(--green);
+  color: #04130a;
+}
+
+.pill-btn.done:hover {
+  background: var(--green-2);
+}

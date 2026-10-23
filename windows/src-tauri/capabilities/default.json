@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "What Peika's windows are allowed to do. Everything that touches the OS goes through Peika's own commands.",
-  "windows": ["island", "settings", "peika", "toast"],
+  "windows": ["island", "settings", "peika", "toast", "pill"],
   "permissions": ["core:default", "autostart:default"]
 }

@@ -14,6 +14,7 @@ mod conversations;
 mod crypto;
 mod desktop;
 mod files;
+mod flow;
 mod github;
 mod hooks;
 mod i18n;
@@ -126,6 +127,7 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
     crypto::settings_saved(&app, &settings.active_integrations);
     spotify::sync(&app, &settings.active_integrations);
     voice::sync(&app, &settings);
+    flow::sync(&app, &settings);
     if shortcuts_changed {
         shortcuts::apply(&app, &settings.shortcuts);
     }
@@ -1085,6 +1087,9 @@ pub fn run() {
             speech::dictate::dictation_begin,
             speech::dictate::dictation_finish,
             speech::dictate::dictation_cancel,
+            flow::flow_pill_state,
+            flow::flow_pill_finish,
+            flow::flow_pill_cancel,
             voice_say,
         ])
         .setup(move |app| {
@@ -1126,6 +1131,7 @@ pub fn run() {
             integrations::start(handle.clone());
             spotify::sync(&handle, &loaded.active_integrations);
             voice::sync(&handle, &loaded);
+            flow::sync(&handle, &loaded);
             // A debug build started with PEIKA_DEVTOOLS=1 opens the island's developer console: its own
             // right-click menu stands in for the browser's, so there is no other way in. Never in a release.
             #[cfg(debug_assertions)]

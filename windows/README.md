@@ -326,6 +326,53 @@ quieter under the usual volume. He does not listen while he speaks, and he
 stops when the wake phrase is heard. English only, like listening: in another
 language the card says it. The voice's code is MIT and its model OpenRAIL-M.
 
+## Flow dictation
+
+Hold a key anywhere, speak, let go: the words are pasted where your cursor is.
+Windows only for now; it is off until you turn it on in **Settings… → Flow
+dictation**, and it needs the speech engine from **Settings → Voice** (Flow
+writes down what you say with the same engine, on this computer).
+
+| You do | Peika does |
+|---|---|
+| Hold **Right Ctrl** (or **Right Alt**, **Right Shift**: your choice) | Opens the microphone at once, so the first word is not lost, and shows a small pill with Peika and the level of your voice at the bottom of the screen you are on |
+| Let go | Writes down the rest, applies your replacements and dictionary, and pastes into the window that was in front when you pressed the key |
+| Tap the key twice, quickly | Hands-free: it keeps listening until you tap again, or click ✓ on the pill (✕ cancels) |
+| `Esc`, or any other key while holding (a shortcut such as `Ctrl+C`) | Cancels: nothing is pasted |
+
+The pill takes no focus (the words go to the window you were typing in), is not
+in the taskbar, and is out of sight between dictations. Right Alt is AltGr on
+many keyboard layouts, where it types characters: pick another key if you use it.
+
+**Replacements** (Settings → Flow dictation → Replacements): say "cloud code",
+get "Claude Code". Case and hyphens do not matter and only whole words match.
+**Dictionary**: names and terms spelled your way ("Supabase"): when Peika hears
+one it uses your capitals and hyphens. A word with symbols (such as "C++") is
+not matched.
+
+**Paste.** The words go on the clipboard as text (kept out of the clipboard
+history and the cloud clipboard), Peika sends Ctrl+V to the window, and about
+300 ms later the clipboard's previous text is put back, unless you copied
+something meanwhile. Only the text is saved and restored: an image or files
+you had copied are replaced by the words. Windows does not let a program that
+is not elevated type into one that is (UIPI): Peika checks first, leaves the
+words on the clipboard and says so in the pill, so you can paste them yourself.
+The same if the window you were in cannot be brought back.
+
+**Privacy.**
+- Nothing is recorded. The sound stays in memory only until it is written down;
+  the log says that a dictation happened, never what was said.
+- To know when you press the key, Flow installs a Windows keyboard hook, which
+  by its nature is told about every key press on the computer. Peika's hook
+  keeps none of them: it reports the state of the chosen key, and, only while
+  a dictation is under way, that Esc or another key was pressed (not which). It
+  never swallows or changes a key, and it is installed only while Flow is on:
+  switching Flow off removes it and the pill's window.
+- The microphone is open only while you hold the key (or are hands-free), and
+  "OK Peika" stands aside meanwhile.
+- Not yet: styles per app, snippets, history and statistics, and clean-up or
+  translation by a model. Flow pastes what was heard, with your replacements.
+
 ## Your pills
 
 **Settings… → Active pills** lists the tools you use, from the same catalog as
